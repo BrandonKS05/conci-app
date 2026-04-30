@@ -1,4 +1,161 @@
 {
-  "active_itinerary_id": null,
-  "itineraries": {}
+  "active_itinerary_id": "059faf17-1dfd-410f-86d4-becc18d26431",
+  "itineraries": {
+    "0a16fd41-40d2-49a3-a7f3-44a2265b37db": {
+      "id": "0a16fd41-40d2-49a3-a7f3-44a2265b37db",
+      "prompt": "I’m flying to San Francisco next Tuesday for two client meetings. Keep the schedule efficient, recommend a dinner spot near my hotel, and suggest one cultural activity if I have a free afternoon.",
+      "category": "travel",
+      "budget": "mid-range",
+      "guest_count": 1,
+      "location": "San Francisco",
+      "start_date": "Tuesday",
+      "end_date": null,
+      "time_hint": "afternoon",
+      "itinerary_items": [
+        {
+          "id": "d245de35-6aa4-4c1f-b390-62992c783241",
+          "slot_key": "flight-1",
+          "kind": "flight",
+          "provider_id": "f1",
+          "title": "Delta",
+          "details": "San Francisco",
+          "meta": "Tuesday · afternoon · mid-range",
+          "price": "$428",
+          "tone": "from-sky-50 via-white to-white",
+          "position": 0,
+          "status": "active"
+        },
+        {
+          "id": "07d2c0ae-a0f9-4705-9ac9-eb2f763c2b52",
+          "slot_key": "restaurant-1",
+          "kind": "restaurant",
+          "provider_id": "r1",
+          "title": "Luma House",
+          "details": "Contemporary American · SoMa",
+          "meta": "Tuesday · afternoon · Quiet corner tables, polished service, and a menu built for power dinners.",
+          "price": "$$$$",
+          "tone": "from-rose-50 via-white to-white",
+          "position": 1,
+          "status": "active"
+        },
+        {
+          "id": "cf867886-b942-4bc0-84b1-874d591bd0e1",
+          "slot_key": "activity-1",
+          "kind": "activity",
+          "provider_id": "a3",
+          "title": "Coffee tasting",
+          "details": "Financial District · Flexible",
+          "meta": "Tuesday · afternoon · A light, easy meetup option if the schedule shifts during the day.",
+          "price": "11:30 AM",
+          "tone": "from-lime-50 via-white to-white",
+          "position": 2,
+          "status": "active"
+        }
+      ],
+      "removed_items": [],
+      "selections": [],
+      "parsed_request": {
+        "category": "travel",
+        "flow_mode": "multi_step",
+        "uncertain": false,
+        "fallback_reason": "The request was broad or mixed, so the fallback treated it as general travel planning.",
+        "summary": "Trip request to San Francisco at afternoon",
+        "location": null,
+        "destination": "San Francisco",
+        "origin": null,
+        "date": "Tuesday",
+        "date_range": null,
+        "time": "afternoon",
+        "budget": null,
+        "party_size": null,
+        "cuisine": null,
+        "vibe": null,
+        "keywords": [
+          "travel",
+          "San Francisco",
+          "Tuesday",
+          "afternoon"
+        ]
+      },
+      "created_at": "2026-04-30T00:31:41.991Z"
+    },
+    "059faf17-1dfd-410f-86d4-becc18d26431": {
+      "id": "059faf17-1dfd-410f-86d4-becc18d26431",
+      "prompt": "I’m flying to San Francisco next Tuesday for two client meetings. Keep the schedule efficient, recommend a dinner spot near my hotel, and suggest one cultural activity if I have a free afternoon.",
+      "category": "travel",
+      "budget": "mid-range",
+      "guest_count": 1,
+      "location": "San Francisco",
+      "start_date": "Tuesday",
+      "end_date": null,
+      "time_hint": "afternoon",
+      "itinerary_items": [
+        {
+          "id": "8e7da2d2-633e-4c16-8728-2160dc6b6009",
+          "slot_key": "flight-1",
+          "kind": "flight",
+          "provider_id": "f1",
+          "title": "Delta",
+          "details": "San Francisco",
+          "meta": "Tuesday · afternoon · mid-range",
+          "price": "$428",
+          "tone": "from-sky-50 via-white to-white",
+          "position": 0,
+          "status": "active"
+        },
+        {
+          "id": "05eedec3-9a7b-4ef2-a811-4fa1a7d77bc3",
+          "slot_key": "restaurant-1",
+          "kind": "restaurant",
+          "provider_id": "r1",
+          "title": "Luma House",
+          "details": "Contemporary American · SoMa",
+          "meta": "Tuesday · afternoon · Quiet corner tables, polished service, and a menu built for power dinners.",
+          "price": "$$$$",
+          "tone": "from-rose-50 via-white to-white",
+          "position": 1,
+          "status": "active"
+        },
+        {
+          "id": "689bfadb-30f1-4719-a99c-40e8e2cfa7c6",
+          "slot_key": "activity-1",
+          "kind": "activity",
+          "provider_id": "a3",
+          "title": "Coffee tasting",
+          "details": "Financial District · Flexible",
+          "meta": "Tuesday · afternoon · A light, easy meetup option if the schedule shifts during the day.",
+          "price": "11:30 AM",
+          "tone": "from-lime-50 via-white to-white",
+          "position": 2,
+          "status": "active"
+        }
+      ],
+      "removed_items": [],
+      "selections": [],
+      "parsed_request": {
+        "category": "travel",
+        "flow_mode": "multi_step",
+        "uncertain": false,
+        "fallback_reason": "The request was broad or mixed, so the fallback treated it as general travel planning.",
+        "summary": "Trip request to San Francisco at afternoon",
+        "location": null,
+        "destination": "San Francisco",
+        "origin": null,
+        "date": "Tuesday",
+        "date_range": null,
+        "time": "afternoon",
+        "budget": null,
+        "party_size": null,
+        "cuisine": null,
+        "vibe": null,
+        "keywords": [
+          "travel",
+          "San Francisco",
+          "Tuesday",
+          "afternoon"
+        ]
+      },
+      "created_at": "2026-04-30T00:31:41.990Z"
+    }
+  }
 }
