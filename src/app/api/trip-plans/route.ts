@@ -28,6 +28,8 @@ export async function POST(request: Request) {
     id?: string;
     plan?: unknown;
     seedText?: string | null;
+    /** When true: save as draft without minting an invite (host setup dashboard next). */
+    hostSetupDraft?: boolean;
   };
 
   if (!body.plan || typeof body.plan !== "object") {
@@ -74,38 +76,47 @@ export async function POST(request: Request) {
       ? existing.invite_code.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6)
       : undefined;
 
-  let inviteCode = existingCode;
-  if (!inviteCode) {
+  const existingStatus = typeof existing?.status === "string" ? existing.status : null;
+  const hostSetupDraft = body.hostSetupDraft === true;
+  const finalized = existingStatus === "finalized";
+
+  let codeToSave: string | null =
+    existingCode?.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6) ?? null;
+  if (codeToSave && codeToSave.length !== 6) codeToSave = null;
+
+  if (!codeToSave && !hostSetupDraft && !finalized) {
     try {
-      inviteCode = await allocateUniqueInviteCode(svc);
+      const raw = await allocateUniqueInviteCode(svc);
+      codeToSave = String(raw).replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
     } catch (e) {
       console.error("[Conci] allocate invite code failed:", e);
       return NextResponse.json({ error: "Could not allocate invite code." }, { status: 500 });
     }
   }
 
-  const codeToSave = String(inviteCode).replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
-  if (codeToSave.length !== 6) {
-    console.error("[trip-plans POST] invalid invite_code after normalize:", inviteCode);
+  if (!hostSetupDraft && !finalized && (!codeToSave || codeToSave.length !== 6)) {
+    console.error("[trip-plans POST] invalid invite_code after normalize:", codeToSave);
     return NextResponse.json({ error: "Invalid invite code state." }, { status: 500 });
   }
 
-  const existingStatus = typeof existing?.status === "string" ? existing.status : null;
-  const nextStatus = existingStatus === "finalized" ? "finalized" : "voting";
+  const nextStatus =
+    finalized ? "finalized" : hostSetupDraft ? "draft" : "voting";
 
   const row = {
     id,
     plan: normalizedPlan,
     seed_text: seedText,
     user_id: user.id,
-    invite_code: codeToSave,
+    invite_code: codeToSave as string | null,
     status: nextStatus,
     updated_at: new Date().toISOString(),
   };
 
-  console.log("[trip-plans POST] upsert payload (invite_code must be present)", {
-    hasInviteCode: "invite_code" in row && row.invite_code === codeToSave,
-    invite_code: row.invite_code,
+  console.log("[trip-plans POST] upsert payload", {
+    hostSetupDraft,
+    hasInviteCode: Boolean(codeToSave),
+    invite_code: codeToSave,
+    status: nextStatus,
     keys: Object.keys(row),
   });
 
@@ -136,7 +147,7 @@ export async function POST(request: Request) {
   }
 
   let persistedCode = typeof fromDb?.invite_code === "string" ? fromDb.invite_code : null;
-  if (!persistedCode || persistedCode !== codeToSave) {
+  if (codeToSave && (!persistedCode || persistedCode !== codeToSave)) {
     const { error: patchErr } = await svc.from("trip_plans").update({ invite_code: codeToSave }).eq("id", id);
     if (patchErr) {
       console.error("[trip-plans POST] invite_code repair update failed:", patchErr.message);
@@ -146,14 +157,15 @@ export async function POST(request: Request) {
     }
   }
 
-  const savedCode = persistedCode ?? (typeof data?.invite_code === "string" ? data.invite_code : codeToSave);
+  const savedCode =
+    persistedCode ?? (typeof data?.invite_code === "string" ? data.invite_code : codeToSave ?? null);
 
   console.log("[trip-plans POST] invite_code written to Supabase", {
     tripId: id,
     upsertReturned: data,
     rowReadAfterSave: fromDb,
     finalInviteCode: savedCode,
-    display: formatInviteCodeDisplay(savedCode),
+    display: savedCode ? formatInviteCodeDisplay(savedCode) : null,
   });
 
   try {
@@ -164,6 +176,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     id: data?.id ?? id,
-    inviteCode: savedCode,
+    inviteCode: savedCode ?? null,
+    status: nextStatus,
   });
 }

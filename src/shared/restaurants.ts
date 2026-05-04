@@ -1,3 +1,4 @@
+import type { PlaceSpotlight } from "@/shared/place-preview";
 import type { TripPlan } from "@/shared/trip-plan";
 
 /** Venue option for collaboration (enriched chips; votes use stable `id`). */
@@ -65,6 +66,20 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
       openTableUrl,
     };
   });
+}
+
+/** Map a live recommendation chip to a saved spotlight / host-setup pin. */
+export function restaurantPickToSpotlight(r: RestaurantPick): PlaceSpotlight {
+  const ratingMatch = r.ratingDisplay.match(/^(\d+(?:\.\d+)?)/);
+  const rating = ratingMatch ? parseFloat(ratingMatch[1]!) : undefined;
+  return {
+    name: r.name,
+    mapsUrl: r.openTableUrl.startsWith("http") ? r.openTableUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name)}`,
+    rating: Number.isFinite(rating) ? rating : undefined,
+    priceRange: r.priceRange,
+    photoUrl: r.coverPhotoUrl ?? null,
+    address: r.neighborhood,
+  };
 }
 
 /** Overlay live API rows onto seeded venue cards; preserves vote ids (`eat-0`…). Uses first Places hit per hint (`eat-{i}-0`). */

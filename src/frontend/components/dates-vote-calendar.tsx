@@ -1,6 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactDatePickerCustomHeaderProps } from "react-datepicker";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   aggregatedTallyForBallotOption,
@@ -9,18 +11,68 @@ import {
   formatBallotProposalHeading,
   formatLocalIsoDate,
   formatLocalIsoRangeVote,
+  inferCalendarOpenDateFromDateOptions,
   inferDefaultYearFromDateOptions,
+  isDayInRange,
   latestParsedDay,
   listCustomVotesOutsideHostSuggestions,
   localDayTime,
   parseDateOptionToRange,
   startOfLocalDay,
   tallyDateStringVotes,
+  votesCoveringCalendarDay,
 } from "@/shared/date-option-parse";
+import "./dates-vote-calendar.css";
 
-/** Native date controls — `react-datepicker` inline range was failing to render in production (blank UI). */
-const dateInputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-500/50 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]";
+/** Client-only load avoids SSR/hydration issues that left the inline calendar blank in Next.js. */
+const InlineRangeDatePicker = dynamic(() => import("@/frontend/components/dates-range-picker-inline"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="flex min-h-[min(380px,50vh)] w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 text-sm text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-neutral-400"
+      role="status"
+      aria-live="polite"
+    >
+      Loading calendar…
+    </div>
+  ),
+});
+
+function RangePickerHeader({
+  monthDate,
+  decreaseMonth,
+  increaseMonth,
+  prevMonthButtonDisabled,
+  nextMonthButtonDisabled,
+}: ReactDatePickerCustomHeaderProps) {
+  return (
+    <div className="conci-datepicker-custom-header">
+      <span className="conci-datepicker-month-title">
+        {monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+      </span>
+      <div className="conci-datepicker-nav">
+        <button
+          type="button"
+          className="conci-datepicker-nav-btn"
+          aria-label="Previous month"
+          disabled={prevMonthButtonDisabled}
+          onClick={decreaseMonth}
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          className="conci-datepicker-nav-btn"
+          aria-label="Next month"
+          disabled={nextMonthButtonDisabled}
+          onClick={increaseMonth}
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function DatesVoteCalendar({
   decisionKey,
@@ -75,34 +127,29 @@ export function DatesVoteCalendar({
     return new Date(Math.max(forward, localDayTime(l) + 120 * 86400000));
   }, [parsed]);
 
-  const minIso = formatLocalIsoDate(minNav);
-  const maxIso = formatLocalIsoDate(maxNav);
+  const calendarOpenDate = useMemo(
+    () => inferCalendarOpenDateFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
 
-  const [nativeStart, setNativeStart] = useState("");
-  const [nativeEnd, setNativeEnd] = useState("");
+  const calendarMountKey = useMemo(
+    () => `${options.join("\u001f")}|${formatLocalIsoDate(calendarOpenDate)}`,
+    [options, calendarOpenDate]
+  );
+
+  const [rangeDraft, setRangeDraft] = useState<[Date | null, Date | null]>([null, null]);
 
   const cast = (option: string) => {
     onVote({ decisionKey, kind: "dates", option });
   };
 
-  /** Sync inputs when vote loads from collab — don’t clear when mine is empty (avoids wiping a selection before POST returns). */
   useEffect(() => {
     const m = mine?.trim() ?? "";
     if (!m) return;
     const r = parseDateOptionToRange(m, y0);
     if (!r) return;
-    setNativeStart(formatLocalIsoDate(r.start));
-    setNativeEnd(formatLocalIsoDate(r.end));
+    setRangeDraft([r.start, r.end]);
   }, [mine, y0]);
-
-  function tryCastNativeRange(startStr: string, endStr: string) {
-    if (busy || !startStr || !endStr || endStr < startStr) return;
-    const start = new Date(`${startStr}T12:00:00`);
-    const end = new Date(`${endStr}T12:00:00`);
-    const canon = formatLocalIsoRangeVote(start, end);
-    if (canon === (mine?.trim() ?? "")) return;
-    cast(canon);
-  }
 
   const rangeSummaries = useMemo(() => {
     const hostRows = parsed.map(({ option, start, end }) => ({
@@ -123,71 +170,97 @@ export function DatesVoteCalendar({
     [rangeSummaries]
   );
 
+  function dayMatchesMine(d: Date): boolean {
+    if (!mine || !mine.trim()) return false;
+    const rMine = parseDateOptionToRange(mine.trim(), y0);
+    if (rMine && isDayInRange(d, rMine.start, rMine.end)) return true;
+    const row = parsed.find((p) => p.option === mine);
+    if (row && isDayInRange(d, row.start, row.end)) return true;
+    return formatLocalIsoDate(d) === mine.trim();
+  }
+
+  function onRangeCalendarChange(upd: [Date | null, Date | null] | null): void {
+    if (busy) return;
+    if (!upd) {
+      setRangeDraft([null, null]);
+      return;
+    }
+    const [start, end] = upd;
+    setRangeDraft(upd);
+    if (start != null && end != null) {
+      const ordered =
+        localDayTime(start) <= localDayTime(end) ? { s: start, e: end } : { s: end, e: start };
+      const canon = formatLocalIsoRangeVote(ordered.s, ordered.e);
+      if (canon !== (mine?.trim() ?? "")) {
+        cast(canon);
+      }
+    }
+  }
+
   return (
     <div className="space-y-4">
       {hideUnmappedBallotChips && !(mine ?? "").trim() ? (
         <p className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/45 dark:bg-amber-950/35 dark:text-amber-100">
-          The host suggested a loose timing window — choose a start and end date below.
-          Your vote submits when both are set.
+          The host suggested a loose timing window — click a start day on the calendar, then click the end day to set your
+          range.
         </p>
       ) : null}
       <p className="text-sm text-slate-600 dark:text-neutral-400">
         {embeddedUnderHostProposal ? (
           <>
-            Pick a start and end date below (same day twice = one-day trip). Your vote saves as soon as both are set.
-            Group needs {voterN}/{quorum}+ votes to lock.
+            Click your first date, then click the second (inclusive range). Tap the same day twice for a one-day trip. Your
+            vote saves once the range is complete. Group needs {voterN}/{quorum}+ votes to lock.
           </>
         ) : hideUnmappedBallotChips ? (
           <>
-            Choose start and end dates below (same day for a single-night trip). Your vote saves when both fields are set.
-            Group needs {voterN}/{quorum}+ votes to lock.
+            Same calendar — first click starts the range, second click completes it (same day twice = one-night trip).
+            Your vote submits when both ends are set. Group needs {voterN}/{quorum}+ votes to lock.
           </>
         ) : (
           <>
-            Votes: {voterN}/{quorum}+ to lock. Set start and end dates below (both inclusive; use one day twice for a
+            Votes: {voterN}/{quorum}+ to lock. Use one calendar — click start date, then end date (tap one day twice for a
             one-day trip).
           </>
         )}
       </p>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
-            Start
-            <input
-              type="date"
-              className={dateInputClass}
-              min={minIso}
-              max={maxIso}
-              disabled={busy}
-              value={nativeStart}
-              onChange={(e) => {
-                const v = e.target.value;
-                setNativeStart(v);
-                tryCastNativeRange(v, nativeEnd);
-              }}
-            />
-          </label>
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
-            End <span className="font-normal text-slate-400">(same as start for one day)</span>
-            <input
-              type="date"
-              className={dateInputClass}
-              min={nativeStart ? nativeStart : minIso}
-              max={maxIso}
-              disabled={busy}
-              value={nativeEnd}
-              onChange={(e) => {
-                const v = e.target.value;
-                setNativeEnd(v);
-                tryCastNativeRange(nativeStart, v);
-              }}
-            />
-          </label>
+      <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
+        <div className="conci-datepicker-centered [&_.react-datepicker]:min-h-[17rem]">
+          <InlineRangeDatePicker
+            key={calendarMountKey}
+            inline
+            selectsRange
+            allowSameDay
+            swapRange
+            shouldCloseOnSelect={false}
+            openToDate={calendarOpenDate}
+            startDate={rangeDraft[0]}
+            endDate={rangeDraft[1]}
+            onChange={onRangeCalendarChange}
+            minDate={minNav}
+            maxDate={maxNav}
+            disabled={busy}
+            calendarStartDay={0}
+            calendarClassName="conci-datepicker-calendar"
+            wrapperClassName="conci-datepicker-wrapper"
+            renderCustomHeader={(p) => <RangePickerHeader {...p} />}
+            renderCustomDayName={({ shortName }) => (
+              <abbr className="conci-datepicker-week-abbr" title={shortName}>
+                {shortName.charAt(0)}
+              </abbr>
+            )}
+            dayClassName={(d: Date) => {
+              const parts: string[] = [];
+              if (votesCoveringCalendarDay(d, tally, y0) > 0) parts.push("conci-datepicker-day--votes");
+              if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
+              return parts.join(" ");
+            }}
+            renderDayContents={(day: number) => <span className="conci-datepicker-day-num">{day}</span>}
+          />
         </div>
 
         {rangeSummariesWithVotes.length > 0 ? (
-          <ul className="mt-4 max-w-[20rem] space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10 sm:mx-auto">
+          <ul className="conci-datepicker-range-totals mt-4 max-w-[20rem] space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10 sm:mx-auto">
             {rangeSummariesWithVotes.map(({ key, label, votes: v }) => (
               <li key={key} className="flex items-baseline justify-between gap-3 text-xs">
                 <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
@@ -230,7 +303,7 @@ export function DatesVoteCalendar({
 
       {parsed.length === 0 && unmapped.length === 0 ? (
         <p className="text-sm text-slate-600 dark:text-neutral-400">
-          No date suggestions on the ballot — pick any range with the dates above.
+          No date suggestions on the ballot — pick any range on the calendar above.
         </p>
       ) : null}
 
@@ -354,7 +427,8 @@ export function DatesSingleProposalMemberVote({
       </div>
 
       <p className="text-sm text-slate-600 dark:text-neutral-400">
-        The date fields are below — selecting a range replaces your vote with that availability window.
+        The calendar is below — click two dates for your range (or the same date twice). That replaces your vote with that
+        availability window.
       </p>
 
       <div

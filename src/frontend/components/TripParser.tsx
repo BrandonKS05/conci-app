@@ -383,6 +383,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           id: persistClientId.current,
           plan,
           seedText: seedMessage,
+          hostSetupDraft: true,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -408,7 +409,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         return;
       }
       if (body.id) {
-        router.replace(`/trip/${body.id}`);
+        router.replace(`/trip/${body.id}/setup`);
       }
     } catch (e) {
       console.error("[Conci Supabase] Save plan request threw:", e);

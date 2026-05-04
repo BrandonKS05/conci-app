@@ -12,6 +12,8 @@ export type SavedTripListItem = {
   location: string | null;
   datesLabel: string;
   vibes: string[];
+  /** When `draft`, the View link routes to host setup (`/trip/.../setup`). */
+  lifecycleStatus?: "draft" | "voting" | "finalized";
 };
 
 function TrashIcon({ className }: { className?: string }) {
@@ -142,10 +144,14 @@ export function SavedTripsList({
               </div>
               <div className="flex shrink-0 flex-row gap-2 sm:flex-col sm:items-stretch">
                 <Link
-                  href={`/trip/${trip.id}`}
+                  href={
+                    trip.lifecycleStatus === "draft"
+                      ? `/trip/${trip.id}/setup`
+                      : `/trip/${trip.id}`
+                  }
                   className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-white dark:hover:bg-dm-page"
                 >
-                  View
+                  {trip.lifecycleStatus === "draft" ? "Finish setup" : "View"}
                 </Link>
                 {showDelete ? (
                   <button

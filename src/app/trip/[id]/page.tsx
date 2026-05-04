@@ -87,6 +87,11 @@ export default async function SavedTripPlanPage({
   const tripStatus = parseTripPlanStatus(data.status);
   const isHost = access.isHost;
 
+  if (tripStatus === "draft") {
+    if (!isHost) notFound();
+    redirect(`/trip/${id}/setup`);
+  }
+
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
   let memberNames: string[] = [];
   try {

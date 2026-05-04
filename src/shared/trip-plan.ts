@@ -1,5 +1,11 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import { looseDateOptionOverlapsUserText } from "@/shared/date-option-parse";
+import {
+  formatLocalIsoDate,
+  inferDefaultYearFromDateOptions,
+  looseDateOptionOverlapsUserText,
+  parseDateOptionToRange,
+  startOfLocalDay,
+} from "@/shared/date-option-parse";
 import { parseItineraryLiveCuration, type ItineraryLiveCuration } from "@/shared/itinerary-live-curation";
 
 /** Narrowed votes the app surfaced (≤3 options each). Omit or empty = no poll for that axis. */
@@ -35,6 +41,25 @@ export function guaranteedPlanTitle(
   return "Your trip";
 }
 
+/** Pins for host pre-publish setup (calendar restaurants). */
+export type HostRestaurantPin = {
+  dateIso: string;
+  place: PlaceSpotlight;
+  /** When false the host removed this suggestion for that day. */
+  kept: boolean;
+};
+
+/**
+ * Persisted while `trip_plans.status === 'draft'`: concrete range, hotel, restaurant pins before invite is minted.
+ */
+export type HostSetupState = {
+  tripRange?: { startIso: string; endIso: string } | null;
+  restaurantPins?: HostRestaurantPin[];
+  hotel?: PlaceSpotlight | null;
+  /** Optional UX flag for completion meter only (does not gate publish). */
+  experiencesOutlined?: boolean;
+};
+
 export type TripPlan = {
   title: string;
   location: string | null;
@@ -48,6 +73,8 @@ export type TripPlan = {
   polls?: TripPolls;
   /** Named venues the user confirmed during chat (hotels, restaurants, activities). */
   spotlights?: PlaceSpotlight[];
+  /** Host dashboard state (draft trips). */
+  hostSetup?: HostSetupState;
   /**
    * Curated live rows (restaurants / experiences / flights): keys the group kept on the trip vs dismissed.
    * See `@/shared/itinerary-live-curation` for key format.
@@ -92,26 +119,85 @@ function normalizePolls(plan: Record<string, unknown>): TripPolls | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+export function spotlightFromUnknown(row: unknown): PlaceSpotlight | null {
+  if (!row || typeof row !== "object") return null;
+  const o = row as Record<string, unknown>;
+  const name = typeof o.name === "string" ? o.name.trim() : "";
+  if (!name) return null;
+  const mapsUrl = typeof o.mapsUrl === "string" && o.mapsUrl.startsWith("http") ? o.mapsUrl : "";
+  if (!mapsUrl) return null;
+  return {
+    name,
+    mapsUrl,
+    rating: typeof o.rating === "number" ? o.rating : undefined,
+    reviewCount: typeof o.reviewCount === "number" ? o.reviewCount : undefined,
+    address: typeof o.address === "string" ? o.address : undefined,
+    priceRange: typeof o.priceRange === "string" ? o.priceRange : undefined,
+    photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
+    sourceQuery: typeof o.sourceQuery === "string" ? o.sourceQuery : undefined,
+  };
+}
+
+export function parseHostSetup(raw: unknown): HostSetupState | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const h = raw as Record<string, unknown>;
+  let tripRange: { startIso: string; endIso: string } | null | undefined;
+  const tr = h.tripRange;
+  if (tr === null) {
+    tripRange = null;
+  } else if (tr && typeof tr === "object") {
+    const o = tr as Record<string, unknown>;
+    const startIso = typeof o.startIso === "string" ? o.startIso : "";
+    const endIso = typeof o.endIso === "string" ? o.endIso : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(startIso) && /^\d{4}-\d{2}-\d{2}$/.test(endIso)) {
+      tripRange = { startIso, endIso };
+    }
+  }
+
+  let hotel: PlaceSpotlight | null | undefined;
+  if (h.hotel === null) hotel = null;
+  else hotel = spotlightFromUnknown(h.hotel) ?? undefined;
+
+  const pinsRaw = h.restaurantPins;
+  let restaurantPins: HostRestaurantPin[] | undefined;
+  if (Array.isArray(pinsRaw) && pinsRaw.length) {
+    const pins: HostRestaurantPin[] = [];
+    for (const row of pinsRaw) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const dateIso = typeof o.dateIso === "string" ? o.dateIso.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) continue;
+      const place = spotlightFromUnknown(o.place);
+      if (!place) continue;
+      const kept = typeof o.kept === "boolean" ? o.kept : true;
+      pins.push({ dateIso, place, kept });
+    }
+    if (pins.length) restaurantPins = pins;
+  }
+
+  const experiencesOutlined = typeof h.experiencesOutlined === "boolean" ? h.experiencesOutlined : undefined;
+
+  const any =
+    tripRange !== undefined ||
+    restaurantPins ||
+    hotel !== undefined ||
+    experiencesOutlined !== undefined;
+  if (!any) return undefined;
+
+  const out: HostSetupState = {};
+  if (tripRange !== undefined) out.tripRange = tripRange;
+  if (restaurantPins) out.restaurantPins = restaurantPins;
+  if (hotel !== undefined) out.hotel = hotel ?? null;
+  if (experiencesOutlined !== undefined) out.experiencesOutlined = experiencesOutlined;
+  return out;
+}
+
 function parseSpotlights(raw: unknown): PlaceSpotlight[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   const out: PlaceSpotlight[] = [];
   for (const row of raw) {
-    if (!row || typeof row !== "object") continue;
-    const o = row as Record<string, unknown>;
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (!name) continue;
-    const mapsUrl = typeof o.mapsUrl === "string" && o.mapsUrl.startsWith("http") ? o.mapsUrl : "";
-    if (!mapsUrl) continue;
-    out.push({
-      name,
-      mapsUrl,
-      rating: typeof o.rating === "number" ? o.rating : undefined,
-      reviewCount: typeof o.reviewCount === "number" ? o.reviewCount : undefined,
-      address: typeof o.address === "string" ? o.address : undefined,
-      priceRange: typeof o.priceRange === "string" ? o.priceRange : undefined,
-      photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
-      sourceQuery: typeof o.sourceQuery === "string" ? o.sourceQuery : undefined,
-    });
+    const one = spotlightFromUnknown(row);
+    if (one) out.push(one);
   }
   return out.length ? out : undefined;
 }
@@ -404,8 +490,136 @@ export function normalizePlan(value: unknown): TripPlan {
     polls: normalizePolls(plan),
     spotlights: parseSpotlights(plan.spotlights),
     itineraryLiveCuration: parseItineraryLiveCuration(plan.itineraryLiveCuration),
+    hostSetup: parseHostSetup(plan.hostSetup),
     nextStep: typeof plan.nextStep === "string" ? plan.nextStep : null,
     confidence: typeof plan.confidence === "number" ? Math.max(0, Math.min(1, plan.confidence)) : 0,
+  };
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** First calendar range implied by `plan.dates.options`, or null when copy is too vague. */
+export function inferredTripRangeFromPlanDates(plan: TripPlan, fallbackYear: number): { startIso: string; endIso: string } | null {
+  const y0 = inferDefaultYearFromDateOptions(plan.dates.options, fallbackYear);
+  for (const opt of plan.dates.options) {
+    const r = parseDateOptionToRange(opt, y0);
+    if (r) {
+      return { startIso: formatLocalIsoDate(r.start), endIso: formatLocalIsoDate(r.end) };
+    }
+  }
+  return null;
+}
+
+export function parseLocalIsoDate(iso: string): Date | null {
+  if (!ISO_DAY.test(iso)) return null;
+  const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return null;
+  const dt = startOfLocalDay(new Date(y, m - 1, d, 12, 0, 0, 0));
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** Inclusive list of yyyy-mm-dd between start and end (invalid / wrong order → []). */
+export function enumerateLocalIsoDays(startIso: string, endIso: string): string[] {
+  const a = parseLocalIsoDate(startIso);
+  const b = parseLocalIsoDate(endIso);
+  if (!a || !b) return [];
+  if (a.getTime() > b.getTime()) return [];
+  const out: string[] = [];
+  let cur = startOfLocalDay(a);
+  const end = startOfLocalDay(b);
+  while (cur.getTime() <= end.getTime()) {
+    out.push(formatLocalIsoDate(cur));
+    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 12, 0, 0, 0);
+  }
+  return out;
+}
+
+export function hostHasConcreteTripRange(plan: TripPlan): boolean {
+  const hs = plan.hostSetup?.tripRange;
+  if (hs?.startIso && hs?.endIso && ISO_DAY.test(hs.startIso) && ISO_DAY.test(hs.endIso)) {
+    const a = parseLocalIsoDate(hs.startIso);
+    const b = parseLocalIsoDate(hs.endIso);
+    return !!(a && b && a.getTime() <= b.getTime());
+  }
+  return false;
+}
+
+export function hostHasHotel(plan: TripPlan): boolean {
+  const h = plan.hostSetup?.hotel;
+  return !!(h?.name?.trim() && h.mapsUrl?.startsWith("http"));
+}
+
+export function hostHasKeptRestaurant(plan: TripPlan): boolean {
+  const pins = plan.hostSetup?.restaurantPins ?? [];
+  return pins.some((p) => p.kept && p.place.mapsUrl.startsWith("http"));
+}
+
+export function isHostPublishReady(plan: TripPlan): boolean {
+  return hostHasConcreteTripRange(plan) && hostHasHotel(plan) && hostHasKeptRestaurant(plan);
+}
+
+/** 0–100 from the three publish requirements only (experiences tracked separately in the UI). */
+export function hostSetupCompletionPercent(plan: TripPlan): number {
+  let n = 0;
+  if (hostHasConcreteTripRange(plan)) n += 1;
+  if (hostHasHotel(plan)) n += 1;
+  if (hostHasKeptRestaurant(plan)) n += 1;
+  return Math.round((n / 3) * 100);
+}
+
+function dedupeSpotlights(urls: Set<string>, next: PlaceSpotlight[]): PlaceSpotlight[] {
+  const added: PlaceSpotlight[] = [];
+  for (const s of next) {
+    const key = s.mapsUrl.trim().toLowerCase();
+    if (!urls.has(key)) {
+      urls.add(key);
+      added.push(s);
+    }
+  }
+  return added;
+}
+
+/**
+ * Apply publish-time merges: sync `dates`, fold host picks into `spotlights`, clear transient `hostSetup`.
+ */
+export function planAfterHostPublish(plan: TripPlan): TripPlan {
+  const range = plan.hostSetup?.tripRange;
+  const startIso = range?.startIso ?? "";
+  const endIso = range?.endIso ?? "";
+  const hs = plan.hostSetup;
+  const pins = (hs?.restaurantPins ?? []).filter((p) => p.kept);
+  const hotel = hs?.hotel;
+
+  const urls = new Set((plan.spotlights ?? []).map((s) => s.mapsUrl.trim().toLowerCase()));
+  const folded: PlaceSpotlight[] = [...(plan.spotlights ?? [])];
+  if (hotel?.name && hotel.mapsUrl.startsWith("http")) {
+    folded.push(...dedupeSpotlights(urls, [hotel]));
+  }
+  folded.push(...dedupeSpotlights(urls, pins.map((p) => p.place)));
+
+  let dates = { ...plan.dates };
+  if (ISO_DAY.test(startIso) && ISO_DAY.test(endIso)) {
+    const a = parseLocalIsoDate(startIso);
+    const b = parseLocalIsoDate(endIso);
+    if (a && b && a.getTime() <= b.getTime()) {
+      const opt =
+        startIso === endIso
+          ? startIso
+          : `${startIso} to ${endIso}`;
+      dates = {
+        confirmed: true,
+        options: [opt],
+      };
+    }
+  }
+
+  const { hostSetup: _discard, ...rest } = plan;
+  void _discard;
+  return {
+    ...rest,
+    dates,
+    spotlights: folded.length ? folded : undefined,
+    hostSetup: undefined,
   };
 }
 

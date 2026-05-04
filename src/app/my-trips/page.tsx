@@ -6,6 +6,7 @@ import { SavedTripsList, type SavedTripListItem } from "@/frontend/components/sa
 import { SiteShell } from "@/frontend/components/site-shell";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
+import { parseTripPlanStatus, type TripPlanStatus } from "@/shared/trip-status";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,14 @@ function datesLabelFromPlan(plan: TripPlan): string {
   return "Dates TBD";
 }
 
-function mapRow(row: { id: string; plan: unknown; created_at: string | null }): SavedTripListItem {
+function mapRow(row: {
+  id: string;
+  plan: unknown;
+  created_at: string | null;
+  status?: string | null;
+}): SavedTripListItem {
   const plan = normalizePlan(row.plan);
+  const lifecycleStatus: TripPlanStatus = parseTripPlanStatus(row.status);
   return {
     id: row.id,
     createdAt: row.created_at ?? new Date().toISOString(),
@@ -25,6 +32,7 @@ function mapRow(row: { id: string; plan: unknown; created_at: string | null }): 
     location: plan.location,
     datesLabel: datesLabelFromPlan(plan),
     vibes: plan.vibe,
+    lifecycleStatus,
   };
 }
 
@@ -43,7 +51,7 @@ export default async function MyTripsPage() {
 
   const { data: hostedRows, error: hostedErr } = await supabase
     .from("trip_plans")
-    .select("id, plan, created_at")
+    .select("id, plan, created_at, status")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
