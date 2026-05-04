@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { allocateUniqueInviteCode, formatInviteCodeDisplay } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { fetchSubscriptionTierForUser, userCanCreateTrips } from "@/backend/subscription-tier";
 import { ensureHostMembership } from "@/backend/trip-memberships";
 import {
   normalizePlan,
@@ -72,6 +73,22 @@ export async function POST(request: Request) {
     .select("user_id, invite_code, status")
     .eq("id", id)
     .maybeSingle();
+
+  const isNewTrip = !existing;
+  if (isNewTrip) {
+    const tier = await fetchSubscriptionTierForUser(svc, user.id);
+    if (!userCanCreateTrips(tier)) {
+      return NextResponse.json(
+        {
+          error: "Subscription required",
+          code: "subscription_required",
+          detail:
+            "You're on the free plan — upgrade to Host or Host Pro to create and share trips.",
+        },
+        { status: 402 }
+      );
+    }
+  }
 
   if (existing?.user_id && existing.user_id !== user.id) {
     return NextResponse.json({ error: "Forbidden", detail: "This trip belongs to another account." }, { status: 403 });

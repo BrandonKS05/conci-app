@@ -1,6 +1,7 @@
 "use client";
 
 import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
+import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
@@ -126,15 +127,6 @@ export function LandingTwPlusHero() {
         </div>
 
         <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
-          <div className="hidden sm:mb-8 sm:flex sm:justify-center">
-            <div className="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-600 ring-1 ring-gray-900/10 transition hover:ring-gray-900/20 dark:bg-slate-800/50 dark:text-slate-300 dark:ring-white/15 dark:hover:ring-white/25">
-              Shareable trip plans for messy group chats.{" "}
-              <a href="#example" className="font-semibold text-indigo-600 dark:text-indigo-400">
-                <span aria-hidden="true" className="absolute inset-0" />
-                See an example <span aria-hidden="true">&rarr;</span>
-              </a>
-            </div>
-          </div>
           <div className="text-center">
             <h1 className="font-display text-5xl font-semibold tracking-tight text-balance text-gray-900 dark:text-white sm:text-7xl">
               Turn messy group chats into a real plan
@@ -158,6 +150,41 @@ export function LandingTwPlusHero() {
               >
                 See an example <span aria-hidden="true">→</span>
               </a>
+            </div>
+
+            <div className="mt-12 flex flex-col items-center sm:mt-14">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-500">
+                Partnered with
+              </p>
+              <ul className="mt-5 flex list-none flex-wrap items-center justify-center gap-x-10 gap-y-6 px-2">
+                <li className="flex h-14 shrink-0 items-center">
+                  <Image
+                    src="/partners/stanford.svg"
+                    alt="Stanford University"
+                    width={52}
+                    height={78}
+                    className="h-14 w-auto max-w-[4.5rem]"
+                  />
+                </li>
+                <li className="flex h-9 shrink-0 items-center sm:h-10">
+                  <Image
+                    src="/partners/uchicago.svg"
+                    alt="University of Chicago"
+                    width={250}
+                    height={63}
+                    className="h-9 w-auto max-w-[min(92vw,13rem)] sm:h-10 sm:max-w-[14rem]"
+                  />
+                </li>
+                <li className="flex h-10 shrink-0 items-center">
+                  <Image
+                    src="/partners/vanderbilt.svg"
+                    alt="Vanderbilt University"
+                    width={200}
+                    height={48}
+                    className="h-10 w-auto max-w-[min(92vw,12rem)]"
+                  />
+                </li>
+              </ul>
             </div>
           </div>
         </div>
