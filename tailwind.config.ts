@@ -1,18 +1,33 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
-    "./app/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./lib/**/*.{ts,tsx}",
+    "./src/app/**/*.{ts,tsx}",
+    "./src/frontend/**/*.{ts,tsx}",
+    "./src/backend/**/*.{ts,tsx}",
+    "./src/shared/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
       fontFamily: {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: [
+          "var(--font-display)",
+          "Georgia",
+          "Cambria",
+          "Times New Roman",
+          "Times",
+          "serif",
+        ],
       },
       colors: {
+        /** Dark mode surfaces (with `class` strategy + `html.dark`) */
+        dm: {
+          page: "#0f0f0f",
+          elevated: "#111111",
+          card: "#1a1a1a",
+        },
         ink: "#101828",
         paper: "#F8FAFC",
         sand: "#E7EBF3",
