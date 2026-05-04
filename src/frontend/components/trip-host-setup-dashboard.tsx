@@ -25,7 +25,6 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
-import { HostSetupAddHotelModal } from "@/frontend/components/host-setup-add-hotel-modal";
 import {
   HostSetupPinDetailModal,
   HostSetupRemovePinConfirm,
@@ -142,7 +141,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
-  const [addHotelOpen, setAddHotelOpen] = useState(false);
   const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
   const [removePinConfirm, setRemovePinConfirm] = useState<{
     kind: "meal" | "activity";
@@ -184,21 +182,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     if (hinted) return hinted.month;
     return new Date().getMonth();
   });
-
-  /** Debug: log calendar defaulting chain once on mount (remove after fixing date default). */
-  useEffect(() => {
-    const y0 = new Date().getFullYear();
-    const bestEffort = tripRangeBestEffortFromPlanDates(initialPlan, y0);
-    // eslint-disable-next-line no-console -- intentional debug: trace why calendar month may not match parser dates
-    console.log("[HostSetup] calendar defaulting chain (page load)", {
-      "plan.dates.options": initialPlan.dates.options,
-      "hostSetup.tripRange": initialPlan.hostSetup?.tripRange ?? null,
-      "tripRangeBestEffortFromPlanDates(plan)": bestEffort,
-      calYear,
-      calMonth,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to snapshot first-paint calendar + initial plan from server
-  }, []);
 
   /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
   const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
@@ -343,7 +326,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         scope === "full" ? "full" : "partial"
       );
       void persistHostSetup({ hotelStays, hotel });
-      setAddHotelOpen(false);
     },
     [
       selectedDayIso,
@@ -786,7 +768,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           "group/cell relative flex h-full min-h-[7.5rem] cursor-pointer flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
                           inTripRangeCell(dom)
-                            ? "bg-teal-50/90 hover:bg-teal-50 dark:bg-teal-950/35 dark:hover:bg-teal-950/45"
+                            ? "bg-slate-100/65 hover:bg-slate-100/90 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
                             : "bg-white hover:bg-slate-50/80 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
@@ -908,18 +890,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                         </div>
 
                         {showDayActions ? (
-                          <div className="pointer-events-auto mt-auto flex shrink-0 flex-col gap-1.5 border-t border-teal-200/60 pt-2 dark:border-teal-500/20">
-                            <button
-                              type="button"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setSelectedDayIso(cellIso);
-                                setAddHotelOpen(true);
-                              }}
-                              className="w-full rounded-lg border border-indigo-200/90 bg-indigo-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-indigo-950 shadow-sm transition hover:bg-indigo-100 sm:px-3 sm:text-xs dark:border-indigo-500/40 dark:bg-indigo-950/60 dark:text-indigo-100 dark:hover:bg-indigo-950"
-                            >
-                              Add hotel
-                            </button>
+                          <div className="pointer-events-auto mt-auto flex shrink-0 flex-col gap-1.5 border-t border-slate-200/70 pt-2 dark:border-white/10">
                             <button
                               type="button"
                               onClick={(ev) => {
@@ -929,7 +900,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                               }}
                               className="w-full rounded-lg border border-teal-200/90 bg-teal-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:text-xs dark:border-teal-500/40 dark:bg-teal-950/90 dark:text-teal-100 dark:hover:bg-teal-950"
                             >
-                              Edit meals &amp; activities
+                              Edit activities
                             </button>
                           </div>
                         ) : null}
@@ -1033,13 +1004,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         dateLabel={selectedDayLabel}
         onAddRestaurant={addRestaurantToDay}
         onAddExperience={addExperienceToDay}
-      />
-      <HostSetupAddHotelModal
-        open={addHotelOpen && Boolean(selectedDayIso)}
-        onClose={() => setAddHotelOpen(false)}
-        plan={plan}
-        dateLabel={selectedDayLabel}
-        onSelectHotel={(place, scope) => onHotelChosen(place, scope)}
+        onAddHotel={(place, entireTrip) => onHotelChosen(place, entireTrip ? "full" : "partial")}
       />
       <HostSetupPinDetailModal
         open={pinDetail !== null}
