@@ -1,3 +1,4 @@
+import { inferDefaultYearFromDateOptions, isAllowedDateVoteOption } from "@/shared/date-option-parse";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import { buildRestaurantPicksFromVenueHints, type RestaurantPick } from "@/shared/restaurants";
@@ -293,14 +294,19 @@ export function tryLockDecision(
   if (meta.kind === "dates") {
     const options = plan.dates.options;
     if (options.length === 0) return blob;
+    const y0 = inferDefaultYearFromDateOptions(options, new Date().getFullYear());
     const tally: Record<string, number> = {};
     for (const o of options) tally[o] = 0;
     for (const v of Object.values(votes)) {
-      if (typeof v === "string" && options.includes(v)) {
-        tally[v] = (tally[v] ?? 0) + 1;
-      }
+      if (typeof v !== "string") continue;
+      if (!isAllowedDateVoteOption(v, options, y0)) continue;
+      tally[v] = (tally[v] ?? 0) + 1;
     }
-    const winner = pluralityWinner(tally, options);
+    const extras = Object.keys(tally)
+      .filter((k) => !options.includes(k) && (tally[k] ?? 0) > 0)
+      .sort((a, b) => a.localeCompare(b));
+    const preferenceOrder = [...options, ...extras];
+    const winner = pluralityWinner(tally, preferenceOrder);
     if (winner) {
       return { ...blob, locked: winner };
     }

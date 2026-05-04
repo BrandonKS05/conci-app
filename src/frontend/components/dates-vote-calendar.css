@@ -140,24 +140,37 @@
   background: rgb(51 65 85);
 }
 
-/* Proposed vote ranges */
-.conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--vote {
+/* Days that overlap a host-proposed window */
+.conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--host-range {
   background: rgb(224 231 255);
   font-weight: 500;
 }
 
-.dark .conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--vote {
+.dark .conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--host-range {
   background: rgb(49 46 129 / 0.55);
 }
 
-.conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--vote:hover:not(.react-datepicker__day--disabled) {
+.conci-datepicker-shell
+  .react-datepicker__day.conci-datepicker-day--host-range:hover:not(.react-datepicker__day--disabled) {
   background: rgb(199 210 254);
 }
 
 .dark
   .conci-datepicker-shell
-  .react-datepicker__day.conci-datepicker-day--vote:hover:not(.react-datepicker__day--disabled) {
+  .react-datepicker__day.conci-datepicker-day--host-range:hover:not(.react-datepicker__day--disabled) {
   background: rgb(67 56 202 / 0.75);
+}
+
+/* At least one vote on this exact calendar day */
+.conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--votes:not(.conci-datepicker-day--host-range) {
+  outline: 1px solid rgb(165 180 252 / 0.9);
+  outline-offset: -1px;
+}
+
+.dark
+  .conci-datepicker-shell
+  .react-datepicker__day.conci-datepicker-day--votes:not(.conci-datepicker-day--host-range) {
+  outline-color: rgb(129 140 248 / 0.5);
 }
 
 .conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--mine {

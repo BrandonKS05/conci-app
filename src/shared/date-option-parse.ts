@@ -192,13 +192,83 @@ export function optionForCalendarDay(day: Date, opts: string[], parsed: ParsedDa
   return null;
 }
 
-export function tallyDateStringVotes(votes: Record<string, unknown>, options: string[]): Record<string, number> {
+/** Local calendar day as YYYY-MM-DD (for per-day availability votes). */
+export function formatLocalIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function isStrictIsoDateString(s: string): boolean {
+  const m = s.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = parseInt(m[1]!, 10);
+  const mo = parseInt(m[2]!, 10) - 1;
+  const d = parseInt(m[3]!, 10);
+  const dt = new Date(y, mo, d, 12, 0, 0, 0);
+  return dt.getFullYear() === y && dt.getMonth() === mo && dt.getDate() === d;
+}
+
+export function isAllowedDateVoteOption(option: string, ballotOptions: string[], fallbackYear: number): boolean {
+  const t = option.trim();
+  if (!t) return false;
+  if (ballotOptions.includes(t)) return true;
+  if (isStrictIsoDateString(t)) return true;
+  return parseDateOptionToRange(t, fallbackYear) !== null;
+}
+
+/** Per-option counts; includes free-form valid date strings (e.g. ISO days) from votes. */
+export function tallyDateStringVotes(votes: Record<string, unknown>, ballotOptions: string[]): Record<string, number> {
   const tally: Record<string, number> = {};
-  for (const o of options) tally[o] = 0;
+  for (const o of ballotOptions) tally[o] = 0;
   for (const v of Object.values(votes)) {
-    if (typeof v === "string" && tally[v] !== undefined) tally[v] += 1;
+    if (typeof v !== "string" || !v.trim()) continue;
+    tally[v] = (tally[v] ?? 0) + 1;
   }
   return tally;
+}
+
+/** Votes cast as ISO days that fall inside a host-proposed range, plus exact option-string votes. */
+export function aggregatedTallyForBallotOption(
+  option: string,
+  parsed: ParsedDateOption[],
+  rawTally: Record<string, number>
+): number {
+  let n = rawTally[option] ?? 0;
+  const row = parsed.find((p) => p.option === option);
+  if (!row) return n;
+  for (const [key, c] of Object.entries(rawTally)) {
+    if (c <= 0 || key === option) continue;
+    if (!isStrictIsoDateString(key)) continue;
+    const [y, mo, d] = key.split("-").map((x) => parseInt(x, 10));
+    const day = new Date(y, mo - 1, d, 12, 0, 0, 0);
+    if (Number.isNaN(day.getTime())) continue;
+    if (isDayInRange(day, row.start, row.end)) n += c;
+  }
+  return n;
+}
+
+export function listIsoVotesOutsideHostRanges(
+  rawTally: Record<string, number>,
+  parsed: ParsedDateOption[]
+): { iso: string; votes: number; label: string }[] {
+  const out: { iso: string; votes: number; label: string }[] = [];
+  for (const [key, c] of Object.entries(rawTally)) {
+    if (c <= 0 || !isStrictIsoDateString(key)) continue;
+    const [y, mo, d] = key.split("-").map((x) => parseInt(x, 10));
+    const day = new Date(y, mo - 1, d, 12, 0, 0, 0);
+    if (Number.isNaN(day.getTime())) continue;
+    const inside = parsed.some((p) => isDayInRange(day, p.start, p.end));
+    if (inside) continue;
+    out.push({
+      iso: key,
+      votes: c,
+      label: day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+    });
+  }
+  out.sort((a, b) => a.iso.localeCompare(b.iso));
+  return out;
 }
 
 export function earliestParsedDay(parsed: ParsedDateOption[]): Date | null {

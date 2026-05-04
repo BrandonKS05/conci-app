@@ -4,13 +4,15 @@ import { useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
+  aggregatedTallyForBallotOption,
   buildParsedDateOptions,
   earliestParsedDay,
-  inferDefaultYearFromDateOptions,
+  formatLocalIsoDate,
+  isDayInRange,
   latestParsedDay,
+  listIsoVotesOutsideHostRanges,
   localDayTime,
-  optionForCalendarDay,
-  parseDateOptionToRange,
+  startOfLocalDay,
   tallyDateStringVotes,
 } from "@/shared/date-option-parse";
 import "./dates-vote-calendar.css";
@@ -35,10 +37,6 @@ export function DatesVoteCalendar({
   onVote: (p: Record<string, unknown>) => void;
 }) {
   const fallbackYear = new Date().getFullYear();
-  const defaultYear = useMemo(
-    () => inferDefaultYearFromDateOptions(options, fallbackYear),
-    [options, fallbackYear]
-  );
   const parsed = useMemo(() => buildParsedDateOptions(options, fallbackYear), [options, fallbackYear]);
   const unmapped = useMemo(
     () => options.filter((o) => !parsed.some((p) => p.option === o)),
@@ -46,96 +44,116 @@ export function DatesVoteCalendar({
   );
   const tally = useMemo(() => tallyDateStringVotes(votes, options), [votes, options]);
 
-  const defaultActive = useMemo(() => earliestParsedDay(parsed) ?? new Date(defaultYear, 0, 1), [parsed, defaultYear]);
+  const defaultActive = useMemo(
+    () => earliestParsedDay(parsed) ?? startOfLocalDay(new Date()),
+    [parsed]
+  );
 
   const minNav = useMemo(() => {
+    const today0 = localDayTime(startOfLocalDay(new Date()));
+    const back = today0 - 14 * 86400000;
     const e = earliestParsedDay(parsed);
-    if (!e) return undefined;
-    return new Date(localDayTime(e) - 32 * 86400000);
+    if (!e) return new Date(back);
+    return new Date(Math.min(back, localDayTime(e) - 30 * 86400000));
   }, [parsed]);
 
   const maxNav = useMemo(() => {
+    const today0 = localDayTime(startOfLocalDay(new Date()));
+    const forward = today0 + 540 * 86400000;
     const l = latestParsedDay(parsed);
-    if (!l) return undefined;
-    return new Date(localDayTime(l) + 62 * 86400000);
+    if (!l) return new Date(forward);
+    return new Date(Math.max(forward, localDayTime(l) + 120 * 86400000));
   }, [parsed]);
 
   const cast = (option: string) => {
     onVote({ decisionKey, kind: "dates", option });
   };
 
-  const rangeSummaries = useMemo(
-    () =>
-      parsed.map(({ option, start, end }) => ({
-        option,
-        label: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
-        votes: tally[option] ?? 0,
-      })),
-    [parsed, tally]
-  );
+  const rangeSummaries = useMemo(() => {
+    const hostRows = parsed.map(({ option, start, end }) => ({
+      key: option,
+      label: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+      votes: aggregatedTallyForBallotOption(option, parsed, tally),
+    }));
+    const isoRows = listIsoVotesOutsideHostRanges(tally, parsed).map((r) => ({
+      key: `iso:${r.iso}`,
+      label: r.label,
+      votes: r.votes,
+    }));
+    return [...hostRows, ...isoRows];
+  }, [parsed, tally]);
+
+  function dayMatchesMine(d: Date): boolean {
+    if (!mine || !mine.trim()) return false;
+    if (formatLocalIsoDate(d) === mine) return true;
+    const row = parsed.find((p) => p.option === mine);
+    if (!row) return false;
+    return isDayInRange(d, row.start, row.end);
+  }
+
+  function dayInHostRange(d: Date): boolean {
+    return parsed.some((p) => isDayInRange(d, p.start, p.end));
+  }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-neutral-400">
-        Votes: {voterN}/{quorum}+ to lock. Choose a highlighted date to vote for that option.
+        Votes: {voterN}/{quorum}+ to lock. Tap any day you can do — your vote is saved for that exact date. Shaded days
+        match a host suggestion; other days work too.
       </p>
 
-      {parsed.length > 0 ? (
-        <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-dm-elevated/50">
-          <DatePicker
-            inline
-            showIcon={false}
-            shouldCloseOnSelect={false}
-            openToDate={defaultActive}
-            selected={null}
-            onChange={(date: Date | null) => {
-              if (busy || !date) return;
-              const opt = optionForCalendarDay(date, options, parsed);
-              if (opt) cast(opt);
-            }}
-            filterDate={(d: Date) => optionForCalendarDay(d, options, parsed) !== null}
-            minDate={minNav}
-            maxDate={maxNav}
-            calendarStartDay={1}
-            calendarClassName="conci-datepicker-calendar"
-            wrapperClassName="conci-datepicker-wrapper"
-            dateFormatCalendar="MMMM yyyy"
-            dayClassName={(d: Date) => {
-              const opt = optionForCalendarDay(d, options, parsed);
-              if (!opt) return "";
-              const parts = ["conci-datepicker-day--vote"];
-              if (mine === opt) parts.push("conci-datepicker-day--mine");
-              return parts.join(" ");
-            }}
-            renderDayContents={(day: number, date?: Date) => {
-              if (!date) return <span>{day}</span>;
-              const opt = optionForCalendarDay(date, options, parsed);
-              if (!opt) return <span>{day}</span>;
-              const c = tally[opt] ?? 0;
-              return (
-                <span className="conci-datepicker-day-inner">
-                  <span className="conci-datepicker-day-num">{day}</span>
-                  <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
-                    {c > 0 ? c : "\u00a0"}
-                  </span>
+      <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-dm-elevated/50">
+        <DatePicker
+          inline
+          showIcon={false}
+          shouldCloseOnSelect={false}
+          openToDate={defaultActive}
+          selected={null}
+          onChange={(date: Date | null) => {
+            if (busy || !date) return;
+            cast(formatLocalIsoDate(date));
+          }}
+          minDate={minNav}
+          maxDate={maxNav}
+          calendarStartDay={1}
+          calendarClassName="conci-datepicker-calendar"
+          wrapperClassName="conci-datepicker-wrapper"
+          dateFormatCalendar="MMMM yyyy"
+          dayClassName={(d: Date) => {
+            const parts: string[] = [];
+            if (dayInHostRange(d)) parts.push("conci-datepicker-day--host-range");
+            const iso = formatLocalIsoDate(d);
+            if ((tally[iso] ?? 0) > 0) parts.push("conci-datepicker-day--votes");
+            if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
+            return parts.join(" ");
+          }}
+          renderDayContents={(day: number, date?: Date) => {
+            if (!date) return <span>{day}</span>;
+            const iso = formatLocalIsoDate(date);
+            const c = tally[iso] ?? 0;
+            return (
+              <span className="conci-datepicker-day-inner">
+                <span className="conci-datepicker-day-num">{day}</span>
+                <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
+                  {c > 0 ? c : "\u00a0"}
                 </span>
-              );
-            }}
-          />
-          {rangeSummaries.length > 0 ? (
-            <ul className="conci-datepicker-range-totals mt-4 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
-              {rangeSummaries.map(({ option, label, votes: v }) => (
-                <li key={option} className="flex items-baseline justify-between gap-3 text-xs">
-                  <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
-                  <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
-                    {v} {v === 1 ? "vote" : "votes"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+              </span>
+            );
+          }}
+        />
+        {rangeSummaries.length > 0 ? (
+          <ul className="conci-datepicker-range-totals mt-4 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
+            {rangeSummaries.map(({ key, label, votes: v }) => (
+              <li key={key} className="flex items-baseline justify-between gap-3 text-xs">
+                <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
+                <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
+                  {v} {v === 1 ? "vote" : "votes"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
       {unmapped.length > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 dark:border-amber-900/40 dark:bg-amber-950/30">
@@ -166,21 +184,15 @@ export function DatesVoteCalendar({
       ) : null}
 
       {parsed.length === 0 && unmapped.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-neutral-400">No date options to show.</p>
+        <p className="text-sm text-slate-600 dark:text-neutral-400">No date suggestions on the ballot — pick any day on the calendar.</p>
       ) : null}
 
-      <ul className="sr-only" aria-label="Vote totals by option">
-        {options.map((opt) => {
-          const r = parseDateOptionToRange(opt, defaultYear);
-          const label = r
-            ? `${r.start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${r.end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-            : opt;
-          return (
-            <li key={opt}>
-              {tally[opt] ?? 0} votes: {label}
-            </li>
-          );
-        })}
+      <ul className="sr-only" aria-label="Vote totals">
+        {rangeSummaries.map(({ key, label, votes: v }) => (
+          <li key={`sr-${key}`}>
+            {v} votes: {label}
+          </li>
+        ))}
       </ul>
     </div>
   );

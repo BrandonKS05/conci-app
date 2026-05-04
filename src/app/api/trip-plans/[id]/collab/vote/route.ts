@@ -11,6 +11,7 @@ import {
   tryLockDecision,
   type CollabStateV1,
 } from "@/shared/collaboration";
+import { inferDefaultYearFromDateOptions, isAllowedDateVoteOption } from "@/shared/date-option-parse";
 import { normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -98,10 +99,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const { votes, writeKey, carriedPeople } = migrateVoterVoteKeys(votesSeed, visitorKey, memberId, isPeopleDecision);
 
   if (body.kind === "dates" && meta.kind === "dates") {
-    if (!plan.dates.options.includes(body.option)) {
+    const y0 = inferDefaultYearFromDateOptions(plan.dates.options, new Date().getFullYear());
+    if (!isAllowedDateVoteOption(body.option, plan.dates.options, y0)) {
       return NextResponse.json({ error: "Invalid date option" }, { status: 400 });
     }
-    votes[writeKey] = body.option;
+    votes[writeKey] = body.option.trim();
   } else if ((body.kind === "binary" || body.kind === "generic") && (meta.kind === "binary" || meta.kind === "generic")) {
     const opts = meta.options ?? ["Yes", "No"];
     if (!opts.includes(body.option)) {
