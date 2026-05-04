@@ -17,7 +17,7 @@ import {
   type CollabStateV1,
 } from "@/shared/collaboration";
 import { visitorVoteKey } from "@/shared/collab-vote-keys";
-import type { TripPlan } from "@/shared/trip-plan";
+import { tripLiveRecommendationsContextFingerprint, type TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/restaurants";
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
@@ -131,6 +131,8 @@ export function TripCollaborationPanel({
     }
   }, [transportMode, transportStorageKey]);
 
+  const livePlanContext = tripLiveRecommendationsContextFingerprint(plan);
+
   useEffect(() => {
     let cancelled = false;
     setLiveLoading(true);
@@ -153,7 +155,7 @@ export function TripCollaborationPanel({
     return () => {
       cancelled = true;
     };
-  }, [tripId]);
+  }, [tripId, livePlanContext]);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/trip-plans/${tripId}/collab`, { credentials: "include" });

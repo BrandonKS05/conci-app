@@ -283,3 +283,123 @@ export function applyDatesSlotToPlan(plan: TripPlan, datesSlotText: string): Tri
   const line = v.length > 200 ? `${v.slice(0, 197)}…` : v;
   return { ...plan, dates: { confirmed: false, options: [line] } };
 }
+
+/**
+ * Busts live recommendation caches and triggers client refetch when inputs to Serp/OpenTable/etc. change.
+ * Intentionally excludes title / nextStep / openDecisions so cosmetic copy edits do not wipe picks.
+ */
+export function tripLiveRecommendationsContextFingerprint(plan: TripPlan): string {
+  return JSON.stringify({
+    location: plan.location,
+    departureCity: plan.departureCity,
+    dates: plan.dates.options,
+    datesConfirmed: plan.dates.confirmed,
+    peopleCount: plan.people.count,
+    budgetTier: plan.budget.tier,
+    budgetPerPerson: plan.budget.perPerson,
+    vibe: plan.vibe,
+    venues: plan.polls?.venues ?? [],
+  });
+}
+
+/** Full snapshot for “did the persisted plan change after chat merge?” */
+export function tripPlanPersistenceFingerprint(plan: TripPlan): string {
+  return JSON.stringify({
+    title: plan.title,
+    location: plan.location,
+    departureCity: plan.departureCity,
+    dates: plan.dates,
+    people: plan.people,
+    budget: plan.budget,
+    vibe: plan.vibe,
+    openDecisions: plan.openDecisions,
+    polls: plan.polls ?? null,
+    nextStep: plan.nextStep,
+    confidence: plan.confidence,
+    spotlights: plan.spotlights?.map((s) => s.mapsUrl) ?? [],
+    itineraryLiveCuration: plan.itineraryLiveCuration ?? null,
+  });
+}
+
+/**
+ * Merge a partial plan object from NLU (trip card chat). Only keys present on `patch` are applied.
+ * Ignores `spotlights` / `itineraryLiveCuration` so chat cannot overwrite structured picks via JSON.
+ */
+export function applyTripPlanChatPatch(base: TripPlan, patch: unknown): TripPlan {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    return base;
+  }
+  const p = patch as Record<string, unknown>;
+  if (Object.keys(p).length === 0) return base;
+
+  const merged: Record<string, unknown> = { ...(base as unknown as Record<string, unknown>) };
+
+  if (typeof p.title === "string") merged.title = p.title;
+  if ("location" in p) {
+    merged.location = typeof p.location === "string" ? p.location.trim() || null : null;
+  }
+  if ("departureCity" in p) {
+    merged.departureCity =
+      typeof p.departureCity === "string" ? p.departureCity.trim() || null : p.departureCity === null ? null : base.departureCity;
+  }
+
+  if (p.dates && typeof p.dates === "object" && !Array.isArray(p.dates)) {
+    const d = p.dates as Record<string, unknown>;
+    const prev = (merged.dates as Record<string, unknown>) ?? {};
+    merged.dates = {
+      ...prev,
+      ...(typeof d.confirmed === "boolean" ? { confirmed: d.confirmed } : {}),
+      ...(Array.isArray(d.options) ? { options: d.options } : {}),
+    };
+  }
+
+  if (p.people && typeof p.people === "object" && !Array.isArray(p.people)) {
+    const pe = p.people as Record<string, unknown>;
+    const prev = (merged.people as Record<string, unknown>) ?? {};
+    const next: Record<string, unknown> = { ...prev };
+    if ("count" in pe) {
+      next.count = typeof pe.count === "number" && Number.isFinite(pe.count) ? Math.round(pe.count) : pe.count === null ? null : prev.count;
+    }
+    if (Array.isArray(pe.names)) {
+      next.names = pe.names.filter((n): n is string => typeof n === "string");
+    }
+    merged.people = next;
+  }
+
+  if (p.budget && typeof p.budget === "object" && !Array.isArray(p.budget)) {
+    const b = p.budget as Record<string, unknown>;
+    const prev = (merged.budget as Record<string, unknown>) ?? {};
+    merged.budget = {
+      ...prev,
+      ...(typeof b.tier === "string" ? { tier: b.tier.trim() || null } : b.tier === null ? { tier: null } : {}),
+      ...(typeof b.perPerson === "string"
+        ? { perPerson: b.perPerson.trim() || null }
+        : b.perPerson === null
+          ? { perPerson: null }
+          : {}),
+    };
+  }
+
+  if (Array.isArray(p.vibe)) {
+    merged.vibe = p.vibe.filter((v): v is string => typeof v === "string");
+  }
+
+  if (Array.isArray(p.openDecisions)) {
+    merged.openDecisions = p.openDecisions.filter((d): d is string => typeof d === "string");
+  }
+
+  if (typeof p.nextStep === "string") merged.nextStep = p.nextStep.trim() || null;
+  if (typeof p.confidence === "number" && Number.isFinite(p.confidence)) {
+    merged.confidence = Math.max(0, Math.min(1, p.confidence));
+  }
+
+  if (p.polls && typeof p.polls === "object" && !Array.isArray(p.polls)) {
+    const prevPolls =
+      merged.polls && typeof merged.polls === "object" && !Array.isArray(merged.polls)
+        ? (merged.polls as Record<string, unknown>)
+        : {};
+    merged.polls = { ...prevPolls, ...(p.polls as Record<string, unknown>) };
+  }
+
+  return normalizePlan(merged);
+}

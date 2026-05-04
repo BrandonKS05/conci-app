@@ -4,7 +4,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { buildTripLiveRecommendations } from "@/backend/trip-live-bundle";
-import { normalizePlan } from "@/shared/trip-plan";
+import { normalizePlan, tripLiveRecommendationsContextFingerprint } from "@/shared/trip-plan";
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -12,19 +12,7 @@ const MEM_TTL_MS = 60 * 60 * 1000;
 const mem = new Map<string, { at: number; payload: TripLiveRecommendationsPayload }>();
 
 function planFingerprint(plan: ReturnType<typeof normalizePlan>): string {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        location: plan.location,
-        departureCity: plan.departureCity,
-        dates: plan.dates.options,
-        peopleCount: plan.people.count,
-        vibe: plan.vibe,
-        venues: plan.polls?.venues,
-      })
-    )
-    .digest("hex")
-    .slice(0, 32);
+  return createHash("sha256").update(tripLiveRecommendationsContextFingerprint(plan)).digest("hex").slice(0, 32);
 }
 
 export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {

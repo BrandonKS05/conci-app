@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlacePreview } from "@/shared/place-preview";
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import type { TripPlan } from "@/shared/trip-plan";
+import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
 import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
 import type { CardChatMessage } from "@/shared/collaboration";
 
@@ -70,9 +70,12 @@ export function TripCardChatWidget({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: t }),
       });
-      const j = (await r.json()) as { messages?: CardChatMessage[]; error?: string };
+      const j = (await r.json()) as { messages?: CardChatMessage[]; plan?: unknown; error?: string };
       if (r.ok && Array.isArray(j.messages)) {
         setMessages(j.messages);
+        if (j.plan && typeof j.plan === "object") {
+          onPlanReplaced(normalizePlan(j.plan));
+        }
         onCollabBump();
       }
     } finally {

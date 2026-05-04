@@ -11,18 +11,47 @@ import {
   trimCardChatMessages,
   type CardChatMessage,
 } from "@/shared/collaboration";
-import { normalizePlan, safeParseJson } from "@/shared/trip-plan";
+import {
+  applyTripPlanChatPatch,
+  normalizePlan,
+  retainPeopleNamesOnlyIfMentionedInInput,
+  safeParseJson,
+  tripLiveRecommendationsContextFingerprint,
+  tripPlanPersistenceFingerprint,
+  type TripPlan,
+} from "@/shared/trip-plan";
 import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
 import type { PlacePreview } from "@/shared/place-preview";
 import { isUuid } from "@/shared/is-uuid";
 
-const SYSTEM = `You help a travel group refine places (hotels, restaurants, activities) for a saved trip card.
+const SYSTEM = `You help a travel group refine a saved trip card: (1) optional edits to trip metadata and (2) place discovery on Google Maps.
+
 Return ONLY valid JSON (no markdown) with this shape:
 {
   "assistantText": "1-3 short sentences acknowledging the request.",
-  "searchQueries": ["1-3 short Google Maps style search strings", "include city or neighborhood when known"]
+  "searchQueries": ["1-3 short Google Maps style search strings", "include city or neighborhood when known"],
+  "planPatch": { }
 }
-searchQueries must be concrete place-discovery queries (not questions).`;
+
+planPatch (optional):
+- Omit "planPatch" entirely, or use {}, when the user is ONLY asking for place ideas (no trip facts change).
+- When the user changes trip facts, include ONLY the top-level keys that change (same schema as the stored trip plan).
+- Fields you may set: "title", "location", "departureCity", "dates", "people", "budget", "vibe", "openDecisions", "polls", "nextStep", "confidence".
+- Never include "spotlights" or "itineraryLiveCuration".
+
+Budget examples:
+- "lower the budget" / "$80 per person" → set "budget": { "perPerson": "~$80/person" or "$80", "tier": "budget-friendly" } (align tier with spend).
+
+Group size:
+- "7 people" → "people": { "count": 7, "names": [] } unless they named travelers; never invent names.
+
+Destination:
+- "Scottsdale instead" → "location": "Scottsdale, AZ" (add state/country when obvious).
+
+Duration / dates:
+- "3 days instead of 2" → update "dates": { "options": ["..."] } with a concise human-readable range that reflects the new length (preserve month if known).
+
+searchQueries must stay concrete place-discovery strings (not questions), tuned to the UPDATED destination/budget/vibe when planPatch changes them.`;
 
 export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -110,14 +139,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     createdAt: new Date().toISOString(),
   };
 
-  const loc = (plan.location || "").trim() || "";
+  const locBefore = (plan.location || "").trim() || "";
   const spotSummary = (plan.spotlights ?? [])
     .map((s) => `${s.name} [id:${spotlightStableIdFromMapsUrl(s.mapsUrl)}]`)
     .join("; ");
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   let assistantText = "Here are a few options that might fit.";
-  let queries: string[] = [`${loc} restaurants`.trim() || "popular restaurants"];
+  let queries: string[] = [`${locBefore} restaurants`.trim() || "popular restaurants"];
+  let planPatch: unknown;
 
   if (apiKey) {
     try {
@@ -133,7 +163,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
             { role: "system", content: SYSTEM },
             {
               role: "user",
-              content: `Trip title: ${plan.title}\nDestination: ${loc || "unknown"}\nBudget: ${plan.budget.tier ?? ""} ${plan.budget.perPerson ?? ""}\nVibe: ${plan.vibe.join(", ")}\nCurrent picked places: ${spotSummary || "none"}\n\nMember message:\n${text}`,
+              content: `Trip title: ${plan.title}\nDestination: ${locBefore || "unknown"}\nBudget: ${plan.budget.tier ?? ""} ${plan.budget.perPerson ?? ""}\nVibe: ${plan.vibe.join(", ")}\nCurrent picked places: ${spotSummary || "none"}\n\nMember message:\n${text}`,
             },
           ],
           text: { format: { type: "json_object" } },
@@ -147,6 +177,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
             const parsed = safeParseJson(outputText) as {
               assistantText?: string;
               searchQueries?: unknown;
+              planPatch?: unknown;
             };
             if (typeof parsed.assistantText === "string" && parsed.assistantText.trim()) {
               assistantText = parsed.assistantText.trim();
@@ -157,6 +188,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
                 .map((x) => x.trim().slice(0, 200));
               if (q.length) queries = q.slice(0, 3);
             }
+            if (parsed.planPatch !== undefined) planPatch = parsed.planPatch;
           } catch {
             //
           }
@@ -166,6 +198,23 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       //
     }
   }
+
+  let nextPlan: TripPlan = plan;
+  if (planPatch !== undefined && planPatch !== null && typeof planPatch === "object" && !Array.isArray(planPatch)) {
+    const keys = Object.keys(planPatch as object);
+    if (keys.length > 0) {
+      let patched = applyTripPlanChatPatch(plan, planPatch);
+      patched = retainPeopleNamesOnlyIfMentionedInInput(patched, text);
+      const liveBefore = tripLiveRecommendationsContextFingerprint(plan);
+      const liveAfter = tripLiveRecommendationsContextFingerprint(patched);
+      if (liveBefore !== liveAfter) {
+        patched = { ...patched, itineraryLiveCuration: undefined };
+      }
+      nextPlan = patched;
+    }
+  }
+
+  const loc = (nextPlan.location || "").trim() || "";
 
   const seen = new Set<string>();
   const merged: PlacePreview[] = [];
@@ -196,15 +245,23 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     cardChat: { messages },
   };
 
-  const { error: upErr } = await svc
-    .from("trip_plans")
-    .update({ collab_state: collab, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const planDirty = tripPlanPersistenceFingerprint(plan) !== tripPlanPersistenceFingerprint(nextPlan);
+  const rowUpdate: { collab_state: typeof collab; updated_at: string; plan?: TripPlan } = {
+    collab_state: collab,
+    updated_at: new Date().toISOString(),
+  };
+  if (planDirty) rowUpdate.plan = nextPlan;
+
+  const { error: upErr } = await svc.from("trip_plans").update(rowUpdate).eq("id", id);
 
   if (upErr) {
     console.error("[card-chat]", upErr);
     return NextResponse.json({ error: "Could not save chat" }, { status: 500 });
   }
 
-  return NextResponse.json({ messages, assistantMessage: assistantMsg });
+  return NextResponse.json({
+    messages,
+    assistantMessage: assistantMsg,
+    ...(planDirty ? { plan: nextPlan } : {}),
+  });
 }
