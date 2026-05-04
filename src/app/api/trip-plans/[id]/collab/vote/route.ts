@@ -11,6 +11,7 @@ import {
 } from "@/shared/collab-pick-vote";
 import {
   BUDGET_POLL_DECISION_KEY,
+  TRANSPORT_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
@@ -155,6 +156,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         if (!hit) return NextResponse.json({ error: "Invalid option" }, { status: 400 });
         canon = hit.id;
       }
+    } else if (meta.key === TRANSPORT_POLL_DECISION_KEY && !labels.includes(rawPick)) {
+      return NextResponse.json({ error: "Choose Fly or Drive." }, { status: 400 });
     } else if (labels.includes(rawPick)) {
       canon = rawPick;
     } else if (

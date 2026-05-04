@@ -45,14 +45,18 @@ export const VENUE_POLL_DECISION_KEY = "p_eat" as const;
 export const BUDGET_POLL_DECISION_KEY = "p_budget" as const;
 /** Structured `plan.polls.transport` poll */
 export const TRANSPORT_POLL_DECISION_KEY = "p_transport" as const;
+export const ACTIVITY_POLL_DECISION_KEY = "p_activity" as const;
+export const VIBE_POLL_DECISION_KEY = "p_vibe" as const;
+
+const POLL_MAX_SYNTH_OPTIONS = 3;
 
 const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "destinations", key: "p_dest", label: "Destination" },
   { bucket: "venues", key: VENUE_POLL_DECISION_KEY, label: "Where should we eat?" },
-  { bucket: "activities", key: "p_activity", label: "What should we prioritize?" },
-  { bucket: "vibePick", key: "p_vibe", label: "Trip vibe" },
+  { bucket: "activities", key: ACTIVITY_POLL_DECISION_KEY, label: "What should we prioritize?" },
+  { bucket: "vibePick", key: VIBE_POLL_DECISION_KEY, label: "Trip vibe" },
   { bucket: "budgetPick", key: "p_budget", label: "Budget per person" },
-  { bucket: "transport", key: TRANSPORT_POLL_DECISION_KEY, label: "How we get there" },
+  { bucket: "transport", key: TRANSPORT_POLL_DECISION_KEY, label: "Road trip vs fly?" },
 ];
 
 export type CardChatMessage = {
@@ -124,6 +128,22 @@ export function classifyDecisionText(text: string, index: number): Omit<Classifi
   return { label, index, kind: "generic", options: ["Yes", "No"] };
 }
 
+/** Open-decision duplicate when we always synth `p_transport` with Fly / Drive. */
+export function isRedundantFlyDriveOpenDecision(c: ClassifiedDecision): boolean {
+  if ((c.kind !== "binary" && c.kind !== "generic") || !c.options || c.options.length !== 2) return false;
+  const [a, b] = c.options;
+  if (
+    (a === "Flights / fly" && b === "Drive / ride together") ||
+    (a === "Drive / ride together" && b === "Flights / fly")
+  ) {
+    return true;
+  }
+  const hay = `${c.label}\n${a}\n${b}`.toLowerCase();
+  return (
+    /\b(fly|flying|flight|flights|plane)\b/.test(hay) && /\b(road|drive|driving|car|ride)\b/.test(hay)
+  );
+}
+
 function openDecisionsToClassified(plan: TripPlan): ClassifiedDecision[] {
   return plan.openDecisions.map((raw, index) => {
     const base = classifyDecisionText(raw, index);
@@ -147,24 +167,80 @@ function synthDatePollIfNeeded(plan: TripPlan, open: ClassifiedDecision[]): Clas
   };
 }
 
+const VAGUE_HOST_POLL_OPTION_RE =
+  /^(not sure|unsure|idk|\?|tbd|tbh|n\/a|na|whatever|any|anything|don'?t know|no idea|haven'?t decided|not sure yet)$/i;
+
+function lenientPollSliceFromBucket(raw: string[] | undefined): string[] {
+  if (!raw?.length) return [];
+  return [...new Set(raw.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean))].slice(
+    0,
+    POLL_MAX_SYNTH_OPTIONS
+  );
+}
+
+/** Host options meaningful enough to show as chips (drops “not sure”, etc.). */
+export function usableHostPollChipOptions(opts: string[]): string[] {
+  return opts
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2 && !VAGUE_HOST_POLL_OPTION_RE.test(s))
+    .slice(0, POLL_MAX_SYNTH_OPTIONS);
+}
+
+function synthPollPairOrSkip(
+  plan: TripPlan,
+  row: PollSynthRow,
+  polls: NonNullable<TripPlan["polls"]>
+): ClassifiedDecision | null {
+  const options = polls[row.bucket];
+  if (!options || options.length < 2) return null;
+  const synth: ClassifiedDecision = {
+    key: row.key,
+    label: row.label,
+    index: 0,
+    kind: "pick",
+    pickOptions: options,
+  };
+  if (row.key === VENUE_POLL_DECISION_KEY) {
+    synth.restaurants = buildRestaurantPicksFromVenueHints(plan, options);
+  }
+  return synth;
+}
+
 function synthPollDecisions(plan: TripPlan, openLength: number): ClassifiedDecision[] {
   const polls = plan.polls;
-  if (!polls) return [];
   const out: ClassifiedDecision[] = [];
   let i = 0;
   for (const row of POLL_SYNTH_ROWS) {
-    const options = polls[row.bucket];
-    if (!options || options.length < 2) continue;
-    const synth: ClassifiedDecision = {
-      key: row.key,
-      label: row.label,
-      index: openLength + i,
-      kind: "pick",
-      pickOptions: options,
-    };
-    if (row.key === VENUE_POLL_DECISION_KEY) {
-      synth.restaurants = buildRestaurantPicksFromVenueHints(plan, options);
+    if (row.key === TRANSPORT_POLL_DECISION_KEY) {
+      out.push({
+        key: row.key,
+        label: row.label,
+        index: openLength + i,
+        kind: "pick",
+        pickOptions: ["Fly", "Drive"],
+      });
+      i += 1;
+      continue;
     }
+
+    if (row.key === ACTIVITY_POLL_DECISION_KEY || row.key === VIBE_POLL_DECISION_KEY) {
+      const raw = lenientPollSliceFromBucket(polls?.[row.bucket]);
+      const chips = usableHostPollChipOptions(raw);
+      out.push({
+        key: row.key,
+        label: row.label,
+        index: openLength + i,
+        kind: "pick",
+        pickOptions: chips,
+      });
+      i += 1;
+      continue;
+    }
+
+    if (!polls) continue;
+    const synth = synthPollPairOrSkip(plan, row, polls);
+    if (!synth) continue;
+    synth.index = openLength + i;
     out.push(synth);
     i += 1;
   }
@@ -173,7 +249,8 @@ function synthPollDecisions(plan: TripPlan, openLength: number): ClassifiedDecis
 
 /** Classified decisions for collab: openDecisions text + inferred date poll + structured polls. */
 export function buildClassifiedDecisions(plan: TripPlan): ClassifiedDecision[] {
-  const open = openDecisionsToClassified(plan);
+  const openAll = openDecisionsToClassified(plan);
+  const open = openAll.filter((c) => !isRedundantFlyDriveOpenDecision(c));
   const dateSynth = synthDatePollIfNeeded(plan, open);
   const tail = synthPollDecisions(plan, open.length + (dateSynth ? 1 : 0));
   if (!dateSynth) return [...open, ...tail];
@@ -183,6 +260,10 @@ export function buildClassifiedDecisions(plan: TripPlan): ClassifiedDecision[] {
 /** Fly/drive (or similar) — UI is a single choice per traveler, no per-option “not for me”. */
 export function isTransportStyleGroupPoll(meta: ClassifiedDecision): boolean {
   if (meta.key === TRANSPORT_POLL_DECISION_KEY) return true;
+  if (meta.kind === "pick" && meta.pickOptions?.length === 2) {
+    const s = new Set(meta.pickOptions);
+    if (s.has("Fly") && s.has("Drive")) return true;
+  }
   if (meta.kind !== "binary" || !meta.options || meta.options.length !== 2) return false;
   const [a, b] = meta.options;
   if (a === "Flights / fly" && b === "Drive / ride together") return true;
@@ -360,7 +441,9 @@ export function tryLockDecision(
     const list = blob.restaurants?.length ? blob.restaurants : meta.restaurants;
     const pickTexts = meta.pickOptions ?? [];
     const voteKeys = list?.length ? list.map((r) => r.id) : pickTexts;
-    if (voteKeys.length === 0) return blob;
+    const allowStructuredWriteIn =
+      !list?.length && meta.key !== BUDGET_POLL_DECISION_KEY && meta.key !== VENUE_POLL_DECISION_KEY;
+    if (voteKeys.length === 0 && !allowStructuredWriteIn) return blob;
     const tally: Record<string, number> = {};
     for (const k of voteKeys) tally[k] = 0;
     const idByName =
@@ -368,8 +451,6 @@ export function tryLockDecision(
         acc[r.name] = r.id;
         return acc;
       }, {}) ?? {};
-    const allowStructuredWriteIn =
-      !list?.length && meta.key !== BUDGET_POLL_DECISION_KEY && meta.key !== VENUE_POLL_DECISION_KEY;
 
     for (const raw of Object.values(votes)) {
       const choice = coerceScalarVoteChoice(raw);

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
+  ACTIVITY_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
   countLocked,
@@ -14,6 +15,8 @@ import {
   isDecisionLocked,
   isTransportStyleGroupPoll,
   parseCollabState,
+  TRANSPORT_POLL_DECISION_KEY,
+  VIBE_POLL_DECISION_KEY,
   BUDGET_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
   type ClassifiedDecision,
@@ -27,6 +30,7 @@ import {
 } from "@/shared/budget-poll";
 import { visitorVoteKey } from "@/shared/collab-vote-keys";
 import {
+  POLL_WRITE_IN_MAX_LEN,
   coerceScalarVoteChoice,
   coerceVoteAgainstList,
   isAllowedPollWriteIn,
@@ -1097,6 +1101,147 @@ function DatesLockedGate({ active, children }: { active: boolean; children: Reac
   );
 }
 
+function ActivityVibePollCard({
+  tripId,
+  meta,
+  chips,
+  viewerPrimaryPick,
+  busy,
+  voterN,
+  quorum,
+  onVote,
+}: {
+  tripId: string;
+  meta: ClassifiedDecision;
+  chips: readonly string[];
+  viewerPrimaryPick: string | null | undefined;
+  busy: boolean;
+  voterN: number;
+  quorum: number;
+  onVote: (p: Record<string, unknown>) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [polishBusy, setPolishBusy] = useState(false);
+  const [polishErr, setPolishErr] = useState<string | null>(null);
+
+  const mineTrim = viewerPrimaryPick?.trim() ?? "";
+
+  const submitPolished = useCallback(async () => {
+    const raw = draft.trim();
+    if (raw.length < 1 || raw.length > POLL_WRITE_IN_MAX_LEN) {
+      setPolishErr("Use 1–80 characters.");
+      return;
+    }
+    setPolishBusy(true);
+    setPolishErr(null);
+    try {
+      const res = await fetch(`/api/trip-plans/${tripId}/collab/polish-vote-text`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decisionKey: meta.key, text: raw }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string; polished?: string };
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not polish answer");
+      const polished = (j.polished ?? "").trim();
+      if (!polished || !isAllowedPollWriteIn(polished, chips)) {
+        setPolishErr("That didn’t come back as a valid short answer—try rephrasing.");
+        return;
+      }
+      onVote({ decisionKey: meta.key, kind: "pick", option: polished });
+      setDraft("");
+    } catch (e) {
+      setPolishErr(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setPolishBusy(false);
+    }
+  }, [chips, draft, meta.key, onVote, tripId]);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+      <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+        {chips.length > 0
+          ? `Vote for a suggestion or add your own (${voterN} vote(s); ${quorum}+ to lock).`
+          : `The host left this open—type your answer (${voterN} vote(s); ${quorum}+ to lock).`}
+      </p>
+
+      {!mineTrim ? (
+        <p className="mt-3 rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/45 dark:bg-amber-950/35 dark:text-amber-100">
+          Please submit your vote: pick a suggestion or use the text box (your wording is cleaned up automatically when you
+          submit).
+        </p>
+      ) : null}
+
+      {chips.length > 0 ? (
+        <ul className="mt-4 space-y-2.5">
+          {chips.map((opt) => {
+            const forSelected = viewerPrimaryPick === opt;
+            return (
+              <li
+                key={opt}
+                className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                  forSelected
+                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
+                }`}
+              >
+                <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: opt })}
+                  className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
+                    forSelected ? primaryFilledInteractive : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                  }`}
+                >
+                  Vote
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          {chips.length > 0 ? "Or type your own answer" : "Your answer"}
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+          We fix typos and phrasing before saving (e.g. &ldquo;beacj vibes lol&rdquo; → &ldquo;Beach vibes&rdquo;).
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            autoComplete="off"
+            maxLength={POLL_WRITE_IN_MAX_LEN}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="e.g. beach days, food-first, chill nights…"
+            disabled={busy || polishBusy}
+            className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+          />
+          <button
+            type="button"
+            disabled={busy || polishBusy || draft.trim().length < 1}
+            onClick={() => void submitPolished()}
+            className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
+          >
+            {polishBusy ? "Polishing…" : "Submit answer"}
+          </button>
+        </div>
+        {polishErr ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">{polishErr}</p> : null}
+      </div>
+
+      {mineTrim ? (
+        <p className="mt-3 text-xs text-slate-600 dark:text-neutral-400">
+          Your vote: <span className="font-semibold text-slate-900 dark:text-neutral-100">{viewerPrimaryPick}</span>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function DecisionCard({
   tripId,
   meta,
@@ -1245,7 +1390,12 @@ function DecisionCard({
 
   if (meta.kind === "pick") {
     const opts = meta.pickOptions ?? [];
-    if (opts.length < 2) {
+    const alwaysShowsSynthPick =
+      meta.key === TRANSPORT_POLL_DECISION_KEY ||
+      meta.key === ACTIVITY_POLL_DECISION_KEY ||
+      meta.key === VIBE_POLL_DECISION_KEY;
+
+    if (!alwaysShowsSynthPick && opts.length < 2) {
       return (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           This poll needs at least two curated options. Re-run the trip parser with clearer choices.
@@ -1316,6 +1466,21 @@ function DecisionCard({
             <div className="mt-3 text-xs text-slate-500 dark:text-neutral-500">{voterN} vote(s) · needs quorum</div>
           </section>
         </DatesLockedGate>
+      );
+    }
+
+    if (meta.key === ACTIVITY_POLL_DECISION_KEY || meta.key === VIBE_POLL_DECISION_KEY) {
+      return (
+        <ActivityVibePollCard
+          tripId={tripId}
+          meta={meta}
+          chips={opts}
+          viewerPrimaryPick={viewerPrimaryPick}
+          busy={busy}
+          voterN={voterN}
+          quorum={quorum}
+          onVote={onVote}
+        />
       );
     }
 
@@ -1450,7 +1615,7 @@ function DecisionCard({
             ))}
           </div>
         )}
-        {!isBudgetPoll ? (
+        {!isBudgetPoll && !transportSimplePick ? (
           <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
               Your idea (optional)
