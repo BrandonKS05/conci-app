@@ -1,25 +1,49 @@
 # Conci
 
-Starter Next.js + Tailwind app for an AI executive assistant concept.
+Next.js + Tailwind app for a consumer-style trip planning assistant (parser, collaboration, Supabase-backed trips).
 
-## What’s included
+## Getting the app after `git clone`
 
-- 6 views: prompt, results, itinerary editor, recommendation detail, booking handoff, saved itinerary
-- Mock provider data for flights, restaurants, and things to do, all hidden behind a local API/state layer
-- Clean consumer-style UI
-- LLM-based request parsing with local fallback handling
-- Canonical itinerary state persisted in Supabase tables, with a local fallback store only if Supabase is unavailable
+This project does **not** use Python’s `requirements.txt`. Dependencies are declared in **`package.json`** and pinned in **`package-lock.json`**. After you pull or clone:
+
+```bash
+npm install
+```
+
+Use a current **Node.js LTS** (v20+ recommended). Then copy environment variables from the example file:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your Supabase keys and any optional API keys you need (see comments in `.env.example`).
 
 ## Run locally
 
 ```bash
-npm install
 npm run dev
 ```
 
-The app works with no API key. If you want OpenAI-based parsing, set `OPENAI_API_KEY` before submitting a prompt. You can also set `OPENAI_MODEL` if you want to override the default parser model.
+Open [http://localhost:3000](http://localhost:3000).
 
-For Supabase, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your environment. You can then open `/supabase-test` to verify the client initializes and reaches your project.
-The app persists itinerary data through `requests`, `itinerary_items`, and `selections`; the matching SQL lives in [supabase/schema.sql](/Users/arnavnigam/Desktop/ai-assistant-app/supabase/schema.sql).
+Other useful commands:
 
-Then open `http://localhost:3000`.
+```bash
+npm run build   # production build
+npm run lint    # ESLint
+```
+
+## Environment
+
+- **Required for auth / trips:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server features (trip pages, delete, collab writes, etc.):** `SUPABASE_SERVICE_ROLE_KEY` (never expose to the browser)
+- **Optional:** `OPENAI_API_KEY`, `RAPIDAPI_KEY`, `RAPIDAPI_AMADEUS_HOST`, `SERPAPI_KEY`, etc. — see `.env.example`
+
+## Database
+
+Schema and policies for Supabase live in [`supabase/schema.sql`](supabase/schema.sql) (and migrations under `supabase/migrations/` if present).
+
+## Legacy README notes
+
+- OpenAI-based trip parsing uses `OPENAI_API_KEY` when set.
+- You can open `/supabase-test` to verify the Supabase client against your project.
