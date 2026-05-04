@@ -142,7 +142,7 @@ export function HostSetupAddPlacesModal({
                           </div>
                           <button
                             type="button"
-                            className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-violet-500"
+                            className="shrink-0 rounded-lg bg-teal-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-teal-500"
                             onClick={() => onAddRestaurant(r)}
                           >
                             Add meal
@@ -180,7 +180,7 @@ export function HostSetupAddPlacesModal({
                           </div>
                           <button
                             type="button"
-                            className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-violet-500"
+                            className="shrink-0 rounded-lg bg-teal-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-teal-500"
                             onClick={() => onAddExperience(x)}
                           >
                             Add activity

@@ -90,7 +90,7 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
             className={[
               "rounded-lg px-2.5 py-2 text-[13px] leading-relaxed",
               msg.role === "user"
-                ? "ml-4 bg-violet-100 text-slate-900 dark:bg-violet-950/50 dark:text-neutral-100"
+                ? "ml-4 bg-teal-100 text-slate-900 dark:bg-teal-950/50 dark:text-neutral-100"
                 : "mr-2 bg-slate-50 text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
             ].join(" ")}
           >
@@ -117,13 +117,13 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
             }
           }}
           placeholder="e.g. Set trip to June 12–18, mid-range budget…"
-          className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+          className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
         />
         <button
           type="button"
           disabled={loading || !input.trim()}
           onClick={() => void send()}
-          className="w-full rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-neutral-700"
+          className="w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-neutral-700"
         >
           {loading ? "Sending…" : "Send"}
         </button>

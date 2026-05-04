@@ -710,7 +710,7 @@ export function isHostPublishReady(plan: TripPlan): boolean {
   return hostHasConcreteTripRange(plan) && hostHasHotel(plan) && hostHasKeptRestaurant(plan);
 }
 
-/** 0–100 from the three publish requirements only (experiences tracked separately in the UI). */
+/** 0–100 from the three publish requirements (dates, hotel, restaurant). */
 export function hostSetupCompletionPercent(plan: TripPlan): number {
   let n = 0;
   if (hostHasConcreteTripRange(plan)) n += 1;

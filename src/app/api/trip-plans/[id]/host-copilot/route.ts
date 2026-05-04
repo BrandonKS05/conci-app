@@ -31,17 +31,9 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   return out;
 }
 
-const NAV_IDS = new Set([
-  "dates",
-  "accommodation",
-  "food",
-  "transport",
-  "experiences",
-  "packing",
-  "budget",
-]);
+const NAV_IDS = new Set(["dates", "accommodation", "transport", "packing", "budget"]);
 
-const SYSTEM = (year: number) => `You are the host's setup copilot for a draft trip in the Conci app. The host is on a single-page checklist (calendar, hotel, food pins, experiences checkbox, budget display).
+const SYSTEM = (year: number) => `You are the host's setup copilot for a draft trip in the Conci app. The host is on a single-page checklist (calendar, hotel, meal pins on calendar days, budget, and other sections).
 
 **Trip dates (critical):** The only source of truth for "which calendar days exist" is **Host trip range** and **Trip calendar days** in the user message. If those are set, **ignore** older months or date ranges mentioned in "Planner dates slot" — that field is from the first chat parse and is often stale after the host moves the trip on the calendar. Never assign meal pins or reservations to ISO dates outside **Trip calendar days**.
 
@@ -71,7 +63,7 @@ Rules:
   - **dates**: update **dates.options** with short human-readable ranges when they change length or timeframe (helps the rest of the app).
   - Never include spotlights or itineraryLiveCuration. Omit **polls** unless the user explicitly asks for vote options between concrete choices.
 - **ui** (optional): guide the app UI.
-  - **scrollTo**: one of "dates" | "accommodation" | "food" | "transport" | "experiences" | "packing" | "budget" — set when the user asks to jump somewhere or when your edits mainly concern that section.
+  - **scrollTo**: one of "dates" | "accommodation" | "transport" | "packing" | "budget" — set when the user asks to jump somewhere or when your edits mainly concern that section.
   - **suggestDatePickMode**: "range" when they should tap two days on the calendar; "day" when the trip range is already set and they should work day-by-day. If you set tripRange in hostSetupPatch, usually use "day" and **focusTripStartMonth**: true.
   - **focusTripStartMonth**: true when you set tripRange so the calendar scrolls to that month.
 
