@@ -185,6 +185,21 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     return new Date().getMonth();
   });
 
+  /** Debug: log calendar defaulting chain once on mount (remove after fixing date default). */
+  useEffect(() => {
+    const y0 = new Date().getFullYear();
+    const bestEffort = tripRangeBestEffortFromPlanDates(initialPlan, y0);
+    // eslint-disable-next-line no-console -- intentional debug: trace why calendar month may not match parser dates
+    console.log("[HostSetup] calendar defaulting chain (page load)", {
+      "plan.dates.options": initialPlan.dates.options,
+      "hostSetup.tripRange": initialPlan.hostSetup?.tripRange ?? null,
+      "tripRangeBestEffortFromPlanDates(plan)": bestEffort,
+      calYear,
+      calMonth,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to snapshot first-paint calendar + initial plan from server
+  }, []);
+
   /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
   const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
   /** While confirming a new range on the calendar, preview highlight uses this; otherwise saved/plan range. */
