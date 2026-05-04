@@ -5,7 +5,13 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { migrateVoterVoteKeys } from "@/shared/collab-vote-keys";
 import {
+  bundlePickVote,
+  sanitizeAgainstOptions,
+  isAllowedPollWriteIn,
+} from "@/shared/collab-pick-vote";
+import {
   BUDGET_POLL_DECISION_KEY,
+  VENUE_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
   parseCollabState,
@@ -22,11 +28,11 @@ import { isUuid } from "@/shared/is-uuid";
 
 type VoteBody =
   | { decisionKey: string; kind: "dates"; option: string }
-  | { decisionKey: string; kind: "binary"; option: string }
+  | { decisionKey: string; kind: "binary"; option: string; againstOptions?: unknown }
   | { decisionKey: string; kind: "hotel"; hotelId: string }
   | { decisionKey: string; kind: "people"; name: string; stance: "in" | "maybe" | "out" }
-  | { decisionKey: string; kind: "generic"; option: string }
-  | { decisionKey: string; kind: "pick"; option: string };
+  | { decisionKey: string; kind: "generic"; option: string; againstOptions?: unknown }
+  | { decisionKey: string; kind: "pick"; option: string; againstOptions?: unknown };
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -111,40 +117,68 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     votes[writeKey] = body.option.trim();
   } else if ((body.kind === "binary" || body.kind === "generic") && (meta.kind === "binary" || meta.kind === "generic")) {
     const opts = meta.options ?? ["Yes", "No"];
-    if (!opts.includes(body.option)) {
+    const rawOpt = typeof body.option === "string" ? body.option.trim() : "";
+    if (!rawOpt) {
+      return NextResponse.json({ error: "Pick an option or add your own wording." }, { status: 400 });
+    }
+    let canon: string;
+    if (opts.includes(rawOpt)) {
+      canon = rawOpt;
+    } else if (isAllowedPollWriteIn(rawOpt, opts)) {
+      canon = rawOpt;
+    } else {
       return NextResponse.json({ error: "Invalid option" }, { status: 400 });
     }
-    votes[writeKey] = body.option;
+    const allowedAgainst = new Set(opts);
+    const binAgainst = sanitizeAgainstOptions(body.againstOptions, allowedAgainst).filter((x) => x !== canon);
+    votes[writeKey] = bundlePickVote(canon, binAgainst);
   } else if (body.kind === "pick" && meta.kind === "pick") {
     const list = blob.restaurants?.length ? blob.restaurants : meta.restaurants ?? [];
     const ids = list.map((r) => r.id);
     const labels = meta.pickOptions ?? [];
+    const rawPick = typeof body.option === "string" ? body.option.trim() : "";
     let canon: string;
+    const allowAgainst =
+      ids.length === 0 && meta.key !== BUDGET_POLL_DECISION_KEY && meta.key !== VENUE_POLL_DECISION_KEY;
+    const against = allowAgainst
+      ? sanitizeAgainstOptions(body.againstOptions, new Set(labels)).filter((x) => x !== rawPick)
+      : [];
+
     if (ids.length > 0) {
-      if (ids.includes(body.option)) canon = body.option;
+      if (against.length || body.againstOptions != null) {
+        return NextResponse.json({ error: "This poll doesn’t support mixed reactions here." }, { status: 400 });
+      }
+      if (!rawPick) return NextResponse.json({ error: "Invalid option" }, { status: 400 });
+      if (ids.includes(rawPick)) canon = rawPick;
       else {
-        const hit = list.find((r) => r.name === body.option);
+        const hit = list.find((r) => r.name === rawPick);
         if (!hit) return NextResponse.json({ error: "Invalid option" }, { status: 400 });
         canon = hit.id;
       }
-    } else if (labels.includes(body.option)) {
-      canon = body.option;
+    } else if (labels.includes(rawPick)) {
+      canon = rawPick;
     } else if (
       meta.key === BUDGET_POLL_DECISION_KEY &&
       ids.length === 0 &&
-      (parseBudgetCustomAmountInput(body.option) ||
-        isValidBudgetCustomVoteToken(body.option))
+      (parseBudgetCustomAmountInput(rawPick) || isValidBudgetCustomVoteToken(rawPick))
     ) {
-      const normalized =
-        parseBudgetCustomAmountInput(body.option) ?? body.option.trim();
+      const normalized = parseBudgetCustomAmountInput(rawPick) ?? rawPick.trim();
       if (!isValidBudgetCustomVoteToken(normalized)) {
         return NextResponse.json({ error: "Invalid option" }, { status: 400 });
       }
       canon = normalized;
+    } else if (
+      ids.length === 0 &&
+      meta.key !== BUDGET_POLL_DECISION_KEY &&
+      meta.key !== VENUE_POLL_DECISION_KEY &&
+      isAllowedPollWriteIn(rawPick, labels)
+    ) {
+      canon = rawPick;
     } else {
       return NextResponse.json({ error: "Invalid option" }, { status: 400 });
     }
-    votes[writeKey] = canon;
+
+    votes[writeKey] = allowAgainst ? bundlePickVote(canon, against) : canon;
   } else if (body.kind === "hotel" && meta.kind === "hotel") {
     const ids = (blob.hotels ?? meta.hotels ?? []).map((h) => h.id);
     if (!ids.includes(body.hotelId)) {

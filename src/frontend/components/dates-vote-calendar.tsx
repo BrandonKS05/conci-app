@@ -11,6 +11,7 @@ import {
   formatLocalIsoDate,
   formatLocalIsoRangeVote,
   inferDefaultYearFromDateOptions,
+  inferCalendarOpenDateFromDateOptions,
   isDayInRange,
   latestParsedDay,
   listCustomVotesOutsideHostSuggestions,
@@ -91,9 +92,15 @@ export function DatesVoteCalendar({
 
   const [rangeDraft, setRangeDraft] = useState<[Date | null, Date | null]>([null, null]);
 
-  const defaultActive = useMemo(
-    () => earliestParsedDay(parsed) ?? startOfLocalDay(new Date()),
-    [parsed]
+  const calendarOpenDate = useMemo(
+    () => inferCalendarOpenDateFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
+
+  /** Remount picker when ballot copy changes so month view tracks host’s vague timing (e.g. “late May”). */
+  const calendarMountKey = useMemo(
+    () => `${options.join("\u001f")}|${formatLocalIsoDate(calendarOpenDate)}`,
+    [options, calendarOpenDate]
   );
 
   const minNav = useMemo(() => {
@@ -155,12 +162,13 @@ export function DatesVoteCalendar({
       <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
         <div className="conci-datepicker-centered">
           <DatePicker
+            key={calendarMountKey}
             inline
             selectsRange
             allowSameDay
             swapRange
             shouldCloseOnSelect={false}
-            openToDate={defaultActive}
+            openToDate={calendarOpenDate}
             startDate={rangeDraft[0]}
             endDate={rangeDraft[1]}
             onChange={(upd: [Date | null, Date | null]) => {

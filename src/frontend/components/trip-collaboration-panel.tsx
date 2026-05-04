@@ -24,6 +24,11 @@ import {
 } from "@/shared/budget-poll";
 import { visitorVoteKey } from "@/shared/collab-vote-keys";
 import {
+  coerceScalarVoteChoice,
+  coerceVoteAgainstList,
+  isAllowedPollWriteIn,
+} from "@/shared/collab-pick-vote";
+import {
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
   type TripPlan,
@@ -60,11 +65,12 @@ function rosterNudgeKey(p: TripRosterPerson): string {
   return "";
 }
 
-function readScalarVote(
+/** Raw vote blob for the current traveler (canonical member key first). */
+function readRawVotePayload(
   votes: Record<string, unknown>,
   visitorKey: string,
   canonicalVoterKey: string
-): string | null {
+): unknown {
   const order = [canonicalVoterKey, visitorVoteKey(visitorKey), visitorKey].filter(
     (k): k is string => typeof k === "string" && k.length > 0
   );
@@ -73,9 +79,19 @@ function readScalarVote(
     if (seen.has(k)) continue;
     seen.add(k);
     const v = votes[k];
-    if (typeof v === "string") return v;
+    if (v !== undefined && v !== null) return v;
   }
-  return null;
+  return undefined;
+}
+
+function readScalarVote(
+  votes: Record<string, unknown>,
+  visitorKey: string,
+  canonicalVoterKey: string
+): string | null {
+  const raw = readRawVotePayload(votes, visitorKey, canonicalVoterKey);
+  if (typeof raw === "string") return raw.length ? raw : null;
+  return coerceScalarVoteChoice(raw);
 }
 
 function readPeopleVoteRow(
@@ -535,11 +551,12 @@ export function TripCollaborationPanel({
           <div className="relative z-10 lg:hidden">{renderGroupProgressCard()}</div>
           <aside
             aria-label="Group progress"
-            className="pointer-events-none fixed inset-x-0 top-0 z-[35] hidden h-0 lg:block"
+            className="box-border hidden max-h-[min(85vh,40rem)] min-h-0 min-w-0 w-[min(18rem,calc(100%-2rem))] overflow-y-auto overscroll-contain lg:fixed lg:top-1/2 lg:z-[35] lg:block lg:-translate-y-1/2"
+            style={{
+              right: "max(0.75rem, env(safe-area-inset-right, 0px))",
+            }}
           >
-            <div className="pointer-events-auto absolute right-5 top-1/2 w-[min(18rem,calc(100vw-1.75rem))] max-h-[min(85vh,40rem)] -translate-y-1/2 overflow-x-hidden overflow-y-auto overscroll-contain xl:right-8">
-              {renderGroupProgressCard()}
-            </div>
+            {renderGroupProgressCard()}
           </aside>
         </>
       ) : null}
@@ -1033,6 +1050,19 @@ function HostDatesConfirmFooter({
   );
 }
 
+function tallyAgainstVotesForOptions(votes: Record<string, unknown>, optionLabels: string[]): Record<string, number> {
+  const tally: Record<string, number> = {};
+  for (const o of optionLabels) tally[o] = 0;
+  for (const raw of Object.values(votes)) {
+    if (typeof raw === "object" && raw !== null) {
+      for (const x of coerceVoteAgainstList(raw)) {
+        if (optionLabels.includes(x)) tally[x] += 1;
+      }
+    }
+  }
+  return tally;
+}
+
 /** Frosted lock overlay when hotels / dinner polls are blocked until group dates are chosen. */
 function DatesLockedGate({ active, children }: { active: boolean; children: ReactNode }) {
   if (!active) return <>{children}</>;
@@ -1092,11 +1122,26 @@ function DecisionCard({
   const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [hotelSearchErr, setHotelSearchErr] = useState<string | null>(null);
   const [budgetCustom, setBudgetCustom] = useState("");
+  const [againstPrep, setAgainstPrep] = useState<string[]>([]);
+  const [pollWriteIn, setPollWriteIn] = useState("");
 
   const hotels = (blob?.hotels ?? meta.hotels) as HotelPick[] | undefined;
   const spots = (blob?.restaurants ?? meta.restaurants) as RestaurantPick[] | undefined;
   const votes = (blob?.votes ?? {}) as Record<string, unknown>;
   const voterN = Object.keys(votes).length;
+
+  const rawVoteBlob = readRawVotePayload(votes, visitorKey, canonicalVoterKey);
+  const serverAgainstChoices = coerceVoteAgainstList(rawVoteBlob);
+  const viewerPrimaryPick = readScalarVote(votes, visitorKey, canonicalVoterKey);
+
+  useEffect(() => {
+    setAgainstPrep([]);
+    setPollWriteIn("");
+  }, [meta.key]);
+
+  useEffect(() => {
+    setAgainstPrep([]);
+  }, [viewerPrimaryPick]);
 
   async function runHotelSearch() {
     if (blockedByDates) return;
@@ -1131,7 +1176,6 @@ function DecisionCard({
         </div>
       );
     }
-    const mine = readScalarVote(votes, visitorKey, canonicalVoterKey);
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
@@ -1140,7 +1184,7 @@ function DecisionCard({
             decisionKey={meta.key}
             options={opts}
             votes={votes}
-            mine={mine}
+            mine={viewerPrimaryPick}
             busy={busy}
             quorum={quorum}
             voterN={voterN}
@@ -1173,8 +1217,6 @@ function DecisionCard({
         </div>
       );
     }
-    const mine = readScalarVote(votes, visitorKey, canonicalVoterKey);
-
     /** Food poll mirrors hotel rows: OT link, rating tier, neighborhood, vote-by-spot id. */
     if (spots?.length && meta.key === VENUE_POLL_DECISION_KEY) {
       const venueList = mergeLiveRestaurantsOntoHints(spots, liveVenueMerge ?? undefined);
@@ -1189,7 +1231,7 @@ function DecisionCard({
             )}
             <ul className="mt-4 space-y-3">
               {venueList.map((r) => {
-                const picked = mine === r.id || mine === r.name;
+                const picked = viewerPrimaryPick === r.id || viewerPrimaryPick === r.name;
                 return (
                   <li
                     key={r.id}
@@ -1244,31 +1286,169 @@ function DecisionCard({
 
     const isBudgetPoll = meta.key === BUDGET_POLL_DECISION_KEY;
     const customMine =
-      typeof mine === "string" &&
-      !opts.includes(mine) &&
-      isValidBudgetCustomVoteToken(mine);
+      typeof viewerPrimaryPick === "string" &&
+      !opts.includes(viewerPrimaryPick) &&
+      isValidBudgetCustomVoteToken(viewerPrimaryPick);
+    const thumbsDownTally = tallyAgainstVotesForOptions(votes, opts);
+    const structuredWriteInMine =
+      !isBudgetPoll &&
+      viewerPrimaryPick != null &&
+      !opts.includes(viewerPrimaryPick) &&
+      isAllowedPollWriteIn(viewerPrimaryPick, opts);
 
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Pick one (max 3 options). · {voterN} vote(s)</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {opts.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              disabled={busy}
-              onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: opt })}
-              className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
-                mine === opt
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                  : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
-              }`}
-            >
-              {isBudgetPoll ? formatBudgetPollChipLabel(opt) : opt}
-            </button>
-          ))}
-        </div>
+        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+          {isBudgetPoll
+            ? `Pick one (max 3 options). · ${voterN} vote(s)`
+            : `Group vote · ${voterN} vote(s) — pick a favorite, flag what you dislike, or suggest your own`}
+        </p>
+        {!isBudgetPoll ? (
+          <ul className="mt-4 space-y-2.5">
+            {opts.map((opt) => {
+              const thumbsDownGroup = thumbsDownTally[opt] ?? 0;
+              const forSelected = viewerPrimaryPick === opt;
+              const myDown =
+                viewerPrimaryPick != null ? serverAgainstChoices.includes(opt) : againstPrep.includes(opt);
+              const disableNotForSelf = viewerPrimaryPick != null && forSelected;
+
+              function submitPickWithAgainst(nextAgainst: string[], primary: string) {
+                void onVote({
+                  decisionKey: meta.key,
+                  kind: "pick",
+                  option: primary,
+                  againstOptions: nextAgainst.filter((x) => x !== primary),
+                });
+              }
+
+              return (
+                <li
+                  key={opt}
+                  className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                    forSelected
+                      ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                      : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                    {thumbsDownGroup > 0 ? (
+                      <p className="text-xs text-rose-700 dark:text-rose-300">
+                        {thumbsDownGroup} traveler
+                        {thumbsDownGroup === 1 ? " " : "s "}
+                        marked &ldquo;not for me&rdquo;
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        const base =
+                          viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
+                        submitPickWithAgainst(base.filter((x) => x !== opt), opt);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                        forSelected
+                          ? "bg-indigo-700 text-white dark:bg-indigo-500"
+                          : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                      }`}
+                    >
+                      Vote for
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || disableNotForSelf}
+                      aria-pressed={myDown ? "true" : "false"}
+                      onClick={() => {
+                        if (viewerPrimaryPick != null) {
+                          const toggle = serverAgainstChoices.includes(opt)
+                            ? serverAgainstChoices.filter((x) => x !== opt)
+                            : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
+                          submitPickWithAgainst(toggle, viewerPrimaryPick);
+                          return;
+                        }
+                        setAgainstPrep((prev) => (prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]));
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
+                        myDown
+                          ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
+                          : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                      }`}
+                    >
+                      Not for me
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {opts.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                disabled={busy}
+                onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: opt })}
+                className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
+                  viewerPrimaryPick === opt
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
+                    : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
+                }`}
+              >
+                {formatBudgetPollChipLabel(opt)}
+              </button>
+            ))}
+          </div>
+        )}
+        {!isBudgetPoll ? (
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+              Your idea (optional)
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                autoComplete="off"
+                maxLength={80}
+                value={pollWriteIn}
+                onChange={(e) => setPollWriteIn(e.target.value)}
+                placeholder="Different priority, activity, vibe…"
+                disabled={busy}
+                className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+              />
+              <button
+                type="button"
+                disabled={busy || !isAllowedPollWriteIn(pollWriteIn, opts)}
+                onClick={() => {
+                  const t = pollWriteIn.trim();
+                  if (!isAllowedPollWriteIn(t, opts)) return;
+                  void onVote({
+                    decisionKey: meta.key,
+                    kind: "pick",
+                    option: t,
+                    againstOptions: (
+                      viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
+                    ).filter((x) => x !== t),
+                  });
+                  setPollWriteIn("");
+                }}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+              >
+                Submit vote
+              </button>
+            </div>
+            {structuredWriteInMine ? (
+              <p className="mt-2 text-xs text-indigo-900 dark:text-indigo-100">
+                Your vote:{" "}
+                <span className="font-semibold">{viewerPrimaryPick}</span>. Change it anytime.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {isBudgetPoll ? (
           <div
             className={`mt-4 rounded-xl border p-3 dark:border-white/10 ${
@@ -1307,7 +1487,7 @@ function DecisionCard({
             </div>
             {customMine ? (
               <p className="mt-2 text-xs text-indigo-800 dark:text-indigo-200">
-                Your vote: {formatBudgetPollChipLabel(mine)}
+                Your vote: {formatBudgetPollChipLabel(viewerPrimaryPick)}
               </p>
             ) : null}
           </div>
@@ -1318,28 +1498,137 @@ function DecisionCard({
 
   if (meta.kind === "binary" || meta.kind === "generic") {
     const opts = meta.options ?? ["Yes", "No"];
-    const mine = readScalarVote(votes, visitorKey, canonicalVoterKey);
     const kind = meta.kind === "generic" ? "generic" : "binary";
+    const kindThumbsDown = tallyAgainstVotesForOptions(votes, opts);
+    const genericWriteInSelected =
+      viewerPrimaryPick != null && !opts.includes(viewerPrimaryPick) && isAllowedPollWriteIn(viewerPrimaryPick, opts);
+
+    function submitBinaryWithAgainst(primary: string, nextAgainst: string[]) {
+      void onVote({
+        decisionKey: meta.key,
+        kind,
+        option: primary,
+        againstOptions: nextAgainst.filter((x) => x !== primary),
+      });
+    }
+
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Group vote · {voterN} vote(s)</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {opts.map((opt) => (
-            <button
-              key={opt}
-              type="button"
+        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+          Group vote · {voterN} vote(s) — pick what fits, flag lines you dislike, or add another idea.
+        </p>
+        <ul className="mt-4 space-y-2.5">
+          {opts.map((opt) => {
+            const groupNo = kindThumbsDown[opt] ?? 0;
+            const forSel = viewerPrimaryPick === opt;
+            const myNo =
+              viewerPrimaryPick != null ? serverAgainstChoices.includes(opt) : againstPrep.includes(opt);
+
+            return (
+              <li
+                key={opt}
+                className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                  forSel
+                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                  {groupNo > 0 ? (
+                    <p className="text-xs text-rose-700 dark:text-rose-300">
+                      {groupNo} traveler{groupNo === 1 ? " " : "s "}
+                      marked &ldquo;not for me&rdquo;
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      const base =
+                        viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
+                      submitBinaryWithAgainst(opt, base.filter((x) => x !== opt));
+                    }}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                      forSel
+                        ? "bg-indigo-700 text-white dark:bg-indigo-500"
+                        : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                    }`}
+                  >
+                    Vote for
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || (viewerPrimaryPick != null && forSel)}
+                    onClick={() => {
+                      if (viewerPrimaryPick != null) {
+                        const toggle = serverAgainstChoices.includes(opt)
+                          ? serverAgainstChoices.filter((x) => x !== opt)
+                          : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
+                        submitBinaryWithAgainst(viewerPrimaryPick, toggle);
+                        return;
+                      }
+                      setAgainstPrep((prev) =>
+                        prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+                      );
+                    }}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
+                      myNo
+                        ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
+                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                    }`}
+                  >
+                    Not for me
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            Prefer something else?
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              autoComplete="off"
+              maxLength={80}
+              value={pollWriteIn}
+              onChange={(e) => setPollWriteIn(e.target.value)}
+              placeholder='e.g. "Train split" · "Defer to host"'
               disabled={busy}
-              onClick={() => onVote({ decisionKey: meta.key, kind, option: opt })}
-              className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
-                mine === opt
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                  : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
-              }`}
+              className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            />
+            <button
+              type="button"
+              disabled={busy || !isAllowedPollWriteIn(pollWriteIn, opts)}
+              onClick={() => {
+                const t = pollWriteIn.trim();
+                if (!isAllowedPollWriteIn(t, opts)) return;
+                void onVote({
+                  decisionKey: meta.key,
+                  kind,
+                  option: t,
+                  againstOptions: (
+                    viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
+                  ).filter((x) => x !== t),
+                });
+                setPollWriteIn("");
+              }}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
             >
-              {opt}
+              Submit vote
             </button>
-          ))}
+          </div>
+          {genericWriteInSelected ? (
+            <p className="mt-2 text-xs text-indigo-900 dark:text-indigo-100">
+              Your vote: <span className="font-semibold">{viewerPrimaryPick}</span>.
+            </p>
+          ) : null}
         </div>
       </section>
     );
@@ -1380,7 +1669,6 @@ function DecisionCard({
   }
 
   if (meta.kind === "hotel" && hotels?.length) {
-    const mine = readScalarVote(votes, visitorKey, canonicalVoterKey);
     return (
       <DatesLockedGate active={blockedByDates}>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -1395,7 +1683,7 @@ function DecisionCard({
               <li
                 key={h.id}
                 className={`rounded-xl border px-4 py-3 ${
-                  mine === h.id
+                  viewerPrimaryPick === h.id
                     ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
                     : "border-slate-200 bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
                 }`}
@@ -1427,7 +1715,7 @@ function DecisionCard({
                       disabled={busy || blockedByDates}
                       onClick={() => onVote({ decisionKey: meta.key, kind: "hotel", hotelId: h.id })}
                       className={`rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40 ${
-                        mine === h.id
+                        viewerPrimaryPick === h.id
                           ? "bg-indigo-700 text-white dark:bg-indigo-500"
                           : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}

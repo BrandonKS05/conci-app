@@ -320,6 +320,95 @@ export function votesCoveringCalendarDay(
   return sum;
 }
 
+/** First day of meteorological-ish season windows (helps vague “summer”, “spring” copy). */
+const SEASON_START_MONTH: Record<string, number> = {
+  spring: 2,
+  summer: 5,
+  fall: 8,
+  autumn: 8,
+  winter: 11,
+};
+
+const MONTH_NAME_RE =
+  /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/gi;
+
+/**
+ * When `parseDateOptionToRange` yields nothing useful, infer month/year hints from fuzzy phrases
+ * (“late May”, “June-ish”, “summer 2026”, “maybe May or June”).
+ */
+export function extractLooseCalendarAnchorsFromText(raw: string, defaultYear: number): Date[] {
+  const s = normalizeDashes(raw).trim();
+  if (!s || /^TBD\b/i.test(s)) return [];
+
+  let y = defaultYear;
+  const yMatch = s.match(/\b(20[0-9]{2})\b/);
+  if (yMatch) y = parseInt(yMatch[1]!, 10);
+
+  const out: Date[] = [];
+
+  for (const word of Object.keys(SEASON_START_MONTH)) {
+    if (new RegExp(`\\b${word}\\b`, "i").test(s)) {
+      out.push(ymd(y, SEASON_START_MONTH[word]!, 1));
+    }
+  }
+
+  const quarter = s.match(/\bQ([1-4])\b/i);
+  if (quarter) {
+    const qi = parseInt(quarter[1]!, 10);
+    const m0 = (qi - 1) * 3;
+    out.push(ymd(y, m0, 1));
+  }
+
+  MONTH_NAME_RE.lastIndex = 0;
+  let mr: RegExpExecArray | null;
+  while ((mr = MONTH_NAME_RE.exec(s)) !== null) {
+    const mo = monthFromToken(mr[1]!);
+    if (mo != null) out.push(ymd(y, mo, 1));
+  }
+
+  return out;
+}
+
+/** True when a host-style date clue (month/summer/quarter…) in `option` also appears in the user’s wording. Used to keep fuzzy `dates.options` after grounding while still resisting invented dates. */
+export function looseDateOptionOverlapsUserText(option: string, userLower: string): boolean {
+  const o = normalizeDashes(option);
+  MONTH_NAME_RE.lastIndex = 0;
+  let mr: RegExpExecArray | null;
+  while ((mr = MONTH_NAME_RE.exec(o)) !== null) {
+    const needle = mr[1]!.toLowerCase();
+    if (needle.length >= 3 && userLower.includes(needle)) return true;
+  }
+
+  for (const word of Object.keys(SEASON_START_MONTH)) {
+    if (new RegExp(`\\b${word}\\b`, "i").test(o) && new RegExp(`\\b${word}\\b`, "i").test(userLower)) {
+      return true;
+    }
+  }
+
+  const qOpt = o.match(/\bQ([1-4])\b/i);
+  if (qOpt && userLower.includes(qOpt[0]!.toLowerCase())) return true;
+
+  return false;
+}
+
+/**
+ * Prefer the earliest concrete range from ballot options; otherwise open the picker on the first
+ * month implied by fuzzy host copy (months, seasons, quarters) across all option strings.
+ */
+export function inferCalendarOpenDateFromDateOptions(opts: string[], fallbackYear: number): Date {
+  const parsed = buildParsedDateOptions(opts, fallbackYear);
+  const earlyConcrete = earliestParsedDay(parsed);
+  if (earlyConcrete) return startOfLocalDay(earlyConcrete);
+
+  const y0 = inferDefaultYearFromDateOptions(opts, fallbackYear);
+  const loose: Date[] = [];
+  for (const o of opts) loose.push(...extractLooseCalendarAnchorsFromText(o, y0));
+  if (loose.length === 0) return startOfLocalDay(new Date());
+
+  loose.sort((a, b) => localDayTime(a) - localDayTime(b));
+  return startOfLocalDay(loose[0]!);
+}
+
 export function earliestParsedDay(parsed: ParsedDateOption[]): Date | null {
   if (!parsed.length) return null;
   let t = Infinity;

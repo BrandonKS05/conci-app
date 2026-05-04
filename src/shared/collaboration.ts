@@ -2,6 +2,10 @@ import {
   budgetVoteNumericUsd,
   isValidBudgetCustomVoteToken,
 } from "@/shared/budget-poll";
+import {
+  coerceScalarVoteChoice,
+  isAllowedPollWriteIn,
+} from "@/shared/collab-pick-vote";
 import { inferDefaultYearFromDateOptions, isAllowedDateVoteOption } from "@/shared/date-option-parse";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
@@ -322,12 +326,16 @@ export function tryLockDecision(
     const opts = meta.options ?? ["Yes", "No"];
     const tally: Record<string, number> = {};
     for (const o of opts) tally[o] = 0;
-    for (const v of Object.values(votes)) {
-      if (typeof v === "string" && opts.includes(v)) {
-        tally[v] = (tally[v] ?? 0) + 1;
-      }
+    const extras: string[] = [];
+    for (const raw of Object.values(votes)) {
+      const choice = coerceScalarVoteChoice(raw);
+      if (!choice) continue;
+      tally[choice] = (tally[choice] ?? 0) + 1;
+      if (!opts.includes(choice) && !extras.includes(choice)) extras.push(choice);
     }
-    const winner = pluralityWinner(tally, opts);
+    extras.sort((a, b) => a.localeCompare(b));
+    const preferenceOrder = [...opts, ...extras];
+    const winner = pluralityWinner(tally, preferenceOrder);
     if (winner) {
       return { ...blob, locked: winner };
     }
@@ -345,21 +353,27 @@ export function tryLockDecision(
         acc[r.name] = r.id;
         return acc;
       }, {}) ?? {};
-    for (const v of Object.values(votes)) {
-      if (typeof v !== "string") continue;
-      if (voteKeys.includes(v)) {
-        tally[v] = (tally[v] ?? 0) + 1;
-      } else if (idByName[v]) {
-        const id = idByName[v]!;
+    const allowStructuredWriteIn =
+      !list?.length && meta.key !== BUDGET_POLL_DECISION_KEY && meta.key !== VENUE_POLL_DECISION_KEY;
+
+    for (const raw of Object.values(votes)) {
+      const choice = coerceScalarVoteChoice(raw);
+      if (!choice) continue;
+      if (voteKeys.includes(choice)) {
+        tally[choice] = (tally[choice] ?? 0) + 1;
+      } else if (idByName[choice]) {
+        const id = idByName[choice]!;
         tally[id] = (tally[id] ?? 0) + 1;
-      } else if (!list?.length && pickTexts.includes(v)) {
-        tally[v] = (tally[v] ?? 0) + 1;
+      } else if (!list?.length && pickTexts.includes(choice)) {
+        tally[choice] = (tally[choice] ?? 0) + 1;
       } else if (
         !list?.length &&
         meta.key === BUDGET_POLL_DECISION_KEY &&
-        isValidBudgetCustomVoteToken(v)
+        isValidBudgetCustomVoteToken(choice)
       ) {
-        tally[v] = (tally[v] ?? 0) + 1;
+        tally[choice] = (tally[choice] ?? 0) + 1;
+      } else if (allowStructuredWriteIn && isAllowedPollWriteIn(choice, pickTexts)) {
+        tally[choice] = (tally[choice] ?? 0) + 1;
       }
     }
     let preferenceOrder = voteKeys;
@@ -372,6 +386,11 @@ export function tryLockDecision(
           if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
           return a.localeCompare(b);
         });
+      preferenceOrder = [...voteKeys, ...extras];
+    } else if (allowStructuredWriteIn) {
+      const extras = Object.keys(tally)
+        .filter((k) => !voteKeys.includes(k) && (tally[k] ?? 0) > 0)
+        .sort((a, b) => a.localeCompare(b));
       preferenceOrder = [...voteKeys, ...extras];
     }
     const winner = pluralityWinner(tally, preferenceOrder);

@@ -1,4 +1,5 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
+import { looseDateOptionOverlapsUserText } from "@/shared/date-option-parse";
 import { parseItineraryLiveCuration, type ItineraryLiveCuration } from "@/shared/itinerary-live-curation";
 
 /** Narrowed votes the app surfaced (≤3 options each). Omit or empty = no poll for that axis. */
@@ -247,7 +248,8 @@ function filterDatesOptionsByUserText(options: string[], userLower: string): str
     const t = o.trim().toLowerCase();
     if (!t) return false;
     if (userLower.includes(t)) return true;
-    return textChunkMentionedInUserInput(o, userLower);
+    if (textChunkMentionedInUserInput(o, userLower)) return true;
+    return looseDateOptionOverlapsUserText(o, userLower);
   });
 }
 
