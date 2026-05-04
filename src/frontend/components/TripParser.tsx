@@ -33,6 +33,7 @@ import {
   INVALID_TRIP_INPUT_REPLY,
   isClearlyGibberish,
   looksLikeMeaninglessTripSeed,
+  looksLikeStandalonePeopleCount,
 } from "@/shared/trip-input-quality";
 
 type SlotKey = "location" | "dates" | "people" | "budget" | "vibe";
@@ -777,8 +778,16 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       return;
     }
 
-    if (slotKey !== "dates" && isClearlyGibberish(answer)) {
-      setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: GIBBERISH_SLOT_REPLY }]);
+    const peopleCountOk =
+      slotKey === "people" &&
+      looksLikeStandalonePeopleCount(answer);
+    if (slotKey !== "dates" && !peopleCountOk && isClearlyGibberish(answer)) {
+      const userBubbleId = newId();
+      setMessages((prev) => [
+        ...prev,
+        { id: userBubbleId, role: "user", text: answer },
+        { id: newId(), role: "assistant", text: GIBBERISH_SLOT_REPLY },
+      ]);
       setReplyDraft("");
       setActiveSlot(activeSlot);
       return;

@@ -232,22 +232,10 @@
   background: rgb(67 56 202 / 0.55);
 }
 
-/* Host suggestions on the ballot */
-.conci-datepicker-shell .react-datepicker__day.conci-datepicker-day--host-range:not(.react-datepicker__day--outside-month) {
-  background: rgb(224 231 255);
-  font-weight: 500;
-}
-
-.dark
-  .conci-datepicker-shell
-  .react-datepicker__day.conci-datepicker-day--host-range:not(.react-datepicker__day--outside-month) {
-  background: rgb(49 46 129 / 0.55);
-}
-
 /* At least one traveler’s range includes this day */
 .conci-datepicker-shell
-  .react-datepicker__day.conci-datepicker-day--votes:not(.conci-datepicker-day--host-range):not(
-    .react-datepicker__day--in-range
+  .react-datepicker__day.conci-datepicker-day--votes:not(.react-datepicker__day--in-range):not(
+    .react-datepicker__day--in-selecting-range
   ) {
   outline: 1px solid rgb(165 180 252 / 0.75);
   outline-offset: -1px;
@@ -255,8 +243,8 @@
 
 .dark
   .conci-datepicker-shell
-  .react-datepicker__day.conci-datepicker-day--votes:not(.conci-datepicker-day--host-range):not(
-    .react-datepicker__day--in-range
+  .react-datepicker__day.conci-datepicker-day--votes:not(.react-datepicker__day--in-range):not(
+    .react-datepicker__day--in-selecting-range
   ) {
   outline-color: rgb(129 140 248 / 0.45);
 }

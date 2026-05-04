@@ -5,12 +5,17 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { migrateVoterVoteKeys } from "@/shared/collab-vote-keys";
 import {
+  BUDGET_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
   parseCollabState,
   tryLockDecision,
   type CollabStateV1,
 } from "@/shared/collaboration";
+import {
+  isValidBudgetCustomVoteToken,
+  parseBudgetCustomAmountInput,
+} from "@/shared/budget-poll";
 import { inferDefaultYearFromDateOptions, isAllowedDateVoteOption } from "@/shared/date-option-parse";
 import { normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
@@ -124,6 +129,18 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
     } else if (labels.includes(body.option)) {
       canon = body.option;
+    } else if (
+      meta.key === BUDGET_POLL_DECISION_KEY &&
+      ids.length === 0 &&
+      (parseBudgetCustomAmountInput(body.option) ||
+        isValidBudgetCustomVoteToken(body.option))
+    ) {
+      const normalized =
+        parseBudgetCustomAmountInput(body.option) ?? body.option.trim();
+      if (!isValidBudgetCustomVoteToken(normalized)) {
+        return NextResponse.json({ error: "Invalid option" }, { status: 400 });
+      }
+      canon = normalized;
     } else {
       return NextResponse.json({ error: "Invalid option" }, { status: 400 });
     }

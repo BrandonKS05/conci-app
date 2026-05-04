@@ -11,11 +11,17 @@ import {
   decisionDependsOnDatesLocked,
   isDecisionLocked,
   parseCollabState,
+  BUDGET_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
   type ClassifiedDecision,
   type CollabDecisionBlob,
   type CollabStateV1,
 } from "@/shared/collaboration";
+import {
+  formatBudgetPollChipLabel,
+  isValidBudgetCustomVoteToken,
+  parseBudgetCustomAmountInput,
+} from "@/shared/budget-poll";
 import { visitorVoteKey } from "@/shared/collab-vote-keys";
 import { tripLiveRecommendationsContextFingerprint, type TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
@@ -711,7 +717,12 @@ function resolvedCelebrationHeadline(meta: ClassifiedDecision, blob: CollabDecis
       const n = (L as { name: string }).name?.trim();
       if (n) return `Group picked · ${n}`;
     }
-    const label = typeof L === "string" ? L : "";
+    const label =
+      typeof L === "string"
+        ? meta.key === BUDGET_POLL_DECISION_KEY
+          ? formatBudgetPollChipLabel(L)
+          : L
+        : "";
     return label.trim() ? `Group picked · ${label}` : "Vote locked";
   }
   return meta.label ? `Done · ${meta.label}` : "Decision locked";
@@ -737,7 +748,11 @@ function formatResolvedDetail(meta: ClassifiedDecision, blob: CollabDecisionBlob
     return `${base}.`;
   }
   if (meta.kind === "pick") {
-    if (typeof L === "string") return `"${L}" carried the poll.`;
+    if (typeof L === "string") {
+      return meta.key === BUDGET_POLL_DECISION_KEY
+        ? `${formatBudgetPollChipLabel(L)} carried the poll.`
+        : `"${L}" carried the poll.`;
+    }
     if (typeof L === "object" && L !== null && "name" in L)
       return `${(L as { name: string }).name} is locked for this choice.`;
   }
@@ -793,6 +808,7 @@ function DecisionCard({
 }) {
   const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [hotelSearchErr, setHotelSearchErr] = useState<string | null>(null);
+  const [budgetCustom, setBudgetCustom] = useState("");
 
   const hotels = (blob?.hotels ?? meta.hotels) as HotelPick[] | undefined;
   const spots = (blob?.restaurants ?? meta.restaurants) as RestaurantPick[] | undefined;
@@ -930,6 +946,12 @@ function DecisionCard({
       );
     }
 
+    const isBudgetPoll = meta.key === BUDGET_POLL_DECISION_KEY;
+    const customMine =
+      typeof mine === "string" &&
+      !opts.includes(mine) &&
+      isValidBudgetCustomVoteToken(mine);
+
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
@@ -947,10 +969,53 @@ function DecisionCard({
                   : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
               }`}
             >
-              {opt}
+              {isBudgetPoll ? formatBudgetPollChipLabel(opt) : opt}
             </button>
           ))}
         </div>
+        {isBudgetPoll ? (
+          <div
+            className={`mt-4 rounded-xl border p-3 dark:border-white/10 ${
+              customMine
+                ? "border-indigo-500 bg-indigo-50/80 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/30 dark:ring-indigo-500/30"
+                : "border-slate-200 bg-slate-50/80 dark:bg-dm-elevated/50"
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+              Custom amount
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="e.g. 75"
+                value={budgetCustom}
+                onChange={(e) => setBudgetCustom(e.target.value)}
+                disabled={busy}
+                className="w-28 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+              />
+              <button
+                type="button"
+                disabled={busy || !parseBudgetCustomAmountInput(budgetCustom)}
+                onClick={() => {
+                  const p = parseBudgetCustomAmountInput(budgetCustom);
+                  if (!p) return;
+                  onVote({ decisionKey: meta.key, kind: "pick", option: p });
+                  setBudgetCustom("");
+                }}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+              >
+                Vote
+              </button>
+            </div>
+            {customMine ? (
+              <p className="mt-2 text-xs text-indigo-800 dark:text-indigo-200">
+                Your vote: {formatBudgetPollChipLabel(mine)}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     );
   }

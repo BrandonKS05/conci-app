@@ -1,3 +1,7 @@
+import {
+  budgetVoteNumericUsd,
+  isValidBudgetCustomVoteToken,
+} from "@/shared/budget-poll";
 import { inferDefaultYearFromDateOptions, isAllowedDateVoteOption } from "@/shared/date-option-parse";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
@@ -33,6 +37,8 @@ type PollSynthRow = {
 };
 /** Food poll stable key — used for richer restaurant cards vs generic picks */
 export const VENUE_POLL_DECISION_KEY = "p_eat" as const;
+/** Budget-per-person poll — allows custom dollar amounts beyond curated picks */
+export const BUDGET_POLL_DECISION_KEY = "p_budget" as const;
 
 const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "destinations", key: "p_dest", label: "Destination" },
@@ -348,9 +354,27 @@ export function tryLockDecision(
         tally[id] = (tally[id] ?? 0) + 1;
       } else if (!list?.length && pickTexts.includes(v)) {
         tally[v] = (tally[v] ?? 0) + 1;
+      } else if (
+        !list?.length &&
+        meta.key === BUDGET_POLL_DECISION_KEY &&
+        isValidBudgetCustomVoteToken(v)
+      ) {
+        tally[v] = (tally[v] ?? 0) + 1;
       }
     }
-    const winner = pluralityWinner(tally, voteKeys);
+    let preferenceOrder = voteKeys;
+    if (!list?.length && meta.key === BUDGET_POLL_DECISION_KEY) {
+      const extras = Object.keys(tally)
+        .filter((k) => !voteKeys.includes(k) && (tally[k] ?? 0) > 0)
+        .sort((a, b) => {
+          const na = budgetVoteNumericUsd(a);
+          const nb = budgetVoteNumericUsd(b);
+          if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+          return a.localeCompare(b);
+        });
+      preferenceOrder = [...voteKeys, ...extras];
+    }
+    const winner = pluralityWinner(tally, preferenceOrder);
     if (winner && list?.length) {
       const hit = list.find((r) => r.id === winner);
       return { ...blob, locked: hit ? { id: hit.id, name: hit.name } : { id: winner, name: winner } };

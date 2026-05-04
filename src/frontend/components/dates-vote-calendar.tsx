@@ -140,15 +140,11 @@ export function DatesVoteCalendar({
     return formatLocalIsoDate(d) === mine.trim();
   }
 
-  function dayInHostRange(d: Date): boolean {
-    return parsed.some((p) => isDayInRange(d, p.start, p.end));
-  }
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-neutral-400">
         Votes: {voterN}/{quorum}+ to lock. Tap a start date, then an end date (both inclusive). Tap the same day twice
-        for a one-day trip. Indigo shading = host suggestion. The small number under a day counts how many travelers’
+        for a one-day trip. The small number under a day counts how many travelers’
         ranges include that date.
       </p>
 
@@ -188,7 +184,6 @@ export function DatesVoteCalendar({
             )}
             dayClassName={(d: Date) => {
               const parts: string[] = [];
-              if (dayInHostRange(d)) parts.push("conci-datepicker-day--host-range");
               if (votesCoveringCalendarDay(d, tally, y0) > 0) parts.push("conci-datepicker-day--votes");
               if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
               return parts.join(" ");

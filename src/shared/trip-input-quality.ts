@@ -13,6 +13,60 @@ const CITYISH =
 
 const HAS_GEO_OR_MONEY = /\$\d|\d\s*(?:people|guest|person|travelers?|nights?|days?)|\d\s*-\s*\d|\d\+\s*(?:people|guests)/i;
 
+/**
+ * Reply to "How many people are coming?" — digits-only or digits + common headcount phrasing.
+ * Kept permissive here so single digits are not flagged as gibberish in the people slot.
+ */
+export function looksLikeStandalonePeopleCount(text: string): boolean {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (!t.length) return false;
+
+  /* e.g. "6", "8 people", "12 guests", "4 of us" */
+  const m =
+    /^(\d{1,3})(?:\s+(?:people\b|persons?\b|guests?\b|travelers?\b|traveler\b|heads?\b|pax\b|of\s+us\b))?$/i.exec(
+      t
+    );
+  if (m?.[1]) {
+    const n = Number.parseInt(m[1], 10);
+    return Number.isFinite(n) && n >= 1 && n <= 500;
+  }
+
+  /** Spelled small counts from voice/UI ("six", "twelve"). */
+  const wordMap: Record<string, number> = {
+    zero: 0,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+  };
+  const wordOnly =
+    /^([a-z]+)(?:\s+(?:people|persons|person|guests|guest|travelers|traveler|heads|pax)\b|\s+of\s+us\b)?$/i.exec(t);
+  if (wordOnly?.[1]) {
+    const key = wordOnly[1].toLowerCase();
+    const n = wordMap[key];
+    if (n != null && n >= 1 && n <= 500) return true;
+    if (n === 0) return false;
+  }
+
+  return false;
+}
+
 /** Keyboard mash / placeholder — use for slots and coarse first-pass. */
 export function isClearlyGibberish(text: string): boolean {
   const t = text.trim();

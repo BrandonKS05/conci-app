@@ -1,3 +1,4 @@
+import { formatBudgetPollChipLabel } from "@/shared/budget-poll";
 import type { TripPlan } from "@/shared/trip-plan";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
@@ -261,7 +262,7 @@ export function TripPlanCard({
                         key={`${label}-${chip}`}
                         className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs dark:border-violet-500/40 dark:bg-violet-950/40 dark:text-violet-200"
                       >
-                        {chip}
+                        {label === "Budget bands" ? formatBudgetPollChipLabel(chip) : chip}
                       </span>
                     ))}
                   </div>
