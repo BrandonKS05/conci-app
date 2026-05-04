@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   buildClassifiedDecisions,
   collaborationQuorum,
@@ -110,23 +109,6 @@ function readPeopleVoteRow(
   return {};
 }
 
-/** Fixed rail: portaled to `document.body` so no ancestor transform/contain can shrink it. */
-function GroupProgressDockedAside({ children }: { children: ReactNode }) {
-  return (
-    <aside
-      aria-label="Group progress"
-      className="box-border hidden max-h-[min(85vh,40rem)] min-h-0 overflow-y-auto overscroll-contain font-body lg:fixed lg:top-1/2 lg:z-[35] lg:block lg:-translate-y-1/2"
-      style={{
-        right: "max(0.75rem, env(safe-area-inset-right, 0px))",
-        boxSizing: "border-box",
-        width: "min(320px, calc(100vw - 24px))",
-      }}
-    >
-      {children}
-    </aside>
-  );
-}
-
 export function TripCollaborationPanel({
   tripId,
   plan,
@@ -161,13 +143,8 @@ export function TripCollaborationPanel({
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
   const [transportMode, setTransportMode] = useState<"fly" | "drive">("fly");
-  const [dockGroupProgressAside, setDockGroupProgressAside] = useState(false);
 
   const transportStorageKey = `conci_trip_transport_${tripId}`;
-
-  useLayoutEffect(() => {
-    setDockGroupProgressAside(true);
-  }, []);
 
   useEffect(() => {
     try {
@@ -417,10 +394,8 @@ export function TripCollaborationPanel({
   const renderGroupProgressCard = () => (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:shadow-[0_22px_55px_rgba(15,23,42,0.14)] lg:ring-1 lg:ring-slate-200/60 dark:lg:shadow-[0_26px_70px_rgba(0,0,0,0.42)] dark:lg:ring-white/10">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="min-w-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-          Group progress
-        </p>
-        <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Group progress</p>
+        <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
           {lockedCount}/{total} decisions locked
         </span>
       </div>
@@ -574,14 +549,20 @@ export function TripCollaborationPanel({
       {!showReady ? (
         <>
           <div className="relative z-10 lg:hidden">{renderGroupProgressCard()}</div>
-          {dockGroupProgressAside ? (
-            createPortal(
-              <GroupProgressDockedAside>{renderGroupProgressCard()}</GroupProgressDockedAside>,
-              document.body
-            )
-          ) : (
-            <GroupProgressDockedAside>{renderGroupProgressCard()}</GroupProgressDockedAside>
-          )}
+          {/* Full-viewport positioning shell avoids narrow layout ancestors shrinking a fixed aside */}
+          <aside
+            aria-label="Group progress"
+            className="pointer-events-none fixed inset-x-0 top-0 z-[35] hidden h-0 overflow-visible lg:block"
+          >
+            <div
+              className="pointer-events-auto absolute top-[50vh] max-h-[min(85vh,40rem)] w-80 max-w-[calc(100vw_-_2rem)] -translate-y-1/2 overflow-y-auto overscroll-contain"
+              style={{
+                right: "max(1rem, env(safe-area-inset-right, 0px))",
+              }}
+            >
+              {renderGroupProgressCard()}
+            </div>
+          </aside>
         </>
       ) : null}
 
