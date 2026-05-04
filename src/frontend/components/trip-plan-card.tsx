@@ -281,13 +281,11 @@ export function TripPlanCard({
           {plan.openDecisions.length ? (
             <ul className="space-y-2">
               {plan.openDecisions.map((decision) => (
-                <li key={decision} className="flex items-start gap-2 text-sm text-slate-700 dark:text-neutral-300">
-                  <input
-                    type="checkbox"
-                    readOnly
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-white/20"
-                  />
-                  <span>{decision}</span>
+                <li
+                  key={decision}
+                  className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200"
+                >
+                  {decision}
                 </li>
               ))}
             </ul>

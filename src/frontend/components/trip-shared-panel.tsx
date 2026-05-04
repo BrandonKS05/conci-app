@@ -154,6 +154,7 @@ export function TripSharedPanel({
         tripStatus={tripStatus}
         isHost={isHost}
         collabRefreshSignal={collabRefreshSignal}
+        onPlanUpdated={setPlan}
       />
 
       <TripCardChatWidget

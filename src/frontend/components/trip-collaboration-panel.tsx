@@ -23,6 +23,13 @@ import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/res
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
+import {
+  CuratedExperiencesSection,
+  CuratedFlightsRows,
+  CuratedRestaurantsSection,
+  LiveCurationErrorBanner,
+  useLiveCurationMutation,
+} from "@/frontend/components/trip-plan-live-curate";
 
 type CollabPayload = {
   collab: CollabStateV1;
@@ -80,6 +87,7 @@ export function TripCollaborationPanel({
   tripStatus,
   isHost,
   collabRefreshSignal = 0,
+  onPlanUpdated,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -87,6 +95,8 @@ export function TripCollaborationPanel({
   isHost: boolean;
   /** Increment to refetch collaboration payload (e.g. after trip card chat / spotlight votes). */
   collabRefreshSignal?: number;
+  /** Called after live suggestion curation is saved (restaurants, experiences, flights). */
+  onPlanUpdated?: (plan: TripPlan) => void;
 }) {
   const router = useRouter();
   const [data, setData] = useState<CollabPayload | null>(null);
@@ -490,12 +500,14 @@ export function TripCollaborationPanel({
       ) : null}
 
       <TripPlanLiveBlocks
+        tripId={tripId}
         plan={plan}
         liveData={liveData}
         liveLoading={liveLoading}
         liveFetchErr={liveFetchErr}
         transportMode={transportMode}
         onTransportModeChange={setTransportMode}
+        onPlanUpdated={onPlanUpdated}
       />
     </div>
   );
@@ -506,24 +518,33 @@ function googleMapsDirUrl(origin: string, dest: string): string {
 }
 
 function TripPlanLiveBlocks({
+  tripId,
   plan,
   liveData,
   liveLoading,
   liveFetchErr,
   transportMode,
   onTransportModeChange,
+  onPlanUpdated,
 }: {
+  tripId: string;
   plan: TripPlan;
   liveData: TripLiveRecommendationsPayload | null;
   liveLoading: boolean;
   liveFetchErr: string | null;
   transportMode: "fly" | "drive";
   onTransportModeChange: (m: "fly" | "drive") => void;
+  onPlanUpdated?: (plan: TripPlan) => void;
 }) {
+  const { mutate, busyKey, err, setErr } = useLiveCurationMutation(tripId, onPlanUpdated);
   const showRestaurants = Boolean(plan.location?.trim());
   const showExperiences = Boolean(plan.location?.trim());
   const showTransport =
     Boolean(plan.departureCity?.trim()) && Boolean(plan.location?.trim());
+
+  const flights = liveData?.flights ?? [];
+  const restaurants = liveData?.restaurants ?? [];
+  const experiences = liveData?.experiences ?? [];
 
   return (
     <div className="space-y-8 pt-4">
@@ -532,6 +553,8 @@ function TripPlanLiveBlocks({
           {liveFetchErr}
         </p>
       ) : null}
+
+      {err ? <LiveCurationErrorBanner message={err} onDismiss={() => setErr(null)} /> : null}
 
       {showTransport ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -566,35 +589,14 @@ function TripPlanLiveBlocks({
 
           {transportMode === "fly" ? (
             <div className="mt-4">
-              {liveLoading ? (
-                <p className="text-sm text-slate-600 dark:text-neutral-400">Loading flights…</p>
-              ) : liveData?.flightsError ? (
-                <p className="text-sm text-amber-800 dark:text-amber-200/90">{liveData.flightsError}</p>
-              ) : (liveData?.flights?.length ?? 0) > 0 ? (
-                <ul className="space-y-3">
-                  {liveData!.flights.map((f, i) => (
-                    <li
-                      key={`${f.airline}-${i}`}
-                      className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
-                    >
-                      <p className="font-semibold text-slate-900 dark:text-neutral-100">{f.airline}</p>
-                      <p className="text-sm text-slate-600 dark:text-neutral-400">Departs {f.departureTime}</p>
-                      <p className="text-sm text-slate-600 dark:text-neutral-400">Duration {f.duration}</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{f.pricePerPerson}</p>
-                      <a
-                        href={f.bookOnGoogleFlightsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-50 dark:border-sky-500/30 dark:bg-dm-page dark:text-sky-200 dark:hover:bg-sky-950/40"
-                      >
-                        Book on Google Flights
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-600 dark:text-neutral-400">No flight rows yet (check SERPAPI_KEY).</p>
-              )}
+              <CuratedFlightsRows
+                plan={plan}
+                flights={flights}
+                liveLoading={liveLoading}
+                flightsError={liveData?.flightsError ?? null}
+                mutate={(a, k) => void mutate(a, k)}
+                busyKey={busyKey}
+              />
             </div>
           ) : (
             <div className="mt-4 space-y-3">
@@ -641,91 +643,25 @@ function TripPlanLiveBlocks({
       ) : null}
 
       {showRestaurants ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
-            Restaurants (live)
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            OpenTable Data API on RapidAPI (elis-lab): destination, party size, and first parseable date when the
-            provider accepts them. Dinner vote cards merge these rows when a venue poll is open.
-          </p>
-          {liveLoading ? (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
-          ) : liveData?.restaurantsError ? (
-            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.restaurantsError}</p>
-          ) : (liveData?.restaurants?.length ?? 0) > 0 ? (
-            <ul className="mt-4 space-y-3">
-              {liveData!.restaurants.map((r) => (
-                <li
-                  key={r.id}
-                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
-                >
-                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
-                  {r.cuisineType ? (
-                    <p className="text-sm text-slate-600 dark:text-neutral-400">{r.cuisineType}</p>
-                  ) : null}
-                  <p className="text-sm text-slate-600 dark:text-neutral-400">{r.neighborhood}</p>
-                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
-                  <a
-                    href={r.openTableUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"
-                  >
-                    {r.reserveCtaLabel ?? "Reserve on OpenTable"}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No live restaurant rows yet.</p>
-          )}
-        </section>
+        <CuratedRestaurantsSection
+          plan={plan}
+          restaurants={restaurants}
+          liveLoading={liveLoading}
+          restaurantsError={liveData?.restaurantsError ?? null}
+          mutate={(a, k) => void mutate(a, k)}
+          busyKey={busyKey}
+        />
       ) : null}
 
       {showExperiences ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
-            Top experiences
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            Powered by Google Places (Text Search). Set{" "}
-            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">GOOGLE_PLACES_API_KEY</code> in{" "}
-            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">.env.local</code>.
-          </p>
-          {liveLoading ? (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
-          ) : liveData?.experiencesError ? (
-            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.experiencesError}</p>
-          ) : (liveData?.experiences?.length ?? 0) > 0 ? (
-            <ul className="mt-4 space-y-3">
-              {liveData!.experiences.map((ex, i) => (
-                <li
-                  key={`${ex.name}-${i}`}
-                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
-                >
-                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{ex.name}</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{ex.pricePerPerson}</p>
-                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{ex.rating}</p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Duration: {ex.duration}</p>
-                  <a
-                    href={ex.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
-                  >
-                    Open booking link
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
-              No experiences found for this destination yet. Try a more specific city, or check back later.
-            </p>
-          )}
-        </section>
+        <CuratedExperiencesSection
+          plan={plan}
+          experiences={experiences}
+          liveLoading={liveLoading}
+          experiencesError={liveData?.experiencesError ?? null}
+          mutate={(a, k) => void mutate(a, k)}
+          busyKey={busyKey}
+        />
       ) : null}
     </div>
   );

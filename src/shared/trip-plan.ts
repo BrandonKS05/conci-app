@@ -1,4 +1,5 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
+import { parseItineraryLiveCuration, type ItineraryLiveCuration } from "@/shared/itinerary-live-curation";
 
 /** Narrowed votes the app surfaced (≤3 options each). Omit or empty = no poll for that axis. */
 export type TripPolls = {
@@ -46,6 +47,11 @@ export type TripPlan = {
   polls?: TripPolls;
   /** Named venues the user confirmed during chat (hotels, restaurants, activities). */
   spotlights?: PlaceSpotlight[];
+  /**
+   * Curated live rows (restaurants / experiences / flights): keys the group kept on the trip vs dismissed.
+   * See `@/shared/itinerary-live-curation` for key format.
+   */
+  itineraryLiveCuration?: ItineraryLiveCuration;
   nextStep: string | null;
   confidence: number;
 };
@@ -200,6 +206,7 @@ export function normalizePlan(value: unknown): TripPlan {
       : [],
     polls: normalizePolls(plan),
     spotlights: parseSpotlights(plan.spotlights),
+    itineraryLiveCuration: parseItineraryLiveCuration(plan.itineraryLiveCuration),
     nextStep: typeof plan.nextStep === "string" ? plan.nextStep : null,
     confidence: typeof plan.confidence === "number" ? Math.max(0, Math.min(1, plan.confidence)) : 0,
   };
