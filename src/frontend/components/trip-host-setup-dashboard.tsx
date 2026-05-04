@@ -16,6 +16,7 @@ import {
   type HostSetupState,
   type TripPlan,
 } from "@/shared/trip-plan";
+import { SiteShell } from "@/frontend/components/site-shell";
 import { restaurantPickToSpotlight } from "@/shared/restaurants";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 
@@ -362,9 +363,50 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
       ? { startIso: tripDisplayRange.startIso, endIso: tripDisplayRange.endIso }
       : null;
 
+  const completionCard = (
+    <div className="rounded-2xl border border-white/15 bg-neutral-950/85 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md sm:p-5">
+      <p className="text-sm font-semibold text-white">Your trip is {pct}% complete</p>
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-neutral-800">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-[width]"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <ul className="mt-4 space-y-2.5 text-xs sm:text-sm">
+        <li className={`flex justify-between gap-2 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+          <span>Dates {!hostHasConcreteTripRange(plan) ? "(req.)" : ""}</span>
+          {hostHasConcreteTripRange(plan) ? "✓" : "—"}
+        </li>
+        <li className={`flex justify-between gap-2 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+          <span>Hotel {!hostHasHotel(plan) ? "(req.)" : ""}</span>
+          {hostHasHotel(plan) ? "✓" : "—"}
+        </li>
+        <li className={`flex justify-between gap-2 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+          <span>Restaurant {!hostHasKeptRestaurant(plan) ? "(req.)" : ""}</span>
+          {hostHasKeptRestaurant(plan) ? "✓" : "—"}
+        </li>
+        <li className="flex justify-between gap-2 border-t border-white/10 pt-3 text-neutral-400">
+          <span>Experiences</span>
+          <span className="text-[11px] text-violet-300">{hostSetup.experiencesOutlined ? "Done" : "Optional"}</span>
+        </li>
+      </ul>
+      <p className="mt-4 border-t border-white/10 pt-3 text-[11px] leading-relaxed text-neutral-500">
+        Publish from the calendar toolbar when all required items are checked.
+      </p>
+      {err ? <p className="mt-2 text-center text-[11px] text-rose-400">{err}</p> : null}
+    </div>
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 lg:flex-row lg:gap-8">
-      <aside className="w-full shrink-0 space-y-4 lg:w-56 xl:w-64 lg:min-w-[220px]">
+    <SiteShell
+      title={plan.title || "Trip setup"}
+      eyebrow="Host setup"
+      tripTypography
+      titleRight={completionCard}
+      contentWide
+    >
+      <div className="mx-auto flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+      <aside className="w-full shrink-0 space-y-4 lg:w-52 xl:w-56 lg:min-w-[200px]">
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/60 shadow-lg">
           <div
             className="aspect-[16/11] bg-neutral-800 bg-cover bg-center"
@@ -389,24 +431,23 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
         </nav>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-10">
+      <div className="min-w-0 flex-1 space-y-10 lg:min-w-0">
         <section id="sec-dates" className="scroll-mt-28">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold tracking-tight text-white">Trip calendar</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-neutral-400">
+          <div className="mb-5">
+            <p className="max-w-3xl text-sm leading-relaxed text-neutral-400">
               {tripDisplayRange?.startIso
-                ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}. Tap start, then tap end — or redraw anytime. Bars show your hotel nights; dinners list inside each day.`
-                : "Select dates with two taps. The violet bar marks your nights once a range exists."}
+                ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap twice to change range. Meals show like events; the violet strip is your hotel stay.`
+                : "Tap two days to set your trip. The violet strip appears once dates are set."}
             </p>
             {rangeAnchor ? (
-              <p className="mt-3 text-xs font-medium text-amber-400">Select end date…</p>
+              <p className="mt-2 text-xs font-medium text-amber-400">Select end date…</p>
             ) : null}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
             {/* Header — toolbar like reference */}
-            <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
-              <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-8 sm:py-6">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
                 {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
               </h3>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -469,7 +510,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
               {WEEKDAY_MON_FIRST.map((w) => (
                 <div
                   key={w}
-                  className="border-l border-transparent py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 sm:text-xs sm:tracking-[0.18em]"
+                  className="border-l border-transparent py-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 sm:py-5 sm:text-[13px] sm:tracking-[0.16em]"
                 >
                   {w}
                 </div>
@@ -489,13 +530,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                 return (
                   <div key={`wk-${wi}`}>
                     {/* Gantt strip for trip / hotel */}
-                    <div className="relative h-11 border-b border-slate-100 bg-[#fafafb]">
+                    <div className="relative h-12 border-b border-slate-100 bg-[#fafafb] sm:h-14">
                       {segs.length > 0
                         ? segs.map((seg) => (
                             <div
                               key={`${wi}-${seg.start}-${seg.end}`}
                               title={hotelLabel}
-                              className="pointer-events-none absolute top-3 z-[1] h-7 truncate rounded-lg bg-violet-100 px-3 text-[11px] font-semibold leading-7 text-violet-950 shadow-inner ring-1 ring-violet-200/70"
+                              className="pointer-events-none absolute top-3.5 z-[1] h-8 truncate rounded-lg bg-violet-100 px-3 text-xs font-semibold leading-8 text-violet-950 shadow-inner ring-1 ring-violet-200/70 sm:top-4 sm:h-9 sm:leading-9"
                               style={{
                                 left: `calc(${seg.start} * (100% / 7) + 4px)`,
                                 width: `calc(${(seg.end - seg.start + 1) * (100 / 7)}% - 8px)`,
@@ -512,7 +553,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                           <div
                             key={`e-${wi}-${ci}`}
                             className={[
-                              "min-h-[6.75rem] border-b border-slate-200 bg-slate-50/40 sm:min-h-[7.75rem]",
+                              "min-h-[9rem] border-b border-slate-200 bg-slate-50/40 sm:min-h-[10.5rem] lg:min-h-[12rem]",
                               ci < 6 ? "border-r border-slate-200" : "",
                             ].join(" ")}
                           />
@@ -522,7 +563,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                             key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
                             onClick={() => onCalendarDayClick(dom)}
                             className={[
-                              "group flex min-h-[6.75rem] flex-col border-b border-slate-200 px-3 py-3 text-left align-top transition hover:bg-violet-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 sm:min-h-[7.75rem] sm:px-3.5 sm:py-4",
+                              "group flex min-h-[9rem] flex-col border-b border-slate-200 px-3 py-3 text-left align-top transition hover:bg-violet-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 sm:min-h-[10.5rem] sm:px-4 sm:py-4 lg:min-h-[12rem] lg:px-5 lg:py-5",
                               ci < 6 ? "border-r border-slate-200" : "",
                               inTripRangeCell(dom)
                                 ? "bg-violet-50/90"
@@ -535,11 +576,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                           >
                             <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
                               {isCalendarToday(dom) ? (
-                                <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white shadow-sm">
+                                <span className="flex h-8 min-w-[2rem] shrink-0 items-center justify-center rounded-full bg-violet-600 text-sm font-semibold text-white shadow-sm sm:h-9 sm:min-w-[2.25rem] sm:text-base">
                                   {dom}
                                 </span>
                               ) : (
-                                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500">{dom}</span>
+                                <span className="shrink-0 text-base font-semibold tabular-nums text-slate-500 sm:text-lg">
+                                  {dom}
+                                </span>
                               )}
                             </div>
 
@@ -701,46 +744,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
           </p>
         </section>
       </div>
-
-      <aside className="w-full shrink-0 lg:w-72">
-        <div className="sticky top-24 space-y-4 rounded-2xl border border-white/10 bg-neutral-900/70 p-4 shadow-xl">
-          <div>
-            <p className="text-sm font-semibold text-white">Your trip is {pct}% complete</p>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-800">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-[width]"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-
-          <ul className="space-y-2 text-sm">
-            <li className={`flex justify-between gap-2 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Dates {!hostHasConcreteTripRange(plan) ? "(required)" : ""}</span>
-              {hostHasConcreteTripRange(plan) ? "✓" : "—"}
-            </li>
-            <li className={`flex justify-between gap-2 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Hotel {!hostHasHotel(plan) ? "(required)" : ""}</span>
-              {hostHasHotel(plan) ? "✓" : "—"}
-            </li>
-            <li className={`flex justify-between gap-2 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Restaurant {!hostHasKeptRestaurant(plan) ? "(required)" : ""}</span>
-              {hostHasKeptRestaurant(plan) ? "✓" : "—"}
-            </li>
-            <li className="flex justify-between gap-2 border-t border-white/10 pt-2 text-neutral-400">
-              <span>Experiences (optional)</span>
-              <span className="text-xs text-violet-300">{hostSetup.experiencesOutlined ? "Outlined" : "Later"}</span>
-            </li>
-          </ul>
-
-          <p className="border-t border-white/10 pt-4 text-xs leading-relaxed text-neutral-500">
-            When everything above is checked, use the violet <strong className="text-neutral-300">Publish trip</strong> button in
-            the calendar header to mint your invite code.
-          </p>
-
-          {err ? <p className="text-center text-xs text-rose-400">{err}</p> : null}
-        </div>
-      </aside>
-    </div>
+      </div>
+    </SiteShell>
   );
 }

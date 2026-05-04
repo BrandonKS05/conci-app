@@ -4,7 +4,6 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripHostSetupDashboard } from "@/frontend/components/trip-host-setup-dashboard";
-import { SiteShell } from "@/frontend/components/site-shell";
 import { normalizePlan } from "@/shared/trip-plan";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
@@ -60,9 +59,7 @@ export default async function TripHostSetupPage({
 
   return (
     <div className="min-h-screen bg-[#161618] py-6 text-neutral-100 sm:py-8">
-      <SiteShell title={plan.title || "Trip setup"} eyebrow="Host setup" tripTypography>
-        <TripHostSetupDashboard tripId={id} initialPlan={plan} />
-      </SiteShell>
+      <TripHostSetupDashboard tripId={id} initialPlan={plan} />
     </div>
   );
 }
