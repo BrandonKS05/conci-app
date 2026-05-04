@@ -4,6 +4,8 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { BookingChecklist } from "@/frontend/components/booking-checklist";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { SiteShell } from "@/frontend/components/site-shell";
 import {
   buildClassifiedDecisions,
@@ -72,6 +74,11 @@ export default async function BookingTripPage({
     <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">
       <SiteShell title="Checklists" eyebrow="Booking checklist">
         <div className="mx-auto w-full max-w-xl space-y-8">
+          <div className="flex items-center justify-between gap-3">
+            <TripDepositTracker tripId={id} />
+            <TripContributeButton tripId={id} />
+          </div>
+
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Trip</p>
             <h2 className="mt-1 font-display text-2xl font-semibold text-slate-900 dark:text-neutral-100">
