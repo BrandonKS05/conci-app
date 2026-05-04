@@ -269,44 +269,44 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 lg:flex-row lg:gap-8">
-      <aside className="w-full shrink-0 space-y-4 lg:w-56 xl:w-64">
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/60 shadow-lg">
+    <div className="mx-auto flex w-full max-w-[1520px] flex-col gap-12 lg:flex-row lg:gap-12 xl:gap-16">
+      <aside className="w-full shrink-0 space-y-8 lg:min-w-[220px] lg:w-72 xl:w-[20rem]">
+        <div className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/20">
           <div
-            className="aspect-[16/11] bg-neutral-800 bg-cover bg-center"
+            className="aspect-[4/5] min-h-[220px] bg-neutral-800 bg-cover bg-center sm:min-h-[260px] lg:min-h-[288px]"
             style={heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined}
           />
-          <p className="border-t border-white/10 px-3 py-2 text-xs font-medium text-neutral-400">
+          <p className="border-t border-white/10 px-5 py-4 text-sm font-medium leading-snug text-neutral-300">
             {plan.location?.trim() || plan.title?.trim() || "Destination"}
           </p>
         </div>
 
-        <nav className="space-y-1 text-sm">
+        <nav className="flex flex-col gap-1 px-1 text-[15px] leading-snug">
           {NAV.map((item) => (
             <a
               key={item.id}
               href={`#sec-${item.id}`}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-neutral-400 transition hover:bg-white/[0.06] hover:text-neutral-100"
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
-              {item.label}
+              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.45)]" />
+              <span>{item.label}</span>
             </a>
           ))}
         </nav>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-10">
-        <section id="sec-dates" className="scroll-mt-28">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0 flex-1 space-y-16 sm:space-y-20 lg:space-y-[5.5rem]">
+        <section id="sec-dates" className="scroll-mt-36">
+          <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white">Trip calendar</h2>
-              <p className="mt-1 max-w-xl text-sm text-neutral-400">
+              <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Trip calendar</h2>
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-neutral-400">
                 {tripDisplayRange?.startIso
                   ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}. Tap another day if you want to redraw the trip window — first tap starts, second tap ends.`
                   : "Select your trip dates on the calendar below (two taps). The parser couldn’t nail exact days yet."}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() =>
@@ -318,7 +318,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                     return m - 1;
                   })
                 }
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5"
+                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-neutral-200 transition hover:border-white/15 hover:bg-white/[0.07]"
               >
                 Prev
               </button>
@@ -333,7 +333,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                     return m + 1;
                   })
                 }
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5"
+                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-neutral-200 transition hover:border-white/15 hover:bg-white/[0.07]"
               >
                 Next
               </button>
@@ -342,7 +342,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
 
           {/* Hotel span row */}
           {tripDisplayRange?.startIso && tripDisplayRange.endIso ? (
-            <div className="mb-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs text-rose-100">
+            <div className="mb-8 rounded-2xl border border-rose-500/35 bg-rose-500/[0.12] px-6 py-4 text-sm leading-relaxed text-rose-100">
               <span className="font-semibold">Hotel stay</span>
               <span className="text-rose-200/90">
                 {" "}
@@ -351,49 +351,56 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
             </div>
           ) : null}
 
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/80 p-3 sm:p-5">
-            <div className="mb-4 text-center font-medium text-neutral-200">
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-950/80 p-5 shadow-inner shadow-black/20 sm:p-8 lg:p-10">
+            <div className="mb-9 text-center text-lg font-semibold text-neutral-100 sm:text-xl">
               {new Date(calYear, calMonth, 1).toLocaleString("default", {
                 month: "long",
                 year: "numeric",
               })}
               {rangeAnchor ? (
-                <span className="ml-3 text-xs font-normal text-amber-400">Select end date…</span>
+                <span className="ml-4 align-middle text-sm font-normal tracking-normal text-amber-400">
+                  Select end date…
+                </span>
               ) : null}
             </div>
 
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+            <div className="grid grid-cols-7 gap-1 px-0.5 pb-4 text-center text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500 sm:gap-2 sm:text-sm sm:tracking-[0.14em]">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((w) => (
-                <div key={w}>{w}</div>
+                <div key={w} className="py-2 sm:py-3">
+                  {w}
+                </div>
               ))}
             </div>
 
-            <div className="mt-1 grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 lg:gap-3">
               {cells.map((dom, i) =>
                 dom == null ? (
-                  <div key={`e-${i}`} className="min-h-[4.75rem]" />
+                  <div key={`e-${i}`} className="min-h-[7.25rem] sm:min-h-[8.5rem] lg:min-h-[9.5rem]" />
                 ) : (
                   <button
                     type="button"
                     key={`d-${calYear}-${calMonth}-${dom}`}
                     onClick={() => onCalendarDayClick(dom)}
                     className={[
-                      "relative flex min-h-[4.75rem] flex-col items-start rounded-lg border px-2 py-1.5 text-left text-[13px] transition",
+                      "relative flex min-h-[7.25rem] flex-col items-start rounded-xl border px-3 py-3 text-left transition sm:min-h-[8.5rem] sm:px-4 sm:py-4 lg:min-h-[9.5rem]",
                       inTripRangeCell(dom)
-                        ? "border-brand-600/70 bg-brand-600/25 text-white shadow-inner"
+                        ? "border-brand-600/70 bg-brand-600/25 text-white shadow-inner shadow-brand-950/40"
                         : parseLocalIsoDate(isoFromCell(calYear, calMonth, dom))?.getTime() ===
                             parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                           ? "border-amber-400/80 bg-amber-500/15 text-amber-50"
-                          : "border-white/5 bg-neutral-900/60 text-neutral-200 hover:bg-neutral-800/80",
+                          : "border-white/5 bg-neutral-900/60 text-neutral-200 hover:bg-neutral-800/85",
                     ].join(" ")}
                   >
-                    <span className="font-semibold tabular-nums">{dom}</span>
+                    <span className="text-lg font-semibold tabular-nums sm:text-xl">{dom}</span>
                     {(hostSetup.restaurantPins ?? [])
                       .filter((p) => p.dateIso === isoFromCell(calYear, calMonth, dom))
                       .map((p) => (
-                        <div key={p.place.mapsUrl} className="mt-1 line-clamp-2 w-full text-[10px] leading-tight text-neutral-400">
+                        <div
+                          key={p.place.mapsUrl}
+                          className="mt-2 line-clamp-2 w-full text-[11px] leading-snug text-neutral-400 sm:text-xs"
+                        >
                           <span className="font-medium text-neutral-200">{p.place.name}</span>
-                          <div className="mt-0.5 flex gap-1">
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
                             {p.kept ? (
                               <button
                                 type="button"
@@ -401,7 +408,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                                   ev.stopPropagation();
                                   togglePin(p.dateIso, p.place.mapsUrl, false);
                                 }}
-                                className="rounded bg-white/10 px-1 py-0.5 hover:bg-rose-500/50"
+                                className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide hover:bg-rose-500/50 sm:text-[11px]"
                               >
                                 Remove
                               </button>
@@ -412,7 +419,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
                                   ev.stopPropagation();
                                   togglePin(p.dateIso, p.place.mapsUrl, true);
                                 }}
-                                className="rounded bg-white/10 px-1 py-0.5 hover:bg-emerald-500/40"
+                                className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide hover:bg-emerald-500/40 sm:text-[11px]"
                               >
                                 Add
                               </button>
@@ -426,52 +433,54 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
             </div>
 
             {!hostHasConcreteTripRange(plan) ? (
-              <p className="mt-4 text-xs text-amber-400">
+              <p className="mt-8 text-sm leading-relaxed text-amber-400">
                 Dates are required to publish — choose a start and end day on this calendar.
               </p>
             ) : null}
           </div>
         </section>
 
-        <section id="sec-accommodation" className="scroll-mt-28 space-y-3">
-          <h2 className="text-lg font-semibold text-white">Accommodation</h2>
-          <p className="text-sm text-neutral-400">Search and select the hotel for this trip (shown as the stay block above).</p>
-          <div className="flex flex-wrap gap-2">
+        <section id="sec-accommodation" className="scroll-mt-36 space-y-7">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Accommodation</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
+            Search and select the hotel for this trip (shown as the stay block above).
+          </p>
+          <div className="flex flex-wrap gap-3 pt-2">
             <input
               value={hotelQuery}
               onChange={(e) => setHotelQuery(e.target.value)}
               placeholder={plan.location ? `Search near ${plan.location}` : "Search hotels"}
-              className="min-w-[200px] flex-1 rounded-xl border border-white/10 bg-neutral-900 px-4 py-2 text-sm outline-none placeholder:text-neutral-600 focus:border-brand-600"
+              className="min-w-[220px] flex-1 rounded-2xl border border-white/10 bg-neutral-900 px-5 py-3.5 text-base outline-none placeholder:text-neutral-600 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
             />
             <button
               type="button"
               onClick={() => void searchHotels()}
               disabled={hotelSearchBusy}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-900 disabled:opacity-50"
+              className="rounded-2xl bg-white px-7 py-3.5 text-base font-medium text-neutral-900 shadow-lg shadow-black/10 disabled:opacity-50"
             >
               {hotelSearchBusy ? "…" : "Search"}
             </button>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-neutral-950/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Selected</p>
+          <div className="grid gap-6 pt-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/70 p-6 sm:p-7">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Selected</p>
               {hostSetup.hotel?.name ? (
-                <div className="mt-2 text-sm text-neutral-100">
+                <div className="mt-4 text-base leading-snug text-neutral-100">
                   {hostSetup.hotel.name}
                   {hostSetup.hotel.priceRange ? (
                     <span className="ml-2 text-neutral-400">({hostSetup.hotel.priceRange})</span>
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-neutral-500">No hotel yet</p>
+                <p className="mt-4 text-base text-neutral-500">No hotel yet</p>
               )}
             </div>
-            <ul className="max-h-60 space-y-1 overflow-auto rounded-xl border border-white/10 bg-neutral-950/40 p-2 text-sm">
+            <ul className="max-h-72 space-y-2 overflow-auto rounded-2xl border border-white/10 bg-neutral-950/40 p-3 text-[15px]">
               {hotelHits.map((h) => (
                 <li key={h.mapsUrl}>
                   <button
                     type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-white/5"
+                    className="w-full rounded-xl px-4 py-3.5 text-left transition hover:bg-white/[0.07]"
                     onClick={() => onHotelPick(h)}
                   >
                     <span className="font-medium text-neutral-100">{h.name}</span>
@@ -483,34 +492,38 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
           </div>
         </section>
 
-        <section id="sec-food" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-white">Food pinboard</h2>
-          <p className="text-sm text-neutral-400">
+        <section id="sec-food" className="scroll-mt-36 space-y-6">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Food pinboard</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
             We suggested restaurants scaled to your budget and spread them across trip days. Toggle Add/Remove on each day.
           </p>
           {!hostHasKeptRestaurant(plan) ? (
-            <p className="mt-2 text-xs text-amber-400">Keep at least one restaurant to publish.</p>
+            <p className="mt-4 text-sm text-amber-400">Keep at least one restaurant to publish.</p>
           ) : null}
         </section>
 
-        <section id="sec-transport" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-white">Transportation</h2>
-          <p className="text-sm text-neutral-400">Finalize flights and ground transfers with your crew after publishing.</p>
+        <section id="sec-transport" className="scroll-mt-36 space-y-5">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Transportation</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
+            Finalize flights and ground transfers with your crew after publishing.
+          </p>
         </section>
 
-        <section id="sec-experiences" className="scroll-mt-28 space-y-2">
-          <h2 className="text-lg font-semibold text-white">Experiences</h2>
-          <p className="text-sm text-neutral-400">Optional — skim ideas with travelers once the invite goes out.</p>
-          <label className="flex cursor-pointer items-center gap-3 text-sm text-neutral-300">
+        <section id="sec-experiences" className="scroll-mt-36 space-y-6 pt-4">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Experiences</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
+            Optional — skim ideas with travelers once the invite goes out.
+          </p>
+          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-transparent px-2 py-2 text-[15px] leading-relaxed text-neutral-300 transition hover:border-white/5 hover:bg-white/[0.03]">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-brand-600"
+              className="mt-1 h-5 w-5 shrink-0 accent-brand-600"
               checked={hostSetup.experiencesOutlined ?? false}
-              onChange={(e) => void persistHostSetup({ ...hostSetup, experiencesOutlined: e.target.checked })}
+              onChange={(e) => void persistHostSetup({ experiencesOutlined: e.target.checked })}
             />
-            I&apos;ve skimmed experiences (helps the completion checklist)
+            <span>I&apos;ve skimmed experiences (helps the completion checklist)</span>
           </label>
-          <div className="mt-3 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-neutral-800">
+          <div className="mt-6 h-2.5 w-full max-w-md overflow-hidden rounded-full bg-neutral-800 sm:h-3">
             <div
               className="h-full rounded-full bg-violet-500/80 transition-[width]"
               style={{ width: `${hostSetup.experiencesOutlined ? "100%" : "40%"}` }}
@@ -518,44 +531,55 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
           </div>
         </section>
 
-        <section id="sec-packing" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-white">Packing list</h2>
-          <p className="text-sm text-neutral-400">Add packing tasks with your group on the shared trip board after publishing.</p>
+        <section id="sec-packing" className="scroll-mt-36 space-y-5">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Packing list</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
+            Add packing tasks with your group on the shared trip board after publishing.
+          </p>
         </section>
 
-        <section id="sec-budget" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-white">Budget</h2>
-          <p className="text-sm text-neutral-400">
+        <section id="sec-budget" className="scroll-mt-36 space-y-5">
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Budget</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
             {plan.budget.tier ?? plan.budget.perPerson ?? "Budget from chat applies to venue suggestions"}
           </p>
         </section>
       </div>
 
-      <aside className="w-full shrink-0 space-y-4 lg:w-72">
-        <div className="sticky top-24 space-y-4 rounded-2xl border border-white/10 bg-neutral-900/70 p-4 shadow-xl">
+      <aside className="w-full shrink-0 lg:w-80 xl:w-[22rem]">
+        <div className="sticky top-28 space-y-10 rounded-3xl border border-white/10 bg-neutral-900/70 p-8 shadow-xl shadow-black/25 sm:p-10">
           <div>
-            <p className="text-sm font-semibold text-white">Your trip is {pct}% complete</p>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-800">
-              <div className="h-full rounded-full bg-emerald-500 transition-[width]" style={{ width: `${pct}%` }} />
+            <p className="text-base font-semibold tracking-tight text-white sm:text-lg">Your trip is {pct}% complete</p>
+            <div className="mt-5 h-3.5 overflow-hidden rounded-full bg-neutral-800/90 sm:h-4">
+              <div
+                className="h-full rounded-full bg-emerald-500 shadow-[0_0_20px_rgba(34,197,94,0.35)] transition-[width]"
+                style={{ width: `${pct}%` }}
+              />
             </div>
           </div>
 
-          <ul className="space-y-2 text-sm">
-            <li className={`flex justify-between gap-2 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Dates {!hostHasConcreteTripRange(plan) ? "(required)" : ""}</span>
-              {hostHasConcreteTripRange(plan) ? "✓" : "—"}
+          <ul className="flex flex-col gap-6 border-t border-white/10 pt-8 text-[15px] sm:text-base">
+            <li
+              className={`flex items-start justify-between gap-4 pb-3 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}
+            >
+              <span className="leading-snug">Dates {!hostHasConcreteTripRange(plan) ? "(required)" : ""}</span>
+              <span className="shrink-0 text-lg">{hostHasConcreteTripRange(plan) ? "✓" : "—"}</span>
             </li>
-            <li className={`flex justify-between gap-2 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Hotel {!hostHasHotel(plan) ? "(required)" : ""}</span>
-              {hostHasHotel(plan) ? "✓" : "—"}
+            <li
+              className={`flex items-start justify-between gap-4 pb-3 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}
+            >
+              <span className="leading-snug">Hotel {!hostHasHotel(plan) ? "(required)" : ""}</span>
+              <span className="shrink-0 text-lg">{hostHasHotel(plan) ? "✓" : "—"}</span>
             </li>
-            <li className={`flex justify-between gap-2 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}>
-              <span>Restaurant {!hostHasKeptRestaurant(plan) ? "(required)" : ""}</span>
-              {hostHasKeptRestaurant(plan) ? "✓" : "—"}
+            <li
+              className={`flex items-start justify-between gap-4 pb-3 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}
+            >
+              <span className="leading-snug">Restaurant {!hostHasKeptRestaurant(plan) ? "(required)" : ""}</span>
+              <span className="shrink-0 text-lg">{hostHasKeptRestaurant(plan) ? "✓" : "—"}</span>
             </li>
-            <li className="flex justify-between gap-2 border-t border-white/10 pt-2 text-neutral-400">
-              <span>Experiences (optional)</span>
-              <span className="text-xs text-violet-300">{hostSetup.experiencesOutlined ? "Outlined" : "Later"}</span>
+            <li className="flex items-start justify-between gap-4 border-t border-white/10 pt-7 text-neutral-400">
+              <span className="leading-snug">Experiences (optional)</span>
+              <span className="shrink-0 text-sm text-violet-300">{hostSetup.experiencesOutlined ? "Outlined" : "Later"}</span>
             </li>
           </ul>
 
@@ -563,17 +587,17 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
             type="button"
             disabled={!pubReady || publishBusy}
             onClick={() => void onPublish()}
-            className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-900/30 disabled:pointer-events-none disabled:opacity-40"
+            className="w-full rounded-2xl bg-rose-500 py-4 text-base font-semibold text-white shadow-lg shadow-rose-900/40 transition hover:bg-rose-400 disabled:pointer-events-none disabled:opacity-40 sm:py-[1.125rem]"
           >
             {publishBusy ? "Publishing…" : "Publish trip"}
           </button>
           {!pubReady ? (
-            <p className="text-xs text-neutral-500">
+            <p className="mx-auto max-w-xs text-center text-sm leading-relaxed text-neutral-500">
               Publishing mints your invite code and opens the collaborative trip workspace.
             </p>
           ) : null}
 
-          {err ? <p className="text-xs text-rose-400">{err}</p> : null}
+          {err ? <p className="text-center text-sm text-rose-400">{err}</p> : null}
         </div>
       </aside>
     </div>
