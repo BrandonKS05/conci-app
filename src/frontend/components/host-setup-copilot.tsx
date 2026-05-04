@@ -40,12 +40,31 @@ function clampBounds(
   };
 }
 
+/** Default dock: bottom-right with standard panel size. */
+function initialBottomRightBounds(): { left: number; top: number; width: number; height: number } {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 800;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+  return clampBounds(vw - DEFAULT_W - MARGIN, vh - DEFAULT_H - MARGIN, DEFAULT_W, DEFAULT_H);
+}
+
 type Props = {
   tripId: string;
   onResult: (plan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => void;
+  /**
+   * When true (default), the panel stays hidden until the host scrolls to the trip calendar block (`#sec-dates`).
+   * Set false to show immediately (e.g. tests).
+   */
+  revealWhenCalendarVisible?: boolean;
+  /** Query selector for the calendar section to observe; default `#sec-dates` on host setup. */
+  calendarSectionSelector?: string;
 };
 
-export function HostSetupCopilot({ tripId, onResult }: Props) {
+export function HostSetupCopilot({
+  tripId,
+  onResult,
+  revealWhenCalendarVisible = true,
+  calendarSectionSelector = "#sec-dates",
+}: Props) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
@@ -55,6 +74,8 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [revealReady, setRevealReady] = useState(() => !revealWhenCalendarVisible);
+  const [surfaceEntered, setSurfaceEntered] = useState(false);
   const [bounds, setBounds] = useState<{
     left: number;
     top: number;
@@ -82,18 +103,74 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
     left: number;
     top: number;
   } | null>(null);
+  const entrancePlayedRef = useRef(false);
+
+  useEffect(() => {
+    if (!revealWhenCalendarVisible) {
+      setRevealReady(true);
+      return;
+    }
+    let io: IntersectionObserver | null = null;
+    let cancelled = false;
+    let raf = 0;
+    let attempts = 0;
+
+    const startObserve = (el: Element) => {
+      io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            setRevealReady(true);
+            io?.disconnect();
+          }
+        },
+        { threshold: 0.06, rootMargin: "0px 0px 10% 0px" }
+      );
+      io.observe(el);
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) {
+        setRevealReady(true);
+        io.disconnect();
+      }
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      const el = document.querySelector(calendarSectionSelector);
+      if (el) {
+        startObserve(el);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 80) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        setRevealReady(true);
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      io?.disconnect();
+    };
+  }, [revealWhenCalendarVisible, calendarSectionSelector]);
 
   useLayoutEffect(() => {
+    if (!revealReady) return;
     setMounted(true);
-    setBounds(
-      clampBounds(
-        MARGIN,
-        Math.max(MARGIN, window.innerHeight - DEFAULT_H - MARGIN),
-        DEFAULT_W,
-        DEFAULT_H
-      )
-    );
-  }, []);
+    setBounds(initialBottomRightBounds());
+  }, [revealReady]);
+
+  useEffect(() => {
+    if (!mounted || !bounds || entrancePlayedRef.current) return;
+    entrancePlayedRef.current = true;
+    setSurfaceEntered(false);
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSurfaceEntered(true));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [mounted, bounds]);
 
   useEffect(() => {
     const onResize = () => {
@@ -225,6 +302,9 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
         width: bounds.width,
         height: bounds.height,
         zIndex: 9999,
+        opacity: surfaceEntered ? 1 : 0,
+        transform: surfaceEntered ? "translateY(0)" : "translateY(14px)",
+        transition: "opacity 280ms ease, transform 280ms ease",
       }}
     >
       <div

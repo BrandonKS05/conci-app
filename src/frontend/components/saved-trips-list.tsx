@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,8 @@ export type SavedTripListItem = {
   location: string | null;
   datesLabel: string;
   vibes: string[];
+  /** Hero image for the destination (plan place photo or resolved Wikipedia thumb). */
+  coverImageUrl?: string | null;
   /** When `draft`, the View link routes to host setup (`/trip/.../setup`). */
   lifecycleStatus?: "draft" | "voting" | "finalized";
 };
@@ -114,60 +117,86 @@ export function SavedTripsList({
         {trips.map((trip) => (
           <li
             key={trip.id}
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:shadow-none dark:hover:border-white/15 sm:p-7"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:shadow-none dark:hover:border-white/15"
           >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
-              <div className="min-w-0 flex-1 space-y-2">
-                <h2 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
-                  {trip.title?.trim() || "Untitled trip"}
-                </h2>
-                <p className="text-sm text-slate-600 dark:text-neutral-400">{trip.location?.trim() || "Location TBD"}</p>
-                <p className="text-sm text-slate-700 dark:text-neutral-300">
-                  <span className="font-medium text-slate-500 dark:text-neutral-500">Dates: </span>
-                  {trip.datesLabel}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {trip.vibes.length ? (
-                    trip.vibes.map((v) => (
-                      <span
-                        key={v}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-0.5 text-xs font-medium text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300"
-                      >
-                        {v}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400 dark:text-neutral-600">No vibe tags</span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 dark:text-neutral-500">Created {formatCreated(trip.createdAt)}</p>
-              </div>
-              <div className="flex shrink-0 flex-row gap-2 sm:flex-col sm:items-stretch">
-                <Link
-                  href={
-                    trip.lifecycleStatus === "draft"
-                      ? `/trip/${trip.id}/setup`
-                      : `/trip/${trip.id}`
-                  }
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-white dark:hover:bg-dm-page"
-                >
-                  {trip.lifecycleStatus === "draft" ? "Finish setup" : "View"}
-                </Link>
-                {showDelete ? (
-                  <button
-                    type="button"
-                    disabled={busyId === trip.id}
-                    onClick={() => {
-                      setError(null);
-                      setConfirmId(trip.id);
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60"
-                    aria-label="Delete trip"
+            <div className="flex flex-col sm:flex-row">
+              <div className="relative h-44 w-full shrink-0 bg-slate-200 sm:h-auto sm:min-h-[11rem] sm:w-52 md:w-60 dark:bg-white/5">
+                {trip.coverImageUrl ? (
+                  <Image
+                    src={trip.coverImageUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, 240px"
+                    unoptimized
+                  />
+                ) : (
+                  <div
+                    className="flex h-full min-h-[11rem] items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300 dark:from-white/10 dark:to-white/5"
+                    aria-hidden
                   >
-                    <TrashIcon className="h-4 w-4" />
-                    Delete
-                  </button>
-                ) : null}
+                    <span className="text-4xl opacity-90">📍</span>
+                  </div>
+                )}
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/50 to-transparent sm:hidden"
+                  aria-hidden
+                />
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-8 sm:p-7">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <h2 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+                    {trip.title?.trim() || "Untitled trip"}
+                  </h2>
+                  <p className="text-sm text-slate-600 dark:text-neutral-400">{trip.location?.trim() || "Location TBD"}</p>
+                  <p className="text-sm text-slate-700 dark:text-neutral-300">
+                    <span className="font-medium text-slate-500 dark:text-neutral-500">Dates: </span>
+                    {trip.datesLabel}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {trip.vibes.length ? (
+                      trip.vibes.map((v) => (
+                        <span
+                          key={v}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-0.5 text-xs font-medium text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300"
+                        >
+                          {v}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-neutral-600">No vibe tags</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-neutral-500">Created {formatCreated(trip.createdAt)}</p>
+                </div>
+                <div className="flex shrink-0 flex-row gap-2 sm:flex-col sm:items-stretch">
+                  <Link
+                    href={
+                      trip.lifecycleStatus === "draft"
+                        ? `/trip/${trip.id}/setup`
+                        : `/trip/${trip.id}`
+                    }
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-white dark:hover:bg-dm-page"
+                  >
+                    {trip.lifecycleStatus === "draft" ? "Finish setup" : "View"}
+                  </Link>
+                  {showDelete ? (
+                    <button
+                      type="button"
+                      disabled={busyId === trip.id}
+                      onClick={() => {
+                        setError(null);
+                        setConfirmId(trip.id);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60"
+                      aria-label="Delete trip"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           </li>

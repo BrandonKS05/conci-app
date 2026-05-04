@@ -1,10 +1,12 @@
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { fetchWikipediaThumbnailForQuery } from "@/backend/wikipedia-place-image";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { SavedTripsList, type SavedTripListItem } from "@/frontend/components/saved-trips-list";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
+import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
 import { parseTripPlanStatus, type TripPlanStatus } from "@/shared/trip-status";
 
@@ -17,13 +19,10 @@ function datesLabelFromPlan(plan: TripPlan): string {
   return "Dates TBD";
 }
 
-function mapRow(row: {
-  id: string;
-  plan: unknown;
-  created_at: string | null;
-  status?: string | null;
-}): SavedTripListItem {
-  const plan = normalizePlan(row.plan);
+function savedTripItemFromPlan(
+  row: { id: string; created_at: string | null; status?: string | null },
+  plan: TripPlan
+): SavedTripListItem {
   const lifecycleStatus: TripPlanStatus = parseTripPlanStatus(row.status);
   return {
     id: row.id,
@@ -34,6 +33,24 @@ function mapRow(row: {
     vibes: plan.vibe,
     lifecycleStatus,
   };
+}
+
+async function listItemWithCover(row: {
+  id: string;
+  plan: unknown;
+  created_at: string | null;
+  status?: string | null;
+}): Promise<SavedTripListItem> {
+  const plan = normalizePlan(row.plan);
+  const item = savedTripItemFromPlan(row, plan);
+  let coverImageUrl = tripDestinationCoverFromPlan(plan);
+  if (!coverImageUrl && plan.location?.trim()) {
+    const token = plan.location.split(",")[0]?.trim() ?? plan.location.trim();
+    if (token.length >= 2 && !/^tbd$/i.test(token)) {
+      coverImageUrl = await fetchWikipediaThumbnailForQuery(token);
+    }
+  }
+  return { ...item, coverImageUrl };
 }
 
 export default async function MyTripsPage() {
@@ -66,7 +83,7 @@ export default async function MyTripsPage() {
     );
   }
 
-  const trips: SavedTripListItem[] = (hostedRows ?? []).map(mapRow);
+  const trips: SavedTripListItem[] = await Promise.all((hostedRows ?? []).map(listItemWithCover));
 
   return (
     <SiteShell title="My Trips" eyebrow="Host">

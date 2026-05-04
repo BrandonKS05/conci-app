@@ -8,6 +8,11 @@ function blobVoteKeysAcrossPlan(classified: ClassifiedDecision[], collab: Collab
   for (const c of classified) {
     const blob = collab.decisions[c.key];
     const keys = blob?.votes ? Object.keys(blob.votes as Record<string, unknown>) : [];
+    if (c.kind === "dates" && blob?.dateWorksForMe) {
+      for (const k of Object.keys(blob.dateWorksForMe)) {
+        if (!keys.includes(k)) keys.push(k);
+      }
+    }
     byDecision.set(c.key, keys);
   }
   return byDecision;

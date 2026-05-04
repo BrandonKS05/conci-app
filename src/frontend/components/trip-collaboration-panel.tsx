@@ -28,14 +28,19 @@ import {
   isValidBudgetCustomVoteToken,
   parseBudgetCustomAmountInput,
 } from "@/shared/budget-poll";
-import { visitorVoteKey } from "@/shared/collab-vote-keys";
+import { visitorVoteKey, voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import {
   POLL_WRITE_IN_MAX_LEN,
   coerceScalarVoteChoice,
   coerceVoteAgainstList,
   isAllowedPollWriteIn,
 } from "@/shared/collab-pick-vote";
-import { inferDefaultYearFromDateOptions, isParsableConcreteDateBallotLine } from "@/shared/date-option-parse";
+import {
+  dateVoteMatchesHostBallot,
+  formatBallotProposalHeading,
+  inferDefaultYearFromDateOptions,
+  isParsableConcreteDateBallotLine,
+} from "@/shared/date-option-parse";
 import {
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
@@ -272,18 +277,21 @@ export function TripCollaborationPanel({
     [plan, classified, collab]
   );
 
-  /** Open decisions: interactive first, date-gated (hotels / dinner) last until weekends lock. */
+  /** Open decisions: interactive first, date-gated (hotels / dinner) last until weekends lock. Host-confirmed trip dates stay interactive for member feedback. */
   const activeDecisionOrder = useMemo(
     () =>
       classified
-        .filter((meta) => !isDecisionLocked(collab.decisions[meta.key]))
+        .filter((meta) => {
+          if (meta.kind === "dates" && plan.dates.confirmed) return true;
+          return !isDecisionLocked(collab.decisions[meta.key]);
+        })
         .sort((a, b) => {
           const ga = decisionDependsOnDatesLocked(a) && !datesLockedByGroup;
           const gb = decisionDependsOnDatesLocked(b) && !datesLockedByGroup;
           if (ga !== gb) return ga ? 1 : -1;
           return a.index - b.index;
         }),
-    [classified, collab, datesLockedByGroup]
+    [classified, collab, datesLockedByGroup, plan.dates.confirmed]
   );
 
   const total = classified.length;
@@ -292,6 +300,7 @@ export function TripCollaborationPanel({
   /** Includes synthetic date/poll cards, not only explicit openDecisions strings. */
   const noDecisionsToResolve = total === 0;
   const showReady = noDecisionsToResolve || allLocked;
+  const showDecideTogetherColumn = total > 0 && (!showReady || activeDecisionOrder.length > 0);
 
   const canSendNudges = isHost && data?.viewerIsTripOwner === true && Boolean(data?.nudgeEmailReady);
 
@@ -544,7 +553,7 @@ export function TripCollaborationPanel({
 
   const mainCollaborationColumn = (
     <>
-      {!showReady && total > 0 ? (
+      {showDecideTogetherColumn ? (
         <div className="space-y-6">
           <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>
           {activeDecisionOrder.map((meta) => {
@@ -560,6 +569,7 @@ export function TripCollaborationPanel({
                 quorum={quorum}
                 visitorKey={data?.visitorKey ?? ""}
                 canonicalVoterKey={data?.canonicalVoterKey ?? visitorVoteKey(data?.visitorKey ?? "")}
+                roster={data?.roster ?? []}
                 busy={busyKey === meta.key}
                 onVote={(p) => void submitVote(p)}
                 reloadCollab={load}
@@ -585,6 +595,7 @@ export function TripCollaborationPanel({
             {classified.map((meta) => {
               const blob = collab.decisions[meta.key];
               if (!isDecisionLocked(blob)) return null;
+              if (meta.kind === "dates" && plan.dates.confirmed) return null;
               return (
                 <li
                   key={meta.key}
@@ -1243,6 +1254,20 @@ function ActivityVibePollCard({
   );
 }
 
+function displayNamesForVoteKeys(keys: string[], roster: TripRosterPerson[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const k of keys) {
+    const person = roster.find((p) => voteKeysIntersectAliases([k], new Set(p.voteAliases)));
+    const name = person?.displayName;
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return out;
+}
+
 function DecisionCard({
   tripId,
   meta,
@@ -1251,6 +1276,7 @@ function DecisionCard({
   quorum,
   visitorKey,
   canonicalVoterKey,
+  roster = [],
   busy,
   onVote,
   reloadCollab,
@@ -1269,6 +1295,7 @@ function DecisionCard({
   quorum: number;
   visitorKey: string;
   canonicalVoterKey: string;
+  roster?: TripRosterPerson[];
   busy: boolean;
   onVote: (p: Record<string, unknown>) => void;
   reloadCollab: () => Promise<void>;
@@ -1287,6 +1314,7 @@ function DecisionCard({
   const [budgetCustom, setBudgetCustom] = useState("");
   const [againstPrep, setAgainstPrep] = useState<string[]>([]);
   const [pollWriteIn, setPollWriteIn] = useState("");
+  const [datesSuggestExpanded, setDatesSuggestExpanded] = useState(false);
 
   const hotels = (blob?.hotels ?? meta.hotels) as HotelPick[] | undefined;
   const spots = (blob?.restaurants ?? meta.restaurants) as RestaurantPick[] | undefined;
@@ -1297,9 +1325,14 @@ function DecisionCard({
   const serverAgainstChoices = coerceVoteAgainstList(rawVoteBlob);
   const viewerPrimaryPick = readScalarVote(votes, visitorKey, canonicalVoterKey);
 
+  const wfmMap = blob?.dateWorksForMe ?? {};
+  const viewerSaidWorksForConfirmed =
+    Boolean(wfmMap[canonicalVoterKey]) || Boolean(wfmMap[visitorVoteKey(visitorKey)]);
+
   useEffect(() => {
     setAgainstPrep([]);
     setPollWriteIn("");
+    setDatesSuggestExpanded(false);
   }, [meta.key]);
 
   useEffect(() => {
@@ -1340,6 +1373,125 @@ function DecisionCard({
         </div>
       );
     }
+
+    if (plan.dates.confirmed && opts.length > 0) {
+      const yHeadline = inferDefaultYearFromDateOptions(opts, new Date().getFullYear());
+      const primaryHeading =
+        opts.length === 1
+          ? formatBallotProposalHeading(opts[0]!, yHeadline)
+          : opts.map((o) => formatBallotProposalHeading(o, yHeadline)).join(" · ");
+
+      const altKeys: string[] = [];
+      for (const [vk, val] of Object.entries(votes)) {
+        if (typeof val !== "string" || !val.trim()) continue;
+        if (dateVoteMatchesHostBallot(val, opts, new Date().getFullYear())) continue;
+        altKeys.push(vk);
+      }
+
+      const worksNames = displayNamesForVoteKeys(Object.keys(wfmMap), roster);
+      const altNames = displayNamesForVoteKeys(altKeys, roster);
+
+      const singleLineConcrete =
+        opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, yHeadline);
+      const singleVagueBallotOnly = opts.length === 1 && !singleLineConcrete;
+      const showSingleProposal = opts.length > 0 && singleLineConcrete;
+
+      return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+          <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-300/90">
+            The host has confirmed these trip dates for the group. Your responses here don&apos;t change that — they help
+            everyone see who&apos;s aligned.
+          </p>
+
+          <div className="mt-4 rounded-2xl border-2 border-emerald-500/35 bg-gradient-to-br from-emerald-50 to-white px-4 py-5 dark:border-emerald-600/30 dark:from-emerald-950/45 dark:to-dm-card sm:px-6 sm:py-6">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-400/90">
+              Confirmed dates
+            </p>
+            <p className="mt-1 font-display text-2xl font-bold tracking-tight text-emerald-950 dark:text-emerald-50">
+              {primaryHeading}
+            </p>
+          </div>
+
+          {!isHost ? (
+            <div className="mt-5 space-y-4">
+              <button
+                type="button"
+                disabled={busy || viewerSaidWorksForConfirmed || blockedByDates}
+                onClick={() => onVote({ decisionKey: meta.key, kind: "datesWorksForMe" })}
+                className={`w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto ${primaryFilledInteractive}`}
+              >
+                {viewerSaidWorksForConfirmed ? "Thanks — noted" : "Works for me"}
+              </button>
+              <div>
+                <button
+                  type="button"
+                  disabled={blockedByDates}
+                  onClick={() => setDatesSuggestExpanded((open) => !open)}
+                  className="text-sm font-medium text-slate-500 underline decoration-slate-400/70 underline-offset-2 transition hover:text-slate-800 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+                >
+                  {datesSuggestExpanded ? "Hide date suggestions" : "Suggest a different date"}
+                </button>
+                {datesSuggestExpanded ? (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+                    Propose an alternative range — the host can review; confirmed dates stay unless they change the trip.
+                  </p>
+                ) : null}
+              </div>
+              {datesSuggestExpanded ? (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/40 p-3 dark:border-white/10 dark:bg-dm-elevated/40">
+                  {showSingleProposal ? (
+                    <DatesSingleProposalMemberVote
+                      decisionKey={meta.key}
+                      options={opts}
+                      votes={votes}
+                      mine={viewerPrimaryPick}
+                      busy={busy}
+                      quorum={quorum}
+                      voterN={voterN}
+                      onVote={onVote}
+                    />
+                  ) : (
+                    <DatesVoteCalendar
+                      decisionKey={meta.key}
+                      options={opts}
+                      votes={votes}
+                      mine={viewerPrimaryPick}
+                      busy={busy}
+                      quorum={quorum}
+                      voterN={voterN}
+                      onVote={onVote}
+                      hideUnmappedBallotChips={singleVagueBallotOnly}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-slate-600 dark:text-neutral-400">
+              Travelers can tap <span className="font-semibold">Works for me</span> or suggest another range below that.
+            </p>
+          )}
+
+          {isHost ? (
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm dark:border-white/10 dark:bg-dm-elevated/60">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+                Member responses
+              </p>
+              <p className="mt-2 text-slate-800 dark:text-neutral-200">
+                <span className="font-semibold text-slate-900 dark:text-neutral-100">Works for me: </span>
+                {worksNames.length > 0 ? worksNames.join(", ") : "—"}
+              </p>
+              <p className="mt-2 text-slate-800 dark:text-neutral-200">
+                <span className="font-semibold text-slate-900 dark:text-neutral-100">Suggested other dates: </span>
+                {altNames.length > 0 ? altNames.join(", ") : "—"}
+              </p>
+            </div>
+          ) : null}
+        </section>
+      );
+    }
+
     const datesVoteYear = inferDefaultYearFromDateOptions(opts, new Date().getFullYear());
     const singleLineConcrete =
       opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, datesVoteYear);

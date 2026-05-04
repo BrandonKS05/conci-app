@@ -86,6 +86,11 @@ export type CollabDecisionBlob = {
   hotels?: HotelPick[];
   /** Persisted venue cards for `p_eat` */
   restaurants?: RestaurantPick[];
+  /**
+   * After the host confirms trip dates (`plan.dates.confirmed`), members tap “Works for me”.
+   * Keys are collab voter keys (e.g. `member:<uuid>`). Does not change `locked` or the plan.
+   */
+  dateWorksForMe?: Record<string, true>;
 };
 
 export function decisionKeyForIndex(i: number): string {

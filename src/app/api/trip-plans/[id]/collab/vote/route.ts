@@ -28,6 +28,7 @@ import { normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
 type VoteBody =
+  | { decisionKey: string; kind: "datesWorksForMe" }
   | { decisionKey: string; kind: "dates"; option: string }
   | { decisionKey: string; kind: "binary"; option: string; againstOptions?: unknown }
   | { decisionKey: string; kind: "hotel"; hotelId: string }
@@ -99,7 +100,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     blob = { ...blob, restaurants: meta.restaurants };
   }
 
-  if (blob.locked !== undefined && blob.locked !== null) {
+  const canInteractWithLockedDates =
+    meta.kind === "dates" && plan.dates.confirmed === true;
+
+  if (blob.locked !== undefined && blob.locked !== null && !canInteractWithLockedDates) {
     return NextResponse.json({ error: "Decision is already locked" }, { status: 400 });
   }
 
@@ -109,6 +113,30 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const votesSeed = { ...(blob.votes as Record<string, unknown>) };
   const isPeopleDecision = meta.kind === "people";
   const { votes, writeKey, carriedPeople } = migrateVoterVoteKeys(votesSeed, visitorKey, memberId, isPeopleDecision);
+
+  if (body.kind === "datesWorksForMe" && meta.kind === "dates") {
+    if (!plan.dates.confirmed) {
+      return NextResponse.json(
+        { error: "The host has not confirmed trip dates yet." },
+        { status: 400 }
+      );
+    }
+    const nextWorks = { ...(blob.dateWorksForMe ?? {}), [writeKey]: true as const };
+    blob = { ...blob, dateWorksForMe: nextWorks };
+    collab = {
+      ...collab,
+      decisions: { ...collab.decisions, [body.decisionKey]: blob },
+    };
+    const { error: upWfm } = await svc
+      .from("trip_plans")
+      .update({ collab_state: collab, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (upWfm) {
+      console.error("[collab vote] datesWorksForMe", upWfm);
+      return NextResponse.json({ error: "Could not save" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true as const, collab });
+  }
 
   if (body.kind === "dates" && meta.kind === "dates") {
     const y0 = inferDefaultYearFromDateOptions(plan.dates.options, new Date().getFullYear());
@@ -203,7 +231,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   blob = { ...blob, votes };
-  blob = tryLockDecision(plan, meta, blob, quorum);
+  const skipAutoLockForConfirmedDates = meta.kind === "dates" && plan.dates.confirmed === true;
+  if (!skipAutoLockForConfirmedDates) {
+    blob = tryLockDecision(plan, meta, blob, quorum);
+  }
 
   collab = {
     ...collab,

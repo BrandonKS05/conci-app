@@ -342,6 +342,31 @@ export function formatBallotProposalHeading(option: string, defaultYear: number)
   return `${r.start.toLocaleDateString("en-US", opts)} – ${r.end.toLocaleDateString("en-US", opts)}`;
 }
 
+/** True when a member’s dates vote matches any host ballot line (same calendar range). */
+export function dateVoteMatchesHostBallot(
+  voteRaw: unknown,
+  hostOptions: string[],
+  fallbackYear: number
+): boolean {
+  if (typeof voteRaw !== "string") return false;
+  const y0 = inferDefaultYearFromDateOptions(hostOptions, fallbackYear);
+  const raw = voteRaw.trim();
+  if (!raw) return false;
+  const vr = parseDateOptionToRange(raw, y0);
+  if (!vr) return false;
+  for (const o of hostOptions) {
+    const h = parseDateOptionToRange(String(o).trim(), y0);
+    if (
+      h &&
+      localDayTime(h.start) === localDayTime(vr.start) &&
+      localDayTime(h.end) === localDayTime(vr.end)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function isStrictIsoDateString(s: string): boolean {
   const m = s.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return false;

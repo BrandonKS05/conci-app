@@ -1,10 +1,12 @@
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { fetchWikipediaThumbnailForQuery } from "@/backend/wikipedia-place-image";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { SavedTripsList, type SavedTripListItem } from "@/frontend/components/saved-trips-list";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
+import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +18,10 @@ function datesLabelFromPlan(plan: TripPlan): string {
   return "Dates TBD";
 }
 
-function mapRow(row: { id: string; plan: unknown; created_at: string | null }): SavedTripListItem {
-  const plan = normalizePlan(row.plan);
+function savedTripItemFromPlan(
+  row: { id: string; created_at: string | null },
+  plan: TripPlan
+): SavedTripListItem {
   return {
     id: row.id,
     createdAt: row.created_at ?? new Date().toISOString(),
@@ -26,6 +30,19 @@ function mapRow(row: { id: string; plan: unknown; created_at: string | null }): 
     datesLabel: datesLabelFromPlan(plan),
     vibes: plan.vibe,
   };
+}
+
+async function listItemWithCover(row: { id: string; plan: unknown; created_at: string | null }): Promise<SavedTripListItem> {
+  const plan = normalizePlan(row.plan);
+  const item = savedTripItemFromPlan(row, plan);
+  let coverImageUrl = tripDestinationCoverFromPlan(plan);
+  if (!coverImageUrl && plan.location?.trim()) {
+    const token = plan.location.split(",")[0]?.trim() ?? plan.location.trim();
+    if (token.length >= 2 && !/^tbd$/i.test(token)) {
+      coverImageUrl = await fetchWikipediaThumbnailForQuery(token);
+    }
+  }
+  return { ...item, coverImageUrl };
 }
 
 export default async function JoinedTripsPage() {
@@ -75,7 +92,7 @@ export default async function JoinedTripsPage() {
     }
   }
 
-  const trips: SavedTripListItem[] = joinedRows.map(mapRow);
+  const trips: SavedTripListItem[] = await Promise.all(joinedRows.map(listItemWithCover));
 
   return (
     <SiteShell title="Joined Trips" eyebrow="Member">

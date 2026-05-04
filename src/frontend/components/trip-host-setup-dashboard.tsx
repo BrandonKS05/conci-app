@@ -633,7 +633,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               href={`#sec-${item.id}`}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500/90" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
               {item.label}
             </a>
           ))}
@@ -641,7 +641,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             href={`/trip/${tripId}/setup/packing`}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
           >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500/90" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
             Packing list
           </Link>
         </nav>
@@ -966,7 +966,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               onClick={() =>
                 void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null })
               }
-              className="shrink-0 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500"
+              className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
             >
               Save budget
             </button>
