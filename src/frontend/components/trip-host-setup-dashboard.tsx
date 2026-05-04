@@ -27,6 +27,11 @@ import {
 import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
 import { HostSetupAddHotelModal } from "@/frontend/components/host-setup-add-hotel-modal";
 import {
+  HostSetupPinDetailModal,
+  HostSetupRemovePinConfirm,
+  type PinDetailState,
+} from "@/frontend/components/host-setup-pin-modals";
+import {
   HostSetupCopilot,
   type HostCopilotUiHint,
 } from "@/frontend/components/host-setup-copilot";
@@ -78,6 +83,13 @@ function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
 }
 
 /** Human-readable range for the confirm dialog. */
+function formatPinDayLabel(iso: string): string {
+  const d = parseLocalIsoDate(iso);
+  return d
+    ? d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" })
+    : iso;
+}
+
 function formatTripRangeLabel(startIso: string, endIso: string): string {
   const a = parseLocalIsoDate(startIso);
   const b = parseLocalIsoDate(endIso);
@@ -131,6 +143,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
   const [addHotelOpen, setAddHotelOpen] = useState(false);
+  const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
+  const [removePinConfirm, setRemovePinConfirm] = useState<{
+    kind: "meal" | "activity";
+    dateIso: string;
+    mapsUrl?: string;
+    bookingUrl?: string;
+    title: string;
+  } | null>(null);
   /** Set after the second tap in range mode; saved only when the host confirms. */
   const [pendingRangeConfirm, setPendingRangeConfirm] = useState<{
     startIso: string;
@@ -319,23 +339,21 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     ]
   );
 
-  const togglePin = useCallback(
-    (dateIso: string, mapsUrl: string, kept: boolean) => {
-      const pins = [...(hostSetup.restaurantPins ?? [])];
-      const idx = pins.findIndex((p) => p.dateIso === dateIso && p.place.mapsUrl === mapsUrl);
-      if (idx === -1) return;
-      pins[idx] = { ...pins[idx]!, kept };
+  const removeRestaurantPinByKey = useCallback(
+    (dateIso: string, mapsUrl: string) => {
+      const pins = (hostSetup.restaurantPins ?? []).filter(
+        (p) => !(p.dateIso === dateIso && p.place.mapsUrl === mapsUrl)
+      );
       void persistHostSetup({ restaurantPins: pins });
     },
     [hostSetup.restaurantPins, persistHostSetup]
   );
 
-  const toggleActivityPin = useCallback(
-    (dateIso: string, bookingUrl: string, kept: boolean) => {
-      const pins = [...(hostSetup.activityPins ?? [])];
-      const idx = pins.findIndex((p) => p.dateIso === dateIso && p.experience.bookingUrl === bookingUrl);
-      if (idx === -1) return;
-      pins[idx] = { ...pins[idx]!, kept };
+  const removeActivityPinByKey = useCallback(
+    (dateIso: string, bookingUrl: string) => {
+      const pins = (hostSetup.activityPins ?? []).filter(
+        (p) => !(p.dateIso === dateIso && p.experience.bookingUrl === bookingUrl)
+      );
       void persistHostSetup({ activityPins: pins });
     },
     [hostSetup.activityPins, persistHostSetup]
@@ -377,20 +395,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [pendingRangeConfirm, cancelPendingTripRange]);
-
-  const clearDayPins = useCallback(
-    (dateIso: string) => {
-      const rp = (hostSetup.restaurantPins ?? []).filter((p) => p.dateIso !== dateIso);
-      const ap = (hostSetup.activityPins ?? []).filter((p) => p.dateIso !== dateIso);
-      const nextRp = rp.length ? rp : undefined;
-      const nextAp = ap.length ? ap : undefined;
-      void persistHostSetup({
-        restaurantPins: nextRp ?? [],
-        activityPins: nextAp ?? [],
-      });
-    },
-    [hostSetup.restaurantPins, hostSetup.activityPins, persistHostSetup]
-  );
 
   const onCalendarDayClick = useCallback(
     (dom: number) => {
@@ -745,15 +749,12 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
-                    const dayHasPins =
-                      (hostSetup.restaurantPins ?? []).some((p) => p.dateIso === cellIso) ||
-                      (hostSetup.activityPins ?? []).some((p) => p.dateIso === cellIso) ||
-                      !!hotelForDay;
                     const showDayActions =
                       datePickMode === "day" &&
                       inTripRangeCell(dom) &&
                       tripDisplayRange?.startIso &&
                       tripDisplayRange.endIso;
+                    const dayLabel = formatPinDayLabel(cellIso);
                     return (
                       <div
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
@@ -767,7 +768,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           }
                         }}
                         className={[
-                          "group/cell relative flex min-h-[7.5rem] cursor-pointer flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
+                          "group/cell relative flex h-full min-h-[7.5rem] cursor-pointer flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
                           inTripRangeCell(dom)
                             ? "bg-teal-50/90 hover:bg-teal-50 dark:bg-teal-950/35 dark:hover:bg-teal-950/45"
@@ -780,7 +781,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                             : "",
                         ].join(" ")}
                       >
-                        <div className="mb-2 flex shrink-0 items-start justify-between gap-2">
+                        <div className="mb-1.5 flex shrink-0 items-start justify-between gap-2">
                           {isCalendarToday(dom) ? (
                             <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-semibold text-white shadow-sm sm:h-8 sm:min-w-[2rem] sm:text-sm">
                               {dom}
@@ -792,84 +793,107 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           )}
                         </div>
 
-                        {hotelForDay ? (
-                          <div className="mb-2 min-w-0 w-full">
-                            <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 dark:text-neutral-100">
-                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                {hotelForDay.place.name}
-                              </span>
-                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                Stay
-                              </span>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {(hostSetup.restaurantPins ?? [])
-                          .filter((p) => p.dateIso === cellIso)
-                          .map((p) => (
-                            <div key={p.place.mapsUrl} className="mb-2 min-w-0 w-full last:mb-0">
-                              <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
-                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">{p.place.name}</span>
+                        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+                          {hotelForDay ? (
+                            <div className="min-w-0 w-full">
+                              <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
+                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                  {hotelForDay.place.name}
+                                </span>
                                 <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                  Meal
+                                  Stay
                                 </span>
                               </div>
-                              {!p.kept ? (
-                                <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      togglePin(p.dateIso, p.place.mapsUrl, true);
-                                    }}
-                                    className="max-w-full truncate rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-center text-xs font-medium text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:text-sm dark:border-teal-500/35 dark:bg-teal-950/55 dark:text-teal-100 dark:hover:bg-teal-950"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
-                              ) : null}
                             </div>
-                          ))}
+                          ) : null}
 
-                        {(hostSetup.activityPins ?? [])
-                          .filter((p) => p.dateIso === cellIso)
-                          .map((p) => (
-                            <div key={p.experience.bookingUrl} className="mb-2 min-w-0 w-full last:mb-0">
-                              <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
-                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">{p.experience.name}</span>
-                                <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                  Activity
-                                </span>
+                          {(hostSetup.restaurantPins ?? [])
+                            .filter((p) => p.dateIso === cellIso && p.kept)
+                            .map((p) => (
+                              <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
+                                <button
+                                  type="button"
+                                  className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
+                                  }}
+                                >
+                                  <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                      {p.place.name}
+                                    </span>
+                                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                      Meal
+                                    </span>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${p.place.name}`}
+                                  className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setRemovePinConfirm({
+                                      kind: "meal",
+                                      dateIso: p.dateIso,
+                                      mapsUrl: p.place.mapsUrl,
+                                      title: `“${p.place.name}” on ${dayLabel}`,
+                                    });
+                                  }}
+                                >
+                                  ×
+                                </button>
                               </div>
-                              {!p.kept ? (
-                                <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      toggleActivityPin(p.dateIso, p.experience.bookingUrl, true);
-                                    }}
-                                    className="max-w-full truncate rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-center text-xs font-medium text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:text-sm dark:border-teal-500/35 dark:bg-teal-950/55 dark:text-teal-100 dark:hover:bg-teal-950"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          ))}
+                            ))}
+
+                          {(hostSetup.activityPins ?? [])
+                            .filter((p) => p.dateIso === cellIso && p.kept)
+                            .map((p) => (
+                              <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
+                                <button
+                                  type="button"
+                                  className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setPinDetail({
+                                      kind: "activity",
+                                      experience: p.experience,
+                                      dateLabel: dayLabel,
+                                    });
+                                  }}
+                                >
+                                  <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                      {p.experience.name}
+                                    </span>
+                                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                      Activity
+                                    </span>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${p.experience.name}`}
+                                  className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setRemovePinConfirm({
+                                      kind: "activity",
+                                      dateIso: p.dateIso,
+                                      bookingUrl: p.experience.bookingUrl,
+                                      title: `“${p.experience.name}” on ${dayLabel}`,
+                                    });
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                        </div>
 
                         {showDayActions ? (
-                          <div
-                            className={[
-                              "pointer-events-none absolute z-[3] flex max-h-[calc(100%-2.5rem)] flex-col gap-1.5 overflow-hidden p-2 opacity-0 transition-opacity duration-150",
-                              dayHasPins
-                                ? "inset-x-1 bottom-1 items-stretch"
-                                : "inset-1 items-center justify-center",
-                              "max-md:pointer-events-auto max-md:opacity-100",
-                              "md:pointer-events-none md:opacity-0 md:group-hover/cell:pointer-events-auto md:group-hover/cell:opacity-100",
-                            ].join(" ")}
-                          >
+                          <div className="pointer-events-auto mt-auto flex shrink-0 flex-col gap-1.5 border-t border-teal-200/60 pt-2 dark:border-teal-500/20">
                             <button
                               type="button"
                               onClick={(ev) => {
@@ -877,7 +901,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                 setSelectedDayIso(cellIso);
                                 setAddHotelOpen(true);
                               }}
-                              className="max-w-full rounded-lg border border-indigo-200/90 bg-indigo-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-indigo-950 shadow-sm backdrop-blur-sm transition hover:bg-indigo-100 sm:px-3 sm:text-xs dark:border-indigo-500/40 dark:bg-indigo-950/60 dark:text-indigo-100 dark:hover:bg-indigo-950"
+                              className="w-full rounded-lg border border-indigo-200/90 bg-indigo-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-indigo-950 shadow-sm transition hover:bg-indigo-100 sm:px-3 sm:text-xs dark:border-indigo-500/40 dark:bg-indigo-950/60 dark:text-indigo-100 dark:hover:bg-indigo-950"
                             >
                               Add hotel
                             </button>
@@ -888,22 +912,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                 setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
-                              className="max-w-full rounded-lg border border-teal-200/90 bg-teal-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-teal-900 shadow-sm backdrop-blur-sm transition hover:bg-teal-100 sm:px-3 sm:text-xs dark:border-teal-500/40 dark:bg-teal-950/90 dark:text-teal-100 dark:hover:bg-teal-950"
+                              className="w-full rounded-lg border border-teal-200/90 bg-teal-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:text-xs dark:border-teal-500/40 dark:bg-teal-950/90 dark:text-teal-100 dark:hover:bg-teal-950"
                             >
-                              Meals &amp; activities
+                              Edit meals &amp; activities
                             </button>
-                            {dayHasPins ? (
-                              <button
-                                type="button"
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  clearDayPins(cellIso);
-                                }}
-                                className="max-w-full rounded-lg border border-slate-200/90 bg-white/95 px-2.5 py-1.5 text-center font-sans text-[11px] font-medium leading-snug text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-rose-50 hover:text-rose-700 sm:text-xs dark:border-white/15 dark:bg-dm-elevated/95 dark:text-neutral-200 dark:hover:bg-rose-950/50 dark:hover:text-rose-200"
-                              >
-                                Clear day
-                              </button>
-                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -1013,6 +1025,25 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         plan={plan}
         dateLabel={selectedDayLabel}
         onSelectHotel={(place, scope) => onHotelChosen(place, scope)}
+      />
+      <HostSetupPinDetailModal
+        open={pinDetail !== null}
+        detail={pinDetail}
+        onClose={() => setPinDetail(null)}
+      />
+      <HostSetupRemovePinConfirm
+        open={removePinConfirm !== null}
+        label={removePinConfirm?.title ?? ""}
+        onCancel={() => setRemovePinConfirm(null)}
+        onConfirm={() => {
+          if (!removePinConfirm) return;
+          if (removePinConfirm.kind === "meal" && removePinConfirm.mapsUrl) {
+            removeRestaurantPinByKey(removePinConfirm.dateIso, removePinConfirm.mapsUrl);
+          } else if (removePinConfirm.kind === "activity" && removePinConfirm.bookingUrl) {
+            removeActivityPinByKey(removePinConfirm.dateIso, removePinConfirm.bookingUrl);
+          }
+          setRemovePinConfirm(null);
+        }}
       />
     </SiteShell>
     <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
