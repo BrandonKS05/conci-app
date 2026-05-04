@@ -144,8 +144,7 @@ export function DatesVoteCalendar({
     <div className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-neutral-400">
         Votes: {voterN}/{quorum}+ to lock. Tap a start date, then an end date (both inclusive). Tap the same day twice
-        for a one-day trip. The small number under a day counts how many travelers’
-        ranges include that date.
+        for a one-day trip.
       </p>
 
       <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
@@ -188,18 +187,9 @@ export function DatesVoteCalendar({
               if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
               return parts.join(" ");
             }}
-            renderDayContents={(day: number, date?: Date) => {
-              if (!date) return <span>{day}</span>;
-              const c = votesCoveringCalendarDay(date, tally, y0);
-              return (
-                <span className="conci-datepicker-day-inner">
-                  <span className="conci-datepicker-day-num">{day}</span>
-                  <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
-                    {c > 0 ? c : "\u00a0"}
-                  </span>
-                </span>
-              );
-            }}
+            renderDayContents={(day: number) => (
+              <span className="conci-datepicker-day-num">{day}</span>
+            )}
           />
         </div>
 
@@ -208,9 +198,11 @@ export function DatesVoteCalendar({
             {rangeSummaries.map(({ key, label, votes: v }) => (
               <li key={key} className="flex items-baseline justify-between gap-3 text-xs">
                 <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
-                <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
-                  {v} {v === 1 ? "vote" : "votes"}
-                </span>
+                {v > 0 ? (
+                  <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
+                    {v} {v === 1 ? "vote" : "votes"}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -253,9 +245,7 @@ export function DatesVoteCalendar({
 
       <ul className="sr-only" aria-label="Vote totals">
         {rangeSummaries.map(({ key, label, votes: v }) => (
-          <li key={`sr-${key}`}>
-            {v} votes: {label}
-          </li>
+          <li key={`sr-${key}`}>{v > 0 ? `${v} ${v === 1 ? "vote" : "votes"}: ${label}` : label}</li>
         ))}
       </ul>
     </div>

@@ -23,7 +23,11 @@ import {
   parseBudgetCustomAmountInput,
 } from "@/shared/budget-poll";
 import { visitorVoteKey } from "@/shared/collab-vote-keys";
-import { tripLiveRecommendationsContextFingerprint, type TripPlan } from "@/shared/trip-plan";
+import {
+  normalizePlan,
+  tripLiveRecommendationsContextFingerprint,
+  type TripPlan,
+} from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/restaurants";
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
@@ -111,6 +115,8 @@ export function TripCollaborationPanel({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeErr, setFinalizeErr] = useState<string | null>(null);
+  const [datesHostConfirmBusy, setDatesHostConfirmBusy] = useState(false);
+  const [datesHostConfirmErr, setDatesHostConfirmErr] = useState<string | null>(null);
   const [nudgeBusyKey, setNudgeBusyKey] = useState<string | null>(null);
   const [nudgeNotice, setNudgeNotice] = useState<string | null>(null);
   const [liveData, setLiveData] = useState<TripLiveRecommendationsPayload | null>(null);
@@ -297,6 +303,33 @@ export function TripCollaborationPanel({
     }
   };
 
+  const confirmHostTripDates = useCallback(async (): Promise<boolean> => {
+    if (!isHost || plan.dates.confirmed || plan.dates.options.length === 0) return false;
+    setDatesHostConfirmBusy(true);
+    setDatesHostConfirmErr(null);
+    try {
+      const r = await fetch(`/api/trip-plans/${tripId}/dates/confirm`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = (await r.json()) as { plan?: unknown; error?: string };
+      if (!r.ok) {
+        setDatesHostConfirmErr(typeof j.error === "string" ? j.error : "Could not confirm dates.");
+        return false;
+      }
+      if (j.plan && typeof j.plan === "object") {
+        onPlanUpdated?.(normalizePlan(j.plan));
+      }
+      await load();
+      return true;
+    } catch {
+      setDatesHostConfirmErr("Network error — try again.");
+      return false;
+    } finally {
+      setDatesHostConfirmBusy(false);
+    }
+  }, [isHost, plan.dates.confirmed, plan.dates.options.length, tripId, onPlanUpdated, load]);
+
   if (error && !data) {
     return (
       <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
@@ -481,6 +514,10 @@ export function TripCollaborationPanel({
                 blockedByDates={gated}
                 canRunHotelSearch={isHost}
                 liveVenueMerge={meta.key === VENUE_POLL_DECISION_KEY ? liveData?.restaurants ?? null : null}
+                isHost={isHost}
+                datesHostConfirmBusy={datesHostConfirmBusy}
+                datesHostConfirmErr={datesHostConfirmErr}
+                onHostConfirmDates={confirmHostTripDates}
               />
             );
           })}
@@ -514,6 +551,22 @@ export function TripCollaborationPanel({
                       </p>
                     </div>
                   </div>
+                  {meta.kind === "dates" &&
+                  isHost &&
+                  !plan.dates.confirmed &&
+                  plan.dates.options.length > 0 ? (
+                    <div className="border-t border-emerald-200/50 bg-emerald-50/30 px-4 py-4 dark:border-emerald-800/40 dark:bg-emerald-950/25 sm:px-5">
+                      <HostDatesConfirmFooter
+                        embedded
+                        quorum={quorum}
+                        voterN={Object.keys((blob?.votes ?? {}) as Record<string, unknown>).length}
+                        voteBusy={busyKey === meta.key}
+                        confirmBusy={datesHostConfirmBusy}
+                        errorMessage={datesHostConfirmErr}
+                        onHostConfirmDates={confirmHostTripDates}
+                      />
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -759,6 +812,110 @@ function formatResolvedDetail(meta: ClassifiedDecision, blob: CollabDecisionBlob
   return "";
 }
 
+function HostDatesConfirmFooter({
+  quorum,
+  voterN,
+  voteBusy,
+  confirmBusy,
+  errorMessage,
+  onHostConfirmDates,
+  embedded = false,
+}: {
+  quorum: number;
+  voterN: number;
+  voteBusy: boolean;
+  confirmBusy: boolean;
+  errorMessage: string | null;
+  onHostConfirmDates: () => Promise<boolean>;
+  /** When nested in “Locked in” card, omit top rule so parent chrome reads as one panel. */
+  embedded?: boolean;
+}) {
+  const [anywayOpen, setAnywayOpen] = useState(false);
+  const enoughVotes = voterN >= quorum;
+  const busy = confirmBusy || voteBusy;
+
+  return (
+    <>
+      {anywayOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => {
+            if (!busy) setAnywayOpen(false);
+          }}
+        >
+          <div
+            className="max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-dm-card"
+            role="dialog"
+            aria-labelledby="confirm-date-anyway-title"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p
+              id="confirm-date-anyway-title"
+              className="text-sm leading-relaxed text-slate-900 dark:text-neutral-100"
+            >
+              Not everyone has voted yet. Are you sure you want to lock in the date?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAnywayOpen(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:text-neutral-200 dark:hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+                onClick={() => {
+                  void onHostConfirmDates().then((ok) => {
+                    if (ok) setAnywayOpen(false);
+                  });
+                }}
+              >
+                {confirmBusy ? "Saving…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <div
+        className={`flex flex-col items-stretch gap-2 ${
+          embedded
+            ? "mt-3 pt-0"
+            : "mt-4 border-t border-slate-100 pt-4 dark:border-white/10"
+        }`}
+      >
+        <button
+          type="button"
+          disabled={!enoughVotes || busy}
+          onClick={() => void onHostConfirmDates()}
+          className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            enoughVotes && !busy
+              ? "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              : "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-neutral-500"
+          }`}
+        >
+          {confirmBusy ? "Saving…" : "Confirm Date"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setAnywayOpen(true)}
+          className="text-center text-xs font-medium text-slate-500 underline decoration-slate-400/70 underline-offset-2 transition hover:text-slate-700 disabled:opacity-50 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+        >
+          confirm anyway
+        </button>
+        {errorMessage ? (
+          <p className="text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 /** Frosted lock overlay when hotels / dinner polls are blocked until group dates are chosen. */
 function DatesLockedGate({ active, children }: { active: boolean; children: ReactNode }) {
   if (!active) return <>{children}</>;
@@ -790,6 +947,10 @@ function DecisionCard({
   blockedByDates = false,
   canRunHotelSearch,
   liveVenueMerge,
+  isHost = false,
+  datesHostConfirmBusy = false,
+  datesHostConfirmErr = null,
+  onHostConfirmDates,
 }: {
   tripId: string;
   meta: ClassifiedDecision;
@@ -805,6 +966,11 @@ function DecisionCard({
   canRunHotelSearch: boolean;
   /** Live API rows aligned by index with venue poll cards (same `eat-*` ids). */
   liveVenueMerge?: RestaurantPick[] | null;
+  isHost?: boolean;
+  datesHostConfirmBusy?: boolean;
+  datesHostConfirmErr?: string | null;
+  /** Host-only trip plan date confirmation (below dates calendar). */
+  onHostConfirmDates?: () => Promise<boolean>;
 }) {
   const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [hotelSearchErr, setHotelSearchErr] = useState<string | null>(null);
@@ -864,6 +1030,19 @@ function DecisionCard({
             onVote={onVote}
           />
         </div>
+        {isHost &&
+        !plan.dates.confirmed &&
+        opts.length > 0 &&
+        onHostConfirmDates ? (
+          <HostDatesConfirmFooter
+            quorum={quorum}
+            voterN={voterN}
+            voteBusy={busy}
+            confirmBusy={datesHostConfirmBusy}
+            errorMessage={datesHostConfirmErr}
+            onHostConfirmDates={onHostConfirmDates}
+          />
+        ) : null}
       </section>
     );
   }
