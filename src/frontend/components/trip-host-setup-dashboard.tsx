@@ -539,6 +539,18 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [effectiveHighlightRange, calYear, calMonth]
   );
 
+  /** Persisted host range only — used for “Edit activities” visibility (not inferred-from-parser fallback). */
+  const inHostSavedTripRangeCell = useCallback(
+    (dom: number | null): boolean => {
+      if (!dom) return false;
+      const tr = hostSetup.tripRange;
+      if (!tr?.startIso || !tr?.endIso) return false;
+      const iso = isoFromCell(calYear, calMonth, dom);
+      return enumerateLocalIsoDays(tr.startIso, tr.endIso).includes(iso);
+    },
+    [hostSetup.tripRange?.startIso, hostSetup.tripRange?.endIso, calYear, calMonth]
+  );
+
   const selectedDayLabel = useMemo(() => {
     if (!selectedDayIso) return "";
     const d = parseLocalIsoDate(selectedDayIso);
@@ -646,7 +658,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — hover a trip day for Add or Clear; Add loads contextual meals & activities (tap on mobile).`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — hover a trip day (saved range) to reveal Edit activities.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
@@ -756,11 +768,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
-                    const showDayActions =
-                      datePickMode === "day" &&
-                      inTripRangeCell(dom) &&
-                      tripDisplayRange?.startIso &&
-                      tripDisplayRange.endIso;
+                    const showEditActivities =
+                      datePickMode === "day" && inHostSavedTripRangeCell(dom);
                     const dayLabel = formatPinDayLabel(cellIso);
                     return (
                       <div
@@ -778,7 +787,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           "group/cell relative flex h-full min-h-[7.5rem] cursor-pointer flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
                           inTripRangeCell(dom)
-                            ? "bg-slate-100/65 hover:bg-slate-100/90 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
+                            ? "bg-amber-100/85 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-950/60"
                             : "bg-white hover:bg-slate-50/80 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
@@ -899,8 +908,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                             ))}
                         </div>
 
-                        {showDayActions ? (
-                          <div className="pointer-events-auto mt-auto flex shrink-0 flex-col gap-1.5 border-t border-slate-200/70 pt-2 dark:border-white/10">
+                        {showEditActivities ? (
+                          <div
+                            className="pointer-events-none absolute bottom-2 left-2 right-2 z-10 opacity-0 shadow-sm transition-opacity duration-150 group-hover/cell:pointer-events-auto group-hover/cell:opacity-100 group-focus-within/cell:pointer-events-auto group-focus-within/cell:opacity-100"
+                            onClick={(ev) => ev.stopPropagation()}
+                            onKeyDown={(ev) => ev.stopPropagation()}
+                            role="presentation"
+                          >
                             <button
                               type="button"
                               onClick={(ev) => {
@@ -908,7 +922,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                 setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
-                              className="w-full rounded-lg border border-zinc-500/35 bg-zinc-700 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-white shadow-sm transition hover:bg-zinc-600 sm:px-3 sm:text-xs dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                              className="pointer-events-auto w-full rounded-lg border border-amber-800/30 bg-zinc-800 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-white transition hover:bg-zinc-700 sm:px-3 sm:text-xs dark:border-amber-500/25 dark:bg-zinc-700 dark:hover:bg-zinc-600"
                             >
                               Edit activities
                             </button>
