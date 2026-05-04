@@ -28,6 +28,8 @@ export function TripPlanCard({
   inviteCode,
   hideOpenDecisions = false,
   showInviteRow = true,
+  /** Use larger invite styling (trip host summary). */
+  inviteCodeProminent = false,
   hideSpotlightsSection = false,
 }: {
   plan: TripPlan;
@@ -44,8 +46,9 @@ export function TripPlanCard({
   inviteCode?: string | null;
   /** Hide the read-only open-decisions list (collaboration UI shows them below). */
   hideOpenDecisions?: boolean;
-  /** When false, omit the invite strip (shown separately on the page). */
+  /** When false, omit the invite strip inside this card. */
   showInviteRow?: boolean;
+  inviteCodeProminent?: boolean;
   /** Trip page: spotlights rendered in interactive panel instead. */
   hideSpotlightsSection?: boolean;
 }) {
@@ -74,7 +77,7 @@ export function TripPlanCard({
 
       {inviteCode && showInviteRow ? (
         <div className="pt-1">
-          <InviteCodeRow rawCode={inviteCode} />
+          <InviteCodeRow rawCode={inviteCode} prominent={inviteCodeProminent} />
         </div>
       ) : null}
 

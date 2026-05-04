@@ -1,4 +1,5 @@
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
+import { googlePlaceFirstPhotoProxyPath } from "@/backend/google-places-photo-media";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { RestaurantPick } from "@/shared/restaurants";
 
@@ -22,6 +23,7 @@ type PlaceJson = {
   priceLevel?: string;
   editorialSummary?: { text?: string };
   googleMapsUri?: string;
+  photos?: Array<{ name?: string } | null>;
 };
 
 async function searchTextPlaces(apiKey: string, textQuery: string, pageSize: number): Promise<PlaceJson[]> {
@@ -96,6 +98,7 @@ function mapPlaceToPick(place: PlaceJson, id: string): RestaurantPick {
     openTableUrl: mapsUrl,
     cuisineType: summary ? summary.slice(0, 240) : undefined,
     reserveCtaLabel: "Open in Google Maps",
+    coverPhotoUrl: googlePlaceFirstPhotoProxyPath(place.photos),
   };
 }
 

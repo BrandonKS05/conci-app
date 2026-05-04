@@ -15,6 +15,8 @@ export type RestaurantPick = {
   /** When live APIs fill this in (e.g. editorial snippet). */
   cuisineType?: string;
   reserveCtaLabel?: string;
+  /** Same-origin `/api/places/photo-media` — first Places `photos[]` resource (never embed API key client-side). */
+  coverPhotoUrl?: string | null;
 };
 
 function cityFromPlan(plan: TripPlan): string {
@@ -86,6 +88,7 @@ export function mergeLiveRestaurantsOntoHints(
       openTableUrl: L.openTableUrl,
       cuisineType: L.cuisineType,
       reserveCtaLabel: L.reserveCtaLabel,
+      coverPhotoUrl: L.coverPhotoUrl ?? b.coverPhotoUrl,
     };
   });
 }

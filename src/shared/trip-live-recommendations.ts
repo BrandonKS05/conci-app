@@ -6,6 +6,7 @@ export type LiveExperienceCard = {
   rating: string;
   duration: string;
   bookingUrl: string;
+  coverPhotoUrl?: string | null;
 };
 
 export type LiveFlightCard = {

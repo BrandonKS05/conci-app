@@ -1,4 +1,5 @@
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
+import { googlePlaceFirstPhotoProxyPath } from "@/backend/google-places-photo-media";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 
@@ -56,7 +57,9 @@ function mapPlace(row: Record<string, unknown>, city: string): LiveExperienceCar
   const pricePerPerson =
     formatted.length > 0 ? formatted.slice(0, 120) + (formatted.length > 120 ? "…" : "") : "See Google Maps";
 
-  return { name, pricePerPerson, rating, duration, bookingUrl };
+  const coverPhotoUrl = googlePlaceFirstPhotoProxyPath(row.photos);
+
+  return { name, pricePerPerson, rating, duration, bookingUrl, coverPhotoUrl };
 }
 
 /**

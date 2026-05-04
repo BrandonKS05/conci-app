@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
+import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   experienceLiveKey,
@@ -47,7 +48,7 @@ function SwipeableLiveCard({
       <div
         role="group"
         aria-label={swipeLabel}
-        className="relative touch-pan-y rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
+        className="relative touch-pan-y overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
         style={{
           transform: `translateX(${offset}px)`,
           transition: dragging ? "none" : "transform 0.22s ease-out",
@@ -307,8 +308,9 @@ export function CuratedRestaurantsSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Restaurants (live)</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-        Curate cards: add picks to your trip, swipe away or dismiss what you won&apos;t book. Suggestions come from Google
-        Places Text Search (group vote food hints per query).
+        Add picks with <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, or{' '}
+        <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> for the rest. Suggestions come from
+        Google Places Text Search (group vote food hints per query).
       </p>
       {liveLoading ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
@@ -320,12 +322,11 @@ export function CuratedRestaurantsSection({
           {restaurantPool.map((r) => {
             const key = restaurantLiveKey(r);
             return (
-              <SwipeableLiveCard
+              <div
                 key={key}
-                disabled={busyKey !== null}
-                onSwipeDismiss={() => mutate("dismiss", key)}
-                swipeLabel="Swipe left to dismiss this restaurant suggestion"
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
               >
+                <LivePlaceCoverImage src={r.coverPhotoUrl} />
                 <div className="px-4 py-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -348,7 +349,7 @@ export function CuratedRestaurantsSection({
                         type="button"
                         disabled={busyKey !== null}
                         onClick={() => mutate("keep", key)}
-                        className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-50 dark:bg-rose-600 dark:hover:bg-rose-500"
+                        className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${primaryFilledInteractive}`}
                       >
                         Add to trip
                       </button>
@@ -359,12 +360,11 @@ export function CuratedRestaurantsSection({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     {r.reserveCtaLabel ?? "Open in Maps"}
                   </a>
                 </div>
-              </SwipeableLiveCard>
+              </div>
             );
           })}
           {!restaurantPool.length && restaurantKeptMeta.length > 0 ? (
@@ -432,6 +432,7 @@ export function CuratedExperiencesSection({
               onSwipeDismiss={() => mutate("dismiss", key)}
               swipeLabel="Swipe left to dismiss this experience"
             >
+              <LivePlaceCoverImage src={ex.coverPhotoUrl} />
               <div className="px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">

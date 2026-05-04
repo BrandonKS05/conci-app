@@ -6,12 +6,11 @@ import type { TripPlanStatus } from "@/shared/trip-status";
 import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
-import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 
-/** Trip home: invite + share (host only), saved plan card, then collaboration. */
+/** Trip home: share (host); invite code lives inside `TripPlanCard`, then collaboration. */
 export function TripSharedPanel({
   tripId,
   plan: planFromServer,
@@ -61,19 +60,7 @@ export function TripSharedPanel({
 
   return (
     <div className="space-y-8">
-      {isHost && inviteCode ? (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <div className="min-w-0 flex-1">
-            <InviteCodeRow rawCode={inviteCode} prominent />
-          </div>
-          <div className="flex shrink-0 flex-col gap-1 sm:items-end">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-              Share trip
-            </span>
-            <TripPlanShareButton shareMessage={shareMessage} />
-          </div>
-        </div>
-      ) : isHost ? (
+      {isHost ? (
         <div className="flex justify-end">
           <div className="flex flex-col gap-1 sm:items-end">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
@@ -92,7 +79,8 @@ export function TripSharedPanel({
             showShare={false}
             hideOpenDecisions
             inviteCode={inviteCode ?? null}
-            showInviteRow={false}
+            showInviteRow={Boolean(isHost && inviteCode)}
+            inviteCodeProminent={Boolean(isHost && inviteCode)}
             guestJoinNames={tripMemberNames}
             hideSpotlightsSection={hasSpotlights}
           />

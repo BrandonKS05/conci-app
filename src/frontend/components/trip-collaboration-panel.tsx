@@ -46,6 +46,7 @@ import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/res
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
+import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
 import { DatesSingleProposalMemberVote, DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
 import { HostTripMemberEmailModal } from "@/frontend/components/host-trip-member-email-modal";
 import {
@@ -1420,13 +1421,14 @@ function DecisionCard({
                 return (
                   <li
                     key={r.id}
-                    className={`rounded-xl border px-4 py-3 ${
+                    className={`overflow-hidden rounded-xl border ${
                       picked
                         ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
                         : "border-slate-200 bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
                     }`}
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <LivePlaceCoverImage src={r.coverPhotoUrl} />
+                    <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
                         {r.cuisineType ? (
