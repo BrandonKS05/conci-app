@@ -52,8 +52,7 @@ export async function middleware(request: NextRequest) {
     path === "/joined-trips" ||
     path === "/booking" ||
     path.startsWith("/booking/") ||
-    path.startsWith("/trip/") ||
-    path === "/join";
+    path.startsWith("/trip/");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

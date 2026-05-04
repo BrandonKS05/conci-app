@@ -24,7 +24,7 @@ export function LandingTwPlusHero() {
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggleButton variant="landing" className="inline-flex" />
-            <Link href="/join" className={primaryNavPillClass}>
+            <Link href="/trip-parser?join=1" className={primaryNavPillClass}>
               <span className="sm:hidden">Join trip</span>
               <span className="hidden sm:inline">Join a trip</span>
             </Link>
@@ -91,7 +91,7 @@ export function LandingTwPlusHero() {
                         <ThemeToggleButton variant="landing" className="w-full justify-center" />
                       </div>
                       <a
-                        href="/join"
+                        href="/trip-parser?join=1"
                         className="-mx-3 block w-full rounded-lg px-3 py-2.5 text-left text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-dm-elevated"
                         {...({ command: "close", commandfor: "mobile-menu" } as object)}
                       >
@@ -140,7 +140,7 @@ export function LandingTwPlusHero() {
               <Link href="/trip-parser" className={primaryHeroLinkPillClass}>
                 Start planning
               </Link>
-              <Link href="/join" className={primaryHeroLinkPillClass}>
+              <Link href="/trip-parser?join=1" className={primaryHeroLinkPillClass}>
                 Join with a code
               </Link>
               <a
