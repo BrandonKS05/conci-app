@@ -180,6 +180,21 @@ export function TripCollaborationPanel({
     () => datesGroupResolved(plan, classified, collab),
     [plan, classified, collab]
   );
+
+  /** Open decisions: interactive first, date-gated (hotels / dinner) last until weekends lock. */
+  const activeDecisionOrder = useMemo(
+    () =>
+      classified
+        .filter((meta) => !isDecisionLocked(collab.decisions[meta.key]))
+        .sort((a, b) => {
+          const ga = decisionDependsOnDatesLocked(a) && !datesLockedByGroup;
+          const gb = decisionDependsOnDatesLocked(b) && !datesLockedByGroup;
+          if (ga !== gb) return ga ? 1 : -1;
+          return a.index - b.index;
+        }),
+    [classified, collab, datesLockedByGroup]
+  );
+
   const total = classified.length;
   const progress = total === 0 ? 100 : Math.round((lockedCount / total) * 100);
   const allLocked = total > 0 && lockedCount === total;
@@ -439,10 +454,8 @@ export function TripCollaborationPanel({
       {!showReady && total > 0 ? (
         <div className="space-y-6">
           <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>
-          {classified.map((meta) => {
+          {activeDecisionOrder.map((meta) => {
             const blob = collab.decisions[meta.key];
-            const locked = isDecisionLocked(blob);
-            if (locked) return null;
             const gated = decisionDependsOnDatesLocked(meta) && !datesLockedByGroup;
             return (
               <DecisionCard
@@ -729,19 +742,19 @@ function formatResolvedDetail(meta: ClassifiedDecision, blob: CollabDecisionBlob
   return "";
 }
 
-const DATE_GATE_BANNER =
-  "Waiting on dates · lock weekends above before hotels & dinner polls matter.";
-
-function DecisionGate({ children, active, banner }: { children: ReactNode; active: boolean; banner: string }) {
-  if (!active) return children;
+/** Frosted lock overlay when hotels / dinner polls are blocked until group dates are chosen. */
+function DatesLockedGate({ active, children }: { active: boolean; children: ReactNode }) {
+  if (!active) return <>{children}</>;
   return (
-    <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-3">
-        <span className="max-w-[min(100%,26rem)] rounded-full border border-amber-500/85 bg-white/95 px-4 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-amber-950 shadow-sm backdrop-blur dark:border-amber-600/55 dark:bg-amber-950/95 dark:text-amber-100">
-          {banner}
-        </span>
+    <div className="relative isolate overflow-hidden rounded-2xl">
+      <div className="pointer-events-none">{children}</div>
+      <div
+        className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center bg-black/60 px-5 text-center text-sm font-medium leading-snug text-white [backdrop-filter:blur(4px)]"
+        role="status"
+        aria-live="polite"
+      >
+        Locked — waiting on dates
       </div>
-      <div className="pointer-events-none select-none opacity-[0.42] saturate-[0.55] grayscale-[0.06]">{children}</div>
     </div>
   );
 }
@@ -852,12 +865,14 @@ function DecisionCard({
     if (spots?.length && meta.key === VENUE_POLL_DECISION_KEY) {
       const venueList = mergeLiveRestaurantsOntoHints(spots, liveVenueMerge ?? undefined);
       return (
-        <DecisionGate active={blockedByDates} banner={DATE_GATE_BANNER}>
+        <DatesLockedGate active={blockedByDates}>
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
             <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-              Live listings when available — book ahead to secure a table.
-            </p>
+            {blockedByDates ? null : (
+              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+                Live listings when available — book ahead to secure a table.
+              </p>
+            )}
             <ul className="mt-4 space-y-3">
               {venueList.map((r) => {
                 const picked = mine === r.id || mine === r.name;
@@ -909,7 +924,7 @@ function DecisionCard({
             </ul>
             <div className="mt-3 text-xs text-slate-500 dark:text-neutral-500">{voterN} vote(s) · needs quorum</div>
           </section>
-        </DecisionGate>
+        </DatesLockedGate>
       );
     }
 
@@ -969,14 +984,14 @@ function DecisionCard({
 
   if (meta.kind === "hotel" && !hotels?.length) {
     return (
-      <DecisionGate active={blockedByDates} banner={DATE_GATE_BANNER}>
+      <DatesLockedGate active={blockedByDates}>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
           <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-          <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-            {blockedByDates
-              ? "Lock trip dates above so nightly hotel rates reflect your actual stay length."
-              : "Search Booking.com via RapidAPI for this city, dates, and guest count."}
-          </p>
+          {blockedByDates ? null : (
+            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+              Search Booking.com via RapidAPI for this city, dates, and guest count.
+            </p>
+          )}
           {hotelSearchErr ? (
             <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
               {hotelSearchErr}
@@ -997,19 +1012,21 @@ function DecisionCard({
             </p>
           )}
         </section>
-      </DecisionGate>
+      </DatesLockedGate>
     );
   }
 
   if (meta.kind === "hotel" && hotels?.length) {
     const mine = readScalarVote(votes, visitorKey, canonicalVoterKey);
     return (
-      <DecisionGate active={blockedByDates} banner={DATE_GATE_BANNER}>
+      <DatesLockedGate active={blockedByDates}>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
           <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            Top picks — prices shown inline so nobody has to bounce for a dollar amount first.
-          </p>
+          {blockedByDates ? null : (
+            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+              Top picks — prices shown inline so nobody has to bounce for a dollar amount first.
+            </p>
+          )}
           <ul className="mt-4 space-y-3">
             {hotels.map((h) => (
               <li
@@ -1073,7 +1090,7 @@ function DecisionCard({
             ) : null}
           </div>
         </section>
-      </DecisionGate>
+      </DatesLockedGate>
     );
   }
 

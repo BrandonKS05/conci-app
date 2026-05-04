@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import Calendar from "react-calendar";
-import type { TileClassNameFunc, TileContentFunc, TileDisabledFunc } from "react-calendar";
-import "react-calendar/dist/Calendar.css";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import {
   buildParsedDateOptions,
   earliestParsedDay,
@@ -52,74 +51,90 @@ export function DatesVoteCalendar({
   const minNav = useMemo(() => {
     const e = earliestParsedDay(parsed);
     if (!e) return undefined;
-    const t = localDayTime(e) - 32 * 86400000;
-    return new Date(t);
+    return new Date(localDayTime(e) - 32 * 86400000);
   }, [parsed]);
 
   const maxNav = useMemo(() => {
     const l = latestParsedDay(parsed);
     if (!l) return undefined;
-    const t = localDayTime(l) + 62 * 86400000;
-    return new Date(t);
+    return new Date(localDayTime(l) + 62 * 86400000);
   }, [parsed]);
-
-  const tileDisabled: TileDisabledFunc = ({ date, view }) => {
-    if (view !== "month") return false;
-    return optionForCalendarDay(date, options, parsed) === null;
-  };
-
-  const tileClassName: TileClassNameFunc = ({ date, view }) => {
-    if (view !== "month") return null;
-    const opt = optionForCalendarDay(date, options, parsed);
-    if (!opt) return null;
-    const classes: string[] = ["dates-tile-proposed"];
-    if (mine && mine === opt) classes.push("dates-tile-mine");
-    return classes.join(" ");
-  };
-
-  const tileContent: TileContentFunc = ({ date, view }) => {
-    if (view !== "month") return null;
-    const opt = optionForCalendarDay(date, options, parsed);
-    if (!opt) return null;
-    const c = tally[opt] ?? 0;
-    return (
-      <span className="dates-tile-votehint" aria-hidden={c === 0}>
-        {c > 0 ? <span className="dates-tile-count">{c}</span> : <span className="dates-tile-dot" />}
-      </span>
-    );
-  };
 
   const cast = (option: string) => {
     onVote({ decisionKey, kind: "dates", option });
   };
 
+  const rangeSummaries = useMemo(
+    () =>
+      parsed.map(({ option, start, end }) => ({
+        option,
+        label: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+        votes: tally[option] ?? 0,
+      })),
+    [parsed, tally]
+  );
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-neutral-400">
-        Votes: {voterN}/{quorum}+ to lock. Tap a highlighted date to vote for that option. Vote totals appear under each
-        day (the same total appears on every day in a range).
+        Votes: {voterN}/{quorum}+ to lock. Choose a highlighted date to vote for that option.
       </p>
 
       {parsed.length > 0 ? (
-        <Calendar
-          className="dates-vote-calendar rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-white/10 dark:bg-dm-elevated/40"
-          calendarType="iso8601"
-          defaultActiveStartDate={defaultActive}
-          minDate={minNav}
-          maxDate={maxNav}
-          minDetail="month"
-          maxDetail="month"
-          tileDisabled={tileDisabled}
-          tileClassName={tileClassName}
-          tileContent={tileContent}
-          showNeighboringMonth={false}
-          onClickDay={(value) => {
-            if (busy) return;
-            const opt = optionForCalendarDay(value, options, parsed);
-            if (!opt) return;
-            cast(opt);
-          }}
-        />
+        <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-dm-elevated/50">
+          <DatePicker
+            inline
+            showIcon={false}
+            shouldCloseOnSelect={false}
+            openToDate={defaultActive}
+            selected={null}
+            onChange={(date: Date | null) => {
+              if (busy || !date) return;
+              const opt = optionForCalendarDay(date, options, parsed);
+              if (opt) cast(opt);
+            }}
+            filterDate={(d: Date) => optionForCalendarDay(d, options, parsed) !== null}
+            minDate={minNav}
+            maxDate={maxNav}
+            calendarStartDay={1}
+            calendarClassName="conci-datepicker-calendar"
+            wrapperClassName="conci-datepicker-wrapper"
+            dateFormatCalendar="MMMM yyyy"
+            dayClassName={(d: Date) => {
+              const opt = optionForCalendarDay(d, options, parsed);
+              if (!opt) return "";
+              const parts = ["conci-datepicker-day--vote"];
+              if (mine === opt) parts.push("conci-datepicker-day--mine");
+              return parts.join(" ");
+            }}
+            renderDayContents={(day: number, date?: Date) => {
+              if (!date) return <span>{day}</span>;
+              const opt = optionForCalendarDay(date, options, parsed);
+              if (!opt) return <span>{day}</span>;
+              const c = tally[opt] ?? 0;
+              return (
+                <span className="conci-datepicker-day-inner">
+                  <span className="conci-datepicker-day-num">{day}</span>
+                  <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
+                    {c > 0 ? c : "\u00a0"}
+                  </span>
+                </span>
+              );
+            }}
+          />
+          {rangeSummaries.length > 0 ? (
+            <ul className="conci-datepicker-range-totals mt-4 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
+              {rangeSummaries.map(({ option, label, votes: v }) => (
+                <li key={option} className="flex items-baseline justify-between gap-3 text-xs">
+                  <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
+                  <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
+                    {v} {v === 1 ? "vote" : "votes"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       {unmapped.length > 0 ? (
@@ -154,7 +169,7 @@ export function DatesVoteCalendar({
         <p className="text-sm text-slate-600 dark:text-neutral-400">No date options to show.</p>
       ) : null}
 
-      <ul className="space-y-1 text-xs text-slate-500 dark:text-neutral-500" aria-label="Vote totals by option">
+      <ul className="sr-only" aria-label="Vote totals by option">
         {options.map((opt) => {
           const r = parseDateOptionToRange(opt, defaultYear);
           const label = r
@@ -162,9 +177,7 @@ export function DatesVoteCalendar({
             : opt;
           return (
             <li key={opt}>
-              <span className="font-medium text-slate-700 dark:text-neutral-300">{tally[opt] ?? 0} votes</span>
-              {" · "}
-              <span className="text-slate-600 dark:text-neutral-400">{label}</span>
+              {tally[opt] ?? 0} votes: {label}
             </li>
           );
         })}
