@@ -4,7 +4,12 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { allocateUniqueInviteCode, formatInviteCodeDisplay } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { ensureHostMembership } from "@/backend/trip-memberships";
-import { normalizePlan, planHasUsableTripTiming } from "@/shared/trip-plan";
+import {
+  concreteTripRangeFromPlanDates,
+  normalizePlan,
+  parseHostSetup,
+  planHasUsableTripTiming,
+} from "@/shared/trip-plan";
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
@@ -102,9 +107,21 @@ export async function POST(request: Request) {
   const nextStatus =
     finalized ? "finalized" : hostSetupDraft ? "draft" : "voting";
 
+  let planForSave = normalizedPlan;
+  if (hostSetupDraft) {
+    const concrete = concreteTripRangeFromPlanDates(normalizedPlan, new Date().getFullYear());
+    const baseHs = parseHostSetup(normalizedPlan.hostSetup) ?? {};
+    if (concrete && !baseHs.tripRange?.startIso) {
+      planForSave = normalizePlan({
+        ...(normalizedPlan as unknown as Record<string, unknown>),
+        hostSetup: { ...baseHs, tripRange: concrete },
+      });
+    }
+  }
+
   const row = {
     id,
-    plan: normalizedPlan,
+    plan: planForSave,
     seed_text: seedText,
     user_id: user.id,
     invite_code: codeToSave as string | null,

@@ -4,6 +4,7 @@ import {
   inferDefaultYearFromDateOptions,
   localDayTime,
   looseDateOptionOverlapsUserText,
+  parseConcreteDateOptionToRange,
   parseDateOptionToRange,
   startOfLocalDay,
 } from "@/shared/date-option-parse";
@@ -577,16 +578,28 @@ export function normalizePlan(value: unknown): TripPlan {
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** First calendar range implied by `plan.dates.options`, or null when copy is too vague. */
-export function inferredTripRangeFromPlanDates(plan: TripPlan, fallbackYear: number): { startIso: string; endIso: string } | null {
+/**
+ * First calendar range from `plan.dates.options` only when options use explicit days
+ * (ISO, slash ranges, “May 4–15, 2026”, etc.). Returns null for vague text that only
+ * matches the loose `Date` fallback — so the host calendar won’t pre-highlight fuzzy ranges.
+ */
+export function concreteTripRangeFromPlanDates(
+  plan: TripPlan,
+  fallbackYear: number
+): { startIso: string; endIso: string } | null {
   const y0 = inferDefaultYearFromDateOptions(plan.dates.options, fallbackYear);
   for (const opt of plan.dates.options) {
-    const r = parseDateOptionToRange(opt, y0);
+    const r = parseConcreteDateOptionToRange(opt, y0);
     if (r) {
       return { startIso: formatLocalIsoDate(r.start), endIso: formatLocalIsoDate(r.end) };
     }
   }
   return null;
+}
+
+/** @deprecated Use concreteTripRangeFromPlanDates */
+export function inferredTripRangeFromPlanDates(plan: TripPlan, fallbackYear: number) {
+  return concreteTripRangeFromPlanDates(plan, fallbackYear);
 }
 
 export function parseLocalIsoDate(iso: string): Date | null {

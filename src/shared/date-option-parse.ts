@@ -77,12 +77,40 @@ export function inferDefaultYearFromDateOptions(opts: string[], fallbackYear: nu
 }
 
 /**
+ * Explicit calendar dates only (ISO, slash ranges, month+day text with numeric days).
+ * Does not use the loose `new Date(string)` fallback so vague copy ("summer", "May") won’t become a range.
+ */
+export function parseConcreteDateOptionToRange(
+  opt: string,
+  defaultYear: number
+): { start: Date; end: Date } | null {
+  const raw = normalizeDashes(opt);
+  if (!raw || /^TBD\b/i.test(raw)) return null;
+  return parseDateOptionToRangeStructured(raw, defaultYear);
+}
+
+/**
  * Best-effort parse of a single `plan.dates.options` entry into inclusive local dates.
+ * Includes a final `new Date(raw)` fallback for fuzzy strings that still parse.
  */
 export function parseDateOptionToRange(opt: string, defaultYear: number): { start: Date; end: Date } | null {
   const raw = normalizeDashes(opt);
   if (!raw || /^TBD\b/i.test(raw)) return null;
+  const structured = parseDateOptionToRangeStructured(raw, defaultYear);
+  if (structured) return structured;
+  const native = new Date(raw);
+  if (!Number.isNaN(native.getTime())) {
+    const one = startOfLocalDay(native);
+    return { start: one, end: one };
+  }
+  return null;
+}
 
+/** ISO / slash / named month+day patterns shared by concrete and loose parsing. */
+function parseDateOptionToRangeStructured(
+  raw: string,
+  defaultYear: number
+): { start: Date; end: Date } | null {
   const isoSingle = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoSingle) {
     const y = parseInt(isoSingle[1]!, 10);
@@ -162,12 +190,6 @@ export function parseDateOptionToRange(opt: string, defaultYear: number): { star
       const one = ymd(y, mon, d);
       return { start: one, end: one };
     }
-  }
-
-  const native = new Date(raw);
-  if (!Number.isNaN(native.getTime())) {
-    const one = startOfLocalDay(native);
-    return { start: one, end: one };
   }
 
   return null;

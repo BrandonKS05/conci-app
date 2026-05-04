@@ -9,7 +9,7 @@ import {
   hostHasHotel,
   hostHasKeptRestaurant,
   hostSetupCompletionPercent,
-  inferredTripRangeFromPlanDates,
+  concreteTripRangeFromPlanDates,
   isHostPublishReady,
   parseLocalIsoDate,
   seedTextMentionsDining,
@@ -71,6 +71,16 @@ function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
   return formatLocalIsoDate(new Date(viewYear, viewMonth, dom, 12, 0, 0, 0));
 }
 
+/** Human-readable range for the confirm dialog. */
+function formatTripRangeLabel(startIso: string, endIso: string): string {
+  const a = parseLocalIsoDate(startIso);
+  const b = parseLocalIsoDate(endIso);
+  if (!a || !b) return `${startIso} → ${endIso}`;
+  const o: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (startIso === endIso) return a.toLocaleDateString(undefined, o);
+  return `${a.toLocaleDateString(undefined, o)} – ${b.toLocaleDateString(undefined, o)}`;
+}
+
 function ChevLeft({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
@@ -119,33 +129,43 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
+  /** Set after the second tap in range mode; saved only when the host confirms. */
+  const [pendingRangeConfirm, setPendingRangeConfirm] = useState<{
+    startIso: string;
+    endIso: string;
+  } | null>(null);
 
-  const inferredRange = inferredTripRangeFromPlanDates(plan, new Date().getFullYear());
+  const concreteRangeFromPlan = concreteTripRangeFromPlanDates(plan, new Date().getFullYear());
 
   const [calYear, setCalYear] = useState(() => {
-    const tr = initialPlan.hostSetup?.tripRange ?? inferredTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
+    const tr = initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     const d = base ?? new Date();
     return d.getFullYear();
   });
   const [calMonth, setCalMonth] = useState(() => {
-    const tr = initialPlan.hostSetup?.tripRange ?? inferredTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
+    const tr = initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     const d = base ?? new Date();
     return d.getMonth();
   });
 
-  /** Persisted preferred for saving pins; inferred fills the grid until PATCH returns. */
-  const tripDisplayRange = hostSetup.tripRange ?? inferredRange ?? null;
+  /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
+  const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
+  /** While confirming a new range on the calendar, preview highlight uses this; otherwise saved/plan range. */
+  const effectiveHighlightRange = useMemo(
+    () => pendingRangeConfirm ?? tripDisplayRange,
+    [pendingRangeConfirm, tripDisplayRange]
+  );
 
   const suggestedSeededRef = useRef(false);
 
   type HostSetupPatch = Partial<HostSetupState>;
 
   const persistHostSetup = useCallback(
-    async (patch: HostSetupPatch) => {
+    async (patch: HostSetupPatch): Promise<boolean> => {
       setErr(null);
       try {
         const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
@@ -157,23 +177,25 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         const j = (await res.json().catch(() => ({}))) as { plan?: TripPlan; error?: string };
         if (!res.ok) {
           setErr(j.error || "Could not save setup.");
-          return;
+          return false;
         }
         if (j.plan) setPlan(j.plan);
+        return true;
       } catch {
         setErr("Could not save setup.");
+        return false;
       }
     },
     [tripId]
   );
 
-  /** First inferred concrete range → persist once if missing server-side host range. */
+  /** Legacy drafts: persist explicit parser dates once if `hostSetup.tripRange` was never saved (new trips get this from POST). */
   useEffect(() => {
     const y0 = new Date().getFullYear();
-    const inferred = inferredTripRangeFromPlanDates(plan, y0);
-    if (!inferred || hostSetup.tripRange?.startIso) return;
-    void persistHostSetup({ tripRange: inferred });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from parser dates
+    const concrete = concreteTripRangeFromPlanDates(initialPlan, y0);
+    if (!concrete || initialPlan.hostSetup?.tripRange?.startIso) return;
+    void persistHostSetup({ tripRange: concrete });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from initial plan only
   }, []);
 
   useEffect(() => {
@@ -280,6 +302,43 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [hostSetup.activityPins, persistHostSetup]
   );
 
+  const confirmPendingTripRange = useCallback(async () => {
+    if (!pendingRangeConfirm) return;
+    setErr(null);
+    suggestedSeededRef.current = false;
+    setSelectedDayIso(null);
+    const ok = await persistHostSetup({
+      hotel: hostSetup.hotel,
+      experiencesOutlined: hostSetup.experiencesOutlined,
+      tripRange: pendingRangeConfirm,
+      restaurantPins: [],
+      activityPins: [],
+    });
+    if (ok) {
+      setPendingRangeConfirm(null);
+      setDatePickMode("day");
+    }
+  }, [
+    pendingRangeConfirm,
+    hostSetup.hotel,
+    hostSetup.experiencesOutlined,
+    persistHostSetup,
+  ]);
+
+  const cancelPendingTripRange = useCallback(() => {
+    setPendingRangeConfirm(null);
+    setRangeAnchor(null);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingRangeConfirm) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelPendingTripRange();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingRangeConfirm, cancelPendingTripRange]);
+
   const clearDayPins = useCallback(
     (dateIso: string) => {
       const rp = (hostSetup.restaurantPins ?? []).filter((p) => p.dateIso !== dateIso);
@@ -308,18 +367,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         let end = parseLocalIsoDate(iso)!;
         if (start.getTime() > end.getTime()) [start, end] = [end, start];
         setRangeAnchor(null);
-        suggestedSeededRef.current = false;
-        setSelectedDayIso(null);
-        void (async () => {
-          await persistHostSetup({
-            hotel: hostSetup.hotel,
-            experiencesOutlined: hostSetup.experiencesOutlined,
-            tripRange: { startIso: formatLocalIsoDate(start), endIso: formatLocalIsoDate(end) },
-            restaurantPins: [],
-            activityPins: [],
-          });
-          setDatePickMode("day");
-        })();
+        setPendingRangeConfirm({
+          startIso: formatLocalIsoDate(start),
+          endIso: formatLocalIsoDate(end),
+        });
         return;
       }
 
@@ -332,17 +383,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       /* Focus this day for keyboard / mobile; hover uses the same cell for actions. */
       setSelectedDayIso(iso);
     },
-    [
-      calYear,
-      calMonth,
-      rangeAnchor,
-      datePickMode,
-      tripDisplayRange?.startIso,
-      tripDisplayRange?.endIso,
-      hostSetup.hotel,
-      hostSetup.experiencesOutlined,
-      persistHostSetup,
-    ]
+    [calYear, calMonth, rangeAnchor, datePickMode, tripDisplayRange?.startIso, tripDisplayRange?.endIso]
   );
 
   const addRestaurantToDay = useCallback(
@@ -421,12 +462,12 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
 
   const inTripRangeCell = useCallback(
     (dom: number | null): boolean => {
-      if (!dom || !tripDisplayRange?.startIso || !tripDisplayRange.endIso) return false;
+      if (!dom || !effectiveHighlightRange?.startIso || !effectiveHighlightRange.endIso) return false;
       const iso = isoFromCell(calYear, calMonth, dom);
-      const days = enumerateLocalIsoDays(tripDisplayRange.startIso, tripDisplayRange.endIso);
+      const days = enumerateLocalIsoDays(effectiveHighlightRange.startIso, effectiveHighlightRange.endIso);
       return days.includes(iso);
     },
-    [tripDisplayRange, calYear, calMonth]
+    [effectiveHighlightRange, calYear, calMonth]
   );
 
   const selectedDayLabel = useMemo(() => {
@@ -533,8 +574,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — hover a trip day for Add or Clear; Add loads contextual meals & activities (tap on mobile).`
                     : "Tap two days to set your trip."}
               </p>
-              {rangeAnchor && datePickMode === "range" ? (
+              {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
                 <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
+              ) : null}
+              {pendingRangeConfirm && datePickMode === "range" ? (
+                <p className="mt-2 text-xs font-medium text-violet-600 dark:text-violet-400">
+                  Confirm your trip dates in the dialog below.
+                </p>
               ) : null}
             </div>
             {hostHasConcreteTripRange(plan) ? (
@@ -545,6 +591,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                   setRangeAnchor(null);
                   setSelectedDayIso(null);
                   setAddPlacesOpen(false);
+                  setPendingRangeConfirm(null);
                 }}
                 className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
               >
@@ -691,14 +738,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                         {(hostSetup.restaurantPins ?? [])
                           .filter((p) => p.dateIso === cellIso)
                           .map((p) => (
-                            <div key={p.place.mapsUrl} className="mb-2 last:mb-0">
+                            <div key={p.place.mapsUrl} className="mb-2 min-w-0 w-full last:mb-0">
                               <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
                                 <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">{p.place.name}</span>
                                 <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
                                   Meal
                                 </span>
                               </div>
-                              <div className="mt-1 flex gap-2 pl-1.5">
+                              <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
                                 {p.kept ? (
                                   <button
                                     type="button"
@@ -706,7 +753,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                       ev.stopPropagation();
                                       togglePin(p.dateIso, p.place.mapsUrl, false);
                                     }}
-                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                    className="max-w-full truncate rounded-md border border-slate-200/90 bg-white px-2.5 py-1.5 text-center text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-sm dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-white/10"
                                   >
                                     Remove
                                   </button>
@@ -717,7 +764,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                       ev.stopPropagation();
                                       togglePin(p.dateIso, p.place.mapsUrl, true);
                                     }}
-                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                    className="max-w-full truncate rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-center text-xs font-medium text-violet-900 shadow-sm transition hover:bg-violet-100 sm:px-3 sm:text-sm dark:border-violet-500/35 dark:bg-violet-950/55 dark:text-violet-100 dark:hover:bg-violet-950"
                                   >
                                     Add
                                   </button>
@@ -729,14 +776,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                         {(hostSetup.activityPins ?? [])
                           .filter((p) => p.dateIso === cellIso)
                           .map((p) => (
-                            <div key={p.experience.bookingUrl} className="mb-2 last:mb-0">
+                            <div key={p.experience.bookingUrl} className="mb-2 min-w-0 w-full last:mb-0">
                               <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
                                 <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">{p.experience.name}</span>
                                 <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
                                   Activity
                                 </span>
                               </div>
-                              <div className="mt-1 flex gap-2 pl-1.5">
+                              <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
                                 {p.kept ? (
                                   <button
                                     type="button"
@@ -744,7 +791,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                       ev.stopPropagation();
                                       toggleActivityPin(p.dateIso, p.experience.bookingUrl, false);
                                     }}
-                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                    className="max-w-full truncate rounded-md border border-slate-200/90 bg-white px-2.5 py-1.5 text-center text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-sm dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-white/10"
                                   >
                                     Remove
                                   </button>
@@ -755,7 +802,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                       ev.stopPropagation();
                                       toggleActivityPin(p.dateIso, p.experience.bookingUrl, true);
                                     }}
-                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                    className="max-w-full truncate rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-center text-xs font-medium text-violet-900 shadow-sm transition hover:bg-violet-100 sm:px-3 sm:text-sm dark:border-violet-500/35 dark:bg-violet-950/55 dark:text-violet-100 dark:hover:bg-violet-950"
                                   >
                                     Add
                                   </button>
@@ -925,6 +972,51 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         </section>
       </div>
       </div>
+
+      {pendingRangeConfirm ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center p-4 sm:items-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-trip-range-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
+            aria-label="Cancel"
+            onClick={cancelPendingTripRange}
+          />
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
+            <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+              <h2 id="confirm-trip-range-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+                Confirm trip dates
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+                Use these dates for your trip?
+              </p>
+              <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-sm font-medium text-violet-900 dark:bg-violet-950/50 dark:text-violet-100">
+                {formatTripRangeLabel(pendingRangeConfirm.startIso, pendingRangeConfirm.endIso)}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4">
+              <button
+                type="button"
+                onClick={cancelPendingTripRange}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmPendingTripRange()}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-500"
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <HostSetupAddPlacesModal
         open={addPlacesOpen && Boolean(selectedDayIso)}
