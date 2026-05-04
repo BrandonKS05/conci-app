@@ -59,7 +59,7 @@ export default async function TripHostSetupPage({
   const plan = normalizePlan(data.plan);
 
   return (
-    <div className="min-h-screen bg-[#161618] px-4 pb-16 pt-10 text-neutral-100 sm:px-6 sm:pb-20 sm:pt-12 lg:px-10 lg:pb-24 lg:pt-16">
+    <div className="min-h-screen bg-[#161618] py-6 text-neutral-100 sm:py-8">
       <SiteShell title={plan.title || "Trip setup"} eyebrow="Host setup" tripTypography>
         <TripHostSetupDashboard tripId={id} initialPlan={plan} />
       </SiteShell>

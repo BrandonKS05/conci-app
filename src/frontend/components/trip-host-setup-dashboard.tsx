@@ -38,18 +38,90 @@ function daysInMonth(y: number, m0: number): number {
   return new Date(y, m0 + 1, 0).getDate();
 }
 
-function calendarCells(viewYear: number, viewMonth: number): (number | null)[] {
-  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+const WEEKDAY_MON_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+/** Monday-first month grid padding (classic wall calendar layout). */
+function calendarCellsMondayFirst(viewYear: number, viewMonth: number): (number | null)[] {
+  const firstDowSun0 = new Date(viewYear, viewMonth, 1).getDay();
+  const padMon0 = (firstDowSun0 + 6) % 7;
   const n = daysInMonth(viewYear, viewMonth);
   const cells: (number | null)[] = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let i = 0; i < padMon0; i++) cells.push(null);
   for (let d = 1; d <= n; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
 
+function chunkWeeks(cells: (number | null)[]): (number | null)[][] {
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+  return weeks;
+}
+
+type TripIsoRange = { startIso: string; endIso: string };
+
 function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
   return formatLocalIsoDate(new Date(viewYear, viewMonth, dom, 12, 0, 0, 0));
+}
+
+/** Horizontal span [colStart,colEnd] 0-indexed inclusive for trip nights in one week row. */
+function tripColumnSegments(
+  week: (number | null)[],
+  calYear: number,
+  calMonth: number,
+  range: TripIsoRange | null
+): { start: number; end: number }[] {
+  if (!range?.startIso || !range.endIso) return [];
+  const days = enumerateLocalIsoDays(range.startIso, range.endIso);
+  const included = new Set(days);
+  const segments: { start: number; end: number }[] = [];
+  let run = -1;
+  for (let c = 0; c < 7; c++) {
+    const dom = week[c];
+    const iso = dom != null ? isoFromCell(calYear, calMonth, dom) : null;
+    const inTrip = !!(iso && included.has(iso));
+    if (inTrip && run < 0) run = c;
+    if ((!inTrip || c === 6) && run >= 0) {
+      const end = inTrip && c === 6 ? c : c - 1;
+      if (end >= run) segments.push({ start: run, end });
+      run = -1;
+    }
+  }
+  return segments;
+}
+
+function ChevLeft({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
+      <path
+        fillRule="evenodd"
+        d="M12.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L9.414 10l3.293 3.293a1 1 0 010 1.414z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function ChevRight({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
+      <path
+        fillRule="evenodd"
+        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function ChevDownSm({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
+      <path d="M4.427 6.073a.75.75 0 001.054 0L8 3.554l2.519 2.519a.75.75 0 001.065-1.06l-3.049-3.05a1.501 1.501 0 00-2.122 0L3.362 5.013a.75.75 0 000 1.06z" />
+    </svg>
+  );
 }
 
 export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
@@ -192,9 +264,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
 
   const onHotelPick = useCallback(
     (h: PlaceSpotlight) => {
-      void persistHostSetup({ ...hostSetup, hotel: h });
+      void persistHostSetup({ hotel: h });
     },
-    [hostSetup, persistHostSetup]
+    [persistHostSetup]
   );
 
   const togglePin = useCallback(
@@ -203,9 +275,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
       const idx = pins.findIndex((p) => p.dateIso === dateIso && p.place.mapsUrl === mapsUrl);
       if (idx === -1) return;
       pins[idx] = { ...pins[idx]!, kept };
-      void persistHostSetup({ ...hostSetup, restaurantPins: pins });
+      void persistHostSetup({ restaurantPins: pins });
     },
-    [hostSetup, persistHostSetup]
+    [hostSetup.restaurantPins, persistHostSetup]
   );
 
   const onCalendarDayClick = useCallback(
@@ -256,7 +328,24 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
     }
   }, [pubReady, tripId, router]);
 
-  const cells = useMemo(() => calendarCells(calYear, calMonth), [calYear, calMonth]);
+  const cells = useMemo(() => calendarCellsMondayFirst(calYear, calMonth), [calYear, calMonth]);
+  const weeks = useMemo(() => chunkWeeks(cells), [cells]);
+
+  const jumpToToday = useCallback(() => {
+    const now = new Date();
+    setCalYear(now.getFullYear());
+    setCalMonth(now.getMonth());
+  }, []);
+
+  const isCalendarToday = useCallback(
+    (dom: number): boolean => {
+      const now = new Date();
+      return (
+        dom === now.getDate() && calMonth === now.getMonth() && calYear === now.getFullYear()
+      );
+    },
+    [calYear, calMonth]
+  );
 
   const inTripRangeCell = useCallback(
     (dom: number | null): boolean => {
@@ -268,219 +357,292 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
     [tripDisplayRange, calYear, calMonth]
   );
 
+  const displayRangeTrip: TripIsoRange | null =
+    tripDisplayRange?.startIso && tripDisplayRange?.endIso
+      ? { startIso: tripDisplayRange.startIso, endIso: tripDisplayRange.endIso }
+      : null;
+
   return (
-    <div className="mx-auto flex w-full max-w-[1520px] flex-col gap-12 lg:flex-row lg:gap-12 xl:gap-16">
-      <aside className="w-full shrink-0 space-y-8 lg:min-w-[220px] lg:w-72 xl:w-[20rem]">
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/20">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 lg:flex-row lg:gap-8">
+      <aside className="w-full shrink-0 space-y-4 lg:w-56 xl:w-64 lg:min-w-[220px]">
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/60 shadow-lg">
           <div
-            className="aspect-[4/5] min-h-[220px] bg-neutral-800 bg-cover bg-center sm:min-h-[260px] lg:min-h-[288px]"
+            className="aspect-[16/11] bg-neutral-800 bg-cover bg-center"
             style={heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined}
           />
-          <p className="border-t border-white/10 px-5 py-4 text-sm font-medium leading-snug text-neutral-300">
+          <p className="border-t border-white/10 px-3 py-2 text-xs font-medium text-neutral-400">
             {plan.location?.trim() || plan.title?.trim() || "Destination"}
           </p>
         </div>
 
-        <nav className="flex flex-col gap-1 px-1 text-[15px] leading-snug">
+        <nav className="space-y-1 text-sm">
           {NAV.map((item) => (
             <a
               key={item.id}
               href={`#sec-${item.id}`}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-neutral-400 transition hover:bg-white/[0.06] hover:text-neutral-100"
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
             >
-              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.45)]" />
-              <span>{item.label}</span>
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
+              {item.label}
             </a>
           ))}
         </nav>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-16 sm:space-y-20 lg:space-y-[5.5rem]">
-        <section id="sec-dates" className="scroll-mt-36">
-          <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Trip calendar</h2>
-              <p className="mt-3 max-w-2xl text-base leading-relaxed text-neutral-400">
-                {tripDisplayRange?.startIso
-                  ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}. Tap another day if you want to redraw the trip window — first tap starts, second tap ends.`
-                  : "Select your trip dates on the calendar below (two taps). The parser couldn’t nail exact days yet."}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setCalMonth((m) => {
-                    if (m <= 0) {
-                      setCalYear((y) => y - 1);
-                      return 11;
-                    }
-                    return m - 1;
-                  })
-                }
-                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-neutral-200 transition hover:border-white/15 hover:bg-white/[0.07]"
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setCalMonth((m) => {
-                    if (m >= 11) {
-                      setCalYear((y) => y + 1);
-                      return 0;
-                    }
-                    return m + 1;
-                  })
-                }
-                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-neutral-200 transition hover:border-white/15 hover:bg-white/[0.07]"
-              >
-                Next
-              </button>
-            </div>
+      <div className="min-w-0 flex-1 space-y-10">
+        <section id="sec-dates" className="scroll-mt-28">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold tracking-tight text-white">Trip calendar</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-neutral-400">
+              {tripDisplayRange?.startIso
+                ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}. Tap start, then tap end — or redraw anytime. Bars show your hotel nights; dinners list inside each day.`
+                : "Select dates with two taps. The violet bar marks your nights once a range exists."}
+            </p>
+            {rangeAnchor ? (
+              <p className="mt-3 text-xs font-medium text-amber-400">Select end date…</p>
+            ) : null}
           </div>
 
-          {/* Hotel span row */}
-          {tripDisplayRange?.startIso && tripDisplayRange.endIso ? (
-            <div className="mb-8 rounded-2xl border border-rose-500/35 bg-rose-500/[0.12] px-6 py-4 text-sm leading-relaxed text-rose-100">
-              <span className="font-semibold">Hotel stay</span>
-              <span className="text-rose-200/90">
-                {" "}
-                — {hostSetup.hotel?.name ? `“${hostSetup.hotel.name}” spanning all trip nights` : "Pick accommodation below"}
-              </span>
+          <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            {/* Header — toolbar like reference */}
+            <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
+              <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
+              </h3>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  aria-label="Previous month"
+                  onClick={() =>
+                    setCalMonth((m) => {
+                      if (m <= 0) {
+                        setCalYear((y) => y - 1);
+                        return 11;
+                      }
+                      return m - 1;
+                    })
+                  }
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <ChevLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => jumpToToday()}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next month"
+                  onClick={() =>
+                    setCalMonth((m) => {
+                      if (m >= 11) {
+                        setCalYear((y) => y + 1);
+                        return 0;
+                      }
+                      return m + 1;
+                    })
+                  }
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <ChevRight className="h-5 w-5" />
+                </button>
+                <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                  Month view
+                  <ChevDownSm className="h-4 w-4 text-slate-400" />
+                </div>
+                <button
+                  type="button"
+                  disabled={!pubReady || publishBusy}
+                  onClick={() => void onPublish()}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500"
+                >
+                  {publishBusy ? "Publishing…" : "Publish trip"}
+                </button>
+              </div>
             </div>
-          ) : null}
 
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-neutral-950/80 p-5 shadow-inner shadow-black/20 sm:p-8 lg:p-10">
-            <div className="mb-9 text-center text-lg font-semibold text-neutral-100 sm:text-xl">
-              {new Date(calYear, calMonth, 1).toLocaleString("default", {
-                month: "long",
-                year: "numeric",
-              })}
-              {rangeAnchor ? (
-                <span className="ml-4 align-middle text-sm font-normal tracking-normal text-amber-400">
-                  Select end date…
-                </span>
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 px-0.5 pb-4 text-center text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500 sm:gap-2 sm:text-sm sm:tracking-[0.14em]">
-              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((w) => (
-                <div key={w} className="py-2 sm:py-3">
+            {/* Weekday stripe */}
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90">
+              {WEEKDAY_MON_FIRST.map((w) => (
+                <div
+                  key={w}
+                  className="border-l border-transparent py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 sm:text-xs sm:tracking-[0.18em]"
+                >
                   {w}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 lg:gap-3">
-              {cells.map((dom, i) =>
-                dom == null ? (
-                  <div key={`e-${i}`} className="min-h-[7.25rem] sm:min-h-[8.5rem] lg:min-h-[9.5rem]" />
-                ) : (
-                  <button
-                    type="button"
-                    key={`d-${calYear}-${calMonth}-${dom}`}
-                    onClick={() => onCalendarDayClick(dom)}
-                    className={[
-                      "relative flex min-h-[7.25rem] flex-col items-start rounded-xl border px-3 py-3 text-left transition sm:min-h-[8.5rem] sm:px-4 sm:py-4 lg:min-h-[9.5rem]",
-                      inTripRangeCell(dom)
-                        ? "border-brand-600/70 bg-brand-600/25 text-white shadow-inner shadow-brand-950/40"
-                        : parseLocalIsoDate(isoFromCell(calYear, calMonth, dom))?.getTime() ===
-                            parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
-                          ? "border-amber-400/80 bg-amber-500/15 text-amber-50"
-                          : "border-white/5 bg-neutral-900/60 text-neutral-200 hover:bg-neutral-800/85",
-                    ].join(" ")}
-                  >
-                    <span className="text-lg font-semibold tabular-nums sm:text-xl">{dom}</span>
-                    {(hostSetup.restaurantPins ?? [])
-                      .filter((p) => p.dateIso === isoFromCell(calYear, calMonth, dom))
-                      .map((p) => (
-                        <div
-                          key={p.place.mapsUrl}
-                          className="mt-2 line-clamp-2 w-full text-[11px] leading-snug text-neutral-400 sm:text-xs"
-                        >
-                          <span className="font-medium text-neutral-200">{p.place.name}</span>
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {p.kept ? (
-                              <button
-                                type="button"
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  togglePin(p.dateIso, p.place.mapsUrl, false);
-                                }}
-                                className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide hover:bg-rose-500/50 sm:text-[11px]"
-                              >
-                                Remove
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  togglePin(p.dateIso, p.place.mapsUrl, true);
-                                }}
-                                className="rounded-lg bg-white/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide hover:bg-emerald-500/40 sm:text-[11px]"
-                              >
-                                Add
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </button>
-                )
-              )}
+            {/* Body: ribbon + rows per ISO week */}
+            <div className="border-x border-slate-200 bg-white">
+              {weeks.map((weekRow, wi) => {
+                const segs =
+                  tripDisplayRange?.startIso && tripDisplayRange.endIso
+                    ? tripColumnSegments(weekRow, calYear, calMonth, displayRangeTrip)
+                    : [];
+
+                const hotelLabel = hostSetup.hotel?.name ?? "Hotel stay";
+
+                return (
+                  <div key={`wk-${wi}`}>
+                    {/* Gantt strip for trip / hotel */}
+                    <div className="relative h-11 border-b border-slate-100 bg-[#fafafb]">
+                      {segs.length > 0
+                        ? segs.map((seg) => (
+                            <div
+                              key={`${wi}-${seg.start}-${seg.end}`}
+                              title={hotelLabel}
+                              className="pointer-events-none absolute top-3 z-[1] h-7 truncate rounded-lg bg-violet-100 px-3 text-[11px] font-semibold leading-7 text-violet-950 shadow-inner ring-1 ring-violet-200/70"
+                              style={{
+                                left: `calc(${seg.start} * (100% / 7) + 4px)`,
+                                width: `calc(${(seg.end - seg.start + 1) * (100 / 7)}% - 8px)`,
+                              }}
+                            >
+                              · {hotelLabel}
+                            </div>
+                          ))
+                        : null}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {weekRow.map((dom, ci) =>
+                        dom == null ? (
+                          <div
+                            key={`e-${wi}-${ci}`}
+                            className={[
+                              "min-h-[6.75rem] border-b border-slate-200 bg-slate-50/40 sm:min-h-[7.75rem]",
+                              ci < 6 ? "border-r border-slate-200" : "",
+                            ].join(" ")}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
+                            onClick={() => onCalendarDayClick(dom)}
+                            className={[
+                              "group flex min-h-[6.75rem] flex-col border-b border-slate-200 px-3 py-3 text-left align-top transition hover:bg-violet-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 sm:min-h-[7.75rem] sm:px-3.5 sm:py-4",
+                              ci < 6 ? "border-r border-slate-200" : "",
+                              inTripRangeCell(dom)
+                                ? "bg-violet-50/90"
+                                : "bg-white",
+                              parseLocalIsoDate(isoFromCell(calYear, calMonth, dom))?.getTime() ===
+                                parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
+                                ? "ring-2 ring-amber-300 ring-inset"
+                                : "",
+                            ].join(" ")}
+                          >
+                            <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
+                              {isCalendarToday(dom) ? (
+                                <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white shadow-sm">
+                                  {dom}
+                                </span>
+                              ) : (
+                                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500">{dom}</span>
+                              )}
+                            </div>
+
+                            {(hostSetup.restaurantPins ?? [])
+                              .filter((p) => p.dateIso === isoFromCell(calYear, calMonth, dom))
+                              .map((p) => (
+                                <div key={p.place.mapsUrl} className="mb-3 last:mb-0">
+                                  <div className="flex items-start gap-2 rounded-md px-1.5 py-1.5 text-left leading-snug text-slate-800 transition hover:bg-white/70">
+                                    <span className="min-w-0 flex-1 text-[13px] font-medium">{p.place.name}</span>
+                                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                                      Meal
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex gap-2 pl-1.5">
+                                    {p.kept ? (
+                                      <button
+                                        type="button"
+                                        onClick={(ev) => {
+                                          ev.stopPropagation();
+                                          togglePin(p.dateIso, p.place.mapsUrl, false);
+                                        }}
+                                        className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline"
+                                      >
+                                        Remove
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(ev) => {
+                                          ev.stopPropagation();
+                                          togglePin(p.dateIso, p.place.mapsUrl, true);
+                                        }}
+                                        className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline"
+                                      >
+                                        Add
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {!hostHasConcreteTripRange(plan) ? (
-              <p className="mt-8 text-sm leading-relaxed text-amber-400">
-                Dates are required to publish — choose a start and end day on this calendar.
+              <p className="border-t border-slate-100 bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900">
+                Choose a trip range — two taps on the calendar — before you can publish.
+              </p>
+            ) : null}
+            {err ? (
+              <p className="border-t border-slate-100 bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800">
+                {err}
               </p>
             ) : null}
           </div>
         </section>
 
-        <section id="sec-accommodation" className="scroll-mt-36 space-y-7">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Accommodation</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
-            Search and select the hotel for this trip (shown as the stay block above).
+        <section id="sec-accommodation" className="scroll-mt-28 space-y-3">
+          <h2 className="text-lg font-semibold text-white">Accommodation</h2>
+          <p className="text-sm text-neutral-400">
+            Search and select the hotel for this trip — the violet bar on the calendar updates with the name.
           </p>
-          <div className="flex flex-wrap gap-3 pt-2">
+          <div className="flex flex-wrap gap-2">
             <input
               value={hotelQuery}
               onChange={(e) => setHotelQuery(e.target.value)}
               placeholder={plan.location ? `Search near ${plan.location}` : "Search hotels"}
-              className="min-w-[220px] flex-1 rounded-2xl border border-white/10 bg-neutral-900 px-5 py-3.5 text-base outline-none placeholder:text-neutral-600 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              className="min-w-[200px] flex-1 rounded-xl border border-white/10 bg-neutral-900 px-4 py-2 text-sm outline-none placeholder:text-neutral-600 focus:border-brand-600"
             />
             <button
               type="button"
               onClick={() => void searchHotels()}
               disabled={hotelSearchBusy}
-              className="rounded-2xl bg-white px-7 py-3.5 text-base font-medium text-neutral-900 shadow-lg shadow-black/10 disabled:opacity-50"
+              className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-900 disabled:opacity-50"
             >
               {hotelSearchBusy ? "…" : "Search"}
             </button>
           </div>
-          <div className="grid gap-6 pt-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-neutral-950/70 p-6 sm:p-7">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">Selected</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-neutral-950/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Selected</p>
               {hostSetup.hotel?.name ? (
-                <div className="mt-4 text-base leading-snug text-neutral-100">
+                <div className="mt-2 text-sm text-neutral-100">
                   {hostSetup.hotel.name}
                   {hostSetup.hotel.priceRange ? (
                     <span className="ml-2 text-neutral-400">({hostSetup.hotel.priceRange})</span>
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-4 text-base text-neutral-500">No hotel yet</p>
+                <p className="mt-2 text-sm text-neutral-500">No hotel yet</p>
               )}
             </div>
-            <ul className="max-h-72 space-y-2 overflow-auto rounded-2xl border border-white/10 bg-neutral-950/40 p-3 text-[15px]">
+            <ul className="max-h-60 space-y-1 overflow-auto rounded-xl border border-white/10 bg-neutral-950/40 p-2 text-sm">
               {hotelHits.map((h) => (
                 <li key={h.mapsUrl}>
                   <button
                     type="button"
-                    className="w-full rounded-xl px-4 py-3.5 text-left transition hover:bg-white/[0.07]"
+                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-white/5"
                     onClick={() => onHotelPick(h)}
                   >
                     <span className="font-medium text-neutral-100">{h.name}</span>
@@ -492,38 +654,34 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
           </div>
         </section>
 
-        <section id="sec-food" className="scroll-mt-36 space-y-6">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Food pinboard</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
-            We suggested restaurants scaled to your budget and spread them across trip days. Toggle Add/Remove on each day.
+        <section id="sec-food" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-white">Food pinboard</h2>
+          <p className="mt-1 text-sm text-neutral-400">
+            Suggestions are listed in each day cell like events — Remove or Add as needed.
           </p>
           {!hostHasKeptRestaurant(plan) ? (
-            <p className="mt-4 text-sm text-amber-400">Keep at least one restaurant to publish.</p>
+            <p className="mt-2 text-xs text-amber-400">Keep at least one restaurant to publish.</p>
           ) : null}
         </section>
 
-        <section id="sec-transport" className="scroll-mt-36 space-y-5">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Transportation</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
-            Finalize flights and ground transfers with your crew after publishing.
-          </p>
+        <section id="sec-transport" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-white">Transportation</h2>
+          <p className="mt-1 text-sm text-neutral-400">Finalize flights and ground transfers with your crew after publishing.</p>
         </section>
 
-        <section id="sec-experiences" className="scroll-mt-36 space-y-6 pt-4">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Experiences</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
-            Optional — skim ideas with travelers once the invite goes out.
-          </p>
-          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-transparent px-2 py-2 text-[15px] leading-relaxed text-neutral-300 transition hover:border-white/5 hover:bg-white/[0.03]">
+        <section id="sec-experiences" className="scroll-mt-28 space-y-2">
+          <h2 className="text-lg font-semibold text-white">Experiences</h2>
+          <p className="text-sm text-neutral-400">Optional — skim ideas with travelers once the invite goes out.</p>
+          <label className="flex cursor-pointer items-center gap-3 text-sm text-neutral-300">
             <input
               type="checkbox"
-              className="mt-1 h-5 w-5 shrink-0 accent-brand-600"
+              className="h-4 w-4 accent-brand-600"
               checked={hostSetup.experiencesOutlined ?? false}
               onChange={(e) => void persistHostSetup({ experiencesOutlined: e.target.checked })}
             />
             <span>I&apos;ve skimmed experiences (helps the completion checklist)</span>
           </label>
-          <div className="mt-6 h-2.5 w-full max-w-md overflow-hidden rounded-full bg-neutral-800 sm:h-3">
+          <div className="mt-3 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-neutral-800">
             <div
               className="h-full rounded-full bg-violet-500/80 transition-[width]"
               style={{ width: `${hostSetup.experiencesOutlined ? "100%" : "40%"}` }}
@@ -531,73 +689,56 @@ export function TripHostSetupDashboard({ tripId, initialPlan }: Props) {
           </div>
         </section>
 
-        <section id="sec-packing" className="scroll-mt-36 space-y-5">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Packing list</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
-            Add packing tasks with your group on the shared trip board after publishing.
-          </p>
+        <section id="sec-packing" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-white">Packing list</h2>
+          <p className="mt-1 text-sm text-neutral-400">Add packing tasks with your group on the shared board after publishing.</p>
         </section>
 
-        <section id="sec-budget" className="scroll-mt-36 space-y-5">
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Budget</h2>
-          <p className="max-w-2xl text-base leading-relaxed text-neutral-400">
+        <section id="sec-budget" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-white">Budget</h2>
+          <p className="mt-1 text-sm text-neutral-400">
             {plan.budget.tier ?? plan.budget.perPerson ?? "Budget from chat applies to venue suggestions"}
           </p>
         </section>
       </div>
 
-      <aside className="w-full shrink-0 lg:w-80 xl:w-[22rem]">
-        <div className="sticky top-28 space-y-10 rounded-3xl border border-white/10 bg-neutral-900/70 p-8 shadow-xl shadow-black/25 sm:p-10">
+      <aside className="w-full shrink-0 lg:w-72">
+        <div className="sticky top-24 space-y-4 rounded-2xl border border-white/10 bg-neutral-900/70 p-4 shadow-xl">
           <div>
-            <p className="text-base font-semibold tracking-tight text-white sm:text-lg">Your trip is {pct}% complete</p>
-            <div className="mt-5 h-3.5 overflow-hidden rounded-full bg-neutral-800/90 sm:h-4">
+            <p className="text-sm font-semibold text-white">Your trip is {pct}% complete</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-800">
               <div
-                className="h-full rounded-full bg-emerald-500 shadow-[0_0_20px_rgba(34,197,94,0.35)] transition-[width]"
+                className="h-full rounded-full bg-emerald-500 transition-[width]"
                 style={{ width: `${pct}%` }}
               />
             </div>
           </div>
 
-          <ul className="flex flex-col gap-6 border-t border-white/10 pt-8 text-[15px] sm:text-base">
-            <li
-              className={`flex items-start justify-between gap-4 pb-3 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}
-            >
-              <span className="leading-snug">Dates {!hostHasConcreteTripRange(plan) ? "(required)" : ""}</span>
-              <span className="shrink-0 text-lg">{hostHasConcreteTripRange(plan) ? "✓" : "—"}</span>
+          <ul className="space-y-2 text-sm">
+            <li className={`flex justify-between gap-2 ${hostHasConcreteTripRange(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+              <span>Dates {!hostHasConcreteTripRange(plan) ? "(required)" : ""}</span>
+              {hostHasConcreteTripRange(plan) ? "✓" : "—"}
             </li>
-            <li
-              className={`flex items-start justify-between gap-4 pb-3 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}
-            >
-              <span className="leading-snug">Hotel {!hostHasHotel(plan) ? "(required)" : ""}</span>
-              <span className="shrink-0 text-lg">{hostHasHotel(plan) ? "✓" : "—"}</span>
+            <li className={`flex justify-between gap-2 ${hostHasHotel(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+              <span>Hotel {!hostHasHotel(plan) ? "(required)" : ""}</span>
+              {hostHasHotel(plan) ? "✓" : "—"}
             </li>
-            <li
-              className={`flex items-start justify-between gap-4 pb-3 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}
-            >
-              <span className="leading-snug">Restaurant {!hostHasKeptRestaurant(plan) ? "(required)" : ""}</span>
-              <span className="shrink-0 text-lg">{hostHasKeptRestaurant(plan) ? "✓" : "—"}</span>
+            <li className={`flex justify-between gap-2 ${hostHasKeptRestaurant(plan) ? "text-neutral-300" : "text-amber-400"}`}>
+              <span>Restaurant {!hostHasKeptRestaurant(plan) ? "(required)" : ""}</span>
+              {hostHasKeptRestaurant(plan) ? "✓" : "—"}
             </li>
-            <li className="flex items-start justify-between gap-4 border-t border-white/10 pt-7 text-neutral-400">
-              <span className="leading-snug">Experiences (optional)</span>
-              <span className="shrink-0 text-sm text-violet-300">{hostSetup.experiencesOutlined ? "Outlined" : "Later"}</span>
+            <li className="flex justify-between gap-2 border-t border-white/10 pt-2 text-neutral-400">
+              <span>Experiences (optional)</span>
+              <span className="text-xs text-violet-300">{hostSetup.experiencesOutlined ? "Outlined" : "Later"}</span>
             </li>
           </ul>
 
-          <button
-            type="button"
-            disabled={!pubReady || publishBusy}
-            onClick={() => void onPublish()}
-            className="w-full rounded-2xl bg-rose-500 py-4 text-base font-semibold text-white shadow-lg shadow-rose-900/40 transition hover:bg-rose-400 disabled:pointer-events-none disabled:opacity-40 sm:py-[1.125rem]"
-          >
-            {publishBusy ? "Publishing…" : "Publish trip"}
-          </button>
-          {!pubReady ? (
-            <p className="mx-auto max-w-xs text-center text-sm leading-relaxed text-neutral-500">
-              Publishing mints your invite code and opens the collaborative trip workspace.
-            </p>
-          ) : null}
+          <p className="border-t border-white/10 pt-4 text-xs leading-relaxed text-neutral-500">
+            When everything above is checked, use the violet <strong className="text-neutral-300">Publish trip</strong> button in
+            the calendar header to mint your invite code.
+          </p>
 
-          {err ? <p className="text-center text-sm text-rose-400">{err}</p> : null}
+          {err ? <p className="text-center text-xs text-rose-400">{err}</p> : null}
         </div>
       </aside>
     </div>
