@@ -8,6 +8,7 @@ import {
   normalizePlan,
   parseHostSetup,
   planHasUsableTripTiming,
+  planRecordWithDatesSyncedToTripRange,
   tripRangeForHostDraftSave,
 } from "@/shared/trip-plan";
 
@@ -109,13 +110,18 @@ export async function POST(request: Request) {
 
   let planForSave = normalizedPlan;
   if (hostSetupDraft) {
-    const range = tripRangeForHostDraftSave(normalizedPlan, new Date().getFullYear());
+    const tripRange = tripRangeForHostDraftSave(normalizedPlan, new Date().getFullYear());
+    console.log("[host-setup-draft] plan.dates.options:", normalizedPlan.dates.options);
+    console.log("[host-setup-draft] tripRange result:", tripRange);
+
     const baseHs = parseHostSetup(normalizedPlan.hostSetup) ?? {};
-    if (range && !baseHs.tripRange?.startIso) {
-      planForSave = normalizePlan({
+    if (tripRange && !baseHs.tripRange?.startIso) {
+      let raw: Record<string, unknown> = {
         ...(normalizedPlan as unknown as Record<string, unknown>),
-        hostSetup: { ...baseHs, tripRange: range },
-      });
+        hostSetup: { ...baseHs, tripRange },
+      };
+      raw = planRecordWithDatesSyncedToTripRange(raw, tripRange);
+      planForSave = normalizePlan(raw);
     }
   }
 
@@ -135,6 +141,8 @@ export async function POST(request: Request) {
     invite_code: codeToSave,
     status: nextStatus,
     keys: Object.keys(row),
+    "plan.hostSetup.tripRange": planForSave.hostSetup?.tripRange ?? null,
+    planHostSetupKeys: planForSave.hostSetup ? Object.keys(planForSave.hostSetup) : [],
   });
 
   const { data, error } = await svc.from("trip_plans").upsert(row, { onConflict: "id" }).select("id, invite_code").single();
