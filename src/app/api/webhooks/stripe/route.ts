@@ -96,19 +96,33 @@ async function handleSubscriptionCheckoutCompleted(stripe: Stripe, session: Stri
   const customerId =
     typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
 
-  const { error } = await svc.from("profiles").upsert(
-    {
+  const updatedAt = new Date().toISOString();
+  const { data: existingRow } = await svc.from("profiles").select("id").eq("id", userId).maybeSingle();
+
+  if (existingRow) {
+    const { error } = await svc
+      .from("profiles")
+      .update({
+        subscription_tier: tier,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subId,
+        updated_at: updatedAt,
+      })
+      .eq("id", userId);
+    if (error) {
+      console.error("[stripe-webhook] profiles subscription update failed:", error.message, { userId });
+    }
+  } else {
+    const { error } = await svc.from("profiles").insert({
       id: userId,
       subscription_tier: tier,
       stripe_customer_id: customerId,
       stripe_subscription_id: subId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
-
-  if (error) {
-    console.error("[stripe-webhook] profiles upsert failed:", error.message, { userId });
+      updated_at: updatedAt,
+    });
+    if (error) {
+      console.error("[stripe-webhook] profiles insert failed:", error.message, { userId });
+    }
   }
 }
 

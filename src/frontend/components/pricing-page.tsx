@@ -43,10 +43,19 @@ function PricingContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tier }),
         });
-        const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; detail?: string };
+        const body = (await r.json().catch(() => ({}))) as {
+          url?: string;
+          error?: string;
+          detail?: string;
+          redirect?: string;
+        };
         if (!r.ok) {
           if (r.status === 401) {
-            router.push(`/auth?next=${encodeURIComponent("/pricing")}`);
+            router.push(
+              typeof body.redirect === "string" && body.redirect.startsWith("/")
+                ? body.redirect
+                : `/auth?next=${encodeURIComponent("/pricing")}`
+            );
             return;
           }
           setCheckoutError(

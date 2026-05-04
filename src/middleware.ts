@@ -44,6 +44,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isProtected =
+    path === "/settings" ||
     path.startsWith("/trip-parser") ||
     path === "/saved" ||
     path.startsWith("/saved/") ||
