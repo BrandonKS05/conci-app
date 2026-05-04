@@ -41,7 +41,7 @@ export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string;
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-neutral-500">Invite code</p>
-          <p className="font-mono text-xl font-bold tracking-wider text-slate-900 dark:text-white sm:text-2xl">{display}</p>
+          <p className="text-xl font-bold tracking-wider text-slate-900 dark:text-white sm:text-2xl">{display}</p>
         </div>
         <button
           type="button"

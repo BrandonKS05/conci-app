@@ -9,10 +9,13 @@ export function SiteShell({
   title,
   eyebrow,
   children,
+  /** When true, page body under the hero uses the same display serif as the title (e.g. saved trip home). */
+  tripTypography = false,
 }: {
   title: string;
   eyebrow?: string;
   children: React.ReactNode;
+  tripTypography?: boolean;
 }) {
   return (
     <main className="min-h-screen bg-transparent text-ink dark:text-neutral-200">
@@ -53,7 +56,9 @@ export function SiteShell({
 
         <section className="mb-7 max-w-3xl lg:mb-9">
           {eyebrow ? (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.34em] text-brand-600 dark:text-neutral-500">
+            <p
+              className={`mb-3 text-xs font-semibold uppercase tracking-[0.34em] text-brand-600 dark:text-neutral-500${tripTypography ? " font-display" : ""}`}
+            >
               {eyebrow}
             </p>
           ) : null}
@@ -62,7 +67,7 @@ export function SiteShell({
           </h1>
         </section>
 
-        <div className="flex-1 pb-24 sm:pb-10">{children}</div>
+        <div className={`flex-1 pb-24 sm:pb-10${tripTypography ? " font-display" : ""}`}>{children}</div>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-white/90 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-dm-elevated md:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">

@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appBaseUrl } from "@/backend/app-base-url";
+import { isOutboundEmailConfigured, sendOutboundEmail } from "@/backend/outbound-email";
 
 const NUDGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export function nudgeEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.NUDGE_EMAIL_FROM?.trim());
+  return isOutboundEmailConfigured();
 }
 
 function escapeHtml(s: string): string {
@@ -51,22 +52,6 @@ async function recordNudgeEvent(
     channel: "email",
   });
   if (error) console.warn("[nudge] log insert failed:", error.message);
-}
-
-async function sendResendEmail(to: string, subject: string, html: string): Promise<{ ok: true } | { ok: false; detail: string }> {
-  const key = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.NUDGE_EMAIL_FROM?.trim();
-  if (!key || !from) return { ok: false, detail: "Email not configured" };
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  });
-  if (!r.ok) {
-    const t = await r.text().catch(() => "");
-    return { ok: false, detail: t || r.statusText };
-  }
-  return { ok: true };
 }
 
 export type NudgeSendResult =
@@ -123,7 +108,7 @@ export async function sendTripReminderNudge(
     <p style="color:#64748b;font-size:12px;margin-top:24px">You received this because the trip organizer sent a reminder from Conci.</p>
   `.trim();
 
-  const sent = await sendResendEmail(email, subject, html);
+  const sent = await sendOutboundEmail(email, subject, { html });
   if (!sent.ok) {
     console.warn("[nudge] Resend error:", sent.detail);
     return { ok: false, error: "Could not send email.", code: "send_failed" };

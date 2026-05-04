@@ -34,6 +34,7 @@ import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommen
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
 import { DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
+import { HostTripMemberEmailModal } from "@/frontend/components/host-trip-member-email-modal";
 import {
   CuratedExperiencesSection,
   CuratedFlightsRows,
@@ -119,6 +120,9 @@ export function TripCollaborationPanel({
   const [datesHostConfirmErr, setDatesHostConfirmErr] = useState<string | null>(null);
   const [nudgeBusyKey, setNudgeBusyKey] = useState<string | null>(null);
   const [nudgeNotice, setNudgeNotice] = useState<string | null>(null);
+  const [notifySelectedMemberIds, setNotifySelectedMemberIds] = useState(() => new Set<string>());
+  const [notifyEmailModalOpen, setNotifyEmailModalOpen] = useState(false);
+  const [notifyEmailModalRecipients, setNotifyEmailModalRecipients] = useState<string[]>([]);
   const [liveData, setLiveData] = useState<TripLiveRecommendationsPayload | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
@@ -188,6 +192,47 @@ export function TripCollaborationPanel({
   const classified = data?.classified ?? buildClassifiedDecisions(plan);
   const collab = data?.collab ?? parseCollabState(null);
   const quorum = data?.quorum ?? collaborationQuorum(plan);
+
+  const viewerMemberId = useMemo(() => {
+    const k = data?.canonicalVoterKey ?? "";
+    return k.startsWith("member:") ? k.slice("member:".length) : null;
+  }, [data?.canonicalVoterKey]);
+
+  const showHostNotifyUi =
+    isHost && data?.viewerIsTripOwner === true && Boolean(data?.nudgeEmailReady);
+
+  const notifyEligibleMemberIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of data?.roster ?? []) {
+      const id = p.memberId;
+      if (typeof id !== "string" || !id) continue;
+      if (viewerMemberId && id === viewerMemberId) continue;
+      ids.add(id);
+    }
+    return ids;
+  }, [data?.roster, viewerMemberId]);
+
+  useEffect(() => {
+    setNotifySelectedMemberIds((prev) => new Set([...prev].filter((id) => notifyEligibleMemberIds.has(id))));
+  }, [notifyEligibleMemberIds]);
+
+  const toggleNotifyMember = useCallback((memberId: string) => {
+    if (!notifyEligibleMemberIds.has(memberId)) return;
+    setNotifySelectedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return next;
+    });
+  }, [notifyEligibleMemberIds]);
+
+  const notifyCheckAllEligible = useCallback(() => {
+    setNotifySelectedMemberIds(new Set(notifyEligibleMemberIds));
+  }, [notifyEligibleMemberIds]);
+
+  const notifyUncheckAll = useCallback(() => {
+    setNotifySelectedMemberIds(new Set());
+  }, []);
 
   const lockedCount = useMemo(() => countLocked(classified, collab), [classified, collab]);
   const datesLockedByGroup = useMemo(
@@ -330,6 +375,133 @@ export function TripCollaborationPanel({
     }
   }, [isHost, plan.dates.confirmed, plan.dates.options.length, tripId, onPlanUpdated, load]);
 
+  const renderGroupProgressCard = () => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:shadow-[0_22px_55px_rgba(15,23,42,0.14)] lg:ring-1 lg:ring-slate-200/60 dark:lg:shadow-[0_26px_70px_rgba(0,0,0,0.42)] dark:lg:ring-white/10">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Group progress</p>
+        <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+          {lockedCount}/{total} decisions locked
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+        Quorum: at least <strong>{quorum}</strong> people need to vote to lock a decision (when options exist).
+      </p>
+      {data?.roster && data.roster.length > 0 ? (
+        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/80">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+              Who&apos;s weighing in
+            </p>
+            {canSendNudges && data.roster.some((p) => !p.hasParticipated) ? (
+              <button
+                type="button"
+                disabled={nudgeBusyKey !== null}
+                onClick={() => void sendNudgeAllPending()}
+                className="shrink-0 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+              >
+                {nudgeBusyKey === "__all__" ? "Sending…" : "Nudge all pending"}
+              </button>
+            ) : null}
+          </div>
+          {isHost && data?.viewerIsTripOwner === true && !data?.nudgeEmailReady ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200/90">
+              Set <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">RESEND_API_KEY</code> +{" "}
+              <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">NUDGE_EMAIL_FROM</code> in{" "}
+              <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">.env.local</code> to send email reminders.
+            </p>
+          ) : null}
+          {nudgeNotice ? (
+            <p className="mt-2 text-[11px] text-slate-600 dark:text-neutral-400">{nudgeNotice}</p>
+          ) : null}
+          {showHostNotifyUi && notifyEligibleMemberIds.size > 0 ? (
+            <div className="mt-3 space-y-2 border-t border-slate-200/80 pt-3 dark:border-white/10">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => notifyCheckAllEligible()}
+                  className="text-[11px] font-medium text-slate-500 underline decoration-slate-400/60 underline-offset-2 transition hover:text-slate-700 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+                >
+                  Check all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => notifyUncheckAll()}
+                  className="text-[11px] font-medium text-slate-500 underline decoration-slate-400/60 underline-offset-2 transition hover:text-slate-700 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+                >
+                  Uncheck all
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={notifySelectedMemberIds.size === 0}
+                onClick={() => {
+                  if (notifySelectedMemberIds.size === 0) return;
+                  setNotifyEmailModalRecipients([...notifySelectedMemberIds]);
+                  setNotifyEmailModalOpen(true);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+              >
+                Notify selected
+              </button>
+            </div>
+          ) : null}
+          <ul className="mt-2 space-y-2 text-xs text-slate-700 dark:text-neutral-300">
+            {data.roster.map((p, i) => {
+              const nk = rosterNudgeKey(p);
+              const showNudge = canSendNudges && !p.hasParticipated && nk.length > 0;
+              const recipientId =
+                typeof p.memberId === "string" && p.memberId.length > 0 ? p.memberId : null;
+              const showEmailCheckbox =
+                Boolean(showHostNotifyUi && recipientId && notifyEligibleMemberIds.has(recipientId));
+              return (
+                <li
+                  key={`${p.kind}-${p.memberId ?? ""}-${p.displayName}-${i}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-transparent px-1 py-0.5 hover:border-slate-200/80 dark:hover:border-white/10"
+                >
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                    {showEmailCheckbox && recipientId ? (
+                      <label className="flex shrink-0 cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={notifySelectedMemberIds.has(recipientId)}
+                          onChange={() => toggleNotifyMember(recipientId)}
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20 dark:bg-dm-card"
+                        />
+                      </label>
+                    ) : null}
+                    <span className="font-medium">{p.displayName}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      {p.hasParticipated ? "✓" : <span className="text-slate-400 dark:text-neutral-500">pending</span>}
+                    </span>
+                    {p.maskedContact ? (
+                      <span className="text-[11px] text-slate-500 dark:text-neutral-500">{p.maskedContact}</span>
+                    ) : null}
+                  </div>
+                  {showNudge ? (
+                    <button
+                      type="button"
+                      disabled={nudgeBusyKey !== null}
+                      onClick={() => void sendOneNudge(p)}
+                      className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
+                    >
+                      {nudgeBusyKey === nk ? "…" : "Nudge"}
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+
   if (error && !data) {
     return (
       <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
@@ -340,6 +512,18 @@ export function TripCollaborationPanel({
 
   return (
     <div className="space-y-8">
+      <HostTripMemberEmailModal
+        open={notifyEmailModalOpen}
+        tripId={tripId}
+        recipientMemberIds={notifyEmailModalRecipients}
+        onClose={() => {
+          setNotifyEmailModalOpen(false);
+          setNotifyEmailModalRecipients([]);
+        }}
+        onSendSuccess={() => {
+          setNotifySelectedMemberIds(new Set());
+        }}
+      />
       {error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
           {error}
@@ -347,84 +531,17 @@ export function TripCollaborationPanel({
       ) : null}
 
       {!showReady ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Group progress</p>
-            <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-              {lockedCount}/{total} decisions locked
-            </span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
-            Quorum: at least <strong>{quorum}</strong> people need to vote to lock a decision (when options exist).
-          </p>
-          {data?.roster && data.roster.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/80">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-                  Who&apos;s weighing in
-                </p>
-                {canSendNudges && data.roster.some((p) => !p.hasParticipated) ? (
-                  <button
-                    type="button"
-                    disabled={nudgeBusyKey !== null}
-                    onClick={() => void sendNudgeAllPending()}
-                    className="shrink-0 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
-                  >
-                    {nudgeBusyKey === "__all__" ? "Sending…" : "Nudge all pending"}
-                  </button>
-                ) : null}
-              </div>
-              {isHost && data?.viewerIsTripOwner === true && !data?.nudgeEmailReady ? (
-                <p className="mt-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200/90">
-                  Set <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">RESEND_API_KEY</code> +{" "}
-                  <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">NUDGE_EMAIL_FROM</code> in{" "}
-                  <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-950/50">.env.local</code> to send email reminders.
-                </p>
-              ) : null}
-              {nudgeNotice ? (
-                <p className="mt-2 text-[11px] text-slate-600 dark:text-neutral-400">{nudgeNotice}</p>
-              ) : null}
-              <ul className="mt-2 space-y-2 text-xs text-slate-700 dark:text-neutral-300">
-                {data.roster.map((p, i) => {
-                  const nk = rosterNudgeKey(p);
-                  const showNudge = canSendNudges && !p.hasParticipated && nk.length > 0;
-                  return (
-                    <li
-                      key={`${p.kind}-${p.memberId ?? ""}-${p.displayName}-${i}`}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-transparent px-1 py-0.5 hover:border-slate-200/80 dark:hover:border-white/10"
-                    >
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="font-medium">{p.displayName}</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          {p.hasParticipated ? "✓" : <span className="text-slate-400 dark:text-neutral-500">pending</span>}
-                        </span>
-                        {p.maskedContact ? (
-                          <span className="text-[11px] text-slate-500 dark:text-neutral-500">{p.maskedContact}</span>
-                        ) : null}
-                      </div>
-                      {showNudge ? (
-                        <button
-                          type="button"
-                          disabled={nudgeBusyKey !== null}
-                          onClick={() => void sendOneNudge(p)}
-                          className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
-                        >
-                          {nudgeBusyKey === nk ? "…" : "Nudge"}
-                        </button>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+        <>
+          <div className="relative z-10 lg:hidden">{renderGroupProgressCard()}</div>
+          <aside
+            aria-label="Group progress"
+            className="pointer-events-none fixed inset-x-0 top-0 z-[35] hidden h-0 lg:block"
+          >
+            <div className="pointer-events-auto absolute right-5 top-1/2 w-[min(18rem,calc(100vw-1.75rem))] max-h-[min(85vh,40rem)] -translate-y-1/2 overflow-x-hidden overflow-y-auto overscroll-contain xl:right-8">
+              {renderGroupProgressCard()}
             </div>
-          ) : null}
-        </div>
+          </aside>
+        </>
       ) : null}
 
       {showReady && tripStatus === "finalized" ? (
