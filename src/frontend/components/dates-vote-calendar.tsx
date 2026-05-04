@@ -131,6 +131,11 @@ export function DatesVoteCalendar({
     return [...hostRows, ...customRows];
   }, [parsed, tally, options, y0]);
 
+  const rangeSummariesWithVotes = useMemo(
+    () => rangeSummaries.filter((r) => r.votes > 0),
+    [rangeSummaries]
+  );
+
   function dayMatchesMine(d: Date): boolean {
     if (!mine || !mine.trim()) return false;
     const rMine = parseDateOptionToRange(mine.trim(), y0);
@@ -193,16 +198,14 @@ export function DatesVoteCalendar({
           />
         </div>
 
-        {rangeSummaries.length > 0 ? (
+        {rangeSummariesWithVotes.length > 0 ? (
           <ul className="conci-datepicker-range-totals mt-4 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
-            {rangeSummaries.map(({ key, label, votes: v }) => (
+            {rangeSummariesWithVotes.map(({ key, label, votes: v }) => (
               <li key={key} className="flex items-baseline justify-between gap-3 text-xs">
                 <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
-                {v > 0 ? (
-                  <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
-                    {v} {v === 1 ? "vote" : "votes"}
-                  </span>
-                ) : null}
+                <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
+                  {v} {v === 1 ? "vote" : "votes"}
+                </span>
               </li>
             ))}
           </ul>
@@ -244,8 +247,10 @@ export function DatesVoteCalendar({
       ) : null}
 
       <ul className="sr-only" aria-label="Vote totals">
-        {rangeSummaries.map(({ key, label, votes: v }) => (
-          <li key={`sr-${key}`}>{v > 0 ? `${v} ${v === 1 ? "vote" : "votes"}: ${label}` : label}</li>
+        {rangeSummariesWithVotes.map(({ key, label, votes: v }) => (
+          <li key={`sr-${key}`}>
+            {v} {v === 1 ? "vote" : "votes"}: {label}
+          </li>
         ))}
       </ul>
     </div>

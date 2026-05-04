@@ -287,7 +287,7 @@ export function groundPlanInUserInput(
 
   const userLower = effective.toLowerCase();
 
-  let next: TripPlan = preserveSpotlights
+  const next: TripPlan = preserveSpotlights
     ? { ...plan }
     : { ...plan, spotlights: undefined };
 

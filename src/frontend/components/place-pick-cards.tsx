@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { PlacePreview } from "@/shared/place-preview";
 
 function StarRow({ rating, count }: { rating?: number; count?: number }) {
@@ -39,7 +40,14 @@ export function PlacePickCards({
           className="flex max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm ring-1 ring-slate-200/60 transition hover:border-orange-400/50 hover:ring-orange-400/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-[#1e1e1e] dark:ring-white/[0.04] dark:hover:border-[#ea580c]/40"
         >
           {item.photoUrl ? (
-            <img src={item.photoUrl} alt="" className="h-[5.25rem] w-[5.25rem] shrink-0 object-cover" loading="lazy" />
+            <Image
+              src={item.photoUrl}
+              alt=""
+              width={84}
+              height={84}
+              unoptimized
+              className="h-[5.25rem] w-[5.25rem] shrink-0 object-cover"
+            />
           ) : (
             <div className="flex h-[5.25rem] w-[5.25rem] shrink-0 items-center justify-center bg-slate-100 text-[10px] text-slate-400 dark:bg-[#2a2a2a] dark:text-[#6b6965]">
               Map

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlacePreview } from "@/shared/place-preview";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -148,7 +149,16 @@ export function TripCardChatWidget({
                         className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#161616]"
                       >
                         {p.photoUrl ? (
-                          <img src={p.photoUrl} alt="" className="h-20 w-full object-cover" loading="lazy" />
+                          <div className="relative h-20 w-full">
+                            <Image
+                              src={p.photoUrl}
+                              alt=""
+                              fill
+                              sizes="400px"
+                              unoptimized
+                              className="object-cover"
+                            />
+                          </div>
                         ) : (
                           <div className="flex h-20 items-center justify-center bg-slate-100 text-[10px] text-slate-400 dark:bg-[#2a2a2a]">
                             Map

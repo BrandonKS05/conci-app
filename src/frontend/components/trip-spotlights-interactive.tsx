@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlacePreview } from "@/shared/place-preview";
 import type { TripPlan } from "@/shared/trip-plan";
@@ -27,7 +28,7 @@ export function TripSpotlightsInteractive({
   onPlanUpdated: (next: TripPlan) => void;
   onCollabBump: () => void;
 }) {
-  const spotlights = plan.spotlights ?? [];
+  const spotlights = useMemo(() => plan.spotlights ?? [], [plan.spotlights]);
   const myKey = memberVoteKey(viewerUserId);
 
   const [votes, setVotes] = useState<Record<string, string[]>>(initialSpotlightVotes ?? {});
@@ -190,7 +191,14 @@ export function TripSpotlightsInteractive({
                   className="flex min-w-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white text-left ring-1 ring-slate-200/50 dark:border-white/10 dark:bg-[#1a1a1a] dark:ring-white/[0.04]"
                 >
                   {s.photoUrl ? (
-                    <img src={s.photoUrl} alt="" className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28" loading="lazy" />
+                    <Image
+                      src={s.photoUrl}
+                      alt=""
+                      width={112}
+                      height={112}
+                      unoptimized
+                      className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28"
+                    />
                   ) : (
                     <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-slate-200 text-xs text-slate-500 dark:bg-white/10 sm:h-28 sm:w-28">
                       Map
@@ -258,7 +266,9 @@ export function TripSpotlightsInteractive({
                         className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#161616]"
                       >
                         {p.photoUrl ? (
-                          <img src={p.photoUrl} alt="" className="h-24 w-full object-cover" loading="lazy" />
+                          <div className="relative h-24 w-full">
+                            <Image src={p.photoUrl} alt="" fill sizes="200px" unoptimized className="object-cover" />
+                          </div>
                         ) : (
                           <div className="flex h-24 items-center justify-center bg-slate-100 text-[10px] text-slate-400 dark:bg-[#2a2a2a]">
                             Map

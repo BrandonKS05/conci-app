@@ -9,6 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import NextImage from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import type { TripPlan } from "@/shared/trip-plan";
@@ -1112,7 +1113,14 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                     key={img.id}
                     className="group relative h-14 w-14 overflow-hidden rounded-lg ring-1 ring-slate-200 dark:ring-white/10"
                   >
-                    <img src={img.dataUrl} alt="" className="h-full w-full object-cover" />
+                    <NextImage
+                      src={img.dataUrl}
+                      alt=""
+                      width={56}
+                      height={56}
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
                     <button
                       type="button"
                       aria-label="Remove image"

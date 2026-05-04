@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { formatBudgetPollChipLabel } from "@/shared/budget-poll";
 import type { TripPlan } from "@/shared/trip-plan";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
@@ -181,7 +182,14 @@ export function TripPlanCard({
                   className="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 text-left ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:ring-indigo-200/40 dark:border-white/10 dark:bg-dm-elevated dark:ring-white/[0.04] dark:hover:border-indigo-500/40"
                 >
                   {s.photoUrl ? (
-                    <img src={s.photoUrl} alt="" className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28" loading="lazy" />
+                    <Image
+                      src={s.photoUrl}
+                      alt=""
+                      width={112}
+                      height={112}
+                      unoptimized
+                      className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28"
+                    />
                   ) : (
                     <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-slate-200 text-xs text-slate-500 dark:bg-white/10 dark:text-neutral-500 sm:h-28 sm:w-28">
                       Map

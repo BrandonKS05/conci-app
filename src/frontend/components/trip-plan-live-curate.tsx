@@ -195,11 +195,11 @@ export function CuratedFlightsRows({
   const dismissed = new Set(cur?.dismissed ?? []);
 
   const flightKeptMeta = flights
-    .map((f, i) => ({ f, i, key: flightLiveKey(f, i) }))
+    .map((f, i) => ({ f, key: flightLiveKey(f, i) }))
     .filter(({ key }) => kept.has(key))
     .map(({ f, key }) => ({ key, label: f.airline, sub: f.departureTime }));
   const flightPool = flights
-    .map((f, i) => ({ f, i, key: flightLiveKey(f, i) }))
+    .map((f, i) => ({ f, key: flightLiveKey(f, i) }))
     .filter(({ key }) => !kept.has(key) && !dismissed.has(key));
 
   if (liveLoading) {
@@ -219,7 +219,7 @@ export function CuratedFlightsRows({
         Swipe left or use <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> to clear the rest.
       </p>
       <KeptStrip title="On your trip" items={flightKeptMeta} busyKey={busyKey} onRemove={(k) => mutate("unkeep", k)} />
-      {flightPool.map(({ f, i, key }) => (
+      {flightPool.map(({ f, key }) => (
         <SwipeableLiveCard
           key={key}
           disabled={busyKey !== null}
