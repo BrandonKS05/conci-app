@@ -1,5 +1,5 @@
 import { getRapidApiKey } from "@/backend/rapidapi-key";
-import { getRapidApiExperiencesActivitiesPath, getRapidApiExperiencesHost } from "@/backend/env-api-keys";
+import { getRapidApiAmadeusActivitiesPath, getRapidApiAmadeusHost } from "@/backend/env-api-keys";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 
@@ -30,11 +30,9 @@ async function geocodeDestination(q: string): Promise<{ lat: number; lon: number
 function destinationQuery(plan: TripPlan): string {
   const loc = plan.location?.trim();
   if (loc?.length) return loc;
-  const t = plan.title?.trim();
-  return t ?? "";
+  return plan.title?.trim() || "";
 }
 
-/** Keywords from plan vibe + poll picks for soft ranking (Amadeus radius search has no text filter). */
 function experienceKeywords(plan: TripPlan): string[] {
   const raw: string[] = [];
   if (Array.isArray(plan.vibe)) raw.push(...plan.vibe);
@@ -113,18 +111,14 @@ export async function fetchAmadeusActivitiesRapid(plan: TripPlan): Promise<{
   error: string | null;
 }> {
   const key = getRapidApiKey();
-  const host = getRapidApiExperiencesHost();
-  const path = getRapidApiExperiencesActivitiesPath() ?? "/v1/shopping/activities";
+  const host = getRapidApiAmadeusHost();
+  const path = getRapidApiAmadeusActivitiesPath() ?? "/v1/shopping/activities";
 
   if (!key) {
     return { items: [], error: "Add RAPIDAPI_KEY to load live experiences (RapidAPI)." };
   }
   if (!host) {
-    return {
-      items: [],
-      error:
-        "Set RAPIDAPI_MUSEMENT_HOST, RAPIDAPI_ACTIVITIES_HOST, or RAPIDAPI_AMADEUS_HOST to the X-RapidAPI-Host from your RapidAPI activities product (same RAPIDAPI_KEY).",
-    };
+    return { items: [], error: null };
   }
 
   const dest = destinationQuery(plan);
@@ -139,14 +133,16 @@ export async function fetchAmadeusActivitiesRapid(plan: TripPlan): Promise<{
 
   const keywords = experienceKeywords(plan);
   const radiusKm = 8;
-  const url = `https://${host.replace(/^https?:\/\//i, "")}${path.startsWith("/") ? path : `/${path}`}?latitude=${coords.lat}&longitude=${coords.lon}&radius=${radiusKm}`;
+  const cleanHost = host.replace(/^https?:\/\//i, "");
+  const pathPart = path.startsWith("/") ? path : `/${path}`;
+  const url = `https://${cleanHost.split("/")[0]}${pathPart}?latitude=${coords.lat}&longitude=${coords.lon}&radius=${radiusKm}`;
 
   try {
     const res = await fetch(url, {
       method: "GET",
       headers: {
         "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": host.replace(/^https?:\/\//i, ""),
+        "X-RapidAPI-Host": cleanHost.split("/")[0]!,
       },
     });
     const text = await res.text();

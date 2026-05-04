@@ -1,12 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { publicOriginFromRequest } from "@/backend/app-base-url";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const nextRaw = requestUrl.searchParams.get("next") || "/trip-parser";
-  const origin = requestUrl.origin;
+  const origin = publicOriginFromRequest(request);
 
   const safeNext =
     nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/trip-parser";

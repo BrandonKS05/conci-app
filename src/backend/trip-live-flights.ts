@@ -108,6 +108,9 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
     }
 
     const outbound = firstOutboundIso(plan);
+    const returnIso = secondReturnIso(plan, outbound);
+    /** SerpApi: type `1` = round trip (requires return_date); type `2` = one-way. Default API type is round trip. */
+    const hasRoundTripDates = Boolean(outbound && returnIso);
     const adults = Math.max(1, Math.min(9, plan.people.count ?? 1));
     const params: Record<string, string> = {
       engine: "google_flights",
@@ -118,16 +121,13 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
       gl: "us",
       adults: String(adults),
     };
-    if (outbound) params.outbound_date = outbound;
-    const roundTrip = plan.dates.options.length >= 2;
-    params.type = roundTrip ? "1" : "1";
-    if (roundTrip) {
+    if (hasRoundTripDates) {
       params.type = "1";
-      const ret = secondReturnIso(plan, outbound);
-      if (outbound && ret) {
-        params.type = "2";
-        params.return_date = ret;
-      }
+      params.outbound_date = outbound!;
+      params.return_date = returnIso!;
+    } else {
+      params.type = "2";
+      if (outbound) params.outbound_date = outbound;
     }
 
     const j = (await serpGet(params)) as {

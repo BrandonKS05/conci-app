@@ -517,8 +517,7 @@ function TripPlanLiveBlocks({
   transportMode: "fly" | "drive";
   onTransportModeChange: (m: "fly" | "drive") => void;
 }) {
-  const venueHints = plan.polls?.venues?.filter(Boolean) ?? [];
-  const showRestaurants = venueHints.length > 0;
+  const showRestaurants = Boolean(plan.location?.trim());
   const showExperiences = Boolean(plan.location?.trim());
   const showTransport =
     Boolean(plan.departureCity?.trim()) && Boolean(plan.location?.trim());
@@ -529,91 +528,6 @@ function TripPlanLiveBlocks({
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           {liveFetchErr}
         </p>
-      ) : null}
-
-      {showRestaurants ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
-            Restaurants (live)
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            Pulled for your destination, dates context, and group size. Voting cards above use the same data when
-            available.
-          </p>
-          {liveLoading ? (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
-          ) : liveData?.restaurantsError ? (
-            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.restaurantsError}</p>
-          ) : (liveData?.restaurants?.length ?? 0) > 0 ? (
-            <ul className="mt-4 space-y-3">
-              {liveData!.restaurants.map((r) => (
-                <li
-                  key={r.id}
-                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
-                >
-                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
-                  {r.cuisineType ? (
-                    <p className="text-sm text-slate-600 dark:text-neutral-400">{r.cuisineType}</p>
-                  ) : null}
-                  <p className="text-sm text-slate-600 dark:text-neutral-400">{r.neighborhood}</p>
-                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
-                  <a
-                    href={r.openTableUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"
-                  >
-                    {r.reserveCtaLabel ?? "Reserve on OpenTable"}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No live restaurant rows yet.</p>
-          )}
-        </section>
-      ) : null}
-
-      {showExperiences ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
-            Top experiences
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            Amadeus tours & activities (via RapidAPI) for {plan.location?.trim()} — ranked using your trip vibe
-            keywords when results include text matches.
-          </p>
-          {liveLoading ? (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
-          ) : liveData?.experiencesError ? (
-            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.experiencesError}</p>
-          ) : (liveData?.experiences?.length ?? 0) > 0 ? (
-            <ul className="mt-4 space-y-3">
-              {liveData!.experiences.map((ex, i) => (
-                <li
-                  key={`${ex.name}-${i}`}
-                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
-                >
-                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{ex.name}</p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">{ex.duration}</p>
-                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{ex.rating}</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{ex.pricePerPerson}</p>
-                  <a
-                    href={ex.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
-                  >
-                    Book activity
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No experiences returned.</p>
-          )}
-        </section>
       ) : null}
 
       {showTransport ? (
@@ -719,6 +633,93 @@ function TripPlanLiveBlocks({
                 ) : null;
               })()}
             </div>
+          )}
+        </section>
+      ) : null}
+
+      {showRestaurants ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
+            Restaurants (live)
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+            OpenTable Data API on RapidAPI (elis-lab): destination, party size, and first parseable date when the
+            provider accepts them. Dinner vote cards merge these rows when a venue poll is open.
+          </p>
+          {liveLoading ? (
+            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
+          ) : liveData?.restaurantsError ? (
+            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.restaurantsError}</p>
+          ) : (liveData?.restaurants?.length ?? 0) > 0 ? (
+            <ul className="mt-4 space-y-3">
+              {liveData!.restaurants.map((r) => (
+                <li
+                  key={r.id}
+                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
+                >
+                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
+                  {r.cuisineType ? (
+                    <p className="text-sm text-slate-600 dark:text-neutral-400">{r.cuisineType}</p>
+                  ) : null}
+                  <p className="text-sm text-slate-600 dark:text-neutral-400">{r.neighborhood}</p>
+                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
+                  <a
+                    href={r.openTableUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"
+                  >
+                    {r.reserveCtaLabel ?? "Reserve on OpenTable"}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No live restaurant rows yet.</p>
+          )}
+        </section>
+      ) : null}
+
+      {showExperiences ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
+            Top experiences
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+            Experiences use Amadeus Tours & Activities on RapidAPI when{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">RAPIDAPI_AMADEUS_HOST</code> is set, then any
+            Musement/activities API you configure, then Tripadvisor COM defaults — same{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">RAPIDAPI_KEY</code> as hotels/OpenTable.
+          </p>
+          {liveLoading ? (
+            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
+          ) : liveData?.experiencesError ? (
+            <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{liveData.experiencesError}</p>
+          ) : (liveData?.experiences?.length ?? 0) > 0 ? (
+            <ul className="mt-4 space-y-3">
+              {liveData!.experiences.map((ex, i) => (
+                <li
+                  key={`${ex.name}-${i}`}
+                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/50"
+                >
+                  <p className="font-semibold text-slate-900 dark:text-neutral-100">{ex.name}</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{ex.pricePerPerson}</p>
+                  <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{ex.rating}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Duration: {ex.duration}</p>
+                  <a
+                    href={ex.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+                  >
+                    Open booking link
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No experiences returned.</p>
           )}
         </section>
       ) : null}
