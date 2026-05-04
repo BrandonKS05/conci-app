@@ -26,6 +26,7 @@ import {
   retainPeopleNamesOnlyIfMentionedInInput,
   safeParseJson,
 } from "@/shared/trip-plan";
+import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
 import { PlacePickCards } from "@/frontend/components/place-pick-cards";
@@ -1130,7 +1131,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                   !dateStart.trim()) ||
                 (activeSlot === "dates" && dateSlotMode === "rough" && !replyDraft.trim())
               }
-              className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
+              className={`rounded-full px-5 py-2 text-sm ${primaryFilledInteractive}`}
             >
               Send
             </button>
@@ -1217,7 +1218,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               <button
                 type="submit"
                 disabled={(!composerText.trim() && imageSlots.length === 0) || !tripName.trim()}
-                className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
+                className={`rounded-full px-6 py-2 text-sm disabled:cursor-not-allowed ${primaryFilledInteractive}`}
               >
                 Send
               </button>

@@ -183,6 +183,11 @@ export function buildParsedDateOptions(opts: string[], fallbackYear: number): Pa
   return out;
 }
 
+/** True when the ballot line maps to an actual calendar range/day (not fuzzy text like “Late July”). */
+export function isParsableConcreteDateBallotLine(option: string, fallbackYear: number): boolean {
+  return parseDateOptionToRange(option.trim(), fallbackYear) !== null;
+}
+
 export function optionForCalendarDay(day: Date, opts: string[], parsed: ParsedDateOption[]): string | null {
   for (const label of opts) {
     const row = parsed.find((p) => p.option === label);

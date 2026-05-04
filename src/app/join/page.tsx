@@ -1,8 +1,9 @@
 "use client";
 
+import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, type FormEvent } from "react";
+import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 
 export default function JoinTripPage() {
   const router = useRouter();
@@ -78,11 +79,7 @@ export default function JoinTripPage() {
               {error}
             </p>
           ) : null}
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-          >
+          <button type="submit" disabled={busy} className={`w-full ${primaryFormButtonClass}`}>
             {busy ? "Joining…" : "Join trip"}
           </button>
         </form>

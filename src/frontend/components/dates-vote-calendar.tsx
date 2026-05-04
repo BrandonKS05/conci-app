@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import type { ReactDatePickerCustomHeaderProps } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   aggregatedTallyForBallotOption,
   buildParsedDateOptions,
@@ -69,6 +70,8 @@ export function DatesVoteCalendar({
   quorum,
   voterN,
   onVote,
+  /** When set (e.g. vague “Late July” as the only line), hide chip votes for unparseable ballot text so members must pick a concrete range on the calendar. */
+  hideUnmappedBallotChips = false,
 }: {
   decisionKey: string;
   options: string[];
@@ -78,6 +81,7 @@ export function DatesVoteCalendar({
   quorum: number;
   voterN: number;
   onVote: (p: Record<string, unknown>) => void;
+  hideUnmappedBallotChips?: boolean;
 }) {
   const fallbackCalendarYear = new Date().getFullYear();
   const y0 = useMemo(
@@ -155,9 +159,24 @@ export function DatesVoteCalendar({
 
   return (
     <div className="space-y-4">
+      {hideUnmappedBallotChips && !(mine ?? "").trim() ? (
+        <p className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/45 dark:bg-amber-950/35 dark:text-amber-100">
+          The host suggested a loose timing window — pick your preferred trip dates on the calendar (start and end day).
+          Your vote submits when both are chosen.
+        </p>
+      ) : null}
       <p className="text-sm text-slate-600 dark:text-neutral-400">
-        Votes: {voterN}/{quorum}+ to lock. Tap a start date, then an end date (both inclusive). Tap the same day twice
-        for a one-day trip.
+        {hideUnmappedBallotChips ? (
+          <>
+            Drag a start and end date on the calendar (same day twice for a single night). Your vote is saved when the
+            range is complete. Group needs {voterN}/{quorum}+ votes to lock.
+          </>
+        ) : (
+          <>
+            Votes: {voterN}/{quorum}+ to lock. Tap a start date, then an end date (both inclusive). Tap the same day twice
+            for a one-day trip.
+          </>
+        )}
       </p>
 
       <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
@@ -221,7 +240,7 @@ export function DatesVoteCalendar({
         ) : null}
       </div>
 
-      {unmapped.length > 0 ? (
+      {unmapped.length > 0 && !hideUnmappedBallotChips ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 dark:border-amber-900/40 dark:bg-amber-950/30">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200/90">
             Also on the ballot
@@ -283,7 +302,10 @@ function CalendarGlyph({ className }: { className?: string }) {
   );
 }
 
-/** When there is exactly one host-proposed ballot line, members confirm before seeing the calendar. */
+/**
+ * Exactly one concrete (calendar-parsable) host date line — members choose “Works for me” or open the shared
+ * calendar to vote a specific range into the same collab tally.
+ */
 export function DatesSingleProposalMemberVote({
   decisionKey,
   options,
@@ -315,19 +337,16 @@ export function DatesSingleProposalMemberVote({
 
   const mineTrim = mine?.trim() ?? "";
   const votedForProposal = mineTrim.length > 0 && mineTrim === proposalNorm;
+  const votedAlternate = Boolean(mineTrim && mineTrim !== proposalNorm);
 
-  const [declinedProposal, setDeclinedProposal] = useState(false);
   const [calendarExpanded, setCalendarExpanded] = useState(false);
 
   useEffect(() => {
-    const alt = Boolean(mineTrim && mineTrim !== proposalNorm);
-    setDeclinedProposal(alt);
-    setCalendarExpanded(alt);
-  }, [mineTrim, proposalNorm]);
+    if (votedAlternate) setCalendarExpanded(true);
+  }, [votedAlternate]);
 
   const castWorksForMe = () => {
     onVote({ decisionKey, kind: "dates", option: proposalRaw });
-    setDeclinedProposal(false);
     setCalendarExpanded(false);
   };
 
@@ -337,72 +356,80 @@ export function DatesSingleProposalMemberVote({
         <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">
           Host proposed trip dates
         </p>
-        <p className="mt-2 font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100">
+        <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-3xl">
           {heading}
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      {!mineTrim ? (
+        <p className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/45 dark:bg-amber-950/35 dark:text-amber-100">
+          Submit your availability: confirm these dates below, or open the calendar and choose a concrete range—everyone must
+          record a vote.
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
           disabled={busy}
           onClick={() => castWorksForMe()}
-          className={`rounded-xl px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${
+          className={`rounded-full px-6 py-2.5 text-sm transition disabled:opacity-50 ${
             votedForProposal
-              ? "bg-indigo-700 text-white ring-2 ring-indigo-400 dark:bg-indigo-500 dark:ring-indigo-300/60"
-              : "border border-slate-200 bg-white text-slate-900 hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/30"
+              ? `${primaryFilledInteractive} ring-2 ring-slate-400 dark:ring-[#d4d2cd]`
+              : "border border-slate-200 bg-white font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/25 dark:hover:bg-white/5"
           }`}
         >
           Works for me
         </button>
+
         <button
           type="button"
           disabled={busy}
-          onClick={() => {
-            setDeclinedProposal(true);
-            setCalendarExpanded(false);
-          }}
-          className={`rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${
-            declinedProposal && !votedForProposal
-              ? "border-rose-400 bg-rose-50 text-rose-950 dark:border-rose-600/60 dark:bg-rose-950/40 dark:text-rose-100"
+          onClick={() => setCalendarExpanded((e) => !e)}
+          className={`inline-flex items-center justify-center gap-2 rounded-full border px-6 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${
+            calendarExpanded && !votedForProposal
+              ? "border-slate-400 bg-slate-100 text-slate-900 dark:border-white/20 dark:bg-white/10 dark:text-neutral-100"
               : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
           }`}
+          aria-expanded={calendarExpanded}
         >
-          Doesn&apos;t work
+          <CalendarGlyph className="shrink-0 opacity-70" />
+          {calendarExpanded ? "Hide calendar" : "Suggest different dates"}
         </button>
       </div>
 
-      {declinedProposal ? (
-        <div className="space-y-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setCalendarExpanded((e) => !e)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:border-slate-300 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
-            aria-expanded={calendarExpanded}
-          >
-            <CalendarGlyph />
-            {calendarExpanded ? "Hide calendar" : "Suggest other dates"}
-          </button>
+      {!mineTrim && calendarExpanded ? (
+        <p className="text-sm text-slate-600 dark:text-neutral-400">
+          Select your preferred trip dates on the calendar (start day, then end day). Your vote submits when both are
+          chosen.
+        </p>
+      ) : null}
 
-          {calendarExpanded ? (
-            <DatesVoteCalendar
-              decisionKey={decisionKey}
-              options={options}
-              votes={votes}
-              mine={mine}
-              busy={busy}
-              quorum={quorum}
-              voterN={voterN}
-              onVote={onVote}
-            />
-          ) : null}
-        </div>
+      {calendarExpanded ? (
+        <DatesVoteCalendar
+          decisionKey={decisionKey}
+          options={options}
+          votes={votes}
+          mine={mine}
+          busy={busy}
+          quorum={quorum}
+          voterN={voterN}
+          onVote={onVote}
+        />
       ) : null}
 
       <p className="text-xs text-slate-500 dark:text-neutral-500">
-        {voterN}/{quorum}+ votes to lock. Pick &quot;Works for me&quot; to vote for the proposed range above, or use the
-        calendar after &quot;Doesn&apos;t work&quot; for an alternate.
+        {mineTrim ? (
+          <>
+            Your availability is recorded. The host may confirm the locked date once there are enough votes, or sooner if
+            needed.
+          </>
+        ) : (
+          <>
+            Waiting on your vote ({voterN}/{quorum}+ toward locking once everyone submits). Voting feeds the same tally the
+            host uses to finalize.
+          </>
+        )}
       </p>
     </div>
   );

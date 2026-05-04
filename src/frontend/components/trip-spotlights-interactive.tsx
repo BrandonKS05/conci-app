@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlacePreview } from "@/shared/place-preview";
+import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import type { TripPlan } from "@/shared/trip-plan";
 import { memberVoteKey } from "@/shared/collab-vote-keys";
 import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
@@ -225,10 +226,10 @@ export function TripSpotlightsInteractive({
                     type="button"
                     disabled={voteBusy === id}
                     onClick={() => void toggleVote(id)}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    className={`rounded-xl px-3 py-2 text-sm transition ${
                       iVoted(id)
-                        ? "bg-indigo-600 text-white dark:bg-indigo-500"
-                        : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/15 dark:bg-[#222] dark:text-[#ebe9e4] dark:hover:bg-white/5"
+                        ? primaryFilledInteractive
+                        : "border border-slate-300 bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:border-white/15 dark:bg-[#222] dark:text-[#ebe9e4] dark:hover:bg-white/5"
                     }`}
                   >
                     {voteBusy === id ? "…" : iVoted(id) ? `Voted · ${voteCount(id)}` : `Vote · ${voteCount(id)}`}

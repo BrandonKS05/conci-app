@@ -46,7 +46,7 @@ export function SiteShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-full border border-transparent px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-ink dark:text-neutral-400 dark:hover:border-white/10 dark:hover:bg-dm-card dark:hover:text-white"
+                className="rounded-full border border-transparent px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-200 hover:bg-slate-50 hover:text-ink dark:text-neutral-400 dark:hover:border-white/10 dark:hover:bg-dm-card dark:hover:text-white"
               >
                 {item.label}
               </Link>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   buildClassifiedDecisions,
   collaborationQuorum,
@@ -30,6 +31,7 @@ import {
   coerceVoteAgainstList,
   isAllowedPollWriteIn,
 } from "@/shared/collab-pick-vote";
+import { inferDefaultYearFromDateOptions, isParsableConcreteDateBallotLine } from "@/shared/date-option-parse";
 import {
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
@@ -704,7 +706,7 @@ export function TripCollaborationPanel({
                 }
               })();
             }}
-            className="mt-6 inline-flex rounded-xl bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+            className={`mt-6 inline-flex rounded-xl px-8 py-3 text-sm shadow-md disabled:opacity-50 ${primaryFilledInteractive}`}
           >
             {finalizeBusy ? "Finalizing…" : "Finalize trip"}
           </button>
@@ -796,10 +798,8 @@ function TripPlanLiveBlocks({
             <button
               type="button"
               onClick={() => onTransportModeChange("fly")}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                transportMode === "fly"
-                  ? "bg-slate-900 text-white dark:bg-neutral-100 dark:text-dm-page"
-                  : "text-slate-600 dark:text-neutral-400"
+              className={`rounded-full px-4 py-1.5 text-sm transition ${
+                transportMode === "fly" ? primaryFilledInteractive : "font-semibold text-slate-600 dark:text-neutral-400"
               }`}
             >
               Fly
@@ -807,10 +807,8 @@ function TripPlanLiveBlocks({
             <button
               type="button"
               onClick={() => onTransportModeChange("drive")}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                transportMode === "drive"
-                  ? "bg-slate-900 text-white dark:bg-neutral-100 dark:text-dm-page"
-                  : "text-slate-600 dark:text-neutral-400"
+              className={`rounded-full px-4 py-1.5 text-sm transition ${
+                transportMode === "drive" ? primaryFilledInteractive : "font-semibold text-slate-600 dark:text-neutral-400"
               }`}
             >
               Drive
@@ -1023,7 +1021,7 @@ function HostDatesConfirmFooter({
               <button
                 type="button"
                 disabled={busy}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+                className={`rounded-lg px-4 py-2 text-sm disabled:opacity-50 ${primaryFilledInteractive}`}
                 onClick={() => {
                   void onHostConfirmDates().then((ok) => {
                     if (ok) setAnywayOpen(false);
@@ -1047,10 +1045,8 @@ function HostDatesConfirmFooter({
           type="button"
           disabled={!enoughVotes || busy}
           onClick={() => void onHostConfirmDates()}
-          className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-            enoughVotes && !busy
-              ? "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-              : "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-neutral-500"
+          className={`rounded-xl px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            enoughVotes && !busy ? primaryFilledInteractive : "font-semibold bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-neutral-500"
           }`}
         >
           {confirmBusy ? "Saving…" : "Confirm Date"}
@@ -1197,11 +1193,15 @@ function DecisionCard({
         </div>
       );
     }
+    const datesVoteYear = inferDefaultYearFromDateOptions(opts, new Date().getFullYear());
+    const singleLineConcrete =
+      opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, datesVoteYear);
+    const vagueOnlyMemberBallot = !isHost && opts.length === 1 && !singleLineConcrete;
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
         <div className="mt-4">
-          {!isHost && opts.length === 1 ? (
+          {!isHost && singleLineConcrete ? (
             <DatesSingleProposalMemberVote
               decisionKey={meta.key}
               options={opts}
@@ -1222,6 +1222,7 @@ function DecisionCard({
               quorum={quorum}
               voterN={voterN}
               onVote={onVote}
+              hideUnmappedBallotChips={vagueOnlyMemberBallot}
             />
           )}
         </div>
@@ -1298,10 +1299,10 @@ function DecisionCard({
                           type="button"
                           disabled={busy || blockedByDates}
                           onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: r.id })}
-                          className={`rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40 ${
+                          className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${
                             picked
-                              ? "bg-indigo-700 text-white dark:bg-indigo-500"
-                              : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                              ? primaryFilledInteractive
+                              : "border border-slate-200 bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                           }`}
                         >
                           Vote for this dinner
@@ -1391,10 +1392,10 @@ function DecisionCard({
                           viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
                         submitPickWithAgainst(base.filter((x) => x !== opt), opt);
                       }}
-                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                      className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
                         forSelected
-                          ? "bg-indigo-700 text-white dark:bg-indigo-500"
-                          : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                          ? primaryFilledInteractive
+                          : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
                       {transportSimplePick ? "Vote" : "Vote for"}
@@ -1485,7 +1486,7 @@ function DecisionCard({
                   );
                   setPollWriteIn("");
                 }}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+                className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
               >
                 Submit vote
               </button>
@@ -1529,7 +1530,7 @@ function DecisionCard({
                   onVote({ decisionKey: meta.key, kind: "pick", option: p });
                   setBudgetCustom("");
                 }}
-                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+                className={`rounded-lg px-3 py-1.5 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
               >
                 Vote
               </button>
@@ -1608,10 +1609,10 @@ function DecisionCard({
                         viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
                       submitBinaryWithAgainst(opt, base.filter((x) => x !== opt));
                     }}
-                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                    className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
                       forSel
-                        ? "bg-indigo-700 text-white dark:bg-indigo-500"
-                        : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                        ? primaryFilledInteractive
+                        : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                     }`}
                   >
                     {transportSimpleBinary ? "Vote" : "Vote for"}
@@ -1681,7 +1682,7 @@ function DecisionCard({
                 );
                 setPollWriteIn("");
               }}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+              className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
             >
               Submit vote
             </button>
@@ -1716,7 +1717,7 @@ function DecisionCard({
               type="button"
               disabled={hotelSearchBusy || blockedByDates}
               onClick={() => void runHotelSearch()}
-              className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white sm:w-auto"
+              className={`mt-4 w-full rounded-xl px-4 py-3 text-sm disabled:opacity-50 sm:w-auto ${primaryFilledInteractive}`}
             >
               {hotelSearchBusy ? "Searching hotels…" : "Search hotels"}
             </button>
@@ -1776,10 +1777,10 @@ function DecisionCard({
                       type="button"
                       disabled={busy || blockedByDates}
                       onClick={() => onVote({ decisionKey: meta.key, kind: "hotel", hotelId: h.id })}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40 ${
+                      className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${
                         viewerPrimaryPick === h.id
-                          ? "bg-indigo-700 text-white dark:bg-indigo-500"
-                          : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                          ? primaryFilledInteractive
+                          : "border border-slate-200 bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
                       Vote for this stay

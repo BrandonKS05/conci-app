@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { SavedTripsList, type SavedTripListItem } from "@/frontend/components/saved-trips-list";
 import { SiteShell } from "@/frontend/components/site-shell";
+import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ export default async function MyTripsPage() {
 
   return (
     <SiteShell title="My Trips" eyebrow="Host">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
+      <div className="mx-auto w-full max-w-3xl space-y-6">
         <p className="text-sm text-slate-600 dark:text-neutral-400">
           Trips you created — you&apos;re the host: edit the plan, share invites, run hotel search, finalize, and delete.
         </p>
@@ -78,10 +79,7 @@ export default async function MyTripsPage() {
           <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
             <p className="font-display text-lg font-semibold text-slate-900 dark:text-white">No trips yet</p>
             <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">Create a plan to host your first trip.</p>
-            <Link
-              href="/trip-parser"
-              className="mt-6 inline-flex rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
-            >
+            <Link href="/trip-parser" className={`mt-6 ${primaryFormButtonClass}`}>
               Create a plan
             </Link>
           </div>

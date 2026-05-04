@@ -231,7 +231,7 @@ export function TripCardChatWidget({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-lg text-white shadow-lg ring-2 ring-white/20 transition hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500"
+        className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-lg text-white shadow-lg ring-2 ring-white/20 transition hover:bg-slate-800 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
         aria-label={open ? "Close trip chat" : "Open trip chat"}
       >
         {open ? "×" : "💬"}

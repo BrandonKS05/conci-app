@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -92,10 +93,7 @@ export function SavedTripsList({
       <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <p className="font-display text-lg font-semibold text-slate-900 dark:text-white">No saved trips yet</p>
         <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">Plans you create and save will show up here.</p>
-        <Link
-          href="/trip-parser"
-          className="mt-6 inline-flex rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
-        >
+        <Link href="/trip-parser" className={`mt-6 ${primaryFormButtonClass}`}>
           Create your first plan
         </Link>
       </div>
@@ -114,9 +112,9 @@ export function SavedTripsList({
         {trips.map((trip) => (
           <li
             key={trip.id}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:shadow-none dark:hover:border-white/15"
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:shadow-none dark:hover:border-white/15 sm:p-7"
           >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
               <div className="min-w-0 flex-1 space-y-2">
                 <h2 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
                   {trip.title?.trim() || "Untitled trip"}

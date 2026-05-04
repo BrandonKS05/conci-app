@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
+
+import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   experienceLiveKey,
   flightLiveKey,
@@ -451,7 +453,7 @@ export function CuratedExperiencesSection({
                       type="button"
                       disabled={busyKey !== null}
                       onClick={() => mutate("keep", key)}
-                      className="rounded-full bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-800 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-500"
+                      className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${primaryFilledInteractive}`}
                     >
                       Add to trip
                     </button>

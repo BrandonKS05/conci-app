@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
+import { primaryHeroEmphasisLinkClass } from "@/frontend/ui/primary-action";
 
 export const metadata: Metadata = {
   title: "Conci — Group trips, planned",
@@ -161,10 +162,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-14 flex justify-center">
-            <Link
-              href="/trip-parser"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-zinc-950 px-8 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-            >
+            <Link href="/trip-parser" className={primaryHeroEmphasisLinkClass}>
               Start planning
             </Link>
           </div>

@@ -4,6 +4,7 @@ import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
 import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
+import { primaryHeroLinkPillClass, primaryNavPillClass } from "@/frontend/ui/primary-action";
 
 export function LandingTwPlusHero() {
   return (
@@ -23,10 +24,7 @@ export function LandingTwPlusHero() {
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggleButton variant="landing" className="inline-flex" />
-            <Link
-              href="/join"
-              className="rounded-full border border-indigo-600 bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:border-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400 sm:px-4 sm:text-sm"
-            >
+            <Link href="/join" className={primaryNavPillClass}>
               <span className="sm:hidden">Join trip</span>
               <span className="hidden sm:inline">Join a trip</span>
             </Link>
@@ -148,16 +146,10 @@ export function LandingTwPlusHero() {
               Friends can join with an invite code—vote and RSVP with no login. Creators sign in to build plans.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-x-6">
-              <Link
-                href="/trip-parser"
-                className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-              >
+              <Link href="/trip-parser" className={primaryHeroLinkPillClass}>
                 Start planning
               </Link>
-              <Link
-                href="/join"
-                className="rounded-md border border-gray-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-              >
+              <Link href="/join" className={primaryHeroLinkPillClass}>
                 Join with a code
               </Link>
               <a
