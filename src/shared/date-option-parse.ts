@@ -200,6 +200,35 @@ export function formatLocalIsoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Canonical stored vote for a local-date range (inclusive), sorted by day. */
+export function formatLocalIsoRangeVote(start: Date, end: Date): string {
+  const a = localDayTime(start) <= localDayTime(end) ? start : end;
+  const b = localDayTime(start) <= localDayTime(end) ? end : start;
+  return `${formatLocalIsoDate(a)} to ${formatLocalIsoDate(b)}`;
+}
+
+export function isRangeContainedIn(
+  inner: { start: Date; end: Date },
+  outer: { start: Date; end: Date }
+): boolean {
+  return (
+    localDayTime(inner.start) >= localDayTime(outer.start) &&
+    localDayTime(inner.end) <= localDayTime(outer.end)
+  );
+}
+
+export function formatVoteRangeLabel(start: Date, end: Date): string {
+  if (localDayTime(start) === localDayTime(end)) {
+    return start.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
 export function isStrictIsoDateString(s: string): boolean {
   const m = s.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return false;
@@ -229,46 +258,66 @@ export function tallyDateStringVotes(votes: Record<string, unknown>, ballotOptio
   return tally;
 }
 
-/** Votes cast as ISO days that fall inside a host-proposed range, plus exact option-string votes. */
+/**
+ * Votes fully contained in a host-proposed window, plus exact option-string votes.
+ * Supports single-day (`YYYY-MM-DD`) and range (`YYYY-MM-DD to YYYY-MM-DD`) keys.
+ */
 export function aggregatedTallyForBallotOption(
   option: string,
   parsed: ParsedDateOption[],
-  rawTally: Record<string, number>
+  rawTally: Record<string, number>,
+  fallbackYear: number
 ): number {
   let n = rawTally[option] ?? 0;
   const row = parsed.find((p) => p.option === option);
   if (!row) return n;
   for (const [key, c] of Object.entries(rawTally)) {
     if (c <= 0 || key === option) continue;
-    if (!isStrictIsoDateString(key)) continue;
-    const [y, mo, d] = key.split("-").map((x) => parseInt(x, 10));
-    const day = new Date(y, mo - 1, d, 12, 0, 0, 0);
-    if (Number.isNaN(day.getTime())) continue;
-    if (isDayInRange(day, row.start, row.end)) n += c;
+    const r = parseDateOptionToRange(key, fallbackYear);
+    if (!r) continue;
+    if (isRangeContainedIn(r, { start: row.start, end: row.end })) n += c;
   }
   return n;
 }
 
-export function listIsoVotesOutsideHostRanges(
+/** Other date/range votes that are not fully contained in any host suggestion (listed separately). */
+export function listCustomVotesOutsideHostSuggestions(
   rawTally: Record<string, number>,
-  parsed: ParsedDateOption[]
-): { iso: string; votes: number; label: string }[] {
-  const out: { iso: string; votes: number; label: string }[] = [];
+  parsed: ParsedDateOption[],
+  ballotOptions: string[],
+  fallbackYear: number
+): { key: string; votes: number; label: string }[] {
+  const out: { key: string; votes: number; label: string }[] = [];
   for (const [key, c] of Object.entries(rawTally)) {
-    if (c <= 0 || !isStrictIsoDateString(key)) continue;
-    const [y, mo, d] = key.split("-").map((x) => parseInt(x, 10));
-    const day = new Date(y, mo - 1, d, 12, 0, 0, 0);
-    if (Number.isNaN(day.getTime())) continue;
-    const inside = parsed.some((p) => isDayInRange(day, p.start, p.end));
-    if (inside) continue;
-    out.push({
-      iso: key,
-      votes: c,
-      label: day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
-    });
+    if (c <= 0) continue;
+    if (ballotOptions.includes(key)) continue;
+    const r = parseDateOptionToRange(key, fallbackYear);
+    if (!r) continue;
+    const contained = parsed.some((p) => isRangeContainedIn(r, { start: p.start, end: p.end }));
+    if (contained) continue;
+    out.push({ key, votes: c, label: formatVoteRangeLabel(r.start, r.end) });
   }
-  out.sort((a, b) => a.iso.localeCompare(b.iso));
+  out.sort((a, b) => a.key.localeCompare(b.key));
   return out;
+}
+
+/** How many voters’ chosen range(s) include this calendar day. */
+export function votesCoveringCalendarDay(
+  day: Date,
+  rawTally: Record<string, number>,
+  fallbackYear: number
+): number {
+  let sum = 0;
+  const tDay = localDayTime(startOfLocalDay(day));
+  for (const [key, c] of Object.entries(rawTally)) {
+    if (c <= 0) continue;
+    const r = parseDateOptionToRange(key, fallbackYear);
+    if (!r) continue;
+    const a = localDayTime(r.start);
+    const b = localDayTime(r.end);
+    if (tDay >= a && tDay <= b) sum += c;
+  }
+  return sum;
 }
 
 export function earliestParsedDay(parsed: ParsedDateOption[]): Date | null {

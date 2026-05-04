@@ -1,21 +1,62 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
+import type { ReactDatePickerCustomHeaderProps } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
   aggregatedTallyForBallotOption,
   buildParsedDateOptions,
   earliestParsedDay,
   formatLocalIsoDate,
+  formatLocalIsoRangeVote,
+  inferDefaultYearFromDateOptions,
   isDayInRange,
   latestParsedDay,
-  listIsoVotesOutsideHostRanges,
+  listCustomVotesOutsideHostSuggestions,
   localDayTime,
+  parseDateOptionToRange,
   startOfLocalDay,
   tallyDateStringVotes,
+  votesCoveringCalendarDay,
 } from "@/shared/date-option-parse";
 import "./dates-vote-calendar.css";
+
+function RangePickerHeader({
+  monthDate,
+  decreaseMonth,
+  increaseMonth,
+  prevMonthButtonDisabled,
+  nextMonthButtonDisabled,
+}: ReactDatePickerCustomHeaderProps) {
+  return (
+    <div className="conci-datepicker-custom-header">
+      <span className="conci-datepicker-month-title">
+        {monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+      </span>
+      <div className="conci-datepicker-nav">
+        <button
+          type="button"
+          className="conci-datepicker-nav-btn"
+          aria-label="Previous month"
+          disabled={prevMonthButtonDisabled}
+          onClick={decreaseMonth}
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          className="conci-datepicker-nav-btn"
+          aria-label="Next month"
+          disabled={nextMonthButtonDisabled}
+          onClick={increaseMonth}
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function DatesVoteCalendar({
   decisionKey,
@@ -36,13 +77,19 @@ export function DatesVoteCalendar({
   voterN: number;
   onVote: (p: Record<string, unknown>) => void;
 }) {
-  const fallbackYear = new Date().getFullYear();
-  const parsed = useMemo(() => buildParsedDateOptions(options, fallbackYear), [options, fallbackYear]);
+  const fallbackCalendarYear = new Date().getFullYear();
+  const y0 = useMemo(
+    () => inferDefaultYearFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
+  const parsed = useMemo(() => buildParsedDateOptions(options, fallbackCalendarYear), [options, fallbackCalendarYear]);
   const unmapped = useMemo(
     () => options.filter((o) => !parsed.some((p) => p.option === o)),
     [options, parsed]
   );
   const tally = useMemo(() => tallyDateStringVotes(votes, options), [votes, options]);
+
+  const [rangeDraft, setRangeDraft] = useState<[Date | null, Date | null]>([null, null]);
 
   const defaultActive = useMemo(
     () => earliestParsedDay(parsed) ?? startOfLocalDay(new Date()),
@@ -67,28 +114,30 @@ export function DatesVoteCalendar({
 
   const cast = (option: string) => {
     onVote({ decisionKey, kind: "dates", option });
+    setRangeDraft([null, null]);
   };
 
   const rangeSummaries = useMemo(() => {
     const hostRows = parsed.map(({ option, start, end }) => ({
       key: option,
       label: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
-      votes: aggregatedTallyForBallotOption(option, parsed, tally),
+      votes: aggregatedTallyForBallotOption(option, parsed, tally, y0),
     }));
-    const isoRows = listIsoVotesOutsideHostRanges(tally, parsed).map((r) => ({
-      key: `iso:${r.iso}`,
+    const customRows = listCustomVotesOutsideHostSuggestions(tally, parsed, options, y0).map((r) => ({
+      key: r.key,
       label: r.label,
       votes: r.votes,
     }));
-    return [...hostRows, ...isoRows];
-  }, [parsed, tally]);
+    return [...hostRows, ...customRows];
+  }, [parsed, tally, options, y0]);
 
   function dayMatchesMine(d: Date): boolean {
     if (!mine || !mine.trim()) return false;
-    if (formatLocalIsoDate(d) === mine) return true;
+    const rMine = parseDateOptionToRange(mine.trim(), y0);
+    if (rMine && isDayInRange(d, rMine.start, rMine.end)) return true;
     const row = parsed.find((p) => p.option === mine);
-    if (!row) return false;
-    return isDayInRange(d, row.start, row.end);
+    if (row && isDayInRange(d, row.start, row.end)) return true;
+    return formatLocalIsoDate(d) === mine.trim();
   }
 
   function dayInHostRange(d: Date): boolean {
@@ -98,49 +147,67 @@ export function DatesVoteCalendar({
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-neutral-400">
-        Votes: {voterN}/{quorum}+ to lock. Tap any day you can do — your vote is saved for that exact date. Shaded days
-        match a host suggestion; other days work too.
+        Votes: {voterN}/{quorum}+ to lock. Tap a start date, then an end date (both inclusive). Tap the same day twice
+        for a one-day trip. Indigo shading = host suggestion. The small number under a day counts how many travelers’
+        ranges include that date.
       </p>
 
-      <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-dm-elevated/50">
-        <DatePicker
-          inline
-          showIcon={false}
-          shouldCloseOnSelect={false}
-          openToDate={defaultActive}
-          selected={null}
-          onChange={(date: Date | null) => {
-            if (busy || !date) return;
-            cast(formatLocalIsoDate(date));
-          }}
-          minDate={minNav}
-          maxDate={maxNav}
-          calendarStartDay={1}
-          calendarClassName="conci-datepicker-calendar"
-          wrapperClassName="conci-datepicker-wrapper"
-          dateFormatCalendar="MMMM yyyy"
-          dayClassName={(d: Date) => {
-            const parts: string[] = [];
-            if (dayInHostRange(d)) parts.push("conci-datepicker-day--host-range");
-            const iso = formatLocalIsoDate(d);
-            if ((tally[iso] ?? 0) > 0) parts.push("conci-datepicker-day--votes");
-            if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
-            return parts.join(" ");
-          }}
-          renderDayContents={(day: number, date?: Date) => {
-            if (!date) return <span>{day}</span>;
-            const iso = formatLocalIsoDate(date);
-            const c = tally[iso] ?? 0;
-            return (
-              <span className="conci-datepicker-day-inner">
-                <span className="conci-datepicker-day-num">{day}</span>
-                <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
-                  {c > 0 ? c : "\u00a0"}
+      <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
+        <div className="conci-datepicker-centered">
+          <DatePicker
+            inline
+            selectsRange
+            allowSameDay
+            swapRange
+            shouldCloseOnSelect={false}
+            openToDate={defaultActive}
+            startDate={rangeDraft[0]}
+            endDate={rangeDraft[1]}
+            onChange={(upd: [Date | null, Date | null]) => {
+              if (busy) return;
+              setRangeDraft(upd ?? [null, null]);
+              const [start, end] = upd ?? [null, null];
+              if (start != null && end != null) {
+                const ordered =
+                  localDayTime(start) <= localDayTime(end)
+                    ? { s: start, e: end }
+                    : { s: end, e: start };
+                cast(formatLocalIsoRangeVote(ordered.s, ordered.e));
+              }
+            }}
+            minDate={minNav}
+            maxDate={maxNav}
+            calendarStartDay={0}
+            calendarClassName="conci-datepicker-calendar"
+            wrapperClassName="conci-datepicker-wrapper"
+            renderCustomHeader={(p) => <RangePickerHeader {...p} />}
+            renderCustomDayName={({ shortName }) => (
+              <abbr className="conci-datepicker-week-abbr" title={shortName}>
+                {shortName.charAt(0)}
+              </abbr>
+            )}
+            dayClassName={(d: Date) => {
+              const parts: string[] = [];
+              if (dayInHostRange(d)) parts.push("conci-datepicker-day--host-range");
+              if (votesCoveringCalendarDay(d, tally, y0) > 0) parts.push("conci-datepicker-day--votes");
+              if (dayMatchesMine(d)) parts.push("conci-datepicker-day--mine");
+              return parts.join(" ");
+            }}
+            renderDayContents={(day: number, date?: Date) => {
+              if (!date) return <span>{day}</span>;
+              const c = votesCoveringCalendarDay(date, tally, y0);
+              return (
+                <span className="conci-datepicker-day-inner">
+                  <span className="conci-datepicker-day-num">{day}</span>
+                  <span className="conci-datepicker-day-votes" aria-hidden={c === 0}>
+                    {c > 0 ? c : "\u00a0"}
+                  </span>
                 </span>
-              </span>
-            );
-          }}
-        />
+              );
+            }}
+          />
+        </div>
+
         {rangeSummaries.length > 0 ? (
           <ul className="conci-datepicker-range-totals mt-4 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
             {rangeSummaries.map(({ key, label, votes: v }) => (
@@ -184,7 +251,9 @@ export function DatesVoteCalendar({
       ) : null}
 
       {parsed.length === 0 && unmapped.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-neutral-400">No date suggestions on the ballot — pick any day on the calendar.</p>
+        <p className="text-sm text-slate-600 dark:text-neutral-400">
+          No date suggestions on the ballot — pick any range on the calendar.
+        </p>
       ) : null}
 
       <ul className="sr-only" aria-label="Vote totals">

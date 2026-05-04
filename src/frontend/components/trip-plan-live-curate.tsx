@@ -305,8 +305,8 @@ export function CuratedRestaurantsSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Restaurants (live)</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-        Curate cards: add picks to your trip, swipe away or dismiss what you won&apos;t book. OpenTable on RapidAPI; dinner vote
-        cards still merge these rows when a venue poll is open.
+        Curate cards: add picks to your trip, swipe away or dismiss what you won&apos;t book. Suggestions come from Google
+        Places Text Search (group vote food hints per query).
       </p>
       {liveLoading ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
@@ -359,7 +359,7 @@ export function CuratedRestaurantsSection({
                     className="mt-3 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {r.reserveCtaLabel ?? "Reserve on OpenTable"}
+                    {r.reserveCtaLabel ?? "Open in Maps"}
                   </a>
                 </div>
               </SwipeableLiveCard>

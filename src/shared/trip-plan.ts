@@ -285,7 +285,7 @@ export function applyDatesSlotToPlan(plan: TripPlan, datesSlotText: string): Tri
 }
 
 /**
- * Busts live recommendation caches and triggers client refetch when inputs to Serp/OpenTable/etc. change.
+ * Busts live recommendation caches and triggers client refetch when inputs to live APIs change.
  * Intentionally excludes title / nextStep / openDecisions so cosmetic copy edits do not wipe picks.
  */
 export function tripLiveRecommendationsContextFingerprint(plan: TripPlan): string {

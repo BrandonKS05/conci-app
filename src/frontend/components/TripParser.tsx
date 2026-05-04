@@ -659,7 +659,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       setPrefetchingSlots(true);
       setError(null);
       const locHint = (slots.location || "").trim();
-      const placeSearchText = [nameTrim, text].filter(Boolean).join("\n\n");
+      // Venue detection runs only on the trip details message — not the trip title. Titles like
+      // "Visit Miami" or "Try Chicago" would otherwise match place-candidate triggers and show bogus cards.
+      const placeSearchText = text.trim();
       try {
         const [placeJson, plan] = await Promise.all([
           fetch("/api/places/preview", {

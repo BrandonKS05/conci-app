@@ -45,7 +45,7 @@ export function BookingChecklist({
     `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`;
 
   const flightsUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights to ${city}`)}`;
-  const diningUrl = `https://www.opentable.com/s?term=${encodeURIComponent(city)}`;
+  const diningUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`restaurants ${city}`)}`;
 
   const toggle = useCallback(
     async (task: BookingTaskKey, nextBooked: boolean) => {

@@ -904,7 +904,7 @@ function DecisionCard({
                           rel="noopener noreferrer"
                           className="inline-flex justify-center rounded-lg border border-rose-200 bg-white px-3 py-2 text-center text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-elevated dark:text-rose-300 dark:hover:bg-dm-page"
                         >
-                          {r.reserveCtaLabel ?? "Reserve on OpenTable"}
+                          {r.reserveCtaLabel ?? "Open in Maps"}
                         </a>
                         <button
                           type="button"

@@ -10,10 +10,10 @@ export type RestaurantPick = {
   ratingDisplay: string;
   /** Typical spend at this tier */
   priceRange: string;
+  /** Listing link (historical field name — usually Google Maps). */
   openTableUrl: string;
-  /** When live APIs fill this in (e.g. Italian, Seafood). */
+  /** When live APIs fill this in (e.g. editorial snippet). */
   cuisineType?: string;
-  /** Button label — default "Reserve on OpenTable"; Yelp fallback uses "View on Yelp". */
   reserveCtaLabel?: string;
 };
 
@@ -51,10 +51,7 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
     const bump = seed % 8;
     const rating = `${(4 + bump / 10).toFixed(1)} · diner rating`;
     const priceRange = priceBands[idx % priceBands.length]!;
-    const q = new URLSearchParams();
-    q.set("name", name);
-    q.set("location", city);
-    const openTableUrl = `https://www.opentable.com/s?${q.toString()}`;
+    const openTableUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${city}`)}`;
     const id = `eat-${idx}`;
 
     return {
@@ -68,17 +65,20 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
   });
 }
 
-/** Overlay live API rows onto seeded venue cards; preserves vote ids (`eat-0`…). */
+/** Overlay live API rows onto seeded venue cards; preserves vote ids (`eat-0`…). Uses first Places hit per hint (`eat-{i}-0`). */
 export function mergeLiveRestaurantsOntoHints(
   base: RestaurantPick[],
   live: RestaurantPick[] | null | undefined
 ): RestaurantPick[] {
   if (!live?.length || !base.length) return base;
   return base.map((b, i) => {
-    const L = live[i];
+    const L =
+      live.find((x) => x.id === `eat-${i}-0`) ??
+      live.find((x) => x.id.startsWith(`eat-${i}-`));
     if (!L) return b;
     return {
       ...b,
+      id: b.id,
       name: L.name,
       neighborhood: L.neighborhood,
       ratingDisplay: L.ratingDisplay,

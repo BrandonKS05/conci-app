@@ -6,7 +6,23 @@ export function hasPlaceCandidates(userText: string, locationHint?: string | nul
   return extractPlaceCandidates(userText, locationHint).length > 0;
 }
 
+/** Whole message is only “(plan) a trip to &lt;destination&gt;” style — not a named venue request. */
+function isGenericTripDestinationOnly(text: string): boolean {
+  const main = text.replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
+  if (!main) return false;
+  if (
+    /\b(?:at|@|from|visit|try|eat at|dinner at|lunch at|brunch at|breakfast at|staying at|stay at|book(?:ed)?|reservation at|check out|hit up|swing by)\b/i.test(
+      main
+    )
+  ) {
+    return false;
+  }
+  return /^(?:plan(?:ning)?\s+)?(?:a\s+)?trip\s+to\s+.+/i.test(main);
+}
+
 export function extractPlaceCandidates(userText: string, locationHint?: string | null): string[] {
+  if (isGenericTripDestinationOnly(userText)) return [];
+
   const out: string[] = [];
   const seen = new Set<string>();
 
