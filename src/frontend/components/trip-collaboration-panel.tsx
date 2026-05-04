@@ -1342,12 +1342,17 @@ function DecisionCard({
     const datesVoteYear = inferDefaultYearFromDateOptions(opts, new Date().getFullYear());
     const singleLineConcrete =
       opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, datesVoteYear);
-    const vagueOnlyMemberBallot = !isHost && opts.length === 1 && !singleLineConcrete;
+    /** Single non-concrete host line (“Late July”, “TBD”) — hide chip voting; calendar is the ballot. */
+    const singleVagueBallotOnly = opts.length === 1 && !singleLineConcrete;
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+        <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+          Date availability is required for this trip — confirm the host&apos;s dates or choose a range on the calendar. You
+          can&apos;t skip this step.
+        </p>
         <div className="mt-4">
-          {!isHost && singleLineConcrete ? (
+          {singleLineConcrete ? (
             <DatesSingleProposalMemberVote
               decisionKey={meta.key}
               options={opts}
@@ -1368,7 +1373,7 @@ function DecisionCard({
               quorum={quorum}
               voterN={voterN}
               onVote={onVote}
-              hideUnmappedBallotChips={vagueOnlyMemberBallot}
+              hideUnmappedBallotChips={singleVagueBallotOnly}
             />
           )}
         </div>
