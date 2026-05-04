@@ -116,8 +116,7 @@ export default async function SavedTripPlanPage({
   return (
     <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">
       <SiteShell title={plan.title || "Trip plan"} eyebrow="Your trip" tripTypography>
-        {/* Reserve viewport space for fixed Group Progress sidebar on lg+ */}
-        <div className="mx-auto w-full max-w-xl space-y-6 lg:pr-80">
+        <div className="mx-auto w-full max-w-xl space-y-6">
           <div className="flex items-center justify-between gap-3">
             <TripDepositTracker tripId={id} />
             <TripContributeButton tripId={id} />

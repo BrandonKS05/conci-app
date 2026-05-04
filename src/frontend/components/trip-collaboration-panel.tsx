@@ -392,7 +392,7 @@ export function TripCollaborationPanel({
   }, [isHost, plan.dates.confirmed, plan.dates.options.length, tripId, onPlanUpdated, load]);
 
   const renderGroupProgressCard = () => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:shadow-[0_22px_55px_rgba(15,23,42,0.14)] lg:ring-1 lg:ring-slate-200/60 dark:lg:shadow-[0_26px_70px_rgba(0,0,0,0.42)] dark:lg:ring-white/10">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Group progress</p>
         <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
@@ -546,25 +546,7 @@ export function TripCollaborationPanel({
         </p>
       ) : null}
 
-      {!showReady ? (
-        <>
-          <div className="relative z-10 lg:hidden">{renderGroupProgressCard()}</div>
-          {/* Full-viewport positioning shell avoids narrow layout ancestors shrinking a fixed aside */}
-          <aside
-            aria-label="Group progress"
-            className="pointer-events-none fixed inset-x-0 top-0 z-[35] hidden h-0 overflow-visible lg:block"
-          >
-            <div
-              className="pointer-events-auto absolute top-[50vh] max-h-[min(85vh,40rem)] w-80 max-w-[calc(100vw_-_2rem)] -translate-y-1/2 overflow-y-auto overscroll-contain"
-              style={{
-                right: "max(1rem, env(safe-area-inset-right, 0px))",
-              }}
-            >
-              {renderGroupProgressCard()}
-            </div>
-          </aside>
-        </>
-      ) : null}
+      {!showReady ? <div className="relative z-10">{renderGroupProgressCard()}</div> : null}
 
       {showReady && tripStatus === "finalized" ? (
         <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-white p-8 text-center shadow-lg dark:border-emerald-700/40 dark:from-emerald-950/50 dark:to-dm-card dark:shadow-black/30">
