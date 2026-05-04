@@ -1,10 +1,28 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { LiveExperienceCard, TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { RestaurantPick } from "@/shared/restaurants";
 import type { TripPlan } from "@/shared/trip-plan";
 import { tripLiveRecommendationsContextFingerprint } from "@/shared/trip-plan";
+
+function SuggestionThumb({ src, label }: { src?: string | null; label: string }) {
+  return (
+    <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-white/5">
+      {src?.trim() ? (
+        <Image src={src.trim()} alt={label} fill className="object-cover" sizes="72px" unoptimized />
+      ) : (
+        <div
+          className="flex h-full w-full items-center justify-center bg-slate-200/60 px-1 text-center text-[10px] font-medium leading-tight text-slate-500 dark:bg-white/10 dark:text-neutral-400"
+          aria-hidden
+        >
+          No photo
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -112,21 +130,24 @@ export function HostSetupAddPlacesModal({
                     topRestaurants.map((r) => (
                       <li
                         key={r.id}
-                        className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
                       >
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-neutral-100">{r.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-neutral-400">
-                            {r.neighborhood} · {r.ratingDisplay} · {r.priceRange}
-                          </p>
+                        <SuggestionThumb src={r.coverPhotoUrl} label={r.name} />
+                        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 dark:text-neutral-100">{r.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-neutral-400">
+                              {r.neighborhood} · {r.ratingDisplay} · {r.priceRange}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-violet-500"
+                            onClick={() => onAddRestaurant(r)}
+                          >
+                            Add meal
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500"
-                          onClick={() => onAddRestaurant(r)}
-                        >
-                          Add meal
-                        </button>
                       </li>
                     ))
                   )}
@@ -147,21 +168,24 @@ export function HostSetupAddPlacesModal({
                     topExperiences.map((x, i) => (
                       <li
                         key={`${x.bookingUrl}-${i}`}
-                        className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
                       >
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-neutral-100">{x.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-neutral-400">
-                            {x.duration} · {x.rating} · {x.pricePerPerson}
-                          </p>
+                        <SuggestionThumb src={x.coverPhotoUrl} label={x.name} />
+                        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 dark:text-neutral-100">{x.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-neutral-400">
+                              {x.duration} · {x.rating} · {x.pricePerPerson}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 font-sans text-xs font-medium text-white hover:bg-violet-500"
+                            onClick={() => onAddExperience(x)}
+                          >
+                            Add activity
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500"
-                          onClick={() => onAddExperience(x)}
-                        >
-                          Add activity
-                        </button>
                       </li>
                     ))
                   )}

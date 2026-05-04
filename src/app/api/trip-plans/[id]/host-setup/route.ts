@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
-import { normalizePlan, parseHostSetup, type HostSetupState } from "@/shared/trip-plan";
+import {
+  normalizePlan,
+  parseHostSetup,
+  planRecordWithDatesSyncedToTripRange,
+  type HostSetupState,
+} from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
 type HostSetupPatch = Partial<HostSetupState>;
@@ -70,10 +75,16 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   const planObj = typeof row.plan === "object" && row.plan !== null ? (row.plan as Record<string, unknown>) : {};
   const mergedSetup = mergeHostSetupPatch(planObj.hostSetup, body.hostSetup);
-  const nextPlan = normalizePlan({
+
+  let planMerged: Record<string, unknown> = {
     ...planObj,
     hostSetup: mergedSetup,
-  });
+  };
+  if (body.hostSetup.tripRange !== undefined) {
+    planMerged = planRecordWithDatesSyncedToTripRange(planMerged, mergedSetup.tripRange);
+  }
+
+  const nextPlan = normalizePlan(planMerged);
 
   const { error: upErr } = await svc
     .from("trip_plans")

@@ -5,8 +5,10 @@ import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import {
   applyTripPlanChatPatch,
+  enumerateLocalIsoDays,
   normalizePlan,
   parseHostSetup,
+  planRecordWithDatesSyncedToTripRange,
   safeParseJson,
   type HostSetupState,
   type TripPlan,
@@ -37,6 +39,8 @@ const NAV_IDS = new Set([
 ]);
 
 const SYSTEM = (year: number) => `You are the host's setup copilot for a draft trip in the Conci app. The host is on a single-page checklist (calendar, hotel, food pins, experiences checkbox, budget display).
+
+**Trip dates (critical):** The only source of truth for "which calendar days exist" is **Host trip range** and **Trip calendar days** in the user message. If those are set, **ignore** older months or date ranges mentioned in "Planner dates slot" — that field is from the first chat parse and is often stale after the host moves the trip on the calendar. Never assign meal pins or reservations to ISO dates outside **Trip calendar days**.
 
 Return ONLY valid JSON (no markdown) with this exact shape:
 {
@@ -129,21 +133,35 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const hs = plan.hostSetup;
   const tr = hs?.tripRange;
+  const hasTr = Boolean(tr?.startIso && tr?.endIso);
+  let calendarDaysLine = "";
+  if (hasTr && tr) {
+    const days = enumerateLocalIsoDays(tr.startIso, tr.endIso);
+    if (days.length > 0 && days.length <= 62) {
+      calendarDaysLine = `Trip calendar days (ONLY valid yyyy-mm-dd for reservations / pins; do not use any other dates): ${days.join(", ")}`;
+    } else if (days.length > 62) {
+      calendarDaysLine = `Trip calendar: ${days.length} days from ${tr.startIso} through ${tr.endIso} (inclusive). Every pin dateIso must fall in this window.`;
+    }
+  }
+
   const contextBlock = [
     `Trip title: ${plan.title}`,
     `Destination: ${plan.location ?? ""}`,
     `Departure city: ${plan.departureCity ?? ""}`,
-    `Dates slot (options): ${(plan.dates?.options ?? []).join(" | ") || "none"}`,
+    hasTr && tr ? `Host trip range (source of truth): ${tr.startIso} → ${tr.endIso}` : `Host trip range: not set`,
+    calendarDaysLine,
     `Budget tier: ${plan.budget.tier ?? ""} perPerson: ${plan.budget.perPerson ?? ""}`,
     `Vibe: ${plan.vibe.join(", ") || "none"}`,
-    `Host trip range: ${tr?.startIso && tr?.endIso ? `${tr.startIso} → ${tr.endIso}` : "not set"}`,
     `Hotel saved: ${hs?.hotel?.name ?? "none"}`,
     `Experiences outlined checkbox: ${hs?.experiencesOutlined === true ? "yes" : "no"}`,
     `Restaurant pins: ${(hs?.restaurantPins ?? []).length}`,
     `Activity pins: ${(hs?.activityPins ?? []).length}`,
+    `Planner dates slot (may be outdated after host changed calendar — use Host trip range first): ${(plan.dates?.options ?? []).join(" | ") || "none"}`,
     "",
     `Host message:\n${message}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   if (apiKey) {
     try {
@@ -228,10 +246,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
   if (hostSetupPatch !== undefined) {
     const mergedSetup = mergeHostSetupPatch(nextPlan.hostSetup, hostSetupPatch);
-    nextPlan = normalizePlan({
+    let planRecord: Record<string, unknown> = {
       ...(nextPlan as unknown as Record<string, unknown>),
       hostSetup: mergedSetup,
-    });
+    };
+    if (hostSetupPatch.tripRange !== undefined) {
+      planRecord = planRecordWithDatesSyncedToTripRange(planRecord, mergedSetup.tripRange);
+    }
+    nextPlan = normalizePlan(planRecord);
   }
 
   const changed =

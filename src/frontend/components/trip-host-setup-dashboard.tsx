@@ -109,14 +109,6 @@ function ChevRight({ className }: { className?: string }) {
   );
 }
 
-function ChevDownSm({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
-      <path d="M4.427 6.073a.75.75 0 001.054 0L8 3.554l2.519 2.519a.75.75 0 001.065-1.06l-3.049-3.05a1.501 1.501 0 00-2.122 0L3.362 5.013a.75.75 0 000 1.06z" />
-    </svg>
-  );
-}
-
 export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
@@ -490,12 +482,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const cells = useMemo(() => calendarCellsMondayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
 
-  const jumpToToday = useCallback(() => {
-    const now = new Date();
-    setCalYear(now.getFullYear());
-    setCalMonth(now.getMonth());
-  }, []);
-
   const isCalendarToday = useCallback(
     (dom: number): boolean => {
       const now = new Date();
@@ -611,7 +597,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
 
       <div className="min-w-0 flex-1 space-y-10 lg:min-w-0">
         <section id="sec-dates" className="scroll-mt-28">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
               <p className="max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
                 {datePickMode === "range"
@@ -631,29 +617,31 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 </p>
               ) : null}
             </div>
-            {hostHasConcreteTripRange(plan) ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setDatePickMode("range");
-                  setRangeAnchor(null);
-                  setSelectedDayIso(null);
-                  setAddPlacesOpen(false);
-                  setPendingRangeConfirm(null);
-                }}
-                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
-              >
-                Change dates
-              </button>
-            ) : null}
           </div>
 
           <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-none">
             {/* Header — toolbar like reference */}
             <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:py-4">
-              <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-xl">
-                {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
-              </h3>
+              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-xl">
+                  {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
+                </h3>
+                {hostHasConcreteTripRange(plan) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDatePickMode("range");
+                      setRangeAnchor(null);
+                      setSelectedDayIso(null);
+                      setAddPlacesOpen(false);
+                      setPendingRangeConfirm(null);
+                    }}
+                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+                  >
+                    Change dates
+                  </button>
+                ) : null}
+              </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <button
                   type="button"
@@ -673,13 +661,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 </button>
                 <button
                   type="button"
-                  onClick={() => jumpToToday()}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 sm:text-sm dark:text-neutral-200 dark:hover:bg-dm-elevated"
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
                   aria-label="Next month"
                   onClick={() =>
                     setCalMonth((m) => {
@@ -694,10 +675,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
-                <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 sm:text-sm dark:border-white/10 dark:bg-dm-page dark:text-neutral-300">
-                  Month view
-                  <ChevDownSm className="h-3.5 w-3.5 text-slate-400 dark:text-neutral-500" />
-                </div>
                 <button
                   type="button"
                   disabled={!pubReady || publishBusy}
@@ -793,19 +770,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                   Meal
                                 </span>
                               </div>
-                              <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
-                                {p.kept ? (
-                                  <button
-                                    type="button"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      togglePin(p.dateIso, p.place.mapsUrl, false);
-                                    }}
-                                    className="max-w-full truncate rounded-md border border-slate-200/90 bg-white px-2.5 py-1.5 text-center text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-sm dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-white/10"
-                                  >
-                                    Remove
-                                  </button>
-                                ) : (
+                              {!p.kept ? (
+                                <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
                                   <button
                                     type="button"
                                     onClick={(ev) => {
@@ -816,8 +782,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                   >
                                     Add
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              ) : null}
                             </div>
                           ))}
 
@@ -831,19 +797,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                   Activity
                                 </span>
                               </div>
-                              <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
-                                {p.kept ? (
-                                  <button
-                                    type="button"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      toggleActivityPin(p.dateIso, p.experience.bookingUrl, false);
-                                    }}
-                                    className="max-w-full truncate rounded-md border border-slate-200/90 bg-white px-2.5 py-1.5 text-center text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:text-sm dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-white/10"
-                                  >
-                                    Remove
-                                  </button>
-                                ) : (
+                              {!p.kept ? (
+                                <div className="mt-1.5 flex w-full min-w-0 justify-center px-0.5">
                                   <button
                                     type="button"
                                     onClick={(ev) => {
@@ -854,8 +809,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                   >
                                     Add
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              ) : null}
                             </div>
                           ))}
 

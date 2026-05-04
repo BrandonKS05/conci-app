@@ -579,6 +579,33 @@ export function normalizePlan(value: unknown): TripPlan {
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * After saving `hostSetup.tripRange`, set `dates.options` to a single ISO range string so AI/collab
+ * context matches the host calendar (avoids stale May/June from the original parser).
+ */
+export function planRecordWithDatesSyncedToTripRange(
+  plan: Record<string, unknown>,
+  tripRange: unknown
+): Record<string, unknown> {
+  if (tripRange === null) return plan;
+  if (!tripRange || typeof tripRange !== "object") return plan;
+  const o = tripRange as Record<string, unknown>;
+  const startIso = typeof o.startIso === "string" ? o.startIso : "";
+  const endIso = typeof o.endIso === "string" ? o.endIso : "";
+  if (!ISO_DAY.test(startIso) || !ISO_DAY.test(endIso)) return plan;
+  const prevDates =
+    plan.dates && typeof plan.dates === "object" && !Array.isArray(plan.dates)
+      ? (plan.dates as Record<string, unknown>)
+      : {};
+  return {
+    ...plan,
+    dates: {
+      ...prevDates,
+      options: [`${startIso} to ${endIso}`],
+    },
+  };
+}
+
+/**
  * First calendar range from `plan.dates.options` only when options use explicit days
  * (ISO, slash ranges, “May 4–15, 2026”, etc.). Returns null for vague text that only
  * matches the loose `Date` fallback — so the host calendar won’t pre-highlight fuzzy ranges.

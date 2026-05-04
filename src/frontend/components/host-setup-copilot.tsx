@@ -72,41 +72,41 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <div className="border-b border-slate-200 px-3 py-2.5 dark:border-white/10">
+      <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
           Setup copilot
         </p>
-        <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-neutral-500">
+        <p className="mt-1 text-xs leading-snug text-slate-500 dark:text-neutral-500">
           AI assistant for this draft — edits save automatically when possible.
         </p>
       </div>
       <div
-        className="max-h-[min(220px,40vh)] space-y-2 overflow-y-auto px-3 py-2.5 text-sm"
+        className="max-h-[min(360px,52vh)] space-y-2.5 overflow-y-auto px-4 py-3 text-sm"
         aria-live="polite"
       >
         {messages.map((msg, i) => (
           <div
             key={`${i}-${msg.role}`}
             className={[
-              "rounded-lg px-2.5 py-2 text-[13px] leading-relaxed",
+              "rounded-lg px-3 py-2.5 text-sm leading-relaxed",
               msg.role === "user"
-                ? "ml-4 bg-violet-100 text-slate-900 dark:bg-violet-950/50 dark:text-neutral-100"
-                : "mr-2 bg-slate-50 text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
+                ? "ml-3 bg-violet-100 text-slate-900 dark:bg-violet-950/50 dark:text-neutral-100"
+                : "mr-1 bg-slate-50 text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
             ].join(" ")}
           >
             {msg.text}
           </div>
         ))}
         {loading ? (
-          <div className="mr-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[13px] text-slate-500 dark:bg-dm-elevated dark:text-neutral-400">
+          <div className="mr-1 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-500 dark:bg-dm-elevated dark:text-neutral-400">
             Thinking…
           </div>
         ) : null}
         <div ref={endRef} />
       </div>
-      <div className="border-t border-slate-200 p-2 dark:border-white/10">
+      <div className="border-t border-slate-200 p-3 dark:border-white/10">
         <textarea
-          rows={2}
+          rows={3}
           value={input}
           disabled={loading}
           onChange={(e) => setInput(e.target.value)}
@@ -117,13 +117,13 @@ export function HostSetupCopilot({ tripId, onResult }: Props) {
             }
           }}
           placeholder="e.g. Set trip to June 12–18, mid-range budget…"
-          className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+          className="mb-2.5 w-full min-h-[5.25rem] resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
         />
         <button
           type="button"
           disabled={loading || !input.trim()}
           onClick={() => void send()}
-          className="w-full rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-neutral-700"
+          className="w-full rounded-lg bg-violet-600 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-neutral-700"
         >
           {loading ? "Sending…" : "Send"}
         </button>
