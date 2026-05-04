@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import TripParser from "@/frontend/components/TripParser";
-import { JoinTripByCodeSection } from "@/frontend/components/join-trip-by-code-section";
+import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
 import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { PRIMARY_APP_NAV } from "@/shared/app-nav";
@@ -47,9 +46,7 @@ export default function TripParserPage() {
       </header>
       <main className="mx-auto max-w-3xl px-4 pb-20 pt-2 sm:px-6 sm:pt-4">
         <TripParser />
-        <Suspense fallback={<div className="mt-14 h-32 rounded-2xl border border-dashed border-slate-200 dark:border-white/10" aria-hidden />}>
-          <JoinTripByCodeSection />
-        </Suspense>
+        <TripParserJoinCta />
       </main>
     </div>
   );

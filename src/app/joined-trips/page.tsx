@@ -114,8 +114,8 @@ export default async function JoinedTripsPage() {
           <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
             <p className="font-display text-lg font-semibold text-slate-900 dark:text-white">No joined trips yet</p>
             <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">Use a code from your host to join.</p>
-            <Link href="/trip-parser?join=1" className={`mt-6 ${primaryFormButtonClass}`}>
-              Join a trip
+            <Link href="/trip-parser" className={`mt-6 ${primaryFormButtonClass}`}>
+              Create a Trip
             </Link>
           </div>
         )}

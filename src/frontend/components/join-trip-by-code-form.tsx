@@ -1,25 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 
-/**
- * Invite-code join form, embedded below Create a Trip (AI parser) on `/trip-parser`.
- * Anchor: `#join-trip`. Query `?join=1` scrolls into view after redirect from legacy `/join`.
- */
-export function JoinTripByCodeSection() {
+export function JoinTripByCodeForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sectionRef = useRef<HTMLElement>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (searchParams.get("join") !== "1") return;
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [searchParams]);
 
   const onSubmit = useCallback(
     async (e: FormEvent) => {
@@ -50,18 +39,10 @@ export function JoinTripByCodeSection() {
   );
 
   return (
-    <section
-      ref={sectionRef}
-      id="join-trip"
-      className="mt-14 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card sm:p-8"
-      aria-labelledby="join-trip-heading"
-    >
-      <h2
-        id="join-trip-heading"
-        className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white"
-      >
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card sm:p-8">
+      <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
         Join a trip
-      </h2>
+      </h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
         Have an invite code from your host? Enter it here. You need to be signed in — we&apos;ll link this trip to your
         account.
@@ -69,13 +50,13 @@ export function JoinTripByCodeSection() {
       <form onSubmit={(ev) => void onSubmit(ev)} className="mt-6 space-y-4">
         <div>
           <label
-            htmlFor="join-code-embedded"
+            htmlFor="join-code"
             className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500"
           >
             Invite code
           </label>
           <input
-            id="join-code-embedded"
+            id="join-code"
             name="code"
             type="text"
             autoComplete="off"
@@ -95,6 +76,6 @@ export function JoinTripByCodeSection() {
           {busy ? "Joining…" : "Join trip"}
         </button>
       </form>
-    </section>
+    </div>
   );
 }

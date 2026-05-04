@@ -178,7 +178,7 @@ export default function HomePage() {
               </span>
               <span className="font-display font-semibold text-zinc-800 dark:text-white">Conci</span>
             </div>
-            <Link href="/trip-parser?join=1" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href="/trip-parser" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
               Join a Trip
             </Link>
           </div>

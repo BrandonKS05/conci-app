@@ -133,7 +133,7 @@ function PricingContent() {
               ))}
             </ul>
             <Link
-              href="/trip-parser?join=1"
+              href="/trip-parser"
               className={`mt-8 block w-full text-center ${primaryFormButtonClass}`}
             >
               Get started
