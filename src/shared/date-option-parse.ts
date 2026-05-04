@@ -61,6 +61,58 @@ function ymd(y: number, m: number, d: number): Date {
   return startOfLocalDay(new Date(y, m, d, 12, 0, 0, 0));
 }
 
+function daysInCalendarMonth(year: number, monthIndex0: number): number {
+  return new Date(year, monthIndex0 + 1, 0).getDate();
+}
+
+/** Longest token first so `september` wins over `sep`. */
+const MONTH_NAME_KEYS_BY_LENGTH = Object.keys(MONTH).sort((a, b) => b.length - a.length);
+
+/**
+ * Vague host/phrasing: "late July", "mid June", "early August", "sometime in September", or a bare month.
+ * Does not match season-only strings (no month word).
+ */
+export function parseVagueMonthQualifierToRange(
+  raw: string,
+  defaultYear: number
+): { start: Date; end: Date } | null {
+  const s = normalizeDashes(raw);
+  if (!s || /^TBD\b/i.test(s)) return null;
+
+  let y = defaultYear;
+  const yMatch = s.match(/\b(20[0-9]{2})\b/);
+  if (yMatch) y = parseInt(yMatch[1]!, 10);
+
+  let bestPos = Infinity;
+  let monthIdx: number | null = null;
+  for (const key of MONTH_NAME_KEYS_BY_LENGTH) {
+    const re = new RegExp(`\\b${key}\\b`, "i");
+    const m = s.match(re);
+    if (m?.index !== undefined && m.index < bestPos) {
+      bestPos = m.index;
+      monthIdx = MONTH[key]!;
+    }
+  }
+  if (monthIdx === null) return null;
+
+  const dim = daysInCalendarMonth(y, monthIdx);
+
+  if (/\b(early|beginning of|start of)\b/i.test(s)) {
+    return { start: ymd(y, monthIdx, 1), end: ymd(y, monthIdx, Math.min(10, dim)) };
+  }
+  if (/\b(mid|middle of)\b/i.test(s)) {
+    return { start: ymd(y, monthIdx, 10), end: ymd(y, monthIdx, Math.min(20, dim)) };
+  }
+  if (/\b(late|end of)\b/i.test(s)) {
+    return { start: ymd(y, monthIdx, 20), end: ymd(y, monthIdx, dim) };
+  }
+  if (/\bsometime\s+in\b/i.test(s)) {
+    return { start: ymd(y, monthIdx, 1), end: ymd(y, monthIdx, dim) };
+  }
+
+  return { start: ymd(y, monthIdx, 1), end: ymd(y, monthIdx, dim) };
+}
+
 /**
  * Prefer an explicit 4-digit year from any option; otherwise use `fallbackYear` (e.g. current year).
  */
@@ -103,6 +155,8 @@ export function parseDateOptionToRange(opt: string, defaultYear: number): { star
     const one = startOfLocalDay(native);
     return { start: one, end: one };
   }
+  const vague = parseVagueMonthQualifierToRange(raw, defaultYear);
+  if (vague) return vague;
   return null;
 }
 
@@ -205,7 +259,7 @@ export function buildParsedDateOptions(opts: string[], fallbackYear: number): Pa
   return out;
 }
 
-/** True when the ballot line maps to an actual calendar range/day (not fuzzy text like “Late July”). */
+/** True when the ballot line maps to an actual calendar range/day (includes vague month phrases like “late July”). */
 export function isParsableConcreteDateBallotLine(option: string, fallbackYear: number): boolean {
   return parseDateOptionToRange(option.trim(), fallbackYear) !== null;
 }
@@ -443,10 +497,53 @@ export function inferCalendarOpenDateFromDateOptions(opts: string[], fallbackYea
   const y0 = inferDefaultYearFromDateOptions(opts, fallbackYear);
   const loose: Date[] = [];
   for (const o of opts) loose.push(...extractLooseCalendarAnchorsFromText(o, y0));
-  if (loose.length === 0) return startOfLocalDay(new Date());
+  if (loose.length === 0) {
+    const ym = inferYearMonthFromDateOptionsHints(opts, fallbackYear);
+    if (ym) {
+      return startOfLocalDay(new Date(ym.year, ym.month, 1, 12, 0, 0, 0));
+    }
+    return startOfLocalDay(new Date());
+  }
 
   loose.sort((a, b) => localDayTime(a) - localDayTime(b));
   return startOfLocalDay(loose[0]!);
+}
+
+/**
+ * Year + month (0–11) to open a calendar on when there is no ISO trip range yet.
+ * Uses parsed ranges, vague month phrases, then seasons / quarters / loose month tokens.
+ */
+export function inferYearMonthFromDateOptionsHints(
+  opts: string[],
+  fallbackYear: number
+): { year: number; month: number } | null {
+  if (!opts.length) return null;
+  const y0 = inferDefaultYearFromDateOptions(opts, fallbackYear);
+  for (const o of opts) {
+    const t = typeof o === "string" ? o.trim() : "";
+    if (!t) continue;
+    const r = parseDateOptionToRange(t, y0);
+    if (r) return { year: r.start.getFullYear(), month: r.start.getMonth() };
+  }
+  const joined = opts.map((o) => String(o).trim()).filter(Boolean).join("; ");
+  if (joined) {
+    const rj = parseDateOptionToRange(joined, y0);
+    if (rj) return { year: rj.start.getFullYear(), month: rj.start.getMonth() };
+  }
+  const spaceJoined = opts.join(" ");
+  if (spaceJoined && spaceJoined !== joined) {
+    const rs = parseDateOptionToRange(spaceJoined, y0);
+    if (rs) return { year: rs.start.getFullYear(), month: rs.start.getMonth() };
+  }
+
+  const anchors: Date[] = [];
+  for (const o of opts) anchors.push(...extractLooseCalendarAnchorsFromText(o, y0));
+  if (anchors.length > 0) {
+    anchors.sort((a, b) => localDayTime(a) - localDayTime(b));
+    const a = anchors[0]!;
+    return { year: a.getFullYear(), month: a.getMonth() };
+  }
+  return null;
 }
 
 export function earliestParsedDay(parsed: ParsedDateOption[]): Date | null {

@@ -19,6 +19,8 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   if (patch.restaurantPins !== undefined) out.restaurantPins = patch.restaurantPins;
   if (patch.activityPins !== undefined) out.activityPins = patch.activityPins;
   if (patch.hotel !== undefined) out.hotel = patch.hotel;
+  if (patch.hotelStays !== undefined) out.hotelStays = patch.hotelStays;
+  if (patch.packingList !== undefined) out.packingList = patch.packingList;
   if (patch.experiencesOutlined !== undefined) out.experiencesOutlined = patch.experiencesOutlined;
   return out;
 }
@@ -48,15 +50,23 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Only the host can update setup." }, { status: 403 });
   }
 
-  let body: { hostSetup?: HostSetupPatch };
+  let body: {
+    hostSetup?: HostSetupPatch;
+    budget?: { tier?: string | null; perPerson?: string | null };
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.hostSetup || typeof body.hostSetup !== "object") {
-    return NextResponse.json({ error: "Field `hostSetup` is required." }, { status: 400 });
+  const hasHostPatch = body.hostSetup && typeof body.hostSetup === "object";
+  const hasBudgetPatch = body.budget && typeof body.budget === "object";
+  if (!hasHostPatch && !hasBudgetPatch) {
+    return NextResponse.json(
+      { error: "Provide `hostSetup` and/or `budget`." },
+      { status: 400 }
+    );
   }
 
   const { data: row, error } = await svc
@@ -74,13 +84,29 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   const planObj = typeof row.plan === "object" && row.plan !== null ? (row.plan as Record<string, unknown>) : {};
-  const mergedSetup = mergeHostSetupPatch(planObj.hostSetup, body.hostSetup);
+  const mergedSetup = hasHostPatch
+    ? mergeHostSetupPatch(planObj.hostSetup, body.hostSetup!)
+    : parseHostSetup(planObj.hostSetup) ?? {};
 
   let planMerged: Record<string, unknown> = {
     ...planObj,
     hostSetup: mergedSetup,
   };
-  if (body.hostSetup.tripRange !== undefined) {
+
+  if (hasBudgetPatch && body.budget) {
+    const pb = planObj.budget && typeof planObj.budget === "object" ? (planObj.budget as Record<string, unknown>) : {};
+    const prevTier = typeof pb.tier === "string" ? pb.tier : null;
+    const prevPP = typeof pb.perPerson === "string" ? pb.perPerson : null;
+    planMerged = {
+      ...planMerged,
+      budget: {
+        tier: body.budget.tier !== undefined ? body.budget.tier : prevTier,
+        perPerson: body.budget.perPerson !== undefined ? body.budget.perPerson : prevPP,
+      },
+    };
+  }
+
+  if (hasHostPatch && body.hostSetup!.tripRange !== undefined) {
     planMerged = planRecordWithDatesSyncedToTripRange(planMerged, mergedSetup.tripRange);
   }
 

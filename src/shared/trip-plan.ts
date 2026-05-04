@@ -67,6 +67,13 @@ export type HostActivityPin = {
   kept: boolean;
 };
 
+/** Inclusive lodging segment (host may split stays across the trip). */
+export type HostHotelStay = {
+  startIso: string;
+  endIso: string;
+  place: PlaceSpotlight;
+};
+
 /**
  * Persisted while `trip_plans.status === 'draft'`: concrete range, hotel, restaurant pins before invite is minted.
  */
@@ -75,6 +82,10 @@ export type HostSetupState = {
   restaurantPins?: HostRestaurantPin[];
   activityPins?: HostActivityPin[];
   hotel?: PlaceSpotlight | null;
+  /** Segmented stays when the trip uses more than one property (calendar pick + scope). */
+  hotelStays?: HostHotelStay[];
+  /** Host-authored packing list notes (draft). */
+  packingList?: string;
   /** Optional UX flag for completion meter only (does not gate publish). */
   experiencesOutlined?: boolean;
 };
@@ -245,12 +256,35 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
 
   const experiencesOutlined = typeof h.experiencesOutlined === "boolean" ? h.experiencesOutlined : undefined;
 
+  const staysRaw = h.hotelStays;
+  let hotelStays: HostHotelStay[] | undefined;
+  if (Array.isArray(staysRaw) && staysRaw.length) {
+    const list: HostHotelStay[] = [];
+    for (const row of staysRaw) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const startIso = typeof o.startIso === "string" ? o.startIso.trim() : "";
+      const endIso = typeof o.endIso === "string" ? o.endIso.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startIso) || !/^\d{4}-\d{2}-\d{2}$/.test(endIso)) continue;
+      const place = spotlightFromUnknown(o.place);
+      if (!place) continue;
+      if (startIso <= endIso) list.push({ startIso, endIso, place });
+    }
+    if (list.length) hotelStays = list;
+  }
+
+  const packingRaw = h.packingList;
+  const packingList =
+    typeof packingRaw === "string" ? packingRaw.slice(0, 20000) : undefined;
+
   const any =
     tripRange !== undefined ||
     restaurantPins ||
     activityPins ||
     hotel !== undefined ||
-    experiencesOutlined !== undefined;
+    experiencesOutlined !== undefined ||
+    hotelStays !== undefined ||
+    packingList !== undefined;
   if (!any) return undefined;
 
   const out: HostSetupState = {};
@@ -259,6 +293,9 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   if (activityPins) out.activityPins = activityPins;
   if (hotel !== undefined) out.hotel = hotel ?? null;
   if (experiencesOutlined !== undefined) out.experiencesOutlined = experiencesOutlined;
+  if (hotelStays !== undefined) out.hotelStays = hotelStays;
+  if (packingList !== undefined) out.packingList = packingList;
+
   return out;
 }
 
@@ -653,7 +690,41 @@ export function tripRangeBestEffortFromPlanDates(
       return { startIso, endIso };
     }
   }
+
+  const joined = plan.dates.options
+    .map((o) => (typeof o === "string" ? o.trim() : ""))
+    .filter(Boolean)
+    .join("; ");
+  if (joined) {
+    const r = parseDateOptionToRange(joined, y0);
+    if (r) {
+      const a = startOfLocalDay(r.start);
+      const b = startOfLocalDay(r.end);
+      if (localDayTime(a) <= localDayTime(b)) {
+        const spanDays = (localDayTime(b) - localDayTime(a)) / (24 * 60 * 60 * 1000);
+        if (spanDays <= MAX_TRIP_RANGE_DAYS) {
+          const startIso = formatLocalIsoDate(a);
+          const endIso = formatLocalIsoDate(b);
+          if (parseLocalIsoDate(startIso) && parseLocalIsoDate(endIso)) {
+            return { startIso, endIso };
+          }
+        }
+      }
+    }
+  }
+
   return null;
+}
+
+/**
+ * Host draft save: same as {@link tripRangeBestEffortFromPlanDates} (concrete → loose option strings
+ * → joined blob → vague month phrases). Call this when persisting `hostSetup.tripRange` for new drafts.
+ */
+export function tripRangeForHostDraftSave(
+  plan: TripPlan,
+  fallbackYear: number
+): { startIso: string; endIso: string } | null {
+  return tripRangeBestEffortFromPlanDates(plan, fallbackYear);
 }
 
 /** @deprecated Use concreteTripRangeFromPlanDates */
@@ -667,6 +738,71 @@ export function parseLocalIsoDate(iso: string): Date | null {
   if (!y || !m || !d) return null;
   const dt = startOfLocalDay(new Date(y, m - 1, d, 12, 0, 0, 0));
   return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+export function addLocalIsoDays(iso: string, deltaDays: number): string | null {
+  const d = parseLocalIsoDate(iso);
+  if (!d) return null;
+  const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + deltaDays, 12, 0, 0, 0);
+  return formatLocalIsoDate(startOfLocalDay(n));
+}
+
+/**
+ * Merge a lodging pick from the calendar into `hotelStays` and set primary `hotel` for publish UIs.
+ * - **full**: one segment for the entire trip range.
+ * - **partial**: this stay runs from `fromDayIso` through `tripEndIso`; earlier days keep existing stays (trimmed).
+ */
+export function applyHostHotelSelection(
+  existing: HostHotelStay[] | undefined,
+  tripStartIso: string,
+  tripEndIso: string,
+  fromDayIso: string,
+  place: PlaceSpotlight,
+  scope: "full" | "partial"
+): { hotelStays: HostHotelStay[]; hotel: PlaceSpotlight } {
+  if (scope === "full") {
+    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+
+  if (!ISO_DAY.test(tripStartIso) || !ISO_DAY.test(tripEndIso) || !ISO_DAY.test(fromDayIso)) {
+    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+
+  if (fromDayIso < tripStartIso || fromDayIso > tripEndIso) {
+    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+
+  const dayBefore = addLocalIsoDays(fromDayIso, -1);
+  const out: HostHotelStay[] = [];
+
+  for (const s of existing ?? []) {
+    if (!ISO_DAY.test(s.startIso) || !ISO_DAY.test(s.endIso)) continue;
+    if (s.endIso < fromDayIso) {
+      out.push(s);
+      continue;
+    }
+    if (s.startIso >= fromDayIso) {
+      continue;
+    }
+    if (s.startIso < fromDayIso && s.endIso >= fromDayIso && dayBefore && dayBefore >= s.startIso) {
+      out.push({ ...s, endIso: dayBefore });
+    }
+  }
+
+  out.push({ startIso: fromDayIso, endIso: tripEndIso, place });
+  out.sort((a, b) => a.startIso.localeCompare(b.startIso));
+  return { hotelStays: out, hotel: out[0]!.place };
+}
+
+export function hotelStayForDay(stays: HostHotelStay[] | undefined, dayIso: string): HostHotelStay | null {
+  if (!stays?.length || !ISO_DAY.test(dayIso)) return null;
+  for (const s of stays) {
+    if (dayIso >= s.startIso && dayIso <= s.endIso) return s;
+  }
+  return null;
 }
 
 /** Inclusive list of yyyy-mm-dd between start and end (invalid / wrong order → []). */
@@ -698,7 +834,9 @@ export function hostHasConcreteTripRange(plan: TripPlan): boolean {
 
 export function hostHasHotel(plan: TripPlan): boolean {
   const h = plan.hostSetup?.hotel;
-  return !!(h?.name?.trim() && h.mapsUrl?.startsWith("http"));
+  if (h?.name?.trim() && h.mapsUrl?.startsWith("http")) return true;
+  const stays = plan.hostSetup?.hotelStays ?? [];
+  return stays.some((s) => s.place?.name?.trim() && s.place.mapsUrl?.startsWith("http"));
 }
 
 export function hostHasKeptRestaurant(plan: TripPlan): boolean {
@@ -745,10 +883,16 @@ export function planAfterHostPublish(plan: TripPlan): TripPlan {
     .map((p) => experienceToSpotlight(p.experience))
     .filter((s): s is PlaceSpotlight => s != null);
   const hotel = hs?.hotel;
+  const stayPlaces =
+    hs?.hotelStays
+      ?.map((s) => s.place)
+      .filter((p) => p?.name?.trim() && p.mapsUrl.startsWith("http")) ?? [];
 
   const urls = new Set((plan.spotlights ?? []).map((s) => s.mapsUrl.trim().toLowerCase()));
   const folded: PlaceSpotlight[] = [...(plan.spotlights ?? [])];
-  if (hotel?.name && hotel.mapsUrl.startsWith("http")) {
+  if (stayPlaces.length) {
+    folded.push(...dedupeSpotlights(urls, stayPlaces));
+  } else if (hotel?.name && hotel.mapsUrl.startsWith("http")) {
     folded.push(...dedupeSpotlights(urls, [hotel]));
   }
   folded.push(...dedupeSpotlights(urls, pins.map((p) => p.place)));

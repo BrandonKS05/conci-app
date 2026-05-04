@@ -27,11 +27,13 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   if (patch.restaurantPins !== undefined) out.restaurantPins = patch.restaurantPins;
   if (patch.activityPins !== undefined) out.activityPins = patch.activityPins;
   if (patch.hotel !== undefined) out.hotel = patch.hotel;
+  if (patch.hotelStays !== undefined) out.hotelStays = patch.hotelStays;
+  if (patch.packingList !== undefined) out.packingList = patch.packingList;
   if (patch.experiencesOutlined !== undefined) out.experiencesOutlined = patch.experiencesOutlined;
   return out;
 }
 
-const NAV_IDS = new Set(["dates", "accommodation", "transport", "packing", "budget"]);
+const NAV_IDS = new Set(["dates", "budget"]);
 
 const SYSTEM = (year: number) => `You are the host's setup copilot for a draft trip in the Conci app. The host is on a single-page checklist (calendar, hotel, meal pins on calendar days, budget, and other sections).
 
@@ -63,7 +65,7 @@ Rules:
   - **dates**: update **dates.options** with short human-readable ranges when they change length or timeframe (helps the rest of the app).
   - Never include spotlights or itineraryLiveCuration. Omit **polls** unless the user explicitly asks for vote options between concrete choices.
 - **ui** (optional): guide the app UI.
-  - **scrollTo**: one of "dates" | "accommodation" | "transport" | "packing" | "budget" — set when the user asks to jump somewhere or when your edits mainly concern that section.
+  - **scrollTo**: one of "dates" | "budget" — set when the user asks to jump somewhere or when your edits mainly concern that section. (Packing list is a separate page under the trip setup URL.)
   - **suggestDatePickMode**: "range" when they should tap two days on the calendar; "day" when the trip range is already set and they should work day-by-day. If you set tripRange in hostSetupPatch, usually use "day" and **focusTripStartMonth**: true.
   - **focusTripStartMonth**: true when you set tripRange so the calendar scrolls to that month.
 

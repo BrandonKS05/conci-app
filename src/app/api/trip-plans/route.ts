@@ -8,7 +8,7 @@ import {
   normalizePlan,
   parseHostSetup,
   planHasUsableTripTiming,
-  tripRangeBestEffortFromPlanDates,
+  tripRangeForHostDraftSave,
 } from "@/shared/trip-plan";
 
 function isUuid(s: string): boolean {
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
   let planForSave = normalizedPlan;
   if (hostSetupDraft) {
-    const range = tripRangeBestEffortFromPlanDates(normalizedPlan, new Date().getFullYear());
+    const range = tripRangeForHostDraftSave(normalizedPlan, new Date().getFullYear());
     const baseHs = parseHostSetup(normalizedPlan.hostSetup) ?? {};
     if (range && !baseHs.tripRange?.startIso) {
       planForSave = normalizePlan({

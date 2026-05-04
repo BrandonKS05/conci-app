@@ -1,13 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import {
+  formatLocalIsoDate,
+  inferYearMonthFromDateOptionsHints,
+} from "@/shared/date-option-parse";
+import {
+  applyHostHotelSelection,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
   hostHasHotel,
   hostHasKeptRestaurant,
+  hotelStayForDay,
   hostSetupCompletionPercent,
   tripRangeBestEffortFromPlanDates,
   isHostPublishReady,
@@ -19,6 +25,7 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
+import { HostSetupAddHotelModal } from "@/frontend/components/host-setup-add-hotel-modal";
 import {
   HostSetupCopilot,
   type HostCopilotUiHint,
@@ -28,11 +35,8 @@ import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaur
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 
-const NAV = [
-  { id: "dates", label: "Dates" },
-  { id: "accommodation", label: "Accommodation" },
-  { id: "transport", label: "Transportation" },
-  { id: "packing", label: "Packing List" },
+const NAV_INPAGE = [
+  { id: "dates", label: "Trip calendar" },
   { id: "budget", label: "Budget" },
 ] as const;
 
@@ -112,10 +116,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
   const hostSetup = useMemo(() => plan.hostSetup ?? {}, [plan.hostSetup]);
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
-  const [hotelQuery, setHotelQuery] = useState("");
-  const [hotelHits, setHotelHits] = useState<PlaceSpotlight[]>([]);
-  const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [budgetLine, setBudgetLine] = useState(
+    () =>
+      initialPlan.budget.perPerson?.trim() ||
+      initialPlan.budget.tier?.trim() ||
+      ""
+  );
   const [err, setErr] = useState<string | null>(null);
   const [rangeAnchor, setRangeAnchor] = useState<string | null>(null);
   const [datePickMode, setDatePickMode] = useState<"range" | "day">(() =>
@@ -123,6 +130,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
+  const [addHotelOpen, setAddHotelOpen] = useState(false);
   /** Set after the second tap in range mode; saved only when the host confirms. */
   const [pendingRangeConfirm, setPendingRangeConfirm] = useState<{
     startIso: string;
@@ -140,8 +148,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
-    const d = base ?? new Date();
-    return d.getFullYear();
+    if (base) return base.getFullYear();
+    const hinted = inferYearMonthFromDateOptionsHints(initialPlan.dates.options, y0);
+    if (hinted) return hinted.year;
+    return new Date().getFullYear();
   });
   const [calMonth, setCalMonth] = useState(() => {
     const y0 = new Date().getFullYear();
@@ -149,8 +159,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
-    const d = base ?? new Date();
-    return d.getMonth();
+    if (base) return base.getMonth();
+    const hinted = inferYearMonthFromDateOptionsHints(initialPlan.dates.options, y0);
+    if (hinted) return hinted.month;
+    return new Date().getMonth();
   });
 
   /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
@@ -166,14 +178,21 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   type HostSetupPatch = Partial<HostSetupState>;
 
   const persistHostSetup = useCallback(
-    async (patch: HostSetupPatch): Promise<boolean> => {
+    async (
+      patch?: HostSetupPatch,
+      budgetPatch?: { tier?: string | null; perPerson?: string | null }
+    ): Promise<boolean> => {
       setErr(null);
+      const body: Record<string, unknown> = {};
+      if (patch && Object.keys(patch).length > 0) body.hostSetup = patch;
+      if (budgetPatch) body.budget = budgetPatch;
+      if (!body.hostSetup && !body.budget) return false;
       try {
         const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hostSetup: patch }),
+          body: JSON.stringify(body),
         });
         const j = (await res.json().catch(() => ({}))) as { plan?: TripPlan; error?: string };
         if (!res.ok) {
@@ -199,6 +218,20 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     setCalYear(d.getFullYear());
     setCalMonth(d.getMonth());
   }, [tripDisplayRange?.startIso]);
+
+  /** When there is no ISO range yet, still open on the month/year implied by vague `dates.options`. */
+  useEffect(() => {
+    if (tripDisplayRange?.startIso) return;
+    const y0 = new Date().getFullYear();
+    const hinted = inferYearMonthFromDateOptionsHints(plan.dates.options, y0);
+    if (!hinted) return;
+    setCalYear(hinted.year);
+    setCalMonth(hinted.month);
+  }, [tripDisplayRange?.startIso, plan.dates.options]);
+
+  useEffect(() => {
+    setBudgetLine(plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "");
+  }, [plan.budget.perPerson, plan.budget.tier]);
 
   /** Legacy drafts: persist explicit parser dates once if `hostSetup.tripRange` was never saved (new trips get this from POST). */
   useEffect(() => {
@@ -263,32 +296,27 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when persisted range is ready
   }, [hostSetup.tripRange?.startIso, hostSetup.tripRange?.endIso, tripId, seedText]);
 
-  const searchHotels = useCallback(async () => {
-    const hint = plan.location?.trim() || "";
-    const q = hotelQuery.trim() || `${hint} boutique hotel`;
-    setHotelSearchBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch("/api/places/maps-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q, locationHint: hint || null }),
-      });
-      const j = (await res.json()) as { places?: PlaceSpotlight[] };
-      setHotelHits((j.places ?? []).slice(0, 12));
-    } catch {
-      setHotelHits([]);
-      setErr("Hotel search failed.");
-    } finally {
-      setHotelSearchBusy(false);
-    }
-  }, [hotelQuery, plan.location]);
-
-  const onHotelPick = useCallback(
-    (h: PlaceSpotlight) => {
-      void persistHostSetup({ hotel: h });
+  const onHotelChosen = useCallback(
+    (place: PlaceSpotlight, scope: "full" | "partial") => {
+      if (!selectedDayIso || !tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return;
+      const { hotelStays, hotel } = applyHostHotelSelection(
+        hostSetup.hotelStays,
+        tripDisplayRange.startIso,
+        tripDisplayRange.endIso,
+        selectedDayIso,
+        place,
+        scope === "full" ? "full" : "partial"
+      );
+      void persistHostSetup({ hotelStays, hotel });
+      setAddHotelOpen(false);
     },
-    [persistHostSetup]
+    [
+      selectedDayIso,
+      tripDisplayRange?.startIso,
+      tripDisplayRange?.endIso,
+      hostSetup.hotelStays,
+      persistHostSetup,
+    ]
   );
 
   const togglePin = useCallback(
@@ -319,7 +347,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     suggestedSeededRef.current = false;
     setSelectedDayIso(null);
     const ok = await persistHostSetup({
-      hotel: hostSetup.hotel,
+      hotel: null,
+      hotelStays: [],
       experiencesOutlined: hostSetup.experiencesOutlined,
       tripRange: pendingRangeConfirm,
       restaurantPins: [],
@@ -331,7 +360,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     }
   }, [
     pendingRangeConfirm,
-    hostSetup.hotel,
     hostSetup.experiencesOutlined,
     persistHostSetup,
   ]);
@@ -576,7 +604,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         </div>
 
         <nav className="space-y-1 text-sm">
-          {NAV.map((item) => (
+          {NAV_INPAGE.map((item) => (
             <a
               key={item.id}
               href={`#sec-${item.id}`}
@@ -586,6 +614,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               {item.label}
             </a>
           ))}
+          <Link
+            href={`/trip/${tripId}/setup/packing`}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500/90" />
+            Packing list
+          </Link>
         </nav>
         </div>
       </aside>
@@ -709,9 +744,11 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                       );
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
+                    const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
                     const dayHasPins =
                       (hostSetup.restaurantPins ?? []).some((p) => p.dateIso === cellIso) ||
-                      (hostSetup.activityPins ?? []).some((p) => p.dateIso === cellIso);
+                      (hostSetup.activityPins ?? []).some((p) => p.dateIso === cellIso) ||
+                      !!hotelForDay;
                     const showDayActions =
                       datePickMode === "day" &&
                       inTripRangeCell(dom) &&
@@ -754,6 +791,19 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                             </span>
                           )}
                         </div>
+
+                        {hotelForDay ? (
+                          <div className="mb-2 min-w-0 w-full">
+                            <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 dark:text-neutral-100">
+                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                {hotelForDay.place.name}
+                              </span>
+                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                Stay
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
 
                         {(hostSetup.restaurantPins ?? [])
                           .filter((p) => p.dateIso === cellIso)
@@ -825,11 +875,22 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                               onClick={(ev) => {
                                 ev.stopPropagation();
                                 setSelectedDayIso(cellIso);
+                                setAddHotelOpen(true);
+                              }}
+                              className="max-w-full rounded-lg border border-indigo-200/90 bg-indigo-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-indigo-950 shadow-sm backdrop-blur-sm transition hover:bg-indigo-100 sm:px-3 sm:text-xs dark:border-indigo-500/40 dark:bg-indigo-950/60 dark:text-indigo-100 dark:hover:bg-indigo-950"
+                            >
+                              Add hotel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
                               className="max-w-full rounded-lg border border-teal-200/90 bg-teal-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-teal-900 shadow-sm backdrop-blur-sm transition hover:bg-teal-100 sm:px-3 sm:text-xs dark:border-teal-500/40 dark:bg-teal-950/90 dark:text-teal-100 dark:hover:bg-teal-950"
                             >
-                              Add meals &amp; activities
+                              Meals &amp; activities
                             </button>
                             {dayHasPins ? (
                               <button
@@ -865,79 +926,29 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
           </div>
         </section>
 
-        <section id="sec-accommodation" className="scroll-mt-28 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Accommodation</h2>
-          <p className="text-sm text-slate-600 dark:text-neutral-400">
-            Search and select the hotel for this trip — it appears here and in your trip details.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={hotelQuery}
-              onChange={(e) => setHotelQuery(e.target.value)}
-              placeholder={plan.location ? `Search near ${plan.location}` : "Search hotels"}
-              className="min-w-[200px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-brand-600 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-            />
-            <button
-              type="button"
-              onClick={() => void searchHotels()}
-              disabled={hotelSearchBusy}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-dm-page"
-            >
-              {hotelSearchBusy ? "…" : "Search"}
-            </button>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-dm-elevated/80">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-                Selected
-              </p>
-              {hostSetup.hotel?.name ? (
-                <div className="mt-2 text-sm text-slate-900 dark:text-neutral-100">
-                  {hostSetup.hotel.name}
-                  {hostSetup.hotel.priceRange ? (
-                    <span className="ml-2 text-slate-500 dark:text-neutral-400">({hostSetup.hotel.priceRange})</span>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-slate-500 dark:text-neutral-500">No hotel yet</p>
-              )}
-            </div>
-            <ul className="max-h-60 space-y-1 overflow-auto rounded-xl border border-slate-200 bg-white p-2 text-sm dark:border-white/10 dark:bg-dm-elevated/50">
-              {hotelHits.map((h) => (
-                <li key={h.mapsUrl}>
-                  <button
-                    type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-white/5"
-                    onClick={() => onHotelPick(h)}
-                  >
-                    <span className="font-medium text-slate-900 dark:text-neutral-100">{h.name}</span>
-                    <span className="ml-2 text-slate-500 dark:text-neutral-500">{h.priceRange}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section id="sec-transport" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Transportation</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-            Finalize flights and ground transfers with your crew after publishing.
-          </p>
-        </section>
-
-        <section id="sec-packing" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Packing list</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-            Add packing tasks with your group on the shared board after publishing.
-          </p>
-        </section>
-
         <section id="sec-budget" className="scroll-mt-28">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Budget</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-            {plan.budget.tier ?? plan.budget.perPerson ?? "Budget from chat applies to venue suggestions"}
+            Set or update your trip budget. This is saved on your draft and guides suggestions.
           </p>
+          <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+            <textarea
+              rows={3}
+              value={budgetLine}
+              onChange={(e) => setBudgetLine(e.target.value)}
+              placeholder="e.g. ~$1,200 per person, splurge on one dinner…"
+              className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null })
+              }
+              className="shrink-0 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500"
+            >
+              Save budget
+            </button>
+          </div>
         </section>
       </div>
       </div>
@@ -995,6 +1006,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         dateLabel={selectedDayLabel}
         onAddRestaurant={addRestaurantToDay}
         onAddExperience={addExperienceToDay}
+      />
+      <HostSetupAddHotelModal
+        open={addHotelOpen && Boolean(selectedDayIso)}
+        onClose={() => setAddHotelOpen(false)}
+        plan={plan}
+        dateLabel={selectedDayLabel}
+        onSelectHotel={(place, scope) => onHotelChosen(place, scope)}
       />
     </SiteShell>
     <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
