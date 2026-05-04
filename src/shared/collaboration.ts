@@ -1,6 +1,7 @@
 import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import { buildRestaurantPicksFromVenueHints, type RestaurantPick } from "@/shared/restaurants";
+import type { PlacePreview } from "@/shared/place-preview";
 
 export const COLLAB_VERSION = 1 as const;
 
@@ -41,9 +42,23 @@ const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "transport", key: "p_transport", label: "How we get there" },
 ];
 
+export type CardChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  places?: PlacePreview[];
+  createdAt: string;
+};
+
+export const MAX_CARD_CHAT_MESSAGES = 60;
+
 export type CollabStateV1 = {
   v: typeof COLLAB_VERSION;
   decisions: Record<string, CollabDecisionBlob>;
+  /** Upvotes per spotlight stable id (`spotlightStableIdFromMapsUrl`) → voter keys (`member:<uuid>`). */
+  spotlightVotes?: Record<string, string[]>;
+  /** Trip card page: persistent group chat + inline place cards. */
+  cardChat?: { messages: CardChatMessage[] };
 };
 
 export type CollabDecisionBlob = {
@@ -166,6 +181,64 @@ export function decisionDependsOnDatesLocked(meta: ClassifiedDecision): boolean 
   return meta.kind === "hotel" || meta.key === VENUE_POLL_DECISION_KEY;
 }
 
+function parseSpotlightVotes(raw: unknown): Record<string, string[]> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (!k || !Array.isArray(v)) continue;
+    const list = [...new Set(v.filter((x) => typeof x === "string" && x.length > 0) as string[])];
+    if (list.length) out[k] = list;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function parsePlacePreviewLoose(row: unknown): PlacePreview | null {
+  if (!row || typeof row !== "object") return null;
+  const p = row as Record<string, unknown>;
+  const name = typeof p.name === "string" ? p.name.trim() : "";
+  const mapsUrl = typeof p.mapsUrl === "string" && p.mapsUrl.startsWith("http") ? p.mapsUrl : "";
+  if (!name || !mapsUrl) return null;
+  return {
+    name,
+    mapsUrl,
+    rating: typeof p.rating === "number" ? p.rating : undefined,
+    reviewCount: typeof p.reviewCount === "number" ? p.reviewCount : undefined,
+    address: typeof p.address === "string" ? p.address : undefined,
+    priceRange: typeof p.priceRange === "string" ? p.priceRange : undefined,
+    photoUrl: typeof p.photoUrl === "string" ? p.photoUrl : null,
+  };
+}
+
+export function parseCardChatMessages(raw: unknown): CardChatMessage[] {
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  const arr = o.messages;
+  if (!Array.isArray(arr)) return [];
+  const out: CardChatMessage[] = [];
+  for (const row of arr) {
+    if (!row || typeof row !== "object") continue;
+    const m = row as Record<string, unknown>;
+    const id = typeof m.id === "string" ? m.id : "";
+    const role = m.role === "user" || m.role === "assistant" ? m.role : null;
+    const text = typeof m.text === "string" ? m.text : "";
+    const createdAt = typeof m.createdAt === "string" ? m.createdAt : new Date().toISOString();
+    if (!id || !role) continue;
+    let places: PlacePreview[] | undefined;
+    if (Array.isArray(m.places)) {
+      const ps = m.places.map(parsePlacePreviewLoose).filter(Boolean) as PlacePreview[];
+      if (ps.length) places = ps;
+    }
+    out.push({ id, role, text, places, createdAt });
+  }
+  return out;
+}
+
+export function trimCardChatMessages(messages: CardChatMessage[]): CardChatMessage[] {
+  if (messages.length <= MAX_CARD_CHAT_MESSAGES) return messages;
+  return messages.slice(messages.length - MAX_CARD_CHAT_MESSAGES);
+}
+
 export function parseCollabState(raw: unknown): CollabStateV1 {
   if (!raw || typeof raw !== "object") {
     return { v: COLLAB_VERSION, decisions: {} };
@@ -174,7 +247,18 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
   if (o.v !== COLLAB_VERSION || typeof o.decisions !== "object" || !o.decisions) {
     return { v: COLLAB_VERSION, decisions: {} };
   }
-  return { v: COLLAB_VERSION, decisions: o.decisions as Record<string, CollabDecisionBlob> };
+  const spotlightVotes = parseSpotlightVotes(o.spotlightVotes);
+  let cardChat: { messages: CardChatMessage[] } | undefined;
+  if (o.cardChat && typeof o.cardChat === "object") {
+    const msgs = parseCardChatMessages(o.cardChat);
+    if (msgs.length) cardChat = { messages: msgs };
+  }
+  return {
+    v: COLLAB_VERSION,
+    decisions: o.decisions as Record<string, CollabDecisionBlob>,
+    ...(spotlightVotes ? { spotlightVotes } : {}),
+    ...(cardChat ? { cardChat } : {}),
+  };
 }
 
 function pluralityWinner(counts: Record<string, number>, preferenceOrder: string[]): string | null {

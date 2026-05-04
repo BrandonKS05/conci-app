@@ -1,3 +1,5 @@
+import type { PlaceSpotlight } from "@/shared/place-preview";
+
 /** Narrowed votes the app surfaced (≤3 options each). Omit or empty = no poll for that axis. */
 export type TripPolls = {
   /** 2–3 destination names when torn between cities */
@@ -14,8 +16,25 @@ export type TripPolls = {
   transport?: string[];
 };
 
+const MAX_PLAN_TITLE_LEN = 120;
+
+/** Always returns a non-empty string for UI and storage. */
+export function guaranteedPlanTitle(
+  title: string | null | undefined,
+  location: string | null | undefined
+): string {
+  const t = (typeof title === "string" ? title : "").trim();
+  if (t) return t.length > MAX_PLAN_TITLE_LEN ? `${t.slice(0, MAX_PLAN_TITLE_LEN - 1)}…` : t;
+  const loc = (typeof location === "string" ? location : "").trim();
+  if (loc) {
+    const first = loc.split(",")[0]?.trim() || loc;
+    return first.length > MAX_PLAN_TITLE_LEN ? `${first.slice(0, MAX_PLAN_TITLE_LEN - 1)}…` : first;
+  }
+  return "Your trip";
+}
+
 export type TripPlan = {
-  title: string | null;
+  title: string;
   location: string | null;
   /** City or metro travelers depart from (enables flight search when set). */
   departureCity: string | null;
@@ -25,6 +44,8 @@ export type TripPlan = {
   vibe: string[];
   openDecisions: string[];
   polls?: TripPolls;
+  /** Named venues the user confirmed during chat (hotels, restaurants, activities). */
+  spotlights?: PlaceSpotlight[];
   nextStep: string | null;
   confidence: number;
 };
@@ -62,6 +83,30 @@ function normalizePolls(plan: Record<string, unknown>): TripPolls | undefined {
   if (tr) out.transport = tr;
 
   return Object.keys(out).length ? out : undefined;
+}
+
+function parseSpotlights(raw: unknown): PlaceSpotlight[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: PlaceSpotlight[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as Record<string, unknown>;
+    const name = typeof o.name === "string" ? o.name.trim() : "";
+    if (!name) continue;
+    const mapsUrl = typeof o.mapsUrl === "string" && o.mapsUrl.startsWith("http") ? o.mapsUrl : "";
+    if (!mapsUrl) continue;
+    out.push({
+      name,
+      mapsUrl,
+      rating: typeof o.rating === "number" ? o.rating : undefined,
+      reviewCount: typeof o.reviewCount === "number" ? o.reviewCount : undefined,
+      address: typeof o.address === "string" ? o.address : undefined,
+      priceRange: typeof o.priceRange === "string" ? o.priceRange : undefined,
+      photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
+      sourceQuery: typeof o.sourceQuery === "string" ? o.sourceQuery : undefined,
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 export function safeParseJson(raw: string): unknown {
@@ -128,9 +173,12 @@ export function normalizePlan(value: unknown): TripPlan {
       ? (plan.budget as Record<string, unknown>)
       : {};
 
+  const location = typeof plan.location === "string" ? plan.location : null;
+  const titleRaw = typeof plan.title === "string" ? plan.title : null;
+
   return {
-    title: typeof plan.title === "string" ? plan.title : null,
-    location: typeof plan.location === "string" ? plan.location : null,
+    title: guaranteedPlanTitle(titleRaw, location),
+    location,
     departureCity: typeof plan.departureCity === "string" ? plan.departureCity.trim() || null : null,
     dates: {
       confirmed: typeof dates.confirmed === "boolean" ? dates.confirmed : false,
@@ -151,6 +199,7 @@ export function normalizePlan(value: unknown): TripPlan {
       ? plan.openDecisions.filter((d) => typeof d === "string")
       : [],
     polls: normalizePolls(plan),
+    spotlights: parseSpotlights(plan.spotlights),
     nextStep: typeof plan.nextStep === "string" ? plan.nextStep : null,
     confidence: typeof plan.confidence === "number" ? Math.max(0, Math.min(1, plan.confidence)) : 0,
   };
@@ -163,7 +212,12 @@ export function isLocationVague(location: string | null): boolean {
   return /\b(tbd|somewhere|anywhere|not sure|maybe|idk)\b/i.test(loc);
 }
 
-export function followUpPromptsForPlan(plan: TripPlan): string[] {
+const VENUE_OR_PLACE_FOLLOWUP = /restaurant|hotel|lodging|where to eat|dinner reservation|brunch spot|café|cafe|stay at|accommodation/i;
+
+export function followUpPromptsForPlan(
+  plan: TripPlan,
+  ctx?: { hadNamedPlaceMentions?: boolean }
+): string[] {
   type Candidate = { priority: number; label: string };
   const candidates: Candidate[] = [];
 
@@ -197,6 +251,9 @@ export function followUpPromptsForPlan(plan: TripPlan): string[] {
   }
 
   candidates.sort((a, b) => a.priority - b.priority);
-  const labels = candidates.map((c) => c.label);
+  let labels = candidates.map((c) => c.label);
+  if (!ctx?.hadNamedPlaceMentions) {
+    labels = labels.filter((label) => !VENUE_OR_PLACE_FOLLOWUP.test(label));
+  }
   return Array.from(new Set(labels)).slice(0, 3);
 }

@@ -26,6 +26,7 @@ export function TripPlanCard({
   inviteCode,
   hideOpenDecisions = false,
   showInviteRow = true,
+  hideSpotlightsSection = false,
 }: {
   plan: TripPlan;
   badge?: string;
@@ -43,6 +44,8 @@ export function TripPlanCard({
   hideOpenDecisions?: boolean;
   /** When false, omit the invite strip (shown separately on the page). */
   showInviteRow?: boolean;
+  /** Trip page: spotlights rendered in interactive panel instead. */
+  hideSpotlightsSection?: boolean;
 }) {
   const verifiedNames = guestJoinNames ?? [];
   const count = plan.people.count;
@@ -149,6 +152,51 @@ export function TripPlanCard({
           {plan.budget.perPerson || "Per-person estimate TBD"}
         </span>
       </section>
+
+      {!hideSpotlightsSection && plan.spotlights && plan.spotlights.length > 0 ? (
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            Picked places
+          </p>
+          <ul className="space-y-3">
+            {plan.spotlights.map((s, idx) => (
+              <li key={`${s.mapsUrl}-${idx}`}>
+                <a
+                  href={s.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 text-left ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:ring-indigo-200/40 dark:border-white/10 dark:bg-dm-elevated dark:ring-white/[0.04] dark:hover:border-indigo-500/40"
+                >
+                  {s.photoUrl ? (
+                    <img src={s.photoUrl} alt="" className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28" loading="lazy" />
+                  ) : (
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-slate-200 text-xs text-slate-500 dark:bg-white/10 dark:text-neutral-500 sm:h-28 sm:w-28">
+                      Map
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 p-3">
+                    <p className="font-semibold text-slate-900 dark:text-white">{s.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-600 dark:text-neutral-400">
+                      {s.rating != null ? (
+                        <>
+                          <span className="font-medium text-amber-700 dark:text-amber-400">{s.rating.toFixed(1)}</span> ★
+                        </>
+                      ) : null}
+                      {s.reviewCount != null ? (
+                        <span className="text-slate-500 dark:text-neutral-500"> · {s.reviewCount.toLocaleString()} reviews</span>
+                      ) : null}
+                      {s.priceRange ? (
+                        <span className="text-slate-600 dark:text-neutral-400"> · {s.priceRange}</span>
+                      ) : null}
+                    </p>
+                    {s.address ? <p className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-neutral-400">{s.address}</p> : null}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">

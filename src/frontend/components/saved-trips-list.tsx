@@ -7,7 +7,7 @@ import { useState } from "react";
 export type SavedTripListItem = {
   id: string;
   createdAt: string;
-  title: string | null;
+  title: string;
   location: string | null;
   datesLabel: string;
   vibes: string[];

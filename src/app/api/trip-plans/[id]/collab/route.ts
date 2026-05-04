@@ -69,7 +69,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
     }
   }
   if (mutated) {
-    collab = { v: collab.v, decisions: nextDecisions };
+    collab = { ...collab, decisions: nextDecisions };
     const { error: persistErr } = await svc
       .from("trip_plans")
       .update({ collab_state: collab, updated_at: new Date().toISOString() })

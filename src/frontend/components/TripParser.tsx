@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import type { TripPlan } from "@/shared/trip-plan";
@@ -13,6 +21,17 @@ import {
   safeParseJson,
 } from "@/shared/trip-plan";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
+import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
+import { PlacePickCards } from "@/frontend/components/place-pick-cards";
+import type { PlacePreview, PlacePreviewBlock, PlaceSpotlight } from "@/shared/place-preview";
+import { hasPlaceCandidates } from "@/shared/place-candidates";
+import type { PlacePreviewResponse, PlaceSearchDisambiguateEvent, PlaceSearchEvent } from "@/shared/place-search-events";
+import {
+  GIBBERISH_SLOT_REPLY,
+  INVALID_TRIP_INPUT_REPLY,
+  isClearlyGibberish,
+  looksLikeMeaninglessTripSeed,
+} from "@/shared/trip-input-quality";
 
 type SlotKey = "location" | "dates" | "people" | "budget" | "vibe";
 
@@ -70,6 +89,19 @@ function slotsFromPlan(plan: TripPlan): Partial<Record<SlotKey, string>> {
   return out;
 }
 
+function mergeSpotlightsFromRef(plan: TripPlan, draftRef: { current: PlaceSpotlight[] }): TripPlan {
+  const d = draftRef.current;
+  if (!d.length) return plan;
+  const merged = [...(plan.spotlights ?? [])];
+  const seen = new Set(merged.map((s) => s.mapsUrl));
+  for (const s of d) {
+    if (seen.has(s.mapsUrl)) continue;
+    seen.add(s.mapsUrl);
+    merged.push(s);
+  }
+  return { ...plan, spotlights: merged.length ? merged : plan.spotlights };
+}
+
 function composeTripPrompt(seed: string, slots: Partial<Record<SlotKey, string>>): string {
   const lines = [
     "Trip idea:",
@@ -91,6 +123,9 @@ const ACK_AFTER_ANSWER = [
 ];
 
 const ACK_BEFORE_PLAN = "Love it—give me a sec to pull your plan together.";
+
+const PARSE_OR_NET_FAIL_REPLY =
+  "I couldn’t turn that into a trip yet. Add a destination or rough dates and try again.";
 
 function generateTripPersistId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -127,7 +162,19 @@ async function imageFileToJpegDataUrl(file: File, maxEdge = 1280, quality = 0.75
   }
 }
 
-type ChatMessage = { id: string; role: "user" | "assistant"; text: string };
+type PlacePickState = {
+  query: string;
+  options: PlacePreview[];
+  resolved: boolean;
+};
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  placeBlocks?: PlacePreviewBlock[];
+  placePick?: PlacePickState;
+};
 
 export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: string }) {
   const router = useRouter();
@@ -161,9 +208,16 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   /** When set, overrides LLM `title` on every parse in this flow (empty = use model title). */
   const fixedTripTitleRef = useRef<string | null>(null);
   const persistClientId = useRef<string>(generateTripPersistId());
+  const placePickResolverRef = useRef<(() => void) | null>(null);
+  const draftSpotlightsRef = useRef<PlaceSpotlight[]>([]);
+
+  const [hadNamedPlaceMentions, setHadNamedPlaceMentions] = useState(false);
 
   const missing = useMemo(() => missingSlots(slots), [slots]);
-  const followUpQuestions = useMemo(() => (plan ? followUpPromptsForPlan(plan) : []), [plan]);
+  const followUpQuestions = useMemo(
+    () => (plan ? followUpPromptsForPlan(plan, { hadNamedPlaceMentions }) : []),
+    [plan, hadNamedPlaceMentions]
+  );
 
   const ackIndexRef = useRef(0);
   const nextAck = () => {
@@ -171,6 +225,73 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     ackIndexRef.current += 1;
     return s;
   };
+
+  const resolvePlacePickFlow = useCallback((messageId: string, picked: PlacePreview | null) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId || !m.placePick || m.placePick.resolved) return m;
+        const q = m.placePick.query;
+        if (picked) {
+          draftSpotlightsRef.current = [...draftSpotlightsRef.current, { ...picked, sourceQuery: q }];
+        }
+        return {
+          ...m,
+          placePick: { ...m.placePick, resolved: true },
+          text: picked
+            ? `${m.text}\n\nYou chose: ${picked.name}.`
+            : `${m.text}\n\nSkipped — continuing.`,
+        };
+      })
+    );
+    queueMicrotask(() => {
+      placePickResolverRef.current?.();
+      placePickResolverRef.current = null;
+    });
+  }, []);
+
+  const consumePlacePreviewResponse = useCallback(
+    async (json: unknown, opts: { userBubbleId: string | null; placeTextHint: string }) => {
+      const events: PlaceSearchEvent[] =
+        json && typeof json === "object" && Array.isArray((json as PlacePreviewResponse).events)
+          ? ((json as PlacePreviewResponse).events as PlaceSearchEvent[])
+          : [];
+
+      if (hasPlaceCandidates(opts.placeTextHint)) {
+        setHadNamedPlaceMentions(true);
+      }
+
+      for (const ev of events) {
+        if (ev.kind === "confirmed") {
+          draftSpotlightsRef.current = [...draftSpotlightsRef.current, { ...ev.place, sourceQuery: ev.query }];
+          if (opts.userBubbleId) {
+            const block: PlacePreviewBlock = { query: ev.query, items: [ev.place] };
+            setMessages((prev) =>
+              prev.map((m) => (m.id === opts.userBubbleId ? { ...m, placeBlocks: [block] } : m))
+            );
+          }
+        }
+      }
+
+      const dis = events.find((e): e is PlaceSearchDisambiguateEvent => e.kind === "disambiguate");
+      if (dis?.options?.length) {
+        setHadNamedPlaceMentions(true);
+        await new Promise<void>((resolve) => {
+          placePickResolverRef.current = () => resolve();
+          const disId = newId();
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: disId,
+              role: "assistant",
+              text: dis.message,
+              placePick: { query: dis.query, options: dis.options, resolved: false },
+            },
+          ]);
+        });
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     const sb = getSupabaseClient();
@@ -278,7 +399,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             model: "claude-sonnet-4-20250514",
             max_tokens: 1200,
             system:
-              'You are a trip planning assistant. Extract trip details from the user\'s input and return ONLY a valid JSON object with these exact fields: { "title": "short catchy trip name", "location": "city or region", "departureCity": null, "dates": { "confirmed": false, "options": ["May 10-12", "May 17-19"] }, "people": { "count": 6, "names": [] }, "budget": { "tier": "mid-range", "perPerson": "$200-300" }, "vibe": ["beach", "nightlife"], "openDecisions": ["Which hotel?", "Flights or drive?"], "nextStep": "Create a poll for dates", "confidence": 0.85 } Only return the JSON. No explanation. Use null for unknown fields. departureCity = city people leave from for flights/driving when stated; else null. CRITICAL for people: never invent names; "names" must be [] unless the user explicitly listed people by name. Use "count" for group size when known.',
+              'You are a trip planning assistant. Extract trip details from the user\'s input and return ONLY a valid JSON object with these exact fields: { "title": "short catchy trip name", "location": "city or region", "departureCity": null, "dates": { "confirmed": false, "options": ["May 10-12", "May 17-19"] }, "people": { "count": 6, "names": [] }, "budget": { "tier": "mid-range", "perPerson": "$200-300" }, "vibe": ["beach", "nightlife"], "openDecisions": ["Which hotel?", "Flights or drive?"], "nextStep": "Create a poll for dates", "confidence": 0.85 } Only return the JSON. No explanation. Use null for unknown fields except title: CRITICAL — "title" must always be a short non-empty string (never null, never ""); infer from destination, occasion, or vibe if needed. departureCity = city people leave from for flights/driving when stated; else null. CRITICAL for people: never invent names; "names" must be [] unless the user explicitly listed people by name. Use "count" for group size when known.',
             messages: [
               {
                 role: "user",
@@ -425,7 +546,23 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
       try {
         const parsed = await fetchParsedPlan(trimmed, imageDataUrls);
-        setPlan(parsed);
+        let planOut = mergeSpotlightsFromRef(parsed, draftSpotlightsRef);
+        try {
+          const enrichRes = await fetch("/api/trip-plan/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan: planOut }),
+          });
+          if (enrichRes.ok) {
+            const j = (await enrichRes.json()) as { plan?: unknown };
+            if (j.plan && typeof j.plan === "object") {
+              planOut = mergeSpotlightsFromRef(normalizePlan(j.plan), draftSpotlightsRef);
+            }
+          }
+        } catch {
+          //
+        }
+        setPlan(planOut);
         setLastSubmittedText(trimmed || "(images)");
         return true;
       } catch (submitError) {
@@ -445,9 +582,27 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     if ((!text && imageUrlsSnapshot.length === 0) || phase !== "chat" || seedMessage) return;
 
     const nameTrim = tripName.trim();
-    fixedTripTitleRef.current = nameTrim || null;
+    if (!nameTrim) {
+      setError("Add a trip name above before you send.");
+      return;
+    }
+
+    if (!imageUrlsSnapshot.length && looksLikeMeaninglessTripSeed(text)) {
+      setError(null);
+      const userBubbleText = `${nameTrim}\n\n${text}`.trim();
+      setMessages((prev) => [
+        ...prev,
+        { id: newId(), role: "user", text: userBubbleText },
+        { id: newId(), role: "assistant", text: INVALID_TRIP_INPUT_REPLY },
+      ]);
+      return;
+    }
+
+    setError(null);
+    fixedTripTitleRef.current = nameTrim;
 
     const seed = text || "(Trip details from attached images)";
+    const msgId = newId();
     setSeedMessage(seed);
     setTripName("");
     setComposerText("");
@@ -456,24 +611,40 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setActiveSlot(null);
     setReplyDraft("");
     setAwaitingFirstChipAnswer(false);
+    draftSpotlightsRef.current = [];
+    setHadNamedPlaceMentions(false);
 
     const imgNote = imageUrlsSnapshot.length
       ? `\n[${imageUrlsSnapshot.length} reference image${imageUrlsSnapshot.length > 1 ? "s" : ""}]`
       : "";
     const userBubbleText = nameTrim ? `${nameTrim}\n\n${text}${imgNote}` : `${text}${imgNote}`.trim() || "Attached images";
-    setMessages((prev) => [...prev, { id: newId(), role: "user", text: userBubbleText }]);
+    setMessages((prev) => [...prev, { id: msgId, role: "user", text: userBubbleText }]);
 
     void (async () => {
       setPrefetchingSlots(true);
       setError(null);
+      const locHint = (slots.location || "").trim();
+      const placeSearchText = [nameTrim, text].filter(Boolean).join("\n\n");
       try {
-        const plan = await fetchParsedPlan(seed, imageUrlsSnapshot.length ? imageUrlsSnapshot : undefined);
+        const [placeJson, plan] = await Promise.all([
+          fetch("/api/places/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: placeSearchText, locationHint: locHint || null }),
+          })
+            .then(async (r) => (await r.json()) as PlacePreviewResponse)
+            .catch(() => ({ events: [] }) satisfies PlacePreviewResponse),
+          fetchParsedPlan(seed, imageUrlsSnapshot.length ? imageUrlsSnapshot : undefined),
+        ]);
+
+        await consumePlacePreviewResponse(placeJson, { userBubbleId: msgId, placeTextHint: placeSearchText });
+
         const extracted = slotsFromPlan(plan);
         setSlots(extracted);
         const stillMissing = missingSlots(extracted);
 
         if (stillMissing.length === 0) {
-          setPlan(plan);
+          setPlan(mergeSpotlightsFromRef(plan, draftSpotlightsRef));
           setLastSubmittedText(composeTripPrompt(seed, extracted));
           setPhase("done");
           setMessages((prev) => [
@@ -494,8 +665,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             id: newId(),
             role: "assistant",
             text: pulledAny
-              ? "Sounds fun! I pulled a lot from that — just need to nail down what’s left 👇"
-              : "Sounds fun! I just need a few things to build your plan 👇",
+              ? "Nice — I pulled a lot from that. Let’s lock in what’s left 👇"
+              : "Thanks for the details — a few quick things will finish the picture 👇",
           },
         ]);
         setAwaitingFirstChipAnswer(true);
@@ -505,7 +676,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           {
             id: newId(),
             role: "assistant",
-            text: "Sounds fun! I just need a few things to build your plan 👇",
+            text: PARSE_OR_NET_FAIL_REPLY,
           },
         ]);
         setAwaitingFirstChipAnswer(true);
@@ -542,13 +713,34 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const answer = replyDraft.trim();
     if (!answer) return;
 
+    if (isClearlyGibberish(answer)) {
+      setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: GIBBERISH_SLOT_REPLY }]);
+      setReplyDraft("");
+      setActiveSlot(activeSlot);
+      return;
+    }
+
     const slotKey = activeSlot;
     const updated = { ...slots, [slotKey]: answer };
+    const msgId = newId();
+    const locHint = ((slotKey === "location" ? answer : updated.location) || slots.location || "").trim();
 
-    setMessages((prev) => [...prev, { id: newId(), role: "user", text: answer }]);
+    setMessages((prev) => [...prev, { id: msgId, role: "user", text: answer }]);
     setSlots(updated);
     setReplyDraft("");
     setActiveSlot(null);
+
+    try {
+      const res = await fetch("/api/places/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: answer, locationHint: locHint || null }),
+      });
+      const data = (await res.json()) as PlacePreviewResponse;
+      await consumePlacePreviewResponse(data, { userBubbleId: msgId, placeTextHint: answer });
+    } catch {
+      //
+    }
 
     const rest = missingSlots(updated);
 
@@ -625,6 +817,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     persistClientId.current = generateTripPersistId();
     setSaveError(null);
     setImageSlots([]);
+    draftSpotlightsRef.current = [];
+    setHadNamedPlaceMentions(false);
+    placePickResolverRef.current = null;
   }
 
   const showChipPicker =
@@ -661,9 +856,17 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       >
         {messages.map((m) =>
           m.role === "assistant" ? (
-            <AssistantBubble key={m.id} text={m.text} />
+            <AssistantBubble key={m.id} text={m.text}>
+              {m.placePick && !m.placePick.resolved ? (
+                <PlacePickCards
+                  options={m.placePick.options}
+                  onPick={(p) => resolvePlacePickFlow(m.id, p)}
+                  onSkip={() => resolvePlacePickFlow(m.id, null)}
+                />
+              ) : null}
+            </AssistantBubble>
           ) : (
-            <UserBubble key={m.id} text={m.text} />
+            <UserBubble key={m.id} text={m.text} placeBlocks={m.placeBlocks} />
           )
         )}
 
@@ -716,7 +919,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
       {activeSlot ? (
         <form
-          onSubmit={(e) => void submitSlotAnswer(e)}
+          onSubmit={(e) => {
+            void submitSlotAnswer(e);
+          }}
           className="mb-2 shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
         >
           <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8d89]">
@@ -753,7 +958,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               type="text"
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
-              placeholder="Trip name (optional)"
+              placeholder="Trip name (required)"
               autoComplete="off"
               className="mb-3 w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
             />
@@ -813,7 +1018,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               </div>
               <button
                 type="submit"
-                disabled={!composerText.trim() && imageSlots.length === 0}
+                disabled={(!composerText.trim() && imageSlots.length === 0) || !tripName.trim()}
                 className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
               >
                 Send
@@ -891,7 +1096,15 @@ function VoiceWaveIcon() {
   );
 }
 
-function AssistantBubble({ text, typing }: { text: string; typing?: boolean }) {
+function AssistantBubble({
+  text,
+  typing,
+  children,
+}: {
+  text: string;
+  typing?: boolean;
+  children?: ReactNode;
+}) {
   return (
     <div className="flex gap-2">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 ring-1 ring-slate-300 dark:bg-[#2a2a2a] dark:text-[#a8a6a2] dark:ring-white/10">
@@ -905,17 +1118,19 @@ function AssistantBubble({ text, typing }: { text: string; typing?: boolean }) {
         }`}
       >
         {typing ? <span className="inline-block animate-pulse">Building…</span> : text}
+        {!typing ? children : null}
       </div>
     </div>
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({ text, placeBlocks }: { text: string; placeBlocks?: PlacePreviewBlock[] }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-1">
       <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 ring-1 ring-slate-300 dark:bg-[#2c2c2c] dark:text-[#ebe9e4] dark:ring-white/10">
         {text}
       </div>
+      {placeBlocks?.length ? <InlinePlacePreviewCards blocks={placeBlocks} /> : null}
     </div>
   );
 }

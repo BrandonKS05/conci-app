@@ -12,6 +12,7 @@ import { TripContributeButton } from "@/frontend/components/trip-contribute-butt
 import { SiteShell } from "@/frontend/components/site-shell";
 import { buildTripShareInviteMessage, publicSiteHostFromEnv } from "@/shared/trip-share-copy";
 import { normalizePlan } from "@/shared/trip-plan";
+import { parseCollabState } from "@/shared/collaboration";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -62,7 +63,7 @@ export default async function SavedTripPlanPage({
 
   const { data, error } = await svc
     .from("trip_plans")
-    .select("plan, invite_code, user_id, status")
+    .select("plan, invite_code, user_id, status, collab_state")
     .eq("id", id)
     .maybeSingle();
 
@@ -82,6 +83,7 @@ export default async function SavedTripPlanPage({
   }
 
   const plan = normalizePlan(data.plan);
+  const initialCollab = parseCollabState(data.collab_state);
   const tripStatus = parseTripPlanStatus(data.status);
   const isHost = access.isHost;
 
@@ -128,6 +130,8 @@ export default async function SavedTripPlanPage({
             isHost={isHost}
             shareMessage={shareMessage}
             tripMemberNames={memberNames}
+            viewerUserId={user.id}
+            initialCollab={initialCollab}
           />
           <p className="text-center text-xs text-slate-500 dark:text-neutral-500">
             Bookmark this URL to reopen this plan anytime.

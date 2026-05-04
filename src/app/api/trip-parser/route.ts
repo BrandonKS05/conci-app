@@ -28,6 +28,9 @@ and return ONLY a valid JSON object with these exact fields:
 
 Only return the JSON. No explanation. Use null for unknown fields.
 
+Title (critical):
+- "title" must always be a short non-empty string (never null, never ""). Derive from destination, occasion, or vibe when the user did not name the trip.
+
 People / names (critical):
 - NEVER invent placeholder names (no "Alex", "Jordan", "Friend 1", etc.).
 - "people.names" must be [] unless the user message clearly lists specific people by name (e.g. "me, Sam, and Priya").

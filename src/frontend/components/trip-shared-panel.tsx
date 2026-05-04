@@ -1,19 +1,27 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
+import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
+import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
+import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 
 /** Trip home: invite + share (host only), saved plan card, then collaboration. */
 export function TripSharedPanel({
   tripId,
-  plan,
+  plan: planFromServer,
   inviteCode,
   tripStatus,
   isHost,
   shareMessage,
   tripMemberNames = [],
+  viewerUserId,
+  initialCollab,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -24,7 +32,23 @@ export function TripSharedPanel({
   shareMessage: string;
   /** Other signed-in travelers on this trip (from memberships). */
   tripMemberNames?: string[];
+  viewerUserId: string;
+  initialCollab: CollabStateV1;
 }) {
+  const [plan, setPlan] = useState(planFromServer);
+  const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
+
+  useEffect(() => {
+    setPlan(planFromServer);
+  }, [planFromServer]);
+
+  const bumpCollab = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
+  }, []);
+
+  const hasSpotlights = Boolean(plan.spotlights?.length);
+  const chatSeed = initialCollab.cardChat?.messages ?? [];
+
   return (
     <div className="space-y-8">
       {isHost && inviteCode ? (
@@ -58,9 +82,35 @@ export function TripSharedPanel({
         inviteCode={inviteCode ?? null}
         showInviteRow={false}
         guestJoinNames={tripMemberNames}
+        hideSpotlightsSection={hasSpotlights}
       />
 
-      <TripCollaborationPanel tripId={tripId} plan={plan} tripStatus={tripStatus} isHost={isHost} />
+      {hasSpotlights ? (
+        <TripSpotlightsInteractive
+          tripId={tripId}
+          plan={plan}
+          viewerUserId={viewerUserId}
+          initialSpotlightVotes={initialCollab.spotlightVotes}
+          onPlanUpdated={setPlan}
+          onCollabBump={bumpCollab}
+        />
+      ) : null}
+
+      <TripCollaborationPanel
+        tripId={tripId}
+        plan={plan}
+        tripStatus={tripStatus}
+        isHost={isHost}
+        collabRefreshSignal={collabRefreshSignal}
+      />
+
+      <TripCardChatWidget
+        tripId={tripId}
+        spotlights={plan.spotlights ?? []}
+        initialMessages={chatSeed}
+        onPlanReplaced={setPlan}
+        onCollabBump={bumpCollab}
+      />
     </div>
   );
 }

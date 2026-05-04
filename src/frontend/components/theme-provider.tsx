@@ -26,9 +26,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem("conci-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial: ConciTheme =
-      stored === "dark" || stored === "light" ? stored : prefersDark ? "dark" : "light";
+    const initial: ConciTheme = stored === "dark" || stored === "light" ? stored : "dark";
     setTheme(initial);
   }, []);
 
@@ -39,13 +37,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((current) => ((current ?? "light") === "dark" ? "light" : "dark"));
+    setTheme((current) => ((current ?? "dark") === "dark" ? "light" : "dark"));
   }, []);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      resolvedTheme: theme ?? "light",
+      resolvedTheme: theme ?? "dark",
       toggleTheme,
     }),
     [theme, toggleTheme]

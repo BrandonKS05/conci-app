@@ -3,6 +3,8 @@ import Stripe from "stripe";
 import { getStripeClient } from "@/backend/stripe";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   const stripe = getStripeClient();
   if (!stripe) {

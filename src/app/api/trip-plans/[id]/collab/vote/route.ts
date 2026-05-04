@@ -150,7 +150,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   blob = tryLockDecision(plan, meta, blob, quorum);
 
   collab = {
-    v: collab.v,
+    ...collab,
     decisions: { ...collab.decisions, [body.decisionKey]: blob },
   };
 

@@ -79,11 +79,14 @@ export function TripCollaborationPanel({
   plan,
   tripStatus,
   isHost,
+  collabRefreshSignal = 0,
 }: {
   tripId: string;
   plan: TripPlan;
   tripStatus: TripPlanStatus;
   isHost: boolean;
+  /** Increment to refetch collaboration payload (e.g. after trip card chat / spotlight votes). */
+  collabRefreshSignal?: number;
 }) {
   const router = useRouter();
   const [data, setData] = useState<CollabPayload | null>(null);
@@ -155,7 +158,7 @@ export function TripCollaborationPanel({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, collabRefreshSignal]);
 
   const classified = data?.classified ?? buildClassifiedDecisions(plan);
   const collab = data?.collab ?? parseCollabState(null);
@@ -687,10 +690,9 @@ function TripPlanLiveBlocks({
             Top experiences
           </h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            Experiences use Amadeus Tours & Activities on RapidAPI when{" "}
-            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">RAPIDAPI_AMADEUS_HOST</code> is set, then any
-            Musement/activities API you configure, then Tripadvisor COM defaults — same{" "}
-            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">RAPIDAPI_KEY</code> as hotels/OpenTable.
+            Powered by Google Places (Text Search). Set{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">GOOGLE_PLACES_API_KEY</code> in{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-white/10">.env.local</code>.
           </p>
           {liveLoading ? (
             <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
@@ -719,7 +721,9 @@ function TripPlanLiveBlocks({
               ))}
             </ul>
           ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No experiences returned.</p>
+            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+              No experiences found for this destination yet. Try a more specific city, or check back later.
+            </p>
           )}
         </section>
       ) : null}

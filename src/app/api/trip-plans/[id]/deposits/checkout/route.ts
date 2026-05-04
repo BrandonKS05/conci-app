@@ -7,6 +7,9 @@ import { resolveTripAccess } from "@/backend/trip-memberships";
 import { normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
+/** Ensure `process.env` from `.env.local` is available (not Edge). */
+export const runtime = "nodejs";
+
 export async function POST(
   req: Request,
   context: { params: Promise<{ id: string }> }

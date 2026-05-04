@@ -5,6 +5,23 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 
+/** OAuth redirect_to must match the tab you signed in from; ignore env localhost when on a real deploy. */
+function oauthRedirectOrigin(): string {
+  if (typeof window === "undefined") return "";
+  const env = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  const hostname = window.location.hostname;
+  const onLoopback =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  if (onLoopback) {
+    return window.location.origin;
+  }
+  if (env && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(env)) {
+    return window.location.origin;
+  }
+  if (env) return env;
+  return window.location.origin;
+}
+
 function AuthInner() {
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/trip-parser";
@@ -19,7 +36,7 @@ function AuthInner() {
     }
     setWorking(true);
     setError(null);
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+    const redirectTo = `${oauthRedirectOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

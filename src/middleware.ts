@@ -2,6 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  // Supabase falls back to "Site URL" when redirect_to is not allowlisted — often the root with ?code=.
+  // Send the OAuth exchange to our real callback route on whatever host the user actually hit.
+  if (path === "/" && request.nextUrl.searchParams.has("code")) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = "/auth/callback";
+    return NextResponse.redirect(dest);
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
@@ -33,8 +42,6 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const path = request.nextUrl.pathname;
 
   const isProtected =
     path.startsWith("/trip-parser") ||
