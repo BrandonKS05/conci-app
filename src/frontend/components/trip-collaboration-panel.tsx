@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   buildClassifiedDecisions,
   collaborationQuorum,
@@ -109,6 +110,23 @@ function readPeopleVoteRow(
   return {};
 }
 
+/** Fixed rail: portaled to `document.body` so no ancestor transform/contain can shrink it. */
+function GroupProgressDockedAside({ children }: { children: ReactNode }) {
+  return (
+    <aside
+      aria-label="Group progress"
+      className="box-border hidden max-h-[min(85vh,40rem)] min-h-0 overflow-y-auto overscroll-contain font-body lg:fixed lg:top-1/2 lg:z-[35] lg:block lg:-translate-y-1/2"
+      style={{
+        right: "max(0.75rem, env(safe-area-inset-right, 0px))",
+        boxSizing: "border-box",
+        width: "min(320px, calc(100vw - 24px))",
+      }}
+    >
+      {children}
+    </aside>
+  );
+}
+
 export function TripCollaborationPanel({
   tripId,
   plan,
@@ -143,8 +161,13 @@ export function TripCollaborationPanel({
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
   const [transportMode, setTransportMode] = useState<"fly" | "drive">("fly");
+  const [dockGroupProgressAside, setDockGroupProgressAside] = useState(false);
 
   const transportStorageKey = `conci_trip_transport_${tripId}`;
+
+  useLayoutEffect(() => {
+    setDockGroupProgressAside(true);
+  }, []);
 
   useEffect(() => {
     try {
@@ -551,15 +574,14 @@ export function TripCollaborationPanel({
       {!showReady ? (
         <>
           <div className="relative z-10 lg:hidden">{renderGroupProgressCard()}</div>
-          <aside
-            aria-label="Group progress"
-            className="box-border hidden w-80 max-w-[min(20rem,calc(100vw_-_1.5rem))] max-h-[min(85vh,40rem)] min-h-0 overflow-y-auto overscroll-contain lg:fixed lg:top-1/2 lg:z-[35] lg:block lg:-translate-y-1/2"
-            style={{
-              right: "max(0.75rem, env(safe-area-inset-right, 0px))",
-            }}
-          >
-            {renderGroupProgressCard()}
-          </aside>
+          {dockGroupProgressAside ? (
+            createPortal(
+              <GroupProgressDockedAside>{renderGroupProgressCard()}</GroupProgressDockedAside>,
+              document.body
+            )
+          ) : (
+            <GroupProgressDockedAside>{renderGroupProgressCard()}</GroupProgressDockedAside>
+          )}
         </>
       ) : null}
 
