@@ -567,8 +567,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       titleRight={completionCard}
       contentWide
     >
-      <div className="mx-auto flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-      <aside className="w-full shrink-0 space-y-4 lg:w-52 xl:w-56 lg:min-w-[200px]">
+      <div className="mx-auto grid h-[100vh] max-h-[100vh] min-h-0 w-full max-w-[min(100%,1800px)] grid-cols-[260px_1fr] gap-x-6 overflow-hidden lg:gap-x-10">
+      <aside className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-r border-slate-200/90 pr-3 pt-0.5 dark:border-white/10">
+        <div className="space-y-4 pb-4">
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
           <div
             className="aspect-[16/11] bg-slate-200 bg-cover bg-center dark:bg-neutral-800"
@@ -593,9 +594,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         </nav>
 
         <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
+        </div>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-10 lg:min-w-0">
+      <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden space-y-10 pl-1 pt-0.5">
         <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -619,7 +621,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-none">
+          <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-none">
             {/* Header — toolbar like reference */}
             <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:py-4">
               <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
