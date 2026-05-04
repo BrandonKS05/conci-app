@@ -14,6 +14,8 @@ import { getSupabaseClient } from "@/frontend/supabase/client";
 import type { TripPlan } from "@/shared/trip-plan";
 import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 import {
+  applyDatesSlotToPlan,
+  DATE_OPTION_TBD,
   followUpPromptsForPlan,
   isLocationVague,
   normalizePlan,
@@ -39,7 +41,7 @@ const SLOT_ORDER: SlotKey[] = ["location", "dates", "people", "budget", "vibe"];
 
 const SLOT_QUESTIONS: Record<SlotKey, string> = {
   location: "Where are you headed—or any region you’re eyeing?",
-  dates: "When are you thinking of going?",
+  dates: "When should this trip happen—or leave dates open for now?",
   people: "How many people are coming?",
   budget: "What’s your budget per person (rough range is fine)?",
   vibe: "What’s the vibe—party, chill, culture, outdoors?",
@@ -87,6 +89,19 @@ function slotsFromPlan(plan: TripPlan): Partial<Record<SlotKey, string>> {
   }
 
   return out;
+}
+
+function formatDateRangeLabel(isoStart: string, isoEnd: string): string {
+  const start = isoStart.trim();
+  const endRaw = (isoEnd || "").trim() || start;
+  const s = new Date(`${start}T12:00:00`);
+  const e = new Date(`${endRaw}T12:00:00`);
+  if (Number.isNaN(s.getTime())) return start;
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (start === endRaw || Number.isNaN(e.getTime()) || s.getTime() === e.getTime()) {
+    return s.toLocaleDateString("en-US", opts);
+  }
+  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
 function mergeSpotlightsFromRef(plan: TripPlan, draftRef: { current: PlaceSpotlight[] }): TripPlan {
@@ -188,6 +203,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [awaitingFirstChipAnswer, setAwaitingFirstChipAnswer] = useState(false);
   const [activeSlot, setActiveSlot] = useState<SlotKey | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
+  const [dateSlotMode, setDateSlotMode] = useState<"specific" | "tbd">("specific");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  const [dateSlotError, setDateSlotError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"chat" | "building" | "done">("chat");
   const [plan, setPlan] = useState<TripPlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -248,6 +267,15 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       placePickResolverRef.current = null;
     });
   }, []);
+
+  useEffect(() => {
+    if (activeSlot !== "dates") {
+      setDateSlotMode("specific");
+      setDateStart("");
+      setDateEnd("");
+      setDateSlotError(null);
+    }
+  }, [activeSlot]);
 
   const consumePlacePreviewResponse = useCallback(
     async (json: unknown, opts: { userBubbleId: string | null; placeTextHint: string }) => {
@@ -537,7 +565,11 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   }, []);
 
   const runParse = useCallback(
-    async (text: string, imageDataUrls?: string[]): Promise<boolean> => {
+    async (
+      text: string,
+      imageDataUrls?: string[],
+      mergeSlots?: Partial<Record<SlotKey, string>>
+    ): Promise<boolean> => {
       const trimmed = text.trim();
       if (!trimmed && !(imageDataUrls?.length)) return false;
 
@@ -561,6 +593,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           }
         } catch {
           //
+        }
+        if (mergeSlots?.dates?.trim()) {
+          planOut = applyDatesSlotToPlan(planOut, mergeSlots.dates.trim());
         }
         setPlan(planOut);
         setLastSubmittedText(trimmed || "(images)");
@@ -688,6 +723,12 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   function pickChip(key: SlotKey) {
     if (phase !== "chat" || loading || prefetchingSlots || !awaitingFirstChipAnswer) return;
+    if (key === "dates") {
+      setDateSlotMode("specific");
+      setDateStart("");
+      setDateEnd("");
+      setDateSlotError(null);
+    }
     setMessages((prev) => [
       ...prev,
       { id: newId(), role: "assistant", text: SLOT_QUESTIONS[key] },
@@ -710,17 +751,36 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   async function submitSlotAnswer(event: FormEvent) {
     event.preventDefault();
     if (!activeSlot || phase !== "chat") return;
-    const answer = replyDraft.trim();
-    if (!answer) return;
+    const slotKey = activeSlot;
 
-    if (isClearlyGibberish(answer)) {
+    let answer = replyDraft.trim();
+    if (slotKey === "dates") {
+      setDateSlotError(null);
+      if (dateSlotMode === "tbd") {
+        answer = DATE_OPTION_TBD;
+      } else {
+        if (!dateStart.trim()) {
+          setDateSlotError("Choose a start date, or pick “TBD”.");
+          return;
+        }
+        const ds = dateStart.trim();
+        const de = (dateEnd || "").trim();
+        if (de && de < ds) {
+          setDateSlotError("End date must be on or after the start date.");
+          return;
+        }
+        answer = formatDateRangeLabel(ds, de);
+      }
+    } else if (!answer) {
+      return;
+    }
+
+    if (slotKey !== "dates" && isClearlyGibberish(answer)) {
       setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: GIBBERISH_SLOT_REPLY }]);
       setReplyDraft("");
       setActiveSlot(activeSlot);
       return;
     }
-
-    const slotKey = activeSlot;
     const updated = { ...slots, [slotKey]: answer };
     const msgId = newId();
     const locHint = ((slotKey === "location" ? answer : updated.location) || slots.location || "").trim();
@@ -769,7 +829,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const prompt = composeTripPrompt(seedMessage, finalSlots);
     setPhase("building");
     setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: ACK_BEFORE_PLAN }]);
-    const ok = await runParse(prompt);
+    const ok = await runParse(prompt, undefined, finalSlots);
     if (ok) {
       setPhase("done");
       setMessages((prev) => [
@@ -808,6 +868,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setAwaitingFirstChipAnswer(false);
     setActiveSlot(null);
     setReplyDraft("");
+    setDateSlotMode("specific");
+    setDateStart("");
+    setDateEnd("");
+    setDateSlotError(null);
     setPhase("chat");
     setPlan(null);
     setError(null);
@@ -927,18 +991,90 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8d89]">
             Your answer
           </label>
-          <textarea
-            ref={replyInputRef}
-            value={replyDraft}
-            onChange={(e) => setReplyDraft(e.target.value)}
-            placeholder="Type here…"
-            rows={2}
-            className="mb-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
-          />
+          {activeSlot === "dates" ? (
+            <div className="mb-3 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateSlotMode("specific");
+                    setDateSlotError(null);
+                  }}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                    dateSlotMode === "specific"
+                      ? "bg-slate-900 text-white dark:bg-[#ebe9e4] dark:text-[#141414]"
+                      : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
+                  }`}
+                >
+                  Specific dates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateSlotMode("tbd");
+                    setDateSlotError(null);
+                  }}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                    dateSlotMode === "tbd"
+                      ? "bg-slate-900 text-white dark:bg-[#ebe9e4] dark:text-[#141414]"
+                      : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
+                  }`}
+                >
+                  TBD
+                </button>
+              </div>
+              {dateSlotMode === "specific" ? (
+                <div className="space-y-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
+                      Start
+                      <input
+                        type="date"
+                        value={dateStart}
+                        onChange={(e) => setDateStart(e.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-500/50 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
+                      />
+                    </label>
+                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
+                      End <span className="font-normal text-slate-400">(optional)</span>
+                      <input
+                        type="date"
+                        value={dateEnd}
+                        min={dateStart || undefined}
+                        onChange={(e) => setDateEnd(e.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-500/50 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+                    Calendar sync coming soon — we&apos;ll automatically suggest dates that work for everyone.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+                  You can set exact dates later. The trip owner can lock them in for everyone when you&apos;re ready.
+                </p>
+              )}
+              {dateSlotError ? <p className="text-sm text-rose-600 dark:text-rose-300">{dateSlotError}</p> : null}
+            </div>
+          ) : (
+            <textarea
+              ref={replyInputRef}
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value)}
+              placeholder="Type here…"
+              rows={2}
+              className="mb-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
+            />
+          )}
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={!replyDraft.trim() || loading}
+              disabled={
+                loading ||
+                (activeSlot !== "dates" && !replyDraft.trim()) ||
+                (activeSlot === "dates" && dateSlotMode === "specific" && !dateStart.trim())
+              }
               className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
             >
               Send

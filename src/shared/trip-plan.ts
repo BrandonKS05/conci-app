@@ -257,3 +257,22 @@ export function followUpPromptsForPlan(
   }
   return Array.from(new Set(labels)).slice(0, 3);
 }
+
+/** Stored in `plan.dates.options` when the creator picks “TBD” during trip creation. */
+export const DATE_OPTION_TBD = "TBD — host will confirm later";
+
+export function isDatesSlotTbdValue(slotText: string): boolean {
+  const v = slotText.trim();
+  return v === DATE_OPTION_TBD || /^TBD\b/i.test(v);
+}
+
+/** Apply the chat “dates” slot answer onto the plan (overrides model dates for this flow). */
+export function applyDatesSlotToPlan(plan: TripPlan, datesSlotText: string): TripPlan {
+  const v = datesSlotText.trim();
+  if (!v) return plan;
+  if (isDatesSlotTbdValue(v)) {
+    return { ...plan, dates: { confirmed: false, options: [DATE_OPTION_TBD] } };
+  }
+  const line = v.length > 200 ? `${v.slice(0, 197)}…` : v;
+  return { ...plan, dates: { confirmed: false, options: [line] } };
+}

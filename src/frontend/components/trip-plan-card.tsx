@@ -77,9 +77,21 @@ export function TripPlanCard({
       ) : null}
 
       <section>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-          Dates
-        </p>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Dates</p>
+          {plan.dates.confirmed ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-200"
+              title="Trip owner confirmed these dates for the group"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Confirmed
+            </span>
+          ) : null}
+        </div>
         {plan.dates.options.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {plan.dates.options.map((date) => {
