@@ -13,10 +13,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import type { TripPlan } from "@/shared/trip-plan";
 import { firstNameFromUserMetadata } from "@/shared/user-display-name";
+import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
   applyDatesSlotToPlan,
   DATE_OPTION_TBD,
   followUpPromptsForPlan,
+  groundPlanInUserInput,
   isLocationVague,
   normalizePlan,
   retainPeopleNamesOnlyIfMentionedInInput,
@@ -427,8 +429,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           body: JSON.stringify({
             model: "claude-sonnet-4-20250514",
             max_tokens: 1200,
-            system:
-              'You are a trip planning assistant. Extract trip details from the user\'s input and return ONLY a valid JSON object with these exact fields: { "title": "short catchy trip name", "location": "city or region", "departureCity": null, "dates": { "confirmed": false, "options": ["May 10-12", "May 17-19"] }, "people": { "count": 6, "names": [] }, "budget": { "tier": "mid-range", "perPerson": "$200-300" }, "vibe": ["beach", "nightlife"], "openDecisions": ["Which hotel?", "Flights or drive?"], "nextStep": "Create a poll for dates", "confidence": 0.85 } Only return the JSON. No explanation. Use null for unknown fields except title: CRITICAL — "title" must always be a short non-empty string (never null, never ""); infer from destination, occasion, or vibe if needed. departureCity = city people leave from for flights/driving when stated; else null. CRITICAL for people: never invent names; "names" must be [] unless the user explicitly listed people by name. Use "count" for group size when known.',
+            system: TRIP_PARSER_SYSTEM_PROMPT,
             messages: [
               {
                 role: "user",
@@ -477,7 +478,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       const inputForRetain = [trimmed, ...(imageDataUrls?.length ? ["[images attached]"] : [])]
         .filter(Boolean)
         .join("\n");
-      let plan = retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(safeParseJson(outputText)), inputForRetain);
+      let plan = groundPlanInUserInput(
+        retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(safeParseJson(outputText)), inputForRetain),
+        trimmed
+      );
       const fixed = fixedTripTitleRef.current?.trim();
       if (fixed) {
         plan = { ...plan, title: fixed };
@@ -580,21 +584,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       try {
         const parsed = await fetchParsedPlan(trimmed, imageDataUrls);
         let planOut = mergeSpotlightsFromRef(parsed, draftSpotlightsRef);
-        try {
-          const enrichRes = await fetch("/api/trip-plan/enrich", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ plan: planOut }),
-          });
-          if (enrichRes.ok) {
-            const j = (await enrichRes.json()) as { plan?: unknown };
-            if (j.plan && typeof j.plan === "object") {
-              planOut = mergeSpotlightsFromRef(normalizePlan(j.plan), draftSpotlightsRef);
-            }
-          }
-        } catch {
-          //
-        }
         if (mergeSlots?.dates?.trim()) {
           planOut = applyDatesSlotToPlan(planOut, mergeSlots.dates.trim());
         }

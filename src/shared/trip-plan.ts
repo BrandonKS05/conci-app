@@ -164,6 +164,178 @@ export function retainPeopleNamesOnlyIfMentionedInInput(plan: TripPlan, userInpu
   return { ...plan, people: { ...plan.people, names: kept } };
 }
 
+const IMAGE_INPUT_PLACEHOLDERS = /\[images?\s+attached\]|\[image\]/gi;
+
+const GROUND_STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "are",
+  "but",
+  "not",
+  "you",
+  "all",
+  "can",
+  "her",
+  "was",
+  "one",
+  "our",
+  "out",
+  "day",
+  "per",
+  "mix",
+  "trip",
+  "week",
+  "stay",
+  "nice",
+  "food",
+  "wine",
+  "bars",
+  "bar",
+  "city",
+  "town",
+  "spot",
+  "hotel",
+  "area",
+  "outdoors",
+  "culture",
+]);
+
+/**
+ * True if a poll option, vibe tag, or short label plausibly comes from the user's message
+ * (substring, money tokens, or all significant tokens present). Used to drop model hallucinations.
+ */
+export function textChunkMentionedInUserInput(chunk: string, userLower: string): boolean {
+  const c = chunk.trim().toLowerCase();
+  if (!c || !userLower.trim()) return false;
+  if (userLower.includes(c)) return true;
+
+  const moneyNums = c.match(/(?:\$?\s*)([\d,]+(?:\.\d{1,2})?)/g);
+  if (moneyNums) {
+    for (const m of moneyNums) {
+      const n = m.replace(/[$,\s]/g, "");
+      if (n.length > 0 && userLower.includes(n)) return true;
+    }
+  }
+
+  const words = c.match(/[a-z0-9']+/gi) ?? [];
+  const significant = words
+    .map((w) => w.toLowerCase())
+    .filter((w) => w.length >= 2 && !GROUND_STOPWORDS.has(w));
+  if (significant.length === 0) return false;
+  return significant.every((w) => userLower.includes(w));
+}
+
+function budgetFieldsGroundedInUserInput(
+  budget: TripPlan["budget"],
+  userLower: string
+): boolean {
+  if (budget.tier?.trim() && textChunkMentionedInUserInput(budget.tier.trim(), userLower)) return true;
+  if (budget.perPerson?.trim()) {
+    const p = budget.perPerson.trim().toLowerCase();
+    if (userLower.includes(p)) return true;
+    const nums = budget.perPerson.match(/\d[\d,.]*/g);
+    if (nums?.some((d) => userLower.includes(d.replace(/,/g, "")))) return true;
+  }
+  return /\$\s*\d|\d\s*\$|budget|splurge|cheap|expensive|afford|bucks|usd|\bpp\b|per\s*person|per\s*night/i.test(
+    userLower
+  );
+}
+
+function filterDatesOptionsByUserText(options: string[], userLower: string): string[] {
+  return options.filter((o) => {
+    const t = o.trim().toLowerCase();
+    if (!t) return false;
+    if (userLower.includes(t)) return true;
+    return textChunkMentionedInUserInput(o, userLower);
+  });
+}
+
+function filterPollsByUserText(polls: TripPolls | undefined, userLower: string): TripPolls | undefined {
+  if (!polls) return undefined;
+  const out: TripPolls = {};
+  (["destinations", "venues", "activities", "vibePick", "budgetPick", "transport"] as const).forEach((key) => {
+    const arr = polls[key];
+    if (!Array.isArray(arr)) return;
+    const filt = arr.filter((opt) => textChunkMentionedInUserInput(opt, userLower));
+    const kept = filt.length >= 2 ? [...new Set(filt)].slice(0, POLL_MAX_OPTIONS) : undefined;
+    if (kept) out[key] = kept;
+  });
+  return Object.keys(out).length ? out : undefined;
+}
+
+export type GroundPlanInUserInputOptions = {
+  /** When merging onto a saved trip (e.g. card chat), keep stored spotlights. Initial parser clears model hallucinations. */
+  preserveSpotlights?: boolean;
+};
+
+/**
+ * After normalize + name retention: drop fields the model invented that do not appear in the user's text.
+ * Skips aggressive filtering when there is no real user prose (e.g. image-only stub).
+ * By default clears model-authored spotlights; set preserveSpotlights when patching an existing plan.
+ */
+export function groundPlanInUserInput(
+  plan: TripPlan,
+  userInput: string,
+  opts?: GroundPlanInUserInputOptions
+): TripPlan {
+  const preserveSpotlights = opts?.preserveSpotlights === true;
+  const effective = userInput.replace(IMAGE_INPUT_PLACEHOLDERS, " ").replace(/\s+/g, " ").trim();
+  if (effective.length < 2) {
+    return preserveSpotlights ? plan : { ...plan, spotlights: undefined };
+  }
+
+  const userLower = effective.toLowerCase();
+
+  let next: TripPlan = preserveSpotlights
+    ? { ...plan }
+    : { ...plan, spotlights: undefined };
+
+  if (next.location?.trim()) {
+    const loc = next.location.trim();
+    const head = loc.split(",")[0]?.trim() ?? loc;
+    if (!textChunkMentionedInUserInput(head, userLower) && !textChunkMentionedInUserInput(loc, userLower)) {
+      next.location = null;
+    }
+  }
+
+  if (next.departureCity?.trim()) {
+    const dc = next.departureCity.trim();
+    const head = dc.split(",")[0]?.trim() ?? dc;
+    if (!textChunkMentionedInUserInput(head, userLower) && !textChunkMentionedInUserInput(dc, userLower)) {
+      next.departureCity = null;
+    }
+  }
+
+  next.dates = {
+    ...next.dates,
+    options: filterDatesOptionsByUserText(next.dates.options, userLower),
+  };
+
+  if (!budgetFieldsGroundedInUserInput(next.budget, userLower)) {
+    next.budget = { tier: null, perPerson: null };
+  }
+
+  next.vibe = next.vibe.filter((v) => textChunkMentionedInUserInput(v, userLower));
+
+  next.openDecisions = next.openDecisions.filter((d) => textChunkMentionedInUserInput(d, userLower));
+
+  next.polls = filterPollsByUserText(next.polls, userLower);
+
+  if (next.nextStep?.trim()) {
+    const ns = next.nextStep.trim();
+    if (
+      /\bshare\b.*\blink\b|\bgroup votes\b|\bcuration\b|\bpoll\b/i.test(ns) &&
+      !/\bshare\b|\bvotes?\b|\bpoll\b|\bcurated\b/i.test(userLower)
+    ) {
+      next.nextStep = null;
+    }
+  }
+
+  next.title = guaranteedPlanTitle(next.title, next.location);
+  return next;
+}
+
 export function normalizePlan(value: unknown): TripPlan {
   const plan = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const people =

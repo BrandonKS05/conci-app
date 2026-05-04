@@ -13,6 +13,7 @@ import {
 } from "@/shared/collaboration";
 import {
   applyTripPlanChatPatch,
+  groundPlanInUserInput,
   normalizePlan,
   retainPeopleNamesOnlyIfMentionedInInput,
   safeParseJson,
@@ -38,6 +39,7 @@ planPatch (optional):
 - When the user changes trip facts, include ONLY the top-level keys that change (same schema as the stored trip plan).
 - Fields you may set: "title", "location", "departureCity", "dates", "people", "budget", "vibe", "openDecisions", "polls", "nextStep", "confidence".
 - Never include "spotlights" or "itineraryLiveCuration".
+- **polls**: only when the user explicitly contrasts 2+ real choices in their message. Never add placeholder group-vote rows; omit "polls" or use null otherwise.
 
 Budget examples:
 - "lower the budget" / "$80 per person" → set "budget": { "perPerson": "~$80/person" or "$80", "tier": "budget-friendly" } (align tier with spend).
@@ -204,7 +206,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const keys = Object.keys(planPatch as object);
     if (keys.length > 0) {
       let patched = applyTripPlanChatPatch(plan, planPatch);
-      patched = retainPeopleNamesOnlyIfMentionedInInput(patched, text);
+      patched = groundPlanInUserInput(retainPeopleNamesOnlyIfMentionedInInput(patched, text), text.trim(), {
+        preserveSpotlights: true,
+      });
       const liveBefore = tripLiveRecommendationsContextFingerprint(plan);
       const liveAfter = tripLiveRecommendationsContextFingerprint(patched);
       if (liveBefore !== liveAfter) {
