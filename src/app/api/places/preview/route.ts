@@ -53,10 +53,12 @@ export async function POST(request: Request) {
   } else {
     const options = raw.slice(0, 3);
     const shortQ = q.length > 42 ? `${q.slice(0, 40)}…` : q;
+    const n = options.length;
+    const optPhrase = n === 1 ? "a similar option" : `${n} similar options`;
     events.push({
       kind: "disambiguate",
       query: q,
-      message: `Couldn’t find “${shortQ}” exactly — here are 3 similar options. Pick one to continue.`,
+      message: `Couldn’t find “${shortQ}” exactly — here ${n === 1 ? "is" : "are"} ${optPhrase}. Pick one to continue, or skip.`,
       options,
     });
   }

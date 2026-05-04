@@ -414,9 +414,9 @@ export function CuratedExperiencesSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Top experiences</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-        Same card flow as restaurants. Set{" "}
-        <code className="rounded bg-slate-100 px-1 dark:bg-white/10">GOOGLE_PLACES_API_KEY</code> in{" "}
-        <code className="rounded bg-slate-100 px-1 dark:bg-white/10">.env.local</code>.
+        Add picks with <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, or{" "}
+        <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> for the rest. Suggestions come from
+        Google Places Text Search for your destination.
       </p>
       {liveLoading ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
@@ -426,11 +426,9 @@ export function CuratedExperiencesSection({
         <div className="mt-4 space-y-3">
           <KeptStrip title="On your trip" items={experienceKeptMeta} busyKey={busyKey} onRemove={(k) => mutate("unkeep", k)} />
           {experiencePool.map(({ ex, key }) => (
-            <SwipeableLiveCard
+            <div
               key={key}
-              disabled={busyKey !== null}
-              onSwipeDismiss={() => mutate("dismiss", key)}
-              swipeLabel="Swipe left to dismiss this experience"
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
             >
               <LivePlaceCoverImage src={ex.coverPhotoUrl} />
               <div className="px-4 py-3">
@@ -465,12 +463,11 @@ export function CuratedExperiencesSection({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-flex rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-900 hover:bg-indigo-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   Open booking link
                 </a>
               </div>
-            </SwipeableLiveCard>
+            </div>
           ))}
           {!experiencePool.length && experienceKeptMeta.length > 0 ? (
             <p className="text-sm text-slate-600 dark:text-neutral-400">No more experience suggestions in the deck.</p>

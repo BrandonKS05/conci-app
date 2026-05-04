@@ -139,14 +139,17 @@ function composeTripPrompt(seed: string, slots: Partial<Record<SlotKey, string>>
   return lines.join("\n");
 }
 
-const ACK_AFTER_ANSWER = [
-  "Got it! One more thing…",
-  "Love that.",
-  "Perfect—quick follow-up:",
-  "Nice—almost there.",
-];
+/** After a slot answer: only when more slots remain. Never claim “one more” if several are left. */
+function ackAfterFilledSlot(remainingSlotCount: number): string | null {
+  if (remainingSlotCount <= 0) return null;
+  if (remainingSlotCount === 1) {
+    return "Sounds good — one question left.";
+  }
+  return `Sounds good — ${remainingSlotCount} more questions to go (I'll ask them one at a time).`;
+}
 
-const ACK_BEFORE_PLAN = "Love it—give me a sec to pull your plan together.";
+const ACK_BEFORE_PLAN =
+  "I'll turn what we have into your plan — takes a few seconds.";
 
 const PARSE_OR_NET_FAIL_REPLY =
   "I couldn’t turn that into a trip yet. Add a destination or rough dates and try again.";
@@ -246,13 +249,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     () => (plan ? followUpPromptsForPlan(plan, { hadNamedPlaceMentions }) : []),
     [plan, hadNamedPlaceMentions]
   );
-
-  const ackIndexRef = useRef(0);
-  const nextAck = () => {
-    const s = ACK_AFTER_ANSWER[ackIndexRef.current % ACK_AFTER_ANSWER.length];
-    ackIndexRef.current += 1;
-    return s;
-  };
 
   const resolvePlacePickFlow = useCallback((messageId: string, picked: PlacePreview | null) => {
     setMessages((prev) =>
@@ -691,21 +687,27 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             {
               id: newId(),
               role: "assistant",
-              text: "Got everything from your message — here’s your plan.",
+              text: "I had enough from your message to build a first draft — here's your plan.",
             },
           ]);
           return;
         }
 
+        const nLeft = stillMissing.length;
+        const pointer =
+          nLeft === 1
+            ? "One open detail below."
+            : nLeft <= 3
+              ? `${nLeft} open details below — tap any topic to answer it first.`
+              : `${nLeft} open details — tap any starter topic below; we’ll go through the rest one question at a time.`;
         const pulledAny = Object.keys(extracted).length > 0;
+        const head = pulledAny ? "Nice — I pulled a lot from that." : "Thanks for sharing.";
         setMessages((prev) => [
           ...prev,
           {
             id: newId(),
             role: "assistant",
-            text: pulledAny
-              ? "Nice — I pulled a lot from that. Let’s lock in what’s left 👇"
-              : "Thanks for the details — a few quick things will finish the picture 👇",
+            text: `${head} ${pointer}`,
           },
         ]);
         setAwaitingFirstChipAnswer(true);
@@ -843,7 +845,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
     if (awaitingFirstChipAnswer) {
       setAwaitingFirstChipAnswer(false);
-      setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: nextAck() }]);
+      const progress = ackAfterFilledSlot(rest.length);
+      if (progress) {
+        setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: progress }]);
+      }
       if (rest.length === 0) {
         await finalizePlan(updated);
         return;
@@ -853,12 +858,14 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     }
 
     if (rest.length === 0) {
-      setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: nextAck() }]);
       await finalizePlan(updated);
       return;
     }
 
-    setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: nextAck() }]);
+    const progress = ackAfterFilledSlot(rest.length);
+    if (progress) {
+      setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: progress }]);
+    }
     appendSequentialQuestion(updated);
   }
 
@@ -913,7 +920,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setPlan(null);
     setError(null);
     setLastSubmittedText("");
-    ackIndexRef.current = 0;
     setPrefetchingSlots(false);
     persistClientId.current = generateTripPersistId();
     setSaveError(null);
@@ -1087,7 +1093,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                     </label>
                   </div>
                   <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
-                    Calendar sync coming soon — we&apos;ll automatically suggest dates that work for everyone.
+                    Group calendar sync isn&apos;t wired up yet — for now this just captures dates for your plan.
                   </p>
                 </div>
               ) : (
