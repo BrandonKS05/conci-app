@@ -26,7 +26,6 @@ function CheckIcon({ className }: { className?: string }) {
 function PricingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const notice = searchParams.get("notice");
   const subscribed = searchParams.get("subscribed");
   const canceled = searchParams.get("canceled");
 
@@ -72,14 +71,6 @@ function PricingContent() {
   return (
     <SiteShell title="Pricing" eyebrow="Conci">
       <div className="mx-auto w-full max-w-5xl px-4 pb-20 pt-6">
-        {notice ? (
-          <div
-            className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
-            role="status"
-          >
-            {notice}
-          </div>
-        ) : null}
         {subscribed ? (
           <div
             className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100"
