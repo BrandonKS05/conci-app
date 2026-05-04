@@ -797,6 +797,75 @@ export function applyHostHotelSelection(
   return { hotelStays: out, hotel: out[0]!.place };
 }
 
+function minIso(a: string, b: string): string {
+  return a <= b ? a : b;
+}
+
+function maxIso(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
+/** Split `[S,E]` around `[a,b]` inclusive; drop pieces fully inside the cut. */
+function clipExistingStay(stay: HostHotelStay, cutStart: string, cutEnd: string): HostHotelStay[] {
+  const S = stay.startIso;
+  const E = stay.endIso;
+  if (!ISO_DAY.test(S) || !ISO_DAY.test(E)) return [];
+  if (E < cutStart || S > cutEnd) return [stay];
+  const parts: HostHotelStay[] = [];
+  const leftEnd = addLocalIsoDays(cutStart, -1);
+  if (leftEnd && ISO_DAY.test(leftEnd) && S <= leftEnd) {
+    const endCap = minIso(E, leftEnd);
+    if (S <= endCap) parts.push({ ...stay, endIso: endCap });
+  }
+  const rightStart = addLocalIsoDays(cutEnd, 1);
+  if (rightStart && ISO_DAY.test(rightStart) && E >= rightStart) {
+    const startCap = maxIso(S, rightStart);
+    if (startCap <= E) parts.push({ ...stay, startIso: startCap });
+  }
+  return parts;
+}
+
+/**
+ * Replace/add a stay for nights `stayStartIso`…`stayEndIso` (inclusive), clamped to the trip.
+ * Existing stays are trimmed where they overlap this interval.
+ */
+export function applyHostHotelDateRange(
+  existing: HostHotelStay[] | undefined,
+  tripStartIso: string,
+  tripEndIso: string,
+  stayStartIso: string,
+  stayEndIso: string,
+  place: PlaceSpotlight
+): { hotelStays: HostHotelStay[]; hotel: PlaceSpotlight } {
+  if (!ISO_DAY.test(tripStartIso) || !ISO_DAY.test(tripEndIso)) {
+    const one: HostHotelStay = { startIso: stayStartIso, endIso: stayEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+  let a = stayStartIso;
+  let b = stayEndIso;
+  if (!ISO_DAY.test(a) || !ISO_DAY.test(b)) {
+    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+  if (a > b) [a, b] = [b, a];
+  if (a < tripStartIso) a = tripStartIso;
+  if (b > tripEndIso) b = tripEndIso;
+  if (a > b) {
+    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
+    return { hotelStays: [one], hotel: place };
+  }
+
+  const trimmed: HostHotelStay[] = [];
+  for (const s of existing ?? []) {
+    for (const frag of clipExistingStay(s, a, b)) {
+      trimmed.push(frag);
+    }
+  }
+  trimmed.push({ startIso: a, endIso: b, place });
+  trimmed.sort((x, y) => x.startIso.localeCompare(y.startIso));
+  return { hotelStays: trimmed, hotel: place };
+}
+
 export function hotelStayForDay(stays: HostHotelStay[] | undefined, dayIso: string): HostHotelStay | null {
   if (!stays?.length || !ISO_DAY.test(dayIso)) return null;
   for (const s of stays) {

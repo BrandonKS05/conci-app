@@ -8,6 +8,7 @@ import {
   inferYearMonthFromDateOptionsHints,
 } from "@/shared/date-option-parse";
 import {
+  applyHostHotelDateRange,
   applyHostHotelSelection,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
@@ -24,7 +25,10 @@ import {
   type HostSetupState,
   type TripPlan,
 } from "@/shared/trip-plan";
-import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
+import {
+  HostSetupAddPlacesModal,
+  type HostSetupHotelAddSpec,
+} from "@/frontend/components/host-setup-add-places-modal";
 import {
   HostSetupPinDetailModal,
   HostSetupRemovePinConfirm,
@@ -314,26 +318,32 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when persisted range is ready
   }, [hostSetup.tripRange?.startIso, hostSetup.tripRange?.endIso, tripId, seedText]);
 
-  const onHotelChosen = useCallback(
-    (place: PlaceSpotlight, scope: "full" | "partial") => {
-      if (!selectedDayIso || !tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return;
-      const { hotelStays, hotel } = applyHostHotelSelection(
+  const onHotelAddFromModal = useCallback(
+    (place: PlaceSpotlight, spec: HostSetupHotelAddSpec) => {
+      if (!tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return;
+      if (spec.kind === "entireTrip") {
+        const { hotelStays, hotel } = applyHostHotelSelection(
+          hostSetup.hotelStays,
+          tripDisplayRange.startIso,
+          tripDisplayRange.endIso,
+          tripDisplayRange.startIso,
+          place,
+          "full"
+        );
+        void persistHostSetup({ hotelStays, hotel });
+        return;
+      }
+      const { hotelStays, hotel } = applyHostHotelDateRange(
         hostSetup.hotelStays,
         tripDisplayRange.startIso,
         tripDisplayRange.endIso,
-        selectedDayIso,
-        place,
-        scope === "full" ? "full" : "partial"
+        spec.stayStartIso,
+        spec.stayEndIso,
+        place
       );
       void persistHostSetup({ hotelStays, hotel });
     },
-    [
-      selectedDayIso,
-      tripDisplayRange?.startIso,
-      tripDisplayRange?.endIso,
-      hostSetup.hotelStays,
-      persistHostSetup,
-    ]
+    [tripDisplayRange?.startIso, tripDisplayRange?.endIso, hostSetup.hotelStays, persistHostSetup]
   );
 
   const removeRestaurantPinByKey = useCallback(
@@ -898,7 +908,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                 setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
-                              className="w-full rounded-lg border border-teal-200/90 bg-teal-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:text-xs dark:border-teal-500/40 dark:bg-teal-950/90 dark:text-teal-100 dark:hover:bg-teal-950"
+                              className="w-full rounded-lg border border-zinc-500/35 bg-zinc-700 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-white shadow-sm transition hover:bg-zinc-600 sm:px-3 sm:text-xs dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
                             >
                               Edit activities
                             </button>
@@ -1002,9 +1012,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         tripId={tripId}
         plan={plan}
         dateLabel={selectedDayLabel}
+        tripRange={
+          tripDisplayRange?.startIso && tripDisplayRange?.endIso
+            ? { startIso: tripDisplayRange.startIso, endIso: tripDisplayRange.endIso }
+            : null
+        }
         onAddRestaurant={addRestaurantToDay}
         onAddExperience={addExperienceToDay}
-        onAddHotel={(place, entireTrip) => onHotelChosen(place, entireTrip ? "full" : "partial")}
+        onAddHotel={onHotelAddFromModal}
       />
       <HostSetupPinDetailModal
         open={pinDetail !== null}

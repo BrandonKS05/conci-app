@@ -33,8 +33,9 @@ const MONTH: Record<string, number> = {
   december: 11,
 };
 
+/** Map en-dash, em-dash, figure dash, minus sign (U+2212) → ASCII hyphen so range splitters match `-`. */
 function normalizeDashes(s: string): string {
-  return s.replace(/[\u2013\u2014\u2012]/g, "-").trim();
+  return s.replace(/[\u2013\u2014\u2012\u2212]/g, "-").trim();
 }
 
 export function startOfLocalDay(d: Date): Date {
@@ -177,7 +178,7 @@ function parseDateOptionToRangeStructured(
   }
 
   const isoRange = raw.match(
-    /^(\d{4}-\d{2}-\d{2})\s*(?:to|-|–)\s*(\d{4}-\d{2}-\d{2})$/i
+    /^(\d{4}-\d{2}-\d{2})\s*(?:to|-)\s*(\d{4}-\d{2}-\d{2})$/i
   );
   if (isoRange) {
     const a = new Date(`${isoRange[1]}T12:00:00`);
@@ -190,7 +191,7 @@ function parseDateOptionToRangeStructured(
   }
 
   const slash = raw.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(?:to|-|–)\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/i
+    /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(?:to|-)\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/i
   );
   if (slash) {
     let y1 = parseInt(slash[3]!, 10);
@@ -204,6 +205,24 @@ function parseDateOptionToRangeStructured(
     const sa = ymd(y1, m1, d1);
     const sb = ymd(y2, m2, d2);
     return localDayTime(sa) <= localDayTime(sb) ? { start: sa, end: sb } : { start: sb, end: sa };
+  }
+
+  /** e.g. `Jun 23, 2026 – Jun 29, 2026` (en-dash normalized to `-` above) */
+  const mdyRangeBothYears = raw.match(
+    /^([A-Za-z]+)\s+(\d{1,2}),\s*(20[0-9]{2})\s*-\s*([A-Za-z]+)\s+(\d{1,2}),\s*(20[0-9]{2})$/i
+  );
+  if (mdyRangeBothYears) {
+    const m1 = monthFromToken(mdyRangeBothYears[1]!);
+    const d1 = parseInt(mdyRangeBothYears[2]!, 10);
+    const y1 = parseInt(mdyRangeBothYears[3]!, 10);
+    const m2 = monthFromToken(mdyRangeBothYears[4]!);
+    const d2 = parseInt(mdyRangeBothYears[5]!, 10);
+    const y2 = parseInt(mdyRangeBothYears[6]!, 10);
+    if (m1 != null && m2 != null && d1 >= 1 && d2 >= 1) {
+      const sa = ymd(y1, m1, d1);
+      const sb = ymd(y2, m2, d2);
+      return localDayTime(sa) <= localDayTime(sb) ? { start: sa, end: sb } : { start: sb, end: sa };
+    }
   }
 
   const cross = raw.match(
