@@ -9,13 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^9.4.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
     "@tailwindplus/elements": "^1.0.22",
     "next": "^15.3.0",
     "openai": "^4.104.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "stripe": "^22.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

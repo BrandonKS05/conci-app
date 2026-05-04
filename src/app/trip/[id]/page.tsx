@@ -7,6 +7,8 @@ import { fetchTripHostDisplayName } from "@/backend/trip-host-profile";
 import { fetchTripMemberDisplayNames } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripSharedPanel } from "@/frontend/components/trip-shared-panel";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { buildTripShareInviteMessage, publicSiteHostFromEnv } from "@/shared/trip-share-copy";
 import { normalizePlan } from "@/shared/trip-plan";
@@ -113,6 +115,11 @@ export default async function SavedTripPlanPage({
     <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">
       <SiteShell title={plan.title || "Trip plan"} eyebrow="Your trip">
         <div className="mx-auto w-full max-w-xl space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            <TripDepositTracker tripId={id} />
+            <TripContributeButton tripId={id} />
+          </div>
+
           <TripSharedPanel
             tripId={id}
             plan={plan}
