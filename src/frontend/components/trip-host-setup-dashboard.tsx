@@ -554,6 +554,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   );
 
   return (
+    <>
     <SiteShell
       title={plan.title || "Trip setup"}
       eyebrow="Host setup"
@@ -586,8 +587,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             </a>
           ))}
         </nav>
-
-        <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
         </div>
       </aside>
 
@@ -998,5 +997,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         onAddExperience={addExperienceToDay}
       />
     </SiteShell>
+    <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
+    </>
   );
 }
