@@ -281,10 +281,79 @@ function uniqueByName(rows: Record<string, unknown>[], limit: number): Record<st
   return out;
 }
 
+/** Venue poll hints are often categories (“Seafood restaurant”, “Rooftop bar”), not OpenTable venue names — try several Yelp-shaped queries. */
+function yelpTermCandidates(hint: string): string[] {
+  const t = hint.trim().replace(/\s+/g, " ");
+  if (t.length < 2) return ["restaurants dinner"];
+
+  const hasVenueWord = /\b(restaurants?|bar|bars|café|cafe|grills?|bistros?|kitchen|eatery|pub|lounge)\b/i.test(t);
+
+  const out: string[] = [];
+  out.push(t);
+
+  const noTrailingRestaurant = t.replace(/\s+restaurants?$/i, "").trim();
+  if (noTrailingRestaurant && noTrailingRestaurant !== t) {
+    out.push(noTrailingRestaurant);
+    out.push(`${noTrailingRestaurant} dinner`);
+  }
+
+  if (!hasVenueWord) {
+    out.push(`${t} restaurant`);
+  }
+  out.push(`${t} food`);
+
+  const words = t.split(/\s+/).filter((w) => w.length > 2);
+  if (words.length >= 2) out.push(words.slice(0, 2).join(" "));
+
+  return [...new Set(out.map((x) => x.slice(0, 100)))].slice(0, 8);
+}
+
+async function firstYelpPickForCandidates(locationStr: string, hint: string | undefined): Promise<RestaurantPick | undefined> {
+  const raw = hint?.trim() || "";
+  const candidates = raw ? yelpTermCandidates(raw) : ["restaurants dinner"];
+  for (const term of candidates) {
+    try {
+      const yRows = await searchYelpRapid(locationStr, term);
+      if (yRows.length) return mapYelpRow(yRows[0]!, "");
+    } catch {
+      /* try next */
+    }
+  }
+  return undefined;
+}
+
+/** When a hint is not a real venue name, still return something useful from the destination. */
+async function genericDestinationPick(
+  base: OtSearchParams,
+  locationStr: string,
+  pickIndex: number
+): Promise<{ row?: Record<string, unknown>; yelpFallback?: RestaurantPick }> {
+  let rows = await searchOpenTableRapid(base).catch(() => []);
+  if (!rows.length) rows = await searchOpenTableVeeya(base).catch(() => []);
+  const uniq = uniqueByName(rows, 20);
+  if (uniq.length) {
+    const row = uniq[Math.min(Math.max(pickIndex, 0), uniq.length - 1)]!;
+    return { row };
+  }
+  try {
+    const terms = ["restaurants dinner", "highly rated restaurants", "dinner near me"];
+    const term = terms[Math.abs(pickIndex) % terms.length]!;
+    const yRows = await searchYelpRapid(locationStr, term);
+    if (yRows.length) {
+      const yPick = Math.abs(pickIndex) % Math.min(yRows.length, 5);
+      return { yelpFallback: mapYelpRow(yRows[yPick]!, "") };
+    }
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+
 async function resolveRowsForHint(
   base: OtSearchParams,
   hint: string | undefined,
-  locationStr: string
+  locationStr: string,
+  pickIndexForFallback = 0
 ): Promise<{ row?: Record<string, unknown>; yelpFallback?: RestaurantPick; err?: string }> {
   const p = { ...base, name: hint?.trim() || undefined };
   try {
@@ -293,14 +362,25 @@ async function resolveRowsForHint(
     const uniq = uniqueByName(rows, 5);
     const row = uniq[0];
     if (row) return { row };
-    const yRows = await searchYelpRapid(locationStr, `${(hint ?? "restaurant").trim() || "restaurant"} restaurant`);
-    if (yRows.length) return { yelpFallback: mapYelpRow(yRows[0]!, "") };
-    return { err: hint ? `No match for “${hint.slice(0, 40)}”` : "No restaurants returned for this city." };
+
+    const yelpPick = await firstYelpPickForCandidates(locationStr, hint);
+    if (yelpPick) return { yelpFallback: yelpPick };
+
+    const generic = await genericDestinationPick(base, locationStr, pickIndexForFallback);
+    if (generic.row) return { row: generic.row };
+    if (generic.yelpFallback) return { yelpFallback: generic.yelpFallback };
+
+    return {
+      err: hint ? `Could not reach listings for “${hint.slice(0, 40)}”` : "No restaurants returned for this city.",
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Restaurant lookup failed";
     try {
-      const yRows = await searchYelpRapid(locationStr, `${(hint ?? "restaurant").trim() || "restaurant"} restaurant`);
-      if (yRows.length) return { yelpFallback: mapYelpRow(yRows[0]!, "") };
+      const yelpPick = await firstYelpPickForCandidates(locationStr, hint);
+      if (yelpPick) return { yelpFallback: yelpPick };
+      const generic = await genericDestinationPick(base, locationStr, pickIndexForFallback);
+      if (generic.row) return { row: generic.row };
+      if (generic.yelpFallback) return { yelpFallback: generic.yelpFallback };
     } catch {
       /* ignore */
     }
@@ -360,7 +440,7 @@ export async function fetchLiveRestaurantsForPlan(plan: TripPlan, hints: string[
   for (let i = 0; i < effectiveHints.length; i += 1) {
     const hint = effectiveHints[i]!;
     const id = `eat-${i}`;
-    const res = await resolveRowsForHint(base, hint, locationStr);
+    const res = await resolveRowsForHint(base, hint, locationStr, i);
     if (res.yelpFallback) {
       picks.push({ ...res.yelpFallback, id });
       continue;
