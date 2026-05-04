@@ -1,17 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { appBaseUrl } from "@/backend/app-base-url";
 
 const NUDGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export function nudgeEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.NUDGE_EMAIL_FROM?.trim());
-}
-
-function appBaseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
-  return "http://localhost:3000";
 }
 
 function escapeHtml(s: string): string {

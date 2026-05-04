@@ -9,31 +9,58 @@ export function getSerpApiKey(): string | undefined {
   return k.length ? k : undefined;
 }
 
-/** Optional RapidAPI host for an OpenTable-oriented product (same key as `RAPIDAPI_KEY`). */
-export function getRapidApiOpenTableHost(): string | undefined {
+/**
+ * X-RapidAPI-Host for OpenTable Data API (elis-lab on RapidAPI).
+ * Default: `opentable-data-api.p.rapidapi.com` — override with `RAPIDAPI_OPENTABLE_HOST` if your subscription differs.
+ */
+export function getRapidApiOpenTableHost(): string {
   const h = getEnvTrimmed("RAPIDAPI_OPENTABLE_HOST");
+  return h.length ? h : "opentable-data-api.p.rapidapi.com";
+}
+
+/** Path on OpenTable Data API host (default `/restaurants` per elis-lab listing). */
+export function getRapidApiOpenTableSearchPath(): string {
+  const p = getEnvTrimmed("RAPIDAPI_OPENTABLE_PATH");
+  return p.length ? p : "/restaurants";
+}
+
+/**
+ * Tripadvisor COM (Things4u / ntd119 on RapidAPI).
+ * Default: `tripadvisor-com1.p.rapidapi.com` — override with `RAPIDAPI_TRIPADVISOR_HOST` if needed.
+ */
+export function getRapidApiTripadvisorHost(): string {
+  const h = getEnvTrimmed("RAPIDAPI_TRIPADVISOR_HOST");
+  return h.length ? h : "tripadvisor-com1.p.rapidapi.com";
+}
+
+/** Search path — Tripadvisor COM on RapidAPI uses category-specific routes; `/locations/search` is not always exposed. */
+export function getRapidApiTripadvisorSearchPath(): string {
+  const p = getEnvTrimmed("RAPIDAPI_TRIPADVISOR_PATH");
+  return p.length ? p : "/attractions/search";
+}
+
+/** Optional backup activities provider (Travel Info API or similar on RapidAPI). */
+export function getRapidApiTravelInfoHost(): string | undefined {
+  const h = getEnvTrimmed("RAPIDAPI_TRAVEL_INFO_HOST");
   return h.length ? h : undefined;
 }
 
-/** Path on OpenTable RapidAPI host (default tries common patterns in fetcher). */
-export function getRapidApiOpenTableSearchPath(): string | undefined {
-  const p = getEnvTrimmed("RAPIDAPI_OPENTABLE_PATH");
-  return p.length ? p : undefined;
+export function getRapidApiTravelInfoPath(): string {
+  const p = getEnvTrimmed("RAPIDAPI_TRAVEL_INFO_PATH");
+  return p.length ? p : "/search";
 }
 
-/** RapidAPI X-RapidAPI-Host for Amadeus Tours & Activities (same key as RAPIDAPI_KEY). */
+/** Amadeus Tours & Activities on RapidAPI — X-RapidAPI-Host from playground (optional if you use Musement/Tripadvisor only). */
 export function getRapidApiAmadeusHost(): string | undefined {
   const h = getEnvTrimmed("RAPIDAPI_AMADEUS_HOST");
   return h.length ? h : undefined;
 }
 
-/** Optional path override (default `/v1/shopping/activities` in fetcher). */
 export function getRapidApiAmadeusActivitiesPath(): string | undefined {
   const p = getEnvTrimmed("RAPIDAPI_AMADEUS_PATH");
   return p.length ? p : undefined;
 }
 
-/** Musement or other RapidAPI “activities” product (same RAPIDAPI_KEY). */
 export function getRapidApiMusementHost(): string | undefined {
   const h = getEnvTrimmed("RAPIDAPI_MUSEMENT_HOST");
   return h.length ? h : undefined;
@@ -44,7 +71,6 @@ export function getRapidApiMusementPath(): string | undefined {
   return p.length ? p : undefined;
 }
 
-/** Generic alias when the subscribed product is neither Amadeus nor Musement-branded. */
 export function getRapidApiActivitiesHost(): string | undefined {
   const h = getEnvTrimmed("RAPIDAPI_ACTIVITIES_HOST");
   return h.length ? h : undefined;
@@ -53,23 +79,4 @@ export function getRapidApiActivitiesHost(): string | undefined {
 export function getRapidApiActivitiesPath(): string | undefined {
   const p = getEnvTrimmed("RAPIDAPI_ACTIVITIES_PATH");
   return p.length ? p : undefined;
-}
-
-/** Host for experiences: Musement, generic activities, or Amadeus (first set wins). */
-export function getRapidApiExperiencesHost(): string | undefined {
-  return (
-    getRapidApiMusementHost() ??
-    getRapidApiActivitiesHost() ??
-    getRapidApiAmadeusHost() ??
-    undefined
-  );
-}
-
-export function getRapidApiExperiencesActivitiesPath(): string | undefined {
-  return (
-    getRapidApiMusementPath() ??
-    getRapidApiActivitiesPath() ??
-    getRapidApiAmadeusActivitiesPath() ??
-    undefined
-  );
 }

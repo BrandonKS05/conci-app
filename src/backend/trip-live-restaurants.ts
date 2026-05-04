@@ -40,8 +40,25 @@ function parseCityCountry(plan: TripPlan): { city: string; country: string; stat
   const city = parts[0] || "New York";
   let state = "";
   if (parts.length >= 2 && /^[A-Z]{2}$/i.test(parts[1]!)) state = parts[1]!.toUpperCase();
-  const country = /canada|uk|united kingdom|france|spain|mexico|japan|australia/i.test(loc) ? "CA" : "US";
-  return { city, country: country === "CA" && /canada/i.test(loc) ? "CA" : "US", state };
+
+  let country = "US";
+  if (/mexico|\bcancun\b|tulum|playa del carmen|quintana roo|riviera maya|los cabos|méxico|cdmx|guadalajara|monterrey/i.test(loc)) {
+    country = "MX";
+  } else if (/canada|toronto|vancouver|montreal|calgary|ottawa/i.test(loc)) {
+    country = "CA";
+  } else if (/united kingdom|england|scotland|wales|\blondon\b|uk\b|ireland|dublin/i.test(loc)) {
+    country = "GB";
+  } else if (/france|\bparis\b|nice|lyon/i.test(loc)) {
+    country = "FR";
+  } else if (/spain|\bmadrid\b|barcelona|seville/i.test(loc)) {
+    country = "ES";
+  } else if (/japan|\btokyo\b|osaka|kyoto/i.test(loc)) {
+    country = "JP";
+  } else if (/australia|\bsydney\b|melbourne|brisbane/i.test(loc)) {
+    country = "AU";
+  }
+
+  return { city, country, state };
 }
 
 function numRating(r: Record<string, unknown>): number | undefined {
@@ -165,9 +182,9 @@ async function searchOpenTableVeeya(params: OtSearchParams): Promise<Record<stri
 async function searchOpenTableRapid(params: OtSearchParams): Promise<Record<string, unknown>[]> {
   const host = getRapidApiOpenTableHost();
   const key = getRapidApiKey();
-  if (!host || !key) return [];
+  if (!key) return [];
 
-  const path = getRapidApiOpenTableSearchPath() || "/api/restaurants";
+  const path = getRapidApiOpenTableSearchPath();
   const qs = new URLSearchParams();
   qs.set("city", params.city);
   qs.set("country", params.country);
@@ -272,7 +289,7 @@ async function resolveRowsForHint(
   const p = { ...base, name: hint?.trim() || undefined };
   try {
     let rows = await searchOpenTableRapid(p).catch(() => []);
-    if (!rows.length) rows = await searchOpenTableVeeya(p);
+    if (!rows.length) rows = await searchOpenTableVeeya(p).catch(() => []);
     const uniq = uniqueByName(rows, 5);
     const row = uniq[0];
     if (row) return { row };
@@ -316,13 +333,13 @@ export async function fetchLiveRestaurantsForPlan(plan: TripPlan, hints: string[
   if (effectiveHints.length === 0) {
     try {
       let rows = await searchOpenTableRapid(base).catch(() => []);
-      if (!rows.length) rows = await searchOpenTableVeeya(base);
+      if (!rows.length) rows = await searchOpenTableVeeya(base).catch(() => []);
       const top = uniqueByName(rows, 3);
       for (let i = 0; i < top.length; i += 1) {
         picks.push(mapOpenTableRow(top[i]!, `eat-${i}`));
       }
       if (!picks.length) {
-        const yRows = await searchYelpRapid(locationStr, "restaurants dinner");
+        const yRows = await searchYelpRapid(locationStr, "restaurants dinner").catch(() => []);
         for (let i = 0; i < Math.min(3, yRows.length); i += 1) {
           picks.push(mapYelpRow(yRows[i]!, `eat-${i}`));
         }
@@ -336,7 +353,7 @@ export async function fetchLiveRestaurantsForPlan(plan: TripPlan, hints: string[
         ? errors[0]!
         : picks.length
           ? null
-          : "Could not load live restaurants (set RAPIDAPI_OPENTABLE_HOST + RAPIDAPI_KEY, or rely on public directory).",
+          : "Could not load live restaurants (add RAPIDAPI_KEY for OpenTable Data API on RapidAPI, or rely on the public directory).",
     };
   }
 

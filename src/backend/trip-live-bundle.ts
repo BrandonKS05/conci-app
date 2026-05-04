@@ -1,5 +1,5 @@
 import { fetchLiveRestaurantsForPlan } from "@/backend/trip-live-restaurants";
-import { fetchAmadeusActivitiesRapid } from "@/backend/trip-live-amadeus-activities";
+import { fetchLiveExperiencesChained } from "@/backend/trip-live-experiences-chain";
 import { fetchSerpGoogleFlights } from "@/backend/trip-live-flights";
 import { fetchDriveSummary } from "@/backend/trip-live-drive";
 import type { TripPlan } from "@/shared/trip-plan";
@@ -11,7 +11,7 @@ export async function buildTripLiveRecommendations(plan: TripPlan): Promise<Trip
 
   const [rest, via, fly] = await Promise.all([
     hasDestination ? fetchLiveRestaurantsForPlan(plan, hints) : Promise.resolve({ picks: [], error: null as string | null }),
-    fetchAmadeusActivitiesRapid(plan),
+    fetchLiveExperiencesChained(plan),
     plan.departureCity?.trim() && plan.location?.trim()
       ? fetchSerpGoogleFlights(plan)
       : Promise.resolve({ flights: [], bookBaseUrl: null, error: null as string | null }),

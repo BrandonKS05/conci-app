@@ -37,7 +37,7 @@ npm run lint    # ESLint
 
 - **Required for auth / trips:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - **Server features (trip pages, delete, collab writes, etc.):** `SUPABASE_SERVICE_ROLE_KEY` (never expose to the browser)
-- **Optional:** `OPENAI_API_KEY`, `RAPIDAPI_KEY`, `RAPIDAPI_AMADEUS_HOST`, `SERPAPI_KEY`, etc. — see `.env.example`
+- **Optional:** `OPENAI_API_KEY`, `RAPIDAPI_KEY` (OpenTable, Amadeus/Musement activities chain, Tripadvisor fallback, hotels), `SERPAPI_KEY` (Google Flights via SerpApi), etc. — see `.env.example`
 
 ## Database
 
