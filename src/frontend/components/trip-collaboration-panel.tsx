@@ -1332,27 +1332,38 @@ function DecisionCard({
 
   if (meta.kind === "dates") {
     const opts = plan.dates.options;
-    if (opts.length === 0) {
+    if (opts.length === 0 && isHost) {
       return (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-          Add date options to the plan first.
+          Add date options to the trip (edit the trip card or use the trip parser). Members see a dates poll on this page
+          where they can submit their availability even before the plan lists host dates.
         </div>
       );
     }
     const datesVoteYear = inferDefaultYearFromDateOptions(opts, new Date().getFullYear());
     const singleLineConcrete =
       opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, datesVoteYear);
-    /** Single non-concrete host line (“Late July”, “TBD”) — hide chip voting; calendar is the ballot. */
+    /** Single non-concrete host line (“Late July”, “TBD”) — hide chip voting; range inputs are the ballot. */
     const singleVagueBallotOnly = opts.length === 1 && !singleLineConcrete;
+    const showSingleProposal = opts.length > 0 && singleLineConcrete;
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
         <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
-          Date availability is required for this trip — confirm the host&apos;s dates or choose a range on the calendar. You
-          can&apos;t skip this step.
+          {opts.length === 0 ? (
+            <>
+              The trip doesn&apos;t list host dates yet — add your availability below. Group needs {voterN}/{quorum}+
+              votes to lock this decision.
+            </>
+          ) : (
+            <>
+              Date availability is required for this trip — confirm the host&apos;s dates or choose a range below. You
+              can&apos;t skip this step.
+            </>
+          )}
         </p>
         <div className="mt-4">
-          {singleLineConcrete ? (
+          {showSingleProposal ? (
             <DatesSingleProposalMemberVote
               decisionKey={meta.key}
               options={opts}
@@ -1373,7 +1384,7 @@ function DecisionCard({
               quorum={quorum}
               voterN={voterN}
               onVote={onVote}
-              hideUnmappedBallotChips={singleVagueBallotOnly}
+              hideUnmappedBallotChips={singleVagueBallotOnly || opts.length === 0}
             />
           )}
         </div>

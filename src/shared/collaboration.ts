@@ -156,8 +156,7 @@ function openDecisionsToClassified(plan: TripPlan): ClassifiedDecision[] {
 function synthDatePollIfNeeded(plan: TripPlan, open: ClassifiedDecision[]): ClassifiedDecision | null {
   const already = open.some((c) => c.kind === "dates");
   if (already || plan.dates.confirmed) return null;
-  const opts = plan.dates.options;
-  if (opts.length < 2) return null;
+  /** Always surface a dates decision (even with 0–1 host `plan.dates.options`) so members can vote concrete ranges. */
   const index = open.length;
   return {
     key: SYNTH_DATES_KEY,
@@ -279,7 +278,6 @@ export function datesGroupResolved(plan: TripPlan, classified: ClassifiedDecisio
   if (plan.dates.confirmed) return true;
   const dm = classified.find((c) => c.kind === "dates");
   if (!dm) return true;
-  if (plan.dates.options.length < 2) return true;
   return isDecisionLocked(collab.decisions[dm.key]);
 }
 
@@ -399,7 +397,6 @@ export function tryLockDecision(
 
   if (meta.kind === "dates") {
     const options = plan.dates.options;
-    if (options.length === 0) return blob;
     const y0 = inferDefaultYearFromDateOptions(options, new Date().getFullYear());
     const tally: Record<string, number> = {};
     for (const o of options) tally[o] = 0;
