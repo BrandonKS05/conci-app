@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   buildClassifiedDecisions,
   collaborationQuorum,
@@ -10,6 +11,7 @@ import {
   datesGroupResolved,
   decisionDependsOnDatesLocked,
   isDecisionLocked,
+  isTransportStyleGroupPoll,
   parseCollabState,
   BUDGET_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
@@ -38,7 +40,7 @@ import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/res
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
-import { DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
+import { DatesSingleProposalMemberVote, DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
 import { HostTripMemberEmailModal } from "@/frontend/components/host-trip-member-email-modal";
 import {
   CuratedExperiencesSection,
@@ -116,6 +118,7 @@ export function TripCollaborationPanel({
   isHost,
   collabRefreshSignal = 0,
   onPlanUpdated,
+  groupProgressStickyTarget,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -125,8 +128,14 @@ export function TripCollaborationPanel({
   collabRefreshSignal?: number;
   /** Called after live suggestion curation is saved (restaurants, experiences, flights). */
   onPlanUpdated?: (plan: TripPlan) => void;
+  /**
+   * When set (typically the trip page’s sticky aside mount), Group Progress renders there via portal.
+   * Omit to use the panel’s built-in grid / stacked layout.
+   */
+  groupProgressStickyTarget?: HTMLElement | null;
 }) {
   const router = useRouter();
+  const stickyGroupProgressRail = typeof groupProgressStickyTarget !== "undefined";
   const [data, setData] = useState<CollabPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -526,93 +535,8 @@ export function TripCollaborationPanel({
     );
   }
 
-  return (
-    <div className="space-y-8">
-      <HostTripMemberEmailModal
-        open={notifyEmailModalOpen}
-        tripId={tripId}
-        recipientMemberIds={notifyEmailModalRecipients}
-        onClose={() => {
-          setNotifyEmailModalOpen(false);
-          setNotifyEmailModalRecipients([]);
-        }}
-        onSendSuccess={() => {
-          setNotifySelectedMemberIds(new Set());
-        }}
-      />
-      {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      ) : null}
-
-      {!showReady ? <div className="relative z-10">{renderGroupProgressCard()}</div> : null}
-
-      {showReady && tripStatus === "finalized" ? (
-        <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-white p-8 text-center shadow-lg dark:border-emerald-700/40 dark:from-emerald-950/50 dark:to-dm-card dark:shadow-black/30">
-          <p className="font-display text-2xl font-semibold text-emerald-950 dark:text-emerald-100">Trip finalized</p>
-          <p className="mt-2 text-sm text-emerald-900/90 dark:text-emerald-200/90">
-            Open the booking checklist to reserve stays, flights, and dinner.
-          </p>
-          <Link
-            href={`/booking/${tripId}`}
-            className="mt-6 inline-flex rounded-xl bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-800"
-          >
-            View booking checklist
-          </Link>
-        </div>
-      ) : null}
-
-      {showReady && tripStatus !== "finalized" && isHost ? (
-        <div className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-8 text-center shadow-lg dark:border-indigo-500/30 dark:from-indigo-950/40 dark:to-dm-card dark:shadow-black/30">
-          <p className="font-display text-2xl font-semibold text-slate-900 dark:text-neutral-100">All decisions resolved</p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
-            Finalize the trip to unlock the booking checklist for everyone.
-          </p>
-          {finalizeErr ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-              {finalizeErr}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            disabled={finalizeBusy}
-            onClick={() => {
-              setFinalizeErr(null);
-              setFinalizeBusy(true);
-              void (async () => {
-                try {
-                  const r = await fetch(`/api/trip-plans/${tripId}/finalize`, {
-                    method: "POST",
-                    credentials: "include",
-                  });
-                  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
-                  if (!r.ok) {
-                    setFinalizeErr([j.error, j.detail].filter(Boolean).join(" ") || "Could not finalize.");
-                    return;
-                  }
-                  router.push(`/booking/${tripId}`);
-                  router.refresh();
-                } catch {
-                  setFinalizeErr("Network error. Try again.");
-                } finally {
-                  setFinalizeBusy(false);
-                }
-              })();
-            }}
-            className="mt-6 inline-flex rounded-xl bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
-          >
-            {finalizeBusy ? "Finalizing…" : "Finalize trip"}
-          </button>
-        </div>
-      ) : null}
-
-      {showReady && tripStatus !== "finalized" && !isHost ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-sm text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
-          Every decision is resolved. The trip host can <strong>finalize</strong> the trip to open the booking checklist.
-        </div>
-      ) : null}
-
+  const mainCollaborationColumn = (
+    <>
       {!showReady && total > 0 ? (
         <div className="space-y-6">
           <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>
@@ -705,6 +629,116 @@ export function TripCollaborationPanel({
         onTransportModeChange={setTransportMode}
         onPlanUpdated={onPlanUpdated}
       />
+    </>
+  );
+
+  return (
+    <div className="space-y-8">
+      <HostTripMemberEmailModal
+        open={notifyEmailModalOpen}
+        tripId={tripId}
+        recipientMemberIds={notifyEmailModalRecipients}
+        onClose={() => {
+          setNotifyEmailModalOpen(false);
+          setNotifyEmailModalRecipients([]);
+        }}
+        onSendSuccess={() => {
+          setNotifySelectedMemberIds(new Set());
+        }}
+      />
+      {error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </p>
+      ) : null}
+
+      {showReady && tripStatus === "finalized" ? (
+        <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-white p-8 text-center shadow-lg dark:border-emerald-700/40 dark:from-emerald-950/50 dark:to-dm-card dark:shadow-black/30">
+          <p className="font-display text-2xl font-semibold text-emerald-950 dark:text-emerald-100">Trip finalized</p>
+          <p className="mt-2 text-sm text-emerald-900/90 dark:text-emerald-200/90">
+            Open the booking checklist to reserve stays, flights, and dinner.
+          </p>
+          <Link
+            href={`/booking/${tripId}`}
+            className="mt-6 inline-flex rounded-xl bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-800"
+          >
+            View booking checklist
+          </Link>
+        </div>
+      ) : null}
+
+      {showReady && tripStatus !== "finalized" && isHost ? (
+        <div className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-8 text-center shadow-lg dark:border-indigo-500/30 dark:from-indigo-950/40 dark:to-dm-card dark:shadow-black/30">
+          <p className="font-display text-2xl font-semibold text-slate-900 dark:text-neutral-100">All decisions resolved</p>
+          <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+            Finalize the trip to unlock the booking checklist for everyone.
+          </p>
+          {finalizeErr ? (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+              {finalizeErr}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={finalizeBusy}
+            onClick={() => {
+              setFinalizeErr(null);
+              setFinalizeBusy(true);
+              void (async () => {
+                try {
+                  const r = await fetch(`/api/trip-plans/${tripId}/finalize`, {
+                    method: "POST",
+                    credentials: "include",
+                  });
+                  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+                  if (!r.ok) {
+                    setFinalizeErr([j.error, j.detail].filter(Boolean).join(" ") || "Could not finalize.");
+                    return;
+                  }
+                  router.push(`/booking/${tripId}`);
+                  router.refresh();
+                } catch {
+                  setFinalizeErr("Network error. Try again.");
+                } finally {
+                  setFinalizeBusy(false);
+                }
+              })();
+            }}
+            className="mt-6 inline-flex rounded-xl bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+          >
+            {finalizeBusy ? "Finalizing…" : "Finalize trip"}
+          </button>
+        </div>
+      ) : null}
+
+      {showReady && tripStatus !== "finalized" && !isHost ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-sm text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
+          Every decision is resolved. The trip host can <strong>finalize</strong> the trip to open the booking checklist.
+        </div>
+      ) : null}
+
+      {!showReady ? (
+        stickyGroupProgressRail ? (
+          <>
+            <div className="space-y-8">{mainCollaborationColumn}</div>
+            {groupProgressStickyTarget
+              ? createPortal(renderGroupProgressCard(), groupProgressStickyTarget)
+              : null}
+          </>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[70%_30%] lg:items-start lg:gap-8">
+            <div className="min-w-0 space-y-8">{mainCollaborationColumn}</div>
+            <aside
+              aria-label="Group progress"
+              className="min-w-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto"
+            >
+              {renderGroupProgressCard()}
+            </aside>
+          </div>
+        )
+      ) : (
+        <div className="space-y-8">{mainCollaborationColumn}</div>
+      )}
     </div>
   );
 }
@@ -1167,16 +1201,29 @@ function DecisionCard({
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
         <div className="mt-4">
-          <DatesVoteCalendar
-            decisionKey={meta.key}
-            options={opts}
-            votes={votes}
-            mine={viewerPrimaryPick}
-            busy={busy}
-            quorum={quorum}
-            voterN={voterN}
-            onVote={onVote}
-          />
+          {!isHost && opts.length === 1 ? (
+            <DatesSingleProposalMemberVote
+              decisionKey={meta.key}
+              options={opts}
+              votes={votes}
+              mine={viewerPrimaryPick}
+              busy={busy}
+              quorum={quorum}
+              voterN={voterN}
+              onVote={onVote}
+            />
+          ) : (
+            <DatesVoteCalendar
+              decisionKey={meta.key}
+              options={opts}
+              votes={votes}
+              mine={viewerPrimaryPick}
+              busy={busy}
+              quorum={quorum}
+              voterN={voterN}
+              onVote={onVote}
+            />
+          )}
         </div>
         {isHost &&
         !plan.dates.confirmed &&
@@ -1272,11 +1319,12 @@ function DecisionCard({
     }
 
     const isBudgetPoll = meta.key === BUDGET_POLL_DECISION_KEY;
+    const transportSimplePick = !isBudgetPoll && isTransportStyleGroupPoll(meta);
     const customMine =
       typeof viewerPrimaryPick === "string" &&
       !opts.includes(viewerPrimaryPick) &&
       isValidBudgetCustomVoteToken(viewerPrimaryPick);
-    const thumbsDownTally = tallyAgainstVotesForOptions(votes, opts);
+    const thumbsDownTally = transportSimplePick ? {} : tallyAgainstVotesForOptions(votes, opts);
     const structuredWriteInMine =
       !isBudgetPoll &&
       viewerPrimaryPick != null &&
@@ -1289,7 +1337,9 @@ function DecisionCard({
         <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
           {isBudgetPoll
             ? `Pick one (max 3 options). · ${voterN} vote(s)`
-            : `Group vote · ${voterN} vote(s) — pick a favorite, flag what you dislike, or suggest your own`}
+            : transportSimplePick
+              ? `Pick the option that works for you · ${voterN} vote(s)`
+              : `Group vote · ${voterN} vote(s) — pick a favorite, flag what you dislike, or suggest your own`}
         </p>
         {!isBudgetPoll ? (
           <ul className="mt-4 space-y-2.5">
@@ -1320,7 +1370,7 @@ function DecisionCard({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
-                    {thumbsDownGroup > 0 ? (
+                    {!transportSimplePick && thumbsDownGroup > 0 ? (
                       <p className="text-xs text-rose-700 dark:text-rose-300">
                         {thumbsDownGroup} traveler
                         {thumbsDownGroup === 1 ? " " : "s "}
@@ -1333,6 +1383,10 @@ function DecisionCard({
                       type="button"
                       disabled={busy}
                       onClick={() => {
+                        if (transportSimplePick) {
+                          void onVote({ decisionKey: meta.key, kind: "pick", option: opt });
+                          return;
+                        }
                         const base =
                           viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
                         submitPickWithAgainst(base.filter((x) => x !== opt), opt);
@@ -1343,30 +1397,34 @@ function DecisionCard({
                           : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
-                      Vote for
+                      {transportSimplePick ? "Vote" : "Vote for"}
                     </button>
-                    <button
-                      type="button"
-                      disabled={busy || disableNotForSelf}
-                      aria-pressed={myDown ? "true" : "false"}
-                      onClick={() => {
-                        if (viewerPrimaryPick != null) {
-                          const toggle = serverAgainstChoices.includes(opt)
-                            ? serverAgainstChoices.filter((x) => x !== opt)
-                            : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
-                          submitPickWithAgainst(toggle, viewerPrimaryPick);
-                          return;
-                        }
-                        setAgainstPrep((prev) => (prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]));
-                      }}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
-                        myDown
-                          ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
-                          : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
-                      }`}
-                    >
-                      Not for me
-                    </button>
+                    {transportSimplePick ? null : (
+                      <button
+                        type="button"
+                        disabled={busy || disableNotForSelf}
+                        aria-pressed={myDown ? "true" : "false"}
+                        onClick={() => {
+                          if (viewerPrimaryPick != null) {
+                            const toggle = serverAgainstChoices.includes(opt)
+                              ? serverAgainstChoices.filter((x) => x !== opt)
+                              : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
+                            submitPickWithAgainst(toggle, viewerPrimaryPick);
+                            return;
+                          }
+                          setAgainstPrep((prev) =>
+                            prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+                          );
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
+                          myDown
+                            ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
+                            : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                        }`}
+                      >
+                        Not for me
+                      </button>
+                    )}
                   </div>
                 </li>
               );
@@ -1413,14 +1471,18 @@ function DecisionCard({
                 onClick={() => {
                   const t = pollWriteIn.trim();
                   if (!isAllowedPollWriteIn(t, opts)) return;
-                  void onVote({
-                    decisionKey: meta.key,
-                    kind: "pick",
-                    option: t,
-                    againstOptions: (
-                      viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
-                    ).filter((x) => x !== t),
-                  });
+                  void onVote(
+                    transportSimplePick
+                      ? { decisionKey: meta.key, kind: "pick", option: t }
+                      : {
+                          decisionKey: meta.key,
+                          kind: "pick",
+                          option: t,
+                          againstOptions: (
+                            viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
+                          ).filter((x) => x !== t),
+                        }
+                  );
                   setPollWriteIn("");
                 }}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
@@ -1486,7 +1548,8 @@ function DecisionCard({
   if (meta.kind === "binary" || meta.kind === "generic") {
     const opts = meta.options ?? ["Yes", "No"];
     const kind = meta.kind === "generic" ? "generic" : "binary";
-    const kindThumbsDown = tallyAgainstVotesForOptions(votes, opts);
+    const transportSimpleBinary = isTransportStyleGroupPoll(meta);
+    const kindThumbsDown = transportSimpleBinary ? {} : tallyAgainstVotesForOptions(votes, opts);
     const genericWriteInSelected =
       viewerPrimaryPick != null && !opts.includes(viewerPrimaryPick) && isAllowedPollWriteIn(viewerPrimaryPick, opts);
 
@@ -1503,7 +1566,9 @@ function DecisionCard({
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-          Group vote · {voterN} vote(s) — pick what fits, flag lines you dislike, or add another idea.
+          {transportSimpleBinary
+            ? `Pick the option that works for you · ${voterN} vote(s)`
+            : `Group vote · ${voterN} vote(s) — pick what fits, flag lines you dislike, or add another idea.`}
         </p>
         <ul className="mt-4 space-y-2.5">
           {opts.map((opt) => {
@@ -1523,7 +1588,7 @@ function DecisionCard({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
-                  {groupNo > 0 ? (
+                  {!transportSimpleBinary && groupNo > 0 ? (
                     <p className="text-xs text-rose-700 dark:text-rose-300">
                       {groupNo} traveler{groupNo === 1 ? " " : "s "}
                       marked &ldquo;not for me&rdquo;
@@ -1535,6 +1600,10 @@ function DecisionCard({
                     type="button"
                     disabled={busy}
                     onClick={() => {
+                      if (transportSimpleBinary) {
+                        void onVote({ decisionKey: meta.key, kind, option: opt });
+                        return;
+                      }
                       const base =
                         viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep];
                       submitBinaryWithAgainst(opt, base.filter((x) => x !== opt));
@@ -1545,31 +1614,33 @@ function DecisionCard({
                         : "border border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                     }`}
                   >
-                    Vote for
+                    {transportSimpleBinary ? "Vote" : "Vote for"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy || (viewerPrimaryPick != null && forSel)}
-                    onClick={() => {
-                      if (viewerPrimaryPick != null) {
-                        const toggle = serverAgainstChoices.includes(opt)
-                          ? serverAgainstChoices.filter((x) => x !== opt)
-                          : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
-                        submitBinaryWithAgainst(viewerPrimaryPick, toggle);
-                        return;
-                      }
-                      setAgainstPrep((prev) =>
-                        prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
-                      );
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
-                      myNo
-                        ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
-                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
-                    }`}
-                  >
-                    Not for me
-                  </button>
+                  {transportSimpleBinary ? null : (
+                    <button
+                      type="button"
+                      disabled={busy || (viewerPrimaryPick != null && forSel)}
+                      onClick={() => {
+                        if (viewerPrimaryPick != null) {
+                          const toggle = serverAgainstChoices.includes(opt)
+                            ? serverAgainstChoices.filter((x) => x !== opt)
+                            : [...serverAgainstChoices.filter((x) => x !== viewerPrimaryPick), opt];
+                          submitBinaryWithAgainst(viewerPrimaryPick, toggle);
+                          return;
+                        }
+                        setAgainstPrep((prev) =>
+                          prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+                        );
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
+                        myNo
+                          ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
+                          : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                      }`}
+                    >
+                      Not for me
+                    </button>
+                  )}
                 </div>
               </li>
             );
@@ -1596,14 +1667,18 @@ function DecisionCard({
               onClick={() => {
                 const t = pollWriteIn.trim();
                 if (!isAllowedPollWriteIn(t, opts)) return;
-                void onVote({
-                  decisionKey: meta.key,
-                  kind,
-                  option: t,
-                  againstOptions: (
-                    viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
-                  ).filter((x) => x !== t),
-                });
+                void onVote(
+                  transportSimpleBinary
+                    ? { decisionKey: meta.key, kind, option: t }
+                    : {
+                        decisionKey: meta.key,
+                        kind,
+                        option: t,
+                        againstOptions: (
+                          viewerPrimaryPick != null ? serverAgainstChoices : [...againstPrep]
+                        ).filter((x) => x !== t),
+                      }
+                );
                 setPollWriteIn("");
               }}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"

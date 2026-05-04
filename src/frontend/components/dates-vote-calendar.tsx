@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import type { ReactDatePickerCustomHeaderProps } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -8,6 +8,7 @@ import {
   aggregatedTallyForBallotOption,
   buildParsedDateOptions,
   earliestParsedDay,
+  formatBallotProposalHeading,
   formatLocalIsoDate,
   formatLocalIsoRangeVote,
   inferDefaultYearFromDateOptions,
@@ -264,3 +265,146 @@ export function DatesVoteCalendar({
     </div>
   );
 }
+
+function CalendarGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** When there is exactly one host-proposed ballot line, members confirm before seeing the calendar. */
+export function DatesSingleProposalMemberVote({
+  decisionKey,
+  options,
+  votes,
+  mine,
+  busy,
+  quorum,
+  voterN,
+  onVote,
+}: {
+  decisionKey: string;
+  options: string[];
+  votes: Record<string, unknown>;
+  mine: string | null;
+  busy: boolean;
+  quorum: number;
+  voterN: number;
+  onVote: (p: Record<string, unknown>) => void;
+}) {
+  const proposalRaw = options[0]!;
+  const proposalNorm = proposalRaw.trim();
+
+  const fallbackCalendarYear = new Date().getFullYear();
+  const y0 = useMemo(
+    () => inferDefaultYearFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
+  const heading = useMemo(() => formatBallotProposalHeading(proposalRaw, y0), [proposalRaw, y0]);
+
+  const mineTrim = mine?.trim() ?? "";
+  const votedForProposal = mineTrim.length > 0 && mineTrim === proposalNorm;
+
+  const [declinedProposal, setDeclinedProposal] = useState(false);
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+
+  useEffect(() => {
+    const alt = Boolean(mineTrim && mineTrim !== proposalNorm);
+    setDeclinedProposal(alt);
+    setCalendarExpanded(alt);
+  }, [mineTrim, proposalNorm]);
+
+  const castWorksForMe = () => {
+    onVote({ decisionKey, kind: "dates", option: proposalRaw });
+    setDeclinedProposal(false);
+    setCalendarExpanded(false);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-5 py-4 dark:border-indigo-500/30 dark:bg-indigo-950/25">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">
+          Host proposed trip dates
+        </p>
+        <p className="mt-2 font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100">
+          {heading}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => castWorksForMe()}
+          className={`rounded-xl px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${
+            votedForProposal
+              ? "bg-indigo-700 text-white ring-2 ring-indigo-400 dark:bg-indigo-500 dark:ring-indigo-300/60"
+              : "border border-slate-200 bg-white text-slate-900 hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/30"
+          }`}
+        >
+          Works for me
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setDeclinedProposal(true);
+            setCalendarExpanded(false);
+          }}
+          className={`rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${
+            declinedProposal && !votedForProposal
+              ? "border-rose-400 bg-rose-50 text-rose-950 dark:border-rose-600/60 dark:bg-rose-950/40 dark:text-rose-100"
+              : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
+          }`}
+        >
+          Doesn&apos;t work
+        </button>
+      </div>
+
+      {declinedProposal ? (
+        <div className="space-y-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setCalendarExpanded((e) => !e)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:border-slate-300 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
+            aria-expanded={calendarExpanded}
+          >
+            <CalendarGlyph />
+            {calendarExpanded ? "Hide calendar" : "Suggest other dates"}
+          </button>
+
+          {calendarExpanded ? (
+            <DatesVoteCalendar
+              decisionKey={decisionKey}
+              options={options}
+              votes={votes}
+              mine={mine}
+              busy={busy}
+              quorum={quorum}
+              voterN={voterN}
+              onVote={onVote}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      <p className="text-xs text-slate-500 dark:text-neutral-500">
+        {voterN}/{quorum}+ votes to lock. Pick &quot;Works for me&quot; to vote for the proposed range above, or use the
+        calendar after &quot;Doesn&apos;t work&quot; for an alternate.
+      </p>
+    </div>
+  );
+}
+

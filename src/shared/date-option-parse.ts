@@ -229,6 +229,19 @@ export function formatVoteRangeLabel(start: Date, end: Date): string {
   return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 }
 
+/** Heading for vote UI — short month/day/year; falls back to raw text if unparseable. */
+export function formatBallotProposalHeading(option: string, defaultYear: number): string {
+  const raw = option.trim();
+  if (!raw) return raw;
+  const r = parseDateOptionToRange(raw, defaultYear);
+  if (!r) return raw;
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (localDayTime(r.start) === localDayTime(r.end)) {
+    return r.start.toLocaleDateString("en-US", opts);
+  }
+  return `${r.start.toLocaleDateString("en-US", opts)} – ${r.end.toLocaleDateString("en-US", opts)}`;
+}
+
 export function isStrictIsoDateString(s: string): boolean {
   const m = s.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return false;

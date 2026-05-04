@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { CollabStateV1 } from "@/shared/collaboration";
@@ -37,6 +37,16 @@ export function TripSharedPanel({
 }) {
   const [plan, setPlan] = useState(planFromServer);
   const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
+  const [lgTwoColumn, setLgTwoColumn] = useState(false);
+  const [groupProgressStickyMount, setGroupProgressStickyMount] = useState<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setLgTwoColumn(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     setPlan(planFromServer);
@@ -74,44 +84,56 @@ export function TripSharedPanel({
         </div>
       ) : null}
 
-      <TripPlanCard
-        plan={plan}
-        badge="Saved"
-        showShare={false}
-        hideOpenDecisions
-        inviteCode={inviteCode ?? null}
-        showInviteRow={false}
-        guestJoinNames={tripMemberNames}
-        hideSpotlightsSection={hasSpotlights}
-      />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[70%_30%] lg:items-start">
+        <div className="min-w-0 space-y-8">
+          <TripPlanCard
+            plan={plan}
+            badge="Saved"
+            showShare={false}
+            hideOpenDecisions
+            inviteCode={inviteCode ?? null}
+            showInviteRow={false}
+            guestJoinNames={tripMemberNames}
+            hideSpotlightsSection={hasSpotlights}
+          />
 
-      {hasSpotlights ? (
-        <TripSpotlightsInteractive
-          tripId={tripId}
-          plan={plan}
-          viewerUserId={viewerUserId}
-          initialSpotlightVotes={initialCollab.spotlightVotes}
-          onPlanUpdated={setPlan}
-          onCollabBump={bumpCollab}
-        />
-      ) : null}
+          {hasSpotlights ? (
+            <TripSpotlightsInteractive
+              tripId={tripId}
+              plan={plan}
+              viewerUserId={viewerUserId}
+              initialSpotlightVotes={initialCollab.spotlightVotes}
+              onPlanUpdated={setPlan}
+              onCollabBump={bumpCollab}
+            />
+          ) : null}
 
-      <TripCollaborationPanel
-        tripId={tripId}
-        plan={plan}
-        tripStatus={tripStatus}
-        isHost={isHost}
-        collabRefreshSignal={collabRefreshSignal}
-        onPlanUpdated={setPlan}
-      />
+          <TripCollaborationPanel
+            tripId={tripId}
+            plan={plan}
+            tripStatus={tripStatus}
+            isHost={isHost}
+            collabRefreshSignal={collabRefreshSignal}
+            onPlanUpdated={setPlan}
+            {...(lgTwoColumn ? { groupProgressStickyTarget: groupProgressStickyMount } : {})}
+          />
 
-      <TripCardChatWidget
-        tripId={tripId}
-        spotlights={plan.spotlights ?? []}
-        initialMessages={chatSeed}
-        onPlanReplaced={setPlan}
-        onCollabBump={bumpCollab}
-      />
+          <TripCardChatWidget
+            tripId={tripId}
+            spotlights={plan.spotlights ?? []}
+            initialMessages={chatSeed}
+            onPlanReplaced={setPlan}
+            onCollabBump={bumpCollab}
+          />
+        </div>
+        {lgTwoColumn ? (
+          <aside
+            ref={(el) => setGroupProgressStickyMount(el)}
+            aria-label="Group progress"
+            className="min-w-0 self-start lg:sticky lg:top-28 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

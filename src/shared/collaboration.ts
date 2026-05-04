@@ -43,6 +43,8 @@ type PollSynthRow = {
 export const VENUE_POLL_DECISION_KEY = "p_eat" as const;
 /** Budget-per-person poll — allows custom dollar amounts beyond curated picks */
 export const BUDGET_POLL_DECISION_KEY = "p_budget" as const;
+/** Structured `plan.polls.transport` poll */
+export const TRANSPORT_POLL_DECISION_KEY = "p_transport" as const;
 
 const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "destinations", key: "p_dest", label: "Destination" },
@@ -50,7 +52,7 @@ const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "activities", key: "p_activity", label: "What should we prioritize?" },
   { bucket: "vibePick", key: "p_vibe", label: "Trip vibe" },
   { bucket: "budgetPick", key: "p_budget", label: "Budget per person" },
-  { bucket: "transport", key: "p_transport", label: "How we get there" },
+  { bucket: "transport", key: TRANSPORT_POLL_DECISION_KEY, label: "How we get there" },
 ];
 
 export type CardChatMessage = {
@@ -176,6 +178,19 @@ export function buildClassifiedDecisions(plan: TripPlan): ClassifiedDecision[] {
   const tail = synthPollDecisions(plan, open.length + (dateSynth ? 1 : 0));
   if (!dateSynth) return [...open, ...tail];
   return [...open, dateSynth, ...tail];
+}
+
+/** Fly/drive (or similar) — UI is a single choice per traveler, no per-option “not for me”. */
+export function isTransportStyleGroupPoll(meta: ClassifiedDecision): boolean {
+  if (meta.key === TRANSPORT_POLL_DECISION_KEY) return true;
+  if (meta.kind !== "binary" || !meta.options || meta.options.length !== 2) return false;
+  const [a, b] = meta.options;
+  if (a === "Flights / fly" && b === "Drive / ride together") return true;
+  if (a === "Drive / ride together" && b === "Flights / fly") return true;
+  const hay = `${meta.label}\n${a}\n${b}`.toLowerCase();
+  return (
+    /\b(fly|flying|flight|flights|plane)\b/.test(hay) && /\b(road|drive|driving|car|ride)\b/.test(hay)
+  );
 }
 
 /** Dates are settled enough to search hotels/dinner (stay length matters). */
