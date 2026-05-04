@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
@@ -25,8 +25,17 @@ type SettingsPayload = {
   notifyNudgeReminders: boolean;
 };
 
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className={className} aria-hidden>
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SettingsPageClient() {
   const router = useRouter();
+  const avatarFileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -282,8 +291,26 @@ export function SettingsPageClient() {
             </div>
             <div>
               <span className="text-sm font-medium text-slate-700 dark:text-neutral-300">Profile photo</span>
-              <div className="mt-2 flex flex-wrap items-center gap-4">
-                <div className="relative h-16 w-16 overflow-hidden rounded-full border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-dm-elevated">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-500">
+                Tap or hover your photo, then click to change it.
+              </p>
+              <div className="mt-2">
+                <input
+                  ref={avatarFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="sr-only"
+                  id="settings-avatar-upload"
+                  onChange={(e) => void onAvatarChange(e)}
+                  disabled={avatarBusy}
+                />
+                <button
+                  type="button"
+                  disabled={avatarBusy}
+                  onClick={() => avatarFileRef.current?.click()}
+                  aria-label={avatarBusy ? "Uploading photo" : "Change profile photo"}
+                  className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 outline-none ring-offset-2 ring-offset-white transition hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-dm-elevated dark:ring-offset-dm-card dark:hover:border-white/20"
+                >
                   {avatarUrl ? (
                     <Image src={avatarUrl} alt="" fill className="object-cover" unoptimized />
                   ) : (
@@ -291,13 +318,17 @@ export function SettingsPageClient() {
                       {(displayName || payload.email || "?").slice(0, 1).toUpperCase()}
                     </span>
                   )}
-                </div>
-                <label className="cursor-pointer">
-                  <span className={`inline-flex ${primaryFormButtonClass} cursor-pointer text-sm`}>
-                    {avatarBusy ? "Uploading…" : "Upload photo"}
+                  <span
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                    aria-hidden
+                  >
+                    {avatarBusy ? (
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <PlusIcon className="h-7 w-7 text-white drop-shadow-sm" />
+                    )}
                   </span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(e) => void onAvatarChange(e)} disabled={avatarBusy} />
-                </label>
+                </button>
               </div>
             </div>
             {accountMsg ? (
