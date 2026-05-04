@@ -17,7 +17,6 @@ import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
   applyDatesSlotToPlan,
-  followUpPromptsForPlan,
   isDatesSlotTbdValue,
   planHasUsableTripTiming,
   groundPlanInUserInput,
@@ -27,11 +26,9 @@ import {
   safeParseJson,
 } from "@/shared/trip-plan";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
-import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
 import { PlacePickCards } from "@/frontend/components/place-pick-cards";
 import type { PlacePreview, PlacePreviewBlock, PlaceSpotlight } from "@/shared/place-preview";
-import { hasPlaceCandidates } from "@/shared/place-candidates";
 import type { PlacePreviewResponse, PlaceSearchDisambiguateEvent, PlaceSearchEvent } from "@/shared/place-search-events";
 import {
   GIBBERISH_SLOT_REPLY,
@@ -219,11 +216,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [dateSlotError, setDateSlotError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"chat" | "building" | "done">("chat");
+  const [phase, setPhase] = useState<"chat" | "building">("chat");
   const [plan, setPlan] = useState<TripPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastSubmittedText, setLastSubmittedText] = useState("");
   const [prefetchingSlots, setPrefetchingSlots] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -242,13 +238,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const placePickResolverRef = useRef<(() => void) | null>(null);
   const draftSpotlightsRef = useRef<PlaceSpotlight[]>([]);
 
-  const [hadNamedPlaceMentions, setHadNamedPlaceMentions] = useState(false);
-
   const missing = useMemo(() => missingSlots(slots), [slots]);
-  const followUpQuestions = useMemo(
-    () => (plan ? followUpPromptsForPlan(plan, { hadNamedPlaceMentions }) : []),
-    [plan, hadNamedPlaceMentions]
-  );
 
   const resolvePlacePickFlow = useCallback((messageId: string, picked: PlacePreview | null) => {
     setMessages((prev) =>
@@ -289,10 +279,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           ? ((json as PlacePreviewResponse).events as PlaceSearchEvent[])
           : [];
 
-      if (hasPlaceCandidates(opts.placeTextHint)) {
-        setHadNamedPlaceMentions(true);
-      }
-
       for (const ev of events) {
         if (ev.kind === "confirmed") {
           draftSpotlightsRef.current = [...draftSpotlightsRef.current, { ...ev.place, sourceQuery: ev.query }];
@@ -307,7 +293,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
       const dis = events.find((e): e is PlaceSearchDisambiguateEvent => e.kind === "disambiguate");
       if (dis?.options?.length) {
-        setHadNamedPlaceMentions(true);
         await new Promise<void>((resolve) => {
           placePickResolverRef.current = () => resolve();
           const disId = newId();
@@ -364,60 +349,72 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     }
   }, [activeSlot]);
 
-  const confirmPlan = useCallback(async () => {
-    if (!plan || !seedMessage) return;
-    if (!planHasUsableTripTiming(plan)) {
-      setSaveError(
-        "Add a rough timing window—season, month, or dates—before saving the trip."
-      );
-      return;
-    }
-    setSaveBusy(true);
-    setSaveError(null);
-    try {
-      const res = await fetch("/api/trip-plans", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: persistClientId.current,
-          plan,
-          seedText: seedMessage,
-          hostSetupDraft: true,
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        detail?: string;
-        code?: string;
-        id?: string;
-      };
-      if (!res.ok) {
-        console.error("[Conci Supabase] Save plan failed:", {
-          status: res.status,
-          error: body.error,
-          detail: body.detail,
-          code: body.code,
-        });
-        if (res.status === 401) {
-          router.push(`/auth?next=${encodeURIComponent(pathname || "/trip-parser")}`);
-          return;
-        }
+  /** Save draft trip and go to host calendar setup. Returns true only when navigation runs. */
+  const persistAndRedirectToHostSetup = useCallback(
+    async (planToSave: TripPlan): Promise<boolean> => {
+      if (!seedMessage) return false;
+      if (!planHasUsableTripTiming(planToSave)) {
         setSaveError(
-          [body.error, body.detail].filter(Boolean).join(" ") || "Could not save plan to Supabase."
+          "Add a rough timing window—season, month, or dates—before saving the trip."
         );
-        return;
+        return false;
       }
-      if (body.id) {
-        router.replace(`/trip/${body.id}/setup`);
+      setSaveBusy(true);
+      setSaveError(null);
+      try {
+        const res = await fetch("/api/trip-plans", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: persistClientId.current,
+            plan: planToSave,
+            seedText: seedMessage,
+            hostSetupDraft: true,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+          code?: string;
+          id?: string;
+        };
+        if (!res.ok) {
+          console.error("[Conci Supabase] Save plan failed:", {
+            status: res.status,
+            error: body.error,
+            detail: body.detail,
+            code: body.code,
+          });
+          if (res.status === 401) {
+            router.push(`/auth?next=${encodeURIComponent(pathname || "/trip-parser")}`);
+            return false;
+          }
+          setSaveError(
+            [body.error, body.detail].filter(Boolean).join(" ") || "Could not save plan to Supabase."
+          );
+          return false;
+        }
+        if (body.id) {
+          router.replace(`/trip/${body.id}/setup`);
+          return true;
+        }
+        return false;
+      } catch (e) {
+        console.error("[Conci Supabase] Save plan request threw:", e);
+        setSaveError("Could not save plan. Check your connection and Supabase setup.");
+        return false;
+      } finally {
+        setSaveBusy(false);
       }
-    } catch (e) {
-      console.error("[Conci Supabase] Save plan request threw:", e);
-      setSaveError("Could not save plan. Check your connection and Supabase setup.");
-    } finally {
-      setSaveBusy(false);
-    }
-  }, [plan, seedMessage, router, pathname]);
+    },
+    [seedMessage, router, pathname]
+  );
+
+  const confirmPlan = useCallback(async () => {
+    if (!plan) return;
+    await persistAndRedirectToHostSetup(plan);
+  }, [plan, persistAndRedirectToHostSetup]);
 
   const fetchParsedPlan = useCallback(
     async (text: string, imageDataUrls?: string[]): Promise<TripPlan> => {
@@ -583,9 +580,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       text: string,
       imageDataUrls?: string[],
       mergeSlots?: Partial<Record<SlotKey, string>>
-    ): Promise<boolean> => {
+    ): Promise<TripPlan | null> => {
       const trimmed = text.trim();
-      if (!trimmed && !(imageDataUrls?.length)) return false;
+      if (!trimmed && !(imageDataUrls?.length)) return null;
 
       setLoading(true);
       setError(null);
@@ -597,11 +594,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           planOut = applyDatesSlotToPlan(planOut, mergeSlots.dates.trim());
         }
         setPlan(planOut);
-        setLastSubmittedText(trimmed || "(images)");
-        return true;
+        return planOut;
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "Unknown parser error.");
-        return false;
+        return null;
       } finally {
         setLoading(false);
       }
@@ -646,7 +642,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setReplyDraft("");
     setAwaitingFirstChipAnswer(false);
     draftSpotlightsRef.current = [];
-    setHadNamedPlaceMentions(false);
 
     const imgNote = imageUrlsSnapshot.length
       ? `\n[${imageUrlsSnapshot.length} reference image${imageUrlsSnapshot.length > 1 ? "s" : ""}]`
@@ -680,17 +675,27 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         const stillMissing = missingSlots(extracted);
 
         if (stillMissing.length === 0) {
-          setPlan(mergeSpotlightsFromRef(plan, draftSpotlightsRef));
-          setLastSubmittedText(composeTripPrompt(seed, extracted));
-          setPhase("done");
+          const merged = mergeSpotlightsFromRef(plan, draftSpotlightsRef);
+          setPlan(merged);
           setMessages((prev) => [
             ...prev,
             {
               id: newId(),
               role: "assistant",
-              text: "I had enough from your message to build a first draft — here's your plan.",
+              text: "Taking you to host setup — opening your calendar next.",
             },
           ]);
+          const navigated = await persistAndRedirectToHostSetup(merged);
+          if (!navigated && !planHasUsableTripTiming(merged)) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: newId(),
+                role: "assistant",
+                text: "We need a rough trip window (season, month, or dates) before saving. Add clearer timing and try sending again.",
+              },
+            ]);
+          }
           return;
         }
 
@@ -874,32 +879,22 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const prompt = composeTripPrompt(seedMessage, finalSlots);
     setPhase("building");
     setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: ACK_BEFORE_PLAN }]);
-    const ok = await runParse(prompt, undefined, finalSlots);
-    if (ok) {
-      setPhase("done");
+    const planOut = await runParse(prompt, undefined, finalSlots);
+    if (planOut) {
       setMessages((prev) => [
         ...prev,
         {
           id: newId(),
           role: "assistant",
-          text: "Here’s your plan—tap through and tweak anything you like.",
+          text: "Taking you to host setup — opening your calendar next.",
         },
       ]);
+      const navigated = await persistAndRedirectToHostSetup(planOut);
+      if (!navigated) {
+        setPhase("chat");
+      }
     } else {
       setPhase("chat");
-    }
-  }
-
-  async function handleFollowUpClick(question: string) {
-    const base = lastSubmittedText.trim() || composeTripPrompt(seedMessage, slots);
-    const combined = base ? `${base}\n\n(Follow-up: ${question})` : question;
-    setMessages((prev) => [...prev, { id: newId(), role: "user", text: question }]);
-    const ok = await runParse(combined);
-    if (ok) {
-      setMessages((prev) => [
-        ...prev,
-        { id: newId(), role: "assistant", text: "Updated—have a look below." },
-      ]);
     }
   }
 
@@ -920,13 +915,11 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setPhase("chat");
     setPlan(null);
     setError(null);
-    setLastSubmittedText("");
     setPrefetchingSlots(false);
     persistClientId.current = generateTripPersistId();
     setSaveError(null);
     setImageSlots([]);
     draftSpotlightsRef.current = [];
-    setHadNamedPlaceMentions(false);
     placePickResolverRef.current = null;
   }
 
@@ -955,6 +948,27 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           Hello, {firstName}
         </h1>
       </header>
+
+      {saveError ? (
+        <div className="rounded-xl border border-amber-300/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <p>
+            {saveError}{" "}
+            If the database table is missing, run{" "}
+            <code className="rounded bg-amber-200/80 px-1 text-xs dark:bg-black/30">trip_plans</code> from{" "}
+            <code className="rounded bg-amber-200/80 px-1 text-xs dark:bg-black/30">supabase/schema.sql</code>.
+          </p>
+          {plan && seedMessage ? (
+            <button
+              type="button"
+              disabled={saveBusy}
+              onClick={() => void confirmPlan()}
+              className="mt-2 rounded-full border border-amber-400/70 bg-white px-4 py-1.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700/50 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-950/80"
+            >
+              {saveBusy ? "Saving…" : "Try saving again"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div
         ref={threadRef}
@@ -1234,59 +1248,16 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         </form>
       ) : null}
 
-      {phase === "done" && plan ? (
-        <>
-          {saveError ? (
-            <div className="mb-3 rounded-xl border border-amber-300/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
-              {saveError} Run{" "}
-              <code className="rounded bg-amber-200/80 px-1 text-xs dark:bg-black/30">trip_plans</code> from{" "}
-              <code className="rounded bg-amber-200/80 px-1 text-xs dark:bg-black/30">supabase/schema.sql</code> if
-              the table is missing.
-            </div>
-          ) : null}
-
-          <div className="rounded-2xl ring-1 ring-slate-200 dark:ring-white/[0.06]">
-            <TripPlanCard plan={plan} />
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              disabled={saveBusy}
-              onClick={() => void confirmPlan()}
-              className="rounded-2xl bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
-            >
-              {saveBusy ? "Saving…" : "Confirm plan"}
-            </button>
-            <button
-              type="button"
-              disabled={saveBusy}
-              onClick={resetTrip}
-              className="rounded-2xl border border-slate-300 bg-transparent px-8 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-white/15 dark:text-[#c4c2be] dark:hover:bg-white/5"
-            >
-              Start over
-            </button>
-          </div>
-
-          {followUpQuestions.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
-              <p className="mb-2 text-sm text-slate-600 dark:text-[#9c9a96]">Want to tighten anything?</p>
-              <div className="flex flex-col gap-2">
-                {followUpQuestions.map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => void handleFollowUpClick(question)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 transition hover:border-orange-400/50 disabled:opacity-50 dark:border-white/10 dark:bg-[#222] dark:text-[#e4e2de] dark:hover:border-[#ea580c]/40"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </>
+      {seedMessage ? (
+        <p className="text-center">
+          <button
+            type="button"
+            onClick={resetTrip}
+            className="text-sm font-medium text-slate-500 underline-offset-4 hover:text-slate-700 hover:underline dark:text-[#9c9a96] dark:hover:text-[#ebe9e4]"
+          >
+            Start over
+          </button>
+        </p>
       ) : null}
     </div>
   );

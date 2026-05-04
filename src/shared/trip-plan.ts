@@ -2,6 +2,7 @@ import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
   formatLocalIsoDate,
   inferDefaultYearFromDateOptions,
+  localDayTime,
   looseDateOptionOverlapsUserText,
   parseDateOptionToRange,
   startOfLocalDay,
@@ -605,7 +606,8 @@ export function enumerateLocalIsoDays(startIso: string, endIso: string): string[
   const out: string[] = [];
   let cur = startOfLocalDay(a);
   const end = startOfLocalDay(b);
-  while (cur.getTime() <= end.getTime()) {
+  /** Compare calendar days — raw `getTime()` breaks after we advance `cur` to noon (end is midnight). */
+  while (localDayTime(cur) <= localDayTime(end)) {
     out.push(formatLocalIsoDate(cur));
     cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 12, 0, 0, 0);
   }

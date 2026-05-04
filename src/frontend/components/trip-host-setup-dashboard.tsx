@@ -280,6 +280,20 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [hostSetup.activityPins, persistHostSetup]
   );
 
+  const clearDayPins = useCallback(
+    (dateIso: string) => {
+      const rp = (hostSetup.restaurantPins ?? []).filter((p) => p.dateIso !== dateIso);
+      const ap = (hostSetup.activityPins ?? []).filter((p) => p.dateIso !== dateIso);
+      const nextRp = rp.length ? rp : undefined;
+      const nextAp = ap.length ? ap : undefined;
+      void persistHostSetup({
+        restaurantPins: nextRp ?? [],
+        activityPins: nextAp ?? [],
+      });
+    },
+    [hostSetup.restaurantPins, hostSetup.activityPins, persistHostSetup]
+  );
+
   const onCalendarDayClick = useCallback(
     (dom: number) => {
       const iso = isoFromCell(calYear, calMonth, dom);
@@ -315,6 +329,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         enumerateLocalIsoDays(tripDisplayRange.startIso, tripDisplayRange.endIso).includes(iso);
       if (!inRange) return;
 
+      /* Focus this day for keyboard / mobile; hover uses the same cell for actions. */
       setSelectedDayIso(iso);
     },
     [
@@ -428,44 +443,46 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   }, [selectedDayIso]);
 
   const completionCard = (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-dm-card dark:shadow-black/20 sm:p-5">
-      <p className="text-sm font-semibold text-slate-900 dark:text-white">Your trip is {pct}% complete</p>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
-        <div
-          className="h-full rounded-full bg-emerald-500 transition-[width]"
-          style={{ width: `${pct}%` }}
-        />
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-white/15 dark:bg-dm-card dark:shadow-black/20 sm:px-4 sm:py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-slate-900 dark:text-white">Trip {pct}% complete</p>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-[width]"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:justify-end sm:text-[11px]">
+          <li
+            className={`flex items-center gap-1.5 ${hostHasConcreteTripRange(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
+          >
+            <span>Dates</span>
+            {hostHasConcreteTripRange(plan) ? "✓" : "—"}
+          </li>
+          <li
+            className={`flex items-center gap-1.5 ${hostHasHotel(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
+          >
+            <span>Hotel</span>
+            {hostHasHotel(plan) ? "✓" : "—"}
+          </li>
+          <li
+            className={`flex items-center gap-1.5 ${hostHasKeptRestaurant(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
+          >
+            <span>Restaurant</span>
+            {hostHasKeptRestaurant(plan) ? "✓" : "—"}
+          </li>
+          <li className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400">
+            <span>Experiences</span>
+            <span className="text-violet-600 dark:text-violet-300">{hostSetup.experiencesOutlined ? "Done" : "Opt."}</span>
+          </li>
+        </ul>
       </div>
-      <ul className="mt-4 space-y-2.5 text-xs sm:text-sm">
-        <li
-          className={`flex justify-between gap-2 ${hostHasConcreteTripRange(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-        >
-          <span>Dates {!hostHasConcreteTripRange(plan) ? "(req.)" : ""}</span>
-          {hostHasConcreteTripRange(plan) ? "✓" : "—"}
-        </li>
-        <li
-          className={`flex justify-between gap-2 ${hostHasHotel(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-        >
-          <span>Hotel {!hostHasHotel(plan) ? "(req.)" : ""}</span>
-          {hostHasHotel(plan) ? "✓" : "—"}
-        </li>
-        <li
-          className={`flex justify-between gap-2 ${hostHasKeptRestaurant(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-        >
-          <span>Restaurant {!hostHasKeptRestaurant(plan) ? "(req.)" : ""}</span>
-          {hostHasKeptRestaurant(plan) ? "✓" : "—"}
-        </li>
-        <li className="flex justify-between gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-white/10 dark:text-neutral-400">
-          <span>Experiences</span>
-          <span className="text-[11px] text-violet-600 dark:text-violet-300">
-            {hostSetup.experiencesOutlined ? "Done" : "Optional"}
-          </span>
-        </li>
-      </ul>
-      <p className="mt-4 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500 dark:border-white/10 dark:text-neutral-500">
-        Publish from the calendar toolbar when all required items are checked.
+      <p className="mt-2 border-t border-slate-200 pt-2 text-[10px] leading-snug text-slate-500 dark:border-white/10 dark:text-neutral-500">
+        Publish from the calendar when ready.
       </p>
-      {err ? <p className="mt-2 text-center text-[11px] text-rose-600 dark:text-rose-400">{err}</p> : null}
+      {err ? <p className="mt-1.5 text-center text-[10px] text-rose-600 dark:text-rose-400">{err}</p> : null}
     </div>
   );
 
@@ -513,7 +530,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap a day inside the trip, then open suggestions to add meals or activities (based on your trip details and budget).`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — hover a trip day for Add or Clear; Add loads contextual meals & activities (tap on mobile).`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" ? (
@@ -625,13 +642,28 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                       );
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
+                    const dayHasPins =
+                      (hostSetup.restaurantPins ?? []).some((p) => p.dateIso === cellIso) ||
+                      (hostSetup.activityPins ?? []).some((p) => p.dateIso === cellIso);
+                    const showDayActions =
+                      datePickMode === "day" &&
+                      inTripRangeCell(dom) &&
+                      tripDisplayRange?.startIso &&
+                      tripDisplayRange.endIso;
                     return (
-                      <button
-                        type="button"
+                      <div
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
+                        tabIndex={0}
+                        role="presentation"
                         onClick={() => onCalendarDayClick(dom)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onCalendarDayClick(dom);
+                          }
+                        }}
                         className={[
-                          "group flex min-h-[7.5rem] flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
+                          "group/cell relative flex min-h-[7.5rem] cursor-pointer flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
                           inTripRangeCell(dom)
                             ? "bg-violet-50/90 hover:bg-violet-50 dark:bg-violet-950/35 dark:hover:bg-violet-950/45"
@@ -640,7 +672,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
                           datePickMode === "day" && selectedDayIso === cellIso
-                            ? "ring-2 ring-violet-400/90 ring-inset dark:ring-violet-500/40"
+                            ? "ring-1 ring-violet-400/80 ring-inset dark:ring-violet-500/50"
                             : "",
                         ].join(" ")}
                       >
@@ -732,25 +764,40 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                             </div>
                           ))}
 
-                        {datePickMode === "day" &&
-                        selectedDayIso === cellIso &&
-                        inTripRangeCell(dom) &&
-                        tripDisplayRange?.startIso &&
-                        tripDisplayRange.endIso ? (
-                          <div className="mt-auto shrink-0 pt-2">
+                        {showDayActions ? (
+                          <div
+                            className={[
+                              "pointer-events-none absolute inset-x-1 bottom-1 z-[2] flex flex-col gap-1 opacity-0 transition-opacity duration-150",
+                              "max-md:pointer-events-auto max-md:opacity-100",
+                              "md:pointer-events-none md:opacity-0 md:group-hover/cell:pointer-events-auto md:group-hover/cell:opacity-100",
+                            ].join(" ")}
+                          >
                             <button
                               type="button"
                               onClick={(ev) => {
                                 ev.stopPropagation();
+                                setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
-                              className="w-full rounded-lg border border-violet-200 bg-violet-50/90 px-2 py-1.5 text-[11px] font-semibold text-violet-800 shadow-sm transition hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-950/70"
+                              className="rounded-md border border-violet-200 bg-violet-50/95 px-2 py-1 text-center text-[10px] font-semibold text-violet-800 shadow-sm backdrop-blur-sm hover:bg-violet-100 dark:border-violet-500/40 dark:bg-violet-950/85 dark:text-violet-100 dark:hover:bg-violet-950"
                             >
                               Add meals &amp; activities
                             </button>
+                            {dayHasPins ? (
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  clearDayPins(cellIso);
+                                }}
+                                className="rounded-md border border-slate-200/90 bg-white/95 px-2 py-1 text-center text-[10px] font-semibold text-slate-600 shadow-sm backdrop-blur-sm hover:bg-rose-50 hover:text-rose-700 dark:border-white/15 dark:bg-dm-elevated/95 dark:text-neutral-300 dark:hover:bg-rose-950/50 dark:hover:text-rose-200"
+                              >
+                                Clear day
+                              </button>
+                            ) : null}
                           </div>
                         ) : null}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

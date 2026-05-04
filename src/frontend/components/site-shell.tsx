@@ -78,7 +78,7 @@ export function SiteShell({
               {title}
             </h1>
             {titleRight ? (
-              <div className="w-full shrink-0 lg:max-w-sm xl:max-w-md">{titleRight}</div>
+              <div className="w-full shrink-0 lg:max-w-3xl">{titleRight}</div>
             ) : null}
           </div>
         </section>
