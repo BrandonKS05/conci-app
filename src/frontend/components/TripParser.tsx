@@ -390,6 +390,13 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             router.push(`/auth?next=${encodeURIComponent(pathname || "/trip-parser")}`);
             return false;
           }
+          if (res.status === 402 || body.code === "subscription_required") {
+            const msg = encodeURIComponent(
+              "You're on the free plan — upgrade to create and share trips."
+            );
+            router.push(`/pricing?notice=${msg}`);
+            return false;
+          }
           setSaveError(
             [body.error, body.detail].filter(Boolean).join(" ") || "Could not save plan to Supabase."
           );
