@@ -17,8 +17,9 @@ import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
   applyDatesSlotToPlan,
-  DATE_OPTION_TBD,
   followUpPromptsForPlan,
+  isDatesSlotTbdValue,
+  planHasUsableTripTiming,
   groundPlanInUserInput,
   isLocationVague,
   normalizePlan,
@@ -45,7 +46,7 @@ const SLOT_ORDER: SlotKey[] = ["location", "dates", "people", "budget", "vibe"];
 
 const SLOT_QUESTIONS: Record<SlotKey, string> = {
   location: "Where are you headed—or any region you’re eyeing?",
-  dates: "When should this trip happen—or leave dates open for now?",
+  dates: "Roughly when should this trip fall—even a season or month is fine?",
   people: "How many people are coming?",
   budget: "What’s your budget per person (rough range is fine)?",
   vibe: "What’s the vibe—party, chill, culture, outdoors?",
@@ -69,8 +70,11 @@ function slotsFromPlan(plan: TripPlan): Partial<Record<SlotKey, string>> {
     out.location = plan.location.trim();
   }
 
-  if (plan.dates.options.length > 0) {
-    out.dates = plan.dates.options.join("; ");
+  const usableDateLines = plan.dates.options.filter(
+    (d) => d.trim().length > 0 && !isDatesSlotTbdValue(d)
+  );
+  if (usableDateLines.length > 0) {
+    out.dates = usableDateLines.join("; ");
   }
 
   const names = plan.people.names.filter(Boolean);
@@ -207,7 +211,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [awaitingFirstChipAnswer, setAwaitingFirstChipAnswer] = useState(false);
   const [activeSlot, setActiveSlot] = useState<SlotKey | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
-  const [dateSlotMode, setDateSlotMode] = useState<"specific" | "tbd">("specific");
+  const [dateSlotMode, setDateSlotMode] = useState<"specific" | "rough">("specific");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [dateSlotError, setDateSlotError] = useState<string | null>(null);
@@ -365,6 +369,12 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   const confirmPlan = useCallback(async () => {
     if (!plan || !seedMessage) return;
+    if (!planHasUsableTripTiming(plan)) {
+      setSaveError(
+        "Add a rough timing window—season, month, or dates—before saving the trip."
+      );
+      return;
+    }
     setSaveBusy(true);
     setSaveError(null);
     try {
@@ -720,6 +730,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       setDateSlotMode("specific");
       setDateStart("");
       setDateEnd("");
+      setReplyDraft("");
       setDateSlotError(null);
     }
     setMessages((prev) => [
@@ -749,11 +760,35 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     let answer = replyDraft.trim();
     if (slotKey === "dates") {
       setDateSlotError(null);
-      if (dateSlotMode === "tbd") {
-        answer = DATE_OPTION_TBD;
+      if (dateSlotMode === "rough") {
+        if (!answer) {
+          setDateSlotError("Describe a rough window (month, season, or year span).");
+          return;
+        }
+        if (answer.length < 3) {
+          setDateSlotError("A bit more detail helps—try “Summer 2026” or “late March”.");
+          return;
+        }
+        if (isClearlyGibberish(answer)) {
+          const userBubbleId = newId();
+          setMessages((prev) => [
+            ...prev,
+            { id: userBubbleId, role: "user", text: answer },
+            { id: newId(), role: "assistant", text: GIBBERISH_SLOT_REPLY },
+          ]);
+          setReplyDraft("");
+          setActiveSlot(activeSlot);
+          return;
+        }
+        if (isDatesSlotTbdValue(answer)) {
+          setDateSlotError(
+            'Give real timing—even vague—rather than deferring (“e.g. May”, “Winter break”).'
+          );
+          return;
+        }
       } else {
         if (!dateStart.trim()) {
-          setDateSlotError("Choose a start date, or pick “TBD”.");
+          setDateSlotError("Pick a start date—or switch to “Rough window” for a timeframe.");
           return;
         }
         const ds = dateStart.trim();
@@ -1000,6 +1035,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                   onClick={() => {
                     setDateSlotMode("specific");
                     setDateSlotError(null);
+                    setReplyDraft("");
                   }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                     dateSlotMode === "specific"
@@ -1012,16 +1048,18 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                 <button
                   type="button"
                   onClick={() => {
-                    setDateSlotMode("tbd");
+                    setDateSlotMode("rough");
                     setDateSlotError(null);
+                    setDateStart("");
+                    setDateEnd("");
                   }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-                    dateSlotMode === "tbd"
+                    dateSlotMode === "rough"
                       ? "bg-slate-900 text-white dark:bg-[#ebe9e4] dark:text-[#141414]"
                       : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
                   }`}
                 >
-                  TBD
+                  Rough window
                 </button>
               </div>
               {dateSlotMode === "specific" ? (
@@ -1052,9 +1090,22 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                   </p>
                 </div>
               ) : (
-                <p className="text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-                  You can set exact dates later. The trip owner can lock them in for everyone when you&apos;re ready.
-                </p>
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-neutral-400">
+                    Timing window <span className="font-normal text-slate-400">(free text)</span>
+                  </label>
+                  <textarea
+                    ref={replyInputRef}
+                    value={replyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    placeholder="e.g. Late July 2026 · Summer · Any weekend in September"
+                    rows={2}
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
+                  />
+                  <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+                    Doesn&apos;t have to be exact—we need something to steer flights, stays, and the group calendar.
+                  </p>
+                </div>
               )}
               {dateSlotError ? <p className="text-sm text-rose-600 dark:text-rose-300">{dateSlotError}</p> : null}
             </div>
@@ -1074,7 +1125,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               disabled={
                 loading ||
                 (activeSlot !== "dates" && !replyDraft.trim()) ||
-                (activeSlot === "dates" && dateSlotMode === "specific" && !dateStart.trim())
+                (activeSlot === "dates" &&
+                  dateSlotMode === "specific" &&
+                  !dateStart.trim()) ||
+                (activeSlot === "dates" && dateSlotMode === "rough" && !replyDraft.trim())
               }
               className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white"
             >

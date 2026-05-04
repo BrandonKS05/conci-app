@@ -338,6 +338,22 @@ export function groundPlanInUserInput(
   return next;
 }
 
+/** Legacy sentinel from flows that deferred dates entirely; stripped on normalize and rejected for new saves. */
+export const DATE_OPTION_TBD = "TBD — host will confirm later";
+
+export function isDatesSlotTbdValue(slotText: string): boolean {
+  const v = slotText.trim();
+  return v === DATE_OPTION_TBD || /^TBD\b/i.test(v);
+}
+
+/** At least one non-placeholder date hint (exact days or vague window). */
+export function planHasUsableTripTiming(plan: TripPlan): boolean {
+  return plan.dates.options.some((o) => {
+    const t = o.trim();
+    return t.length > 0 && !isDatesSlotTbdValue(t);
+  });
+}
+
 export function normalizePlan(value: unknown): TripPlan {
   const plan = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const people =
@@ -363,7 +379,14 @@ export function normalizePlan(value: unknown): TripPlan {
     dates: {
       confirmed: typeof dates.confirmed === "boolean" ? dates.confirmed : false,
       options: Array.isArray(dates.options)
-        ? [...new Set(dates.options.filter((d) => typeof d === "string"))].slice(0, POLL_MAX_OPTIONS)
+        ? [
+            ...new Set(
+              dates.options
+                .filter((d): d is string => typeof d === "string")
+                .map((d) => d.trim())
+                .filter((d) => d.length > 0 && !isDatesSlotTbdValue(d))
+            ),
+          ].slice(0, POLL_MAX_OPTIONS)
         : [],
     },
     people: {
@@ -409,8 +432,12 @@ export function followUpPromptsForPlan(
     });
   }
 
-  if (plan.dates.options.length === 0) {
-    candidates.push({ priority: 2, label: "When are you thinking of going?" });
+  if (!planHasUsableTripTiming(plan)) {
+    candidates.push({
+      priority: 2,
+      label:
+        "When should this roughly land—even a season, month, or wide date range?",
+    });
   }
 
   const budgetMissing =
@@ -439,20 +466,12 @@ export function followUpPromptsForPlan(
   return Array.from(new Set(labels)).slice(0, 3);
 }
 
-/** Stored in `plan.dates.options` when the creator picks “TBD” during trip creation. */
-export const DATE_OPTION_TBD = "TBD — host will confirm later";
-
-export function isDatesSlotTbdValue(slotText: string): boolean {
-  const v = slotText.trim();
-  return v === DATE_OPTION_TBD || /^TBD\b/i.test(v);
-}
-
 /** Apply the chat “dates” slot answer onto the plan (overrides model dates for this flow). */
 export function applyDatesSlotToPlan(plan: TripPlan, datesSlotText: string): TripPlan {
   const v = datesSlotText.trim();
   if (!v) return plan;
   if (isDatesSlotTbdValue(v)) {
-    return { ...plan, dates: { confirmed: false, options: [DATE_OPTION_TBD] } };
+    return { ...plan, dates: { confirmed: false, options: [] } };
   }
   const line = v.length > 200 ? `${v.slice(0, 197)}…` : v;
   return { ...plan, dates: { confirmed: false, options: [line] } };

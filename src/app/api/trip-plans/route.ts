@@ -4,6 +4,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { allocateUniqueInviteCode, formatInviteCodeDisplay } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { ensureHostMembership } from "@/backend/trip-memberships";
+import { normalizePlan, planHasUsableTripTiming } from "@/shared/trip-plan";
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
@@ -31,6 +32,17 @@ export async function POST(request: Request) {
 
   if (!body.plan || typeof body.plan !== "object") {
     return NextResponse.json({ error: "Field `plan` is required." }, { status: 400 });
+  }
+
+  const normalizedPlan = normalizePlan(body.plan);
+  if (!planHasUsableTripTiming(normalizedPlan)) {
+    return NextResponse.json(
+      {
+        error: "Rough trip timing required",
+        detail: "Add a month, season, or date window so schedules and polls can anchor.",
+      },
+      { status: 400 }
+    );
   }
 
   const id = body.id && typeof body.id === "string" && isUuid(body.id) ? body.id : randomUUID();
@@ -83,7 +95,7 @@ export async function POST(request: Request) {
 
   const row = {
     id,
-    plan: body.plan,
+    plan: normalizedPlan,
     seed_text: seedText,
     user_id: user.id,
     invite_code: codeToSave,
