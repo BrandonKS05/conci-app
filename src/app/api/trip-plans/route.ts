@@ -5,10 +5,10 @@ import { allocateUniqueInviteCode, formatInviteCodeDisplay } from "@/backend/inv
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { ensureHostMembership } from "@/backend/trip-memberships";
 import {
-  concreteTripRangeFromPlanDates,
   normalizePlan,
   parseHostSetup,
   planHasUsableTripTiming,
+  tripRangeBestEffortFromPlanDates,
 } from "@/shared/trip-plan";
 
 function isUuid(s: string): boolean {
@@ -109,12 +109,12 @@ export async function POST(request: Request) {
 
   let planForSave = normalizedPlan;
   if (hostSetupDraft) {
-    const concrete = concreteTripRangeFromPlanDates(normalizedPlan, new Date().getFullYear());
+    const range = tripRangeBestEffortFromPlanDates(normalizedPlan, new Date().getFullYear());
     const baseHs = parseHostSetup(normalizedPlan.hostSetup) ?? {};
-    if (concrete && !baseHs.tripRange?.startIso) {
+    if (range && !baseHs.tripRange?.startIso) {
       planForSave = normalizePlan({
         ...(normalizedPlan as unknown as Record<string, unknown>),
-        hostSetup: { ...baseHs, tripRange: concrete },
+        hostSetup: { ...baseHs, tripRange: range },
       });
     }
   }

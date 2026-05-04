@@ -597,6 +597,38 @@ export function concreteTripRangeFromPlanDates(
   return null;
 }
 
+const MAX_TRIP_RANGE_DAYS = 370;
+
+/**
+ * Strict ISO/slug ranges first; if none match, uses the loose parser (incl. `Date` fallback)
+ * so model‑phrased options still map to a calendar range when possible.
+ */
+export function tripRangeBestEffortFromPlanDates(
+  plan: TripPlan,
+  fallbackYear: number
+): { startIso: string; endIso: string } | null {
+  const strict = concreteTripRangeFromPlanDates(plan, fallbackYear);
+  if (strict) return strict;
+  const y0 = inferDefaultYearFromDateOptions(plan.dates.options, fallbackYear);
+  for (const opt of plan.dates.options) {
+    const t = typeof opt === "string" ? opt.trim() : "";
+    if (!t) continue;
+    const r = parseDateOptionToRange(t, y0);
+    if (!r) continue;
+    const a = startOfLocalDay(r.start);
+    const b = startOfLocalDay(r.end);
+    if (localDayTime(a) > localDayTime(b)) continue;
+    const spanDays = (localDayTime(b) - localDayTime(a)) / (24 * 60 * 60 * 1000);
+    if (spanDays > MAX_TRIP_RANGE_DAYS) continue;
+    const startIso = formatLocalIsoDate(a);
+    const endIso = formatLocalIsoDate(b);
+    if (parseLocalIsoDate(startIso) && parseLocalIsoDate(endIso)) {
+      return { startIso, endIso };
+    }
+  }
+  return null;
+}
+
 /** @deprecated Use concreteTripRangeFromPlanDates */
 export function inferredTripRangeFromPlanDates(plan: TripPlan, fallbackYear: number) {
   return concreteTripRangeFromPlanDates(plan, fallbackYear);

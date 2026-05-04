@@ -9,7 +9,7 @@ import {
   hostHasHotel,
   hostHasKeptRestaurant,
   hostSetupCompletionPercent,
-  concreteTripRangeFromPlanDates,
+  tripRangeBestEffortFromPlanDates,
   isHostPublishReady,
   parseLocalIsoDate,
   seedTextMentionsDining,
@@ -19,6 +19,10 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
+import {
+  HostSetupCopilot,
+  type HostCopilotUiHint,
+} from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
@@ -135,17 +139,24 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     endIso: string;
   } | null>(null);
 
-  const concreteRangeFromPlan = concreteTripRangeFromPlanDates(plan, new Date().getFullYear());
+  const concreteRangeFromPlan = useMemo(
+    () => tripRangeBestEffortFromPlanDates(plan, new Date().getFullYear()),
+    [plan]
+  );
 
   const [calYear, setCalYear] = useState(() => {
-    const tr = initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
+    const y0 = new Date().getFullYear();
+    const tr =
+      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     const d = base ?? new Date();
     return d.getFullYear();
   });
   const [calMonth, setCalMonth] = useState(() => {
-    const tr = initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, new Date().getFullYear());
+    const y0 = new Date().getFullYear();
+    const tr =
+      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     const d = base ?? new Date();
@@ -189,12 +200,22 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [tripId]
   );
 
+  /** Keep the calendar month aligned when trip dates appear (parser hydrate, PATCH, first paint). */
+  useEffect(() => {
+    const start = tripDisplayRange?.startIso;
+    if (!start) return;
+    const d = parseLocalIsoDate(start);
+    if (!d) return;
+    setCalYear(d.getFullYear());
+    setCalMonth(d.getMonth());
+  }, [tripDisplayRange?.startIso]);
+
   /** Legacy drafts: persist explicit parser dates once if `hostSetup.tripRange` was never saved (new trips get this from POST). */
   useEffect(() => {
     const y0 = new Date().getFullYear();
-    const concrete = concreteTripRangeFromPlanDates(initialPlan, y0);
-    if (!concrete || initialPlan.hostSetup?.tripRange?.startIso) return;
-    void persistHostSetup({ tripRange: concrete });
+    const inferred = tripRangeBestEffortFromPlanDates(initialPlan, y0);
+    if (!inferred || initialPlan.hostSetup?.tripRange?.startIso) return;
+    void persistHostSetup({ tripRange: inferred });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from initial plan only
   }, []);
 
@@ -420,6 +441,31 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const pct = hostSetupCompletionPercent(plan);
   const pubReady = isHostPublishReady(plan);
 
+  const onCopilotResult = useCallback((nextPlan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => {
+    if (applied) {
+      setPlan(nextPlan);
+      setPendingRangeConfirm(null);
+      setRangeAnchor(null);
+    }
+    if (ui.suggestDatePickMode) {
+      setDatePickMode(ui.suggestDatePickMode);
+    } else if (applied && nextPlan.hostSetup?.tripRange?.startIso) {
+      setDatePickMode("day");
+    }
+    if (ui.focusTripStartMonth && nextPlan.hostSetup?.tripRange?.startIso) {
+      const d = parseLocalIsoDate(nextPlan.hostSetup.tripRange.startIso);
+      if (d) {
+        setCalYear(d.getFullYear());
+        setCalMonth(d.getMonth());
+      }
+    }
+    if (ui.scrollTo) {
+      requestAnimationFrame(() => {
+        document.getElementById(`sec-${ui.scrollTo}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, []);
+
   const onPublish = useCallback(async () => {
     if (!pubReady) return;
     setPublishBusy(true);
@@ -559,6 +605,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             </a>
           ))}
         </nav>
+
+        <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
       </aside>
 
       <div className="min-w-0 flex-1 space-y-10 lg:min-w-0">
@@ -814,7 +862,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                         {showDayActions ? (
                           <div
                             className={[
-                              "pointer-events-none absolute inset-x-1 bottom-1 z-[2] flex flex-col gap-1 opacity-0 transition-opacity duration-150",
+                              "pointer-events-none absolute z-[3] flex max-h-[calc(100%-2.5rem)] flex-col gap-1.5 overflow-hidden p-2 opacity-0 transition-opacity duration-150",
+                              dayHasPins
+                                ? "inset-x-1 bottom-1 items-stretch"
+                                : "inset-1 items-center justify-center",
                               "max-md:pointer-events-auto max-md:opacity-100",
                               "md:pointer-events-none md:opacity-0 md:group-hover/cell:pointer-events-auto md:group-hover/cell:opacity-100",
                             ].join(" ")}
@@ -826,7 +877,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                 setSelectedDayIso(cellIso);
                                 setAddPlacesOpen(true);
                               }}
-                              className="rounded-md border border-violet-200 bg-violet-50/95 px-2 py-1 text-center text-[10px] font-semibold text-violet-800 shadow-sm backdrop-blur-sm hover:bg-violet-100 dark:border-violet-500/40 dark:bg-violet-950/85 dark:text-violet-100 dark:hover:bg-violet-950"
+                              className="max-w-full rounded-lg border border-violet-200/90 bg-violet-50/95 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-violet-900 shadow-sm backdrop-blur-sm transition hover:bg-violet-100 sm:px-3 sm:text-xs dark:border-violet-500/40 dark:bg-violet-950/90 dark:text-violet-100 dark:hover:bg-violet-950"
                             >
                               Add meals &amp; activities
                             </button>
@@ -837,7 +888,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                                   ev.stopPropagation();
                                   clearDayPins(cellIso);
                                 }}
-                                className="rounded-md border border-slate-200/90 bg-white/95 px-2 py-1 text-center text-[10px] font-semibold text-slate-600 shadow-sm backdrop-blur-sm hover:bg-rose-50 hover:text-rose-700 dark:border-white/15 dark:bg-dm-elevated/95 dark:text-neutral-300 dark:hover:bg-rose-950/50 dark:hover:text-rose-200"
+                                className="max-w-full rounded-lg border border-slate-200/90 bg-white/95 px-2.5 py-1.5 text-center font-sans text-[11px] font-medium leading-snug text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-rose-50 hover:text-rose-700 sm:text-xs dark:border-white/15 dark:bg-dm-elevated/95 dark:text-neutral-200 dark:hover:bg-rose-950/50 dark:hover:text-rose-200"
                               >
                                 Clear day
                               </button>
