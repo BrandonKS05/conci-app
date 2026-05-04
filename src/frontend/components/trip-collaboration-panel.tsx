@@ -23,6 +23,7 @@ import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/res
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
+import { DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
 import {
   CuratedExperiencesSection,
   CuratedFlightsRows,
@@ -820,25 +821,17 @@ function DecisionCard({
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
         <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Vote for a weekend. Votes: {voterN}/{quorum}+ to lock.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {opts.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                onVote({ decisionKey: meta.key, kind: "dates", option: opt })
-              }
-              className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
-                mine === opt
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                  : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
-              }`}
-            >
-              {opt}
-            </button>
-          ))}
+        <div className="mt-4">
+          <DatesVoteCalendar
+            decisionKey={meta.key}
+            options={opts}
+            votes={votes}
+            mine={mine}
+            busy={busy}
+            quorum={quorum}
+            voterN={voterN}
+            onVote={onVote}
+          />
         </div>
       </section>
     );

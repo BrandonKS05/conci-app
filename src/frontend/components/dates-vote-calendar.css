@@ -1,0 +1,116 @@
+/* Conci dates vote — extends react-calendar (base CSS imported from TSX). */
+
+.dates-vote-calendar.react-calendar {
+  width: 100%;
+  max-width: 32rem;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+
+.dates-vote-calendar .react-calendar__navigation {
+  margin-bottom: 0.5rem;
+}
+
+.dates-vote-calendar .react-calendar__navigation button {
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  min-width: 2.25rem;
+}
+
+.dates-vote-calendar .react-calendar__month-view__weekdays {
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: rgb(100 116 139);
+}
+
+.dark .dates-vote-calendar .react-calendar__month-view__weekdays {
+  color: rgb(148 163 184);
+}
+
+.dates-vote-calendar .react-calendar__month-view__weekdays__weekday {
+  padding: 0.35rem 0;
+}
+
+.dates-vote-calendar .react-calendar__tile {
+  position: relative;
+  padding: 0.55em 0.25em 1.15em;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.dates-vote-calendar .react-calendar__tile:enabled:hover,
+.dates-vote-calendar .react-calendar__tile:enabled:focus {
+  background: rgb(224 231 255);
+}
+
+.dark .dates-vote-calendar .react-calendar__tile:enabled:hover,
+.dark .dates-vote-calendar .react-calendar__tile:enabled:focus {
+  background: rgb(67 56 202 / 0.45);
+}
+
+.dates-vote-calendar .react-calendar__tile--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: transparent !important;
+}
+
+.dates-vote-calendar .dates-tile-proposed:enabled {
+  background: rgb(238 242 255);
+}
+
+.dark .dates-vote-calendar .dates-tile-proposed:enabled {
+  background: rgb(49 46 129 / 0.4);
+}
+
+.dates-vote-calendar .dates-tile-mine:enabled {
+  box-shadow: inset 0 0 0 2px rgb(79 70 229);
+  background: rgb(224 231 255);
+}
+
+.dark .dates-vote-calendar .dates-tile-mine:enabled {
+  box-shadow: inset 0 0 0 2px rgb(165 180 252);
+  background: rgb(55 48 163 / 0.55);
+}
+
+.dates-vote-calendar .react-calendar__tile--now {
+  background: rgb(254 249 195);
+}
+
+.dark .dates-vote-calendar .react-calendar__tile--now {
+  background: rgb(113 63 18 / 0.45);
+}
+
+.dates-vote-calendar .dates-tile-votehint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dates-vote-calendar .dates-tile-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgb(67 56 202);
+}
+
+.dark .dates-vote-calendar .dates-tile-count {
+  color: rgb(196 181 253);
+}
+
+.dates-vote-calendar .dates-tile-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: rgb(139 92 246 / 0.75);
+}
+
+.dark .dates-vote-calendar .dates-tile-dot {
+  background: rgb(167 139 250 / 0.85);
+}
