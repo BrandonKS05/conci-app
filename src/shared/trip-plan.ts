@@ -49,12 +49,29 @@ export type HostRestaurantPin = {
   kept: boolean;
 };
 
+/** Serialized experience row (matches `LiveExperienceCard` from live recommendations). */
+export type HostActivityExperience = {
+  name: string;
+  pricePerPerson: string;
+  rating: string;
+  duration: string;
+  bookingUrl: string;
+  coverPhotoUrl?: string | null;
+};
+
+export type HostActivityPin = {
+  dateIso: string;
+  experience: HostActivityExperience;
+  kept: boolean;
+};
+
 /**
  * Persisted while `trip_plans.status === 'draft'`: concrete range, hotel, restaurant pins before invite is minted.
  */
 export type HostSetupState = {
   tripRange?: { startIso: string; endIso: string } | null;
   restaurantPins?: HostRestaurantPin[];
+  activityPins?: HostActivityPin[];
   hotel?: PlaceSpotlight | null;
   /** Optional UX flag for completion meter only (does not gate publish). */
   experiencesOutlined?: boolean;
@@ -119,6 +136,21 @@ function normalizePolls(plan: Record<string, unknown>): TripPolls | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+export function experienceToSpotlight(e: HostActivityExperience): PlaceSpotlight | null {
+  const mapsUrl = typeof e.bookingUrl === "string" ? e.bookingUrl.trim() : "";
+  if (!mapsUrl.startsWith("http")) return null;
+  const name = typeof e.name === "string" ? e.name.trim() : "";
+  const ratingMatch = typeof e.rating === "string" ? e.rating.match(/^(\d+(?:\.\d+)?)/) : null;
+  const rating = ratingMatch ? parseFloat(ratingMatch[1]!) : undefined;
+  return {
+    name: name || "Activity",
+    mapsUrl,
+    rating: Number.isFinite(rating) ? rating : undefined,
+    priceRange: typeof e.pricePerPerson === "string" ? e.pricePerPerson : undefined,
+    photoUrl: typeof e.coverPhotoUrl === "string" && e.coverPhotoUrl.startsWith("http") ? e.coverPhotoUrl : null,
+  };
+}
+
 export function spotlightFromUnknown(row: unknown): PlaceSpotlight | null {
   if (!row || typeof row !== "object") return null;
   const o = row as Record<string, unknown>;
@@ -175,11 +207,46 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
     if (pins.length) restaurantPins = pins;
   }
 
+  const actRaw = h.activityPins;
+  let activityPins: HostActivityPin[] | undefined;
+  if (Array.isArray(actRaw) && actRaw.length) {
+    const pins: HostActivityPin[] = [];
+    for (const row of actRaw) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const dateIso = typeof o.dateIso === "string" ? o.dateIso.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) continue;
+      const ex = o.experience;
+      if (!ex || typeof ex !== "object") continue;
+      const e = ex as Record<string, unknown>;
+      const name = typeof e.name === "string" ? e.name.trim().slice(0, 200) : "";
+      const bookingUrl = typeof e.bookingUrl === "string" ? e.bookingUrl.trim() : "";
+      if (!name || !bookingUrl.startsWith("http")) continue;
+      const experience: HostActivityExperience = {
+        name,
+        pricePerPerson: typeof e.pricePerPerson === "string" ? e.pricePerPerson : "",
+        rating: typeof e.rating === "string" ? e.rating : "",
+        duration: typeof e.duration === "string" ? e.duration : "",
+        bookingUrl,
+        coverPhotoUrl:
+          typeof e.coverPhotoUrl === "string" && e.coverPhotoUrl.startsWith("http")
+            ? e.coverPhotoUrl
+            : e.coverPhotoUrl === null
+              ? null
+              : undefined,
+      };
+      const kept = typeof o.kept === "boolean" ? o.kept : true;
+      pins.push({ dateIso, experience, kept });
+    }
+    if (pins.length) activityPins = pins;
+  }
+
   const experiencesOutlined = typeof h.experiencesOutlined === "boolean" ? h.experiencesOutlined : undefined;
 
   const any =
     tripRange !== undefined ||
     restaurantPins ||
+    activityPins ||
     hotel !== undefined ||
     experiencesOutlined !== undefined;
   if (!any) return undefined;
@@ -187,6 +254,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   const out: HostSetupState = {};
   if (tripRange !== undefined) out.tripRange = tripRange;
   if (restaurantPins) out.restaurantPins = restaurantPins;
+  if (activityPins) out.activityPins = activityPins;
   if (hotel !== undefined) out.hotel = hotel ?? null;
   if (experiencesOutlined !== undefined) out.experiencesOutlined = experiencesOutlined;
   return out;
@@ -598,6 +666,10 @@ export function planAfterHostPublish(plan: TripPlan): TripPlan {
   const endIso = range?.endIso ?? "";
   const hs = plan.hostSetup;
   const pins = (hs?.restaurantPins ?? []).filter((p) => p.kept);
+  const actPins = (hs?.activityPins ?? [])
+    .filter((p) => p.kept)
+    .map((p) => experienceToSpotlight(p.experience))
+    .filter((s): s is PlaceSpotlight => s != null);
   const hotel = hs?.hotel;
 
   const urls = new Set((plan.spotlights ?? []).map((s) => s.mapsUrl.trim().toLowerCase()));
@@ -606,6 +678,7 @@ export function planAfterHostPublish(plan: TripPlan): TripPlan {
     folded.push(...dedupeSpotlights(urls, [hotel]));
   }
   folded.push(...dedupeSpotlights(urls, pins.map((p) => p.place)));
+  folded.push(...dedupeSpotlights(urls, actPins));
 
   let dates = { ...plan.dates };
   if (ISO_DAY.test(startIso) && ISO_DAY.test(endIso)) {

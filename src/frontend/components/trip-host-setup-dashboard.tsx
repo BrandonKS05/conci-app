@@ -13,12 +13,15 @@ import {
   isHostPublishReady,
   parseLocalIsoDate,
   seedTextMentionsDining,
+  type HostActivityExperience,
   type HostRestaurantPin,
   type HostSetupState,
   type TripPlan,
 } from "@/shared/trip-plan";
+import { HostSetupAddPlacesModal } from "@/frontend/components/host-setup-add-places-modal";
 import { SiteShell } from "@/frontend/components/site-shell";
-import { restaurantPickToSpotlight } from "@/shared/restaurants";
+import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
+import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 
 const NAV = [
@@ -111,6 +114,11 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const [publishBusy, setPublishBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [rangeAnchor, setRangeAnchor] = useState<string | null>(null);
+  const [datePickMode, setDatePickMode] = useState<"range" | "day">(() =>
+    hostHasConcreteTripRange(initialPlan) ? "day" : "range"
+  );
+  const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
+  const [addPlacesOpen, setAddPlacesOpen] = useState(false);
 
   const inferredRange = inferredTripRangeFromPlanDates(plan, new Date().getFullYear());
 
@@ -261,28 +269,96 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [hostSetup.restaurantPins, persistHostSetup]
   );
 
+  const toggleActivityPin = useCallback(
+    (dateIso: string, bookingUrl: string, kept: boolean) => {
+      const pins = [...(hostSetup.activityPins ?? [])];
+      const idx = pins.findIndex((p) => p.dateIso === dateIso && p.experience.bookingUrl === bookingUrl);
+      if (idx === -1) return;
+      pins[idx] = { ...pins[idx]!, kept };
+      void persistHostSetup({ activityPins: pins });
+    },
+    [hostSetup.activityPins, persistHostSetup]
+  );
+
   const onCalendarDayClick = useCallback(
     (dom: number) => {
       const iso = isoFromCell(calYear, calMonth, dom);
 
-      if (!rangeAnchor) {
-        setRangeAnchor(iso);
+      if (datePickMode === "range") {
+        if (!rangeAnchor) {
+          setRangeAnchor(iso);
+          return;
+        }
+
+        let start = parseLocalIsoDate(rangeAnchor)!;
+        let end = parseLocalIsoDate(iso)!;
+        if (start.getTime() > end.getTime()) [start, end] = [end, start];
+        setRangeAnchor(null);
+        suggestedSeededRef.current = false;
+        setSelectedDayIso(null);
+        void (async () => {
+          await persistHostSetup({
+            hotel: hostSetup.hotel,
+            experiencesOutlined: hostSetup.experiencesOutlined,
+            tripRange: { startIso: formatLocalIsoDate(start), endIso: formatLocalIsoDate(end) },
+            restaurantPins: [],
+            activityPins: [],
+          });
+          setDatePickMode("day");
+        })();
         return;
       }
 
-      let start = parseLocalIsoDate(rangeAnchor)!;
-      let end = parseLocalIsoDate(iso)!;
-      if (start.getTime() > end.getTime()) [start, end] = [end, start];
-      setRangeAnchor(null);
-      suggestedSeededRef.current = false;
-      void persistHostSetup({
-        hotel: hostSetup.hotel,
-        experiencesOutlined: hostSetup.experiencesOutlined,
-        tripRange: { startIso: formatLocalIsoDate(start), endIso: formatLocalIsoDate(end) },
-        restaurantPins: [],
-      });
+      const inRange =
+        tripDisplayRange?.startIso &&
+        tripDisplayRange?.endIso &&
+        enumerateLocalIsoDays(tripDisplayRange.startIso, tripDisplayRange.endIso).includes(iso);
+      if (!inRange) return;
+
+      setSelectedDayIso(iso);
     },
-    [calYear, calMonth, rangeAnchor, hostSetup, persistHostSetup]
+    [
+      calYear,
+      calMonth,
+      rangeAnchor,
+      datePickMode,
+      tripDisplayRange?.startIso,
+      tripDisplayRange?.endIso,
+      hostSetup.hotel,
+      hostSetup.experiencesOutlined,
+      persistHostSetup,
+    ]
+  );
+
+  const addRestaurantToDay = useCallback(
+    (pick: RestaurantPick) => {
+      if (!selectedDayIso) return;
+      const place = restaurantPickToSpotlight(pick);
+      const pins = [...(hostSetup.restaurantPins ?? [])];
+      if (pins.some((p) => p.dateIso === selectedDayIso && p.place.mapsUrl === place.mapsUrl)) return;
+      pins.push({ dateIso: selectedDayIso, place, kept: true });
+      void persistHostSetup({ restaurantPins: pins });
+    },
+    [hostSetup.restaurantPins, persistHostSetup, selectedDayIso]
+  );
+
+  const addExperienceToDay = useCallback(
+    (card: LiveExperienceCard) => {
+      if (!selectedDayIso) return;
+      const experience: HostActivityExperience = {
+        name: card.name,
+        pricePerPerson: card.pricePerPerson,
+        rating: card.rating,
+        duration: card.duration,
+        bookingUrl: card.bookingUrl,
+        coverPhotoUrl: card.coverPhotoUrl ?? null,
+      };
+      const pins = [...(hostSetup.activityPins ?? [])];
+      if (pins.some((p) => p.dateIso === selectedDayIso && p.experience.bookingUrl === experience.bookingUrl)) return;
+      pins.push({ dateIso: selectedDayIso, experience, kept: true });
+      void persistHostSetup({ activityPins: pins });
+    },
+    [hostSetup.activityPins, persistHostSetup, selectedDayIso]
   );
 
   const pct = hostSetupCompletionPercent(plan);
@@ -337,6 +413,19 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     },
     [tripDisplayRange, calYear, calMonth]
   );
+
+  const selectedDayLabel = useMemo(() => {
+    if (!selectedDayIso) return "";
+    const d = parseLocalIsoDate(selectedDayIso);
+    return d
+      ? d.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : selectedDayIso;
+  }, [selectedDayIso]);
 
   const completionCard = (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-dm-card dark:shadow-black/20 sm:p-5">
@@ -416,14 +505,34 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
 
       <div className="min-w-0 flex-1 space-y-10 lg:min-w-0">
         <section id="sec-dates" className="scroll-mt-28">
-          <div className="mb-5">
-            <p className="max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-              {tripDisplayRange?.startIso
-                ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap twice to change range. Meal pins appear in each day when you add them.`
-                : "Tap two days to set your trip; days in range are highlighted below."}
-            </p>
-            {rangeAnchor ? (
-              <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+                {datePickMode === "range"
+                  ? tripDisplayRange?.startIso && tripDisplayRange.endIso
+                    ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
+                    : "Tap two days to set your trip; days in range are highlighted below."
+                  : tripDisplayRange?.startIso && tripDisplayRange.endIso
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap a day inside the trip, then open suggestions to add meals or activities (based on your trip details and budget).`
+                    : "Tap two days to set your trip."}
+              </p>
+              {rangeAnchor && datePickMode === "range" ? (
+                <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
+              ) : null}
+            </div>
+            {hostHasConcreteTripRange(plan) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setDatePickMode("range");
+                  setRangeAnchor(null);
+                  setSelectedDayIso(null);
+                  setAddPlacesOpen(false);
+                }}
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+              >
+                Change dates
+              </button>
             ) : null}
           </div>
 
@@ -503,16 +612,20 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             <div className="border-x border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card">
               {weeks.map((weekRow, wi) => (
                 <div key={`wk-${wi}`} className="grid grid-cols-7">
-                  {weekRow.map((dom, ci) =>
-                    dom == null ? (
-                      <div
-                        key={`e-${wi}-${ci}`}
-                        className={[
-                          "min-h-[7.5rem] border-b border-slate-200 bg-slate-50/40 dark:border-white/10 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
-                          ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
-                        ].join(" ")}
-                      />
-                    ) : (
+                  {weekRow.map((dom, ci) => {
+                    if (dom == null) {
+                      return (
+                        <div
+                          key={`e-${wi}-${ci}`}
+                          className={[
+                            "min-h-[7.5rem] border-b border-slate-200 bg-slate-50/40 dark:border-white/10 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
+                            ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
+                          ].join(" ")}
+                        />
+                      );
+                    }
+                    const cellIso = isoFromCell(calYear, calMonth, dom);
+                    return (
                       <button
                         type="button"
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
@@ -523,9 +636,11 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           inTripRangeCell(dom)
                             ? "bg-violet-50/90 hover:bg-violet-50 dark:bg-violet-950/35 dark:hover:bg-violet-950/45"
                             : "bg-white hover:bg-slate-50/80 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
-                          parseLocalIsoDate(isoFromCell(calYear, calMonth, dom))?.getTime() ===
-                            parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
+                          parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
+                            : "",
+                          datePickMode === "day" && selectedDayIso === cellIso
+                            ? "ring-2 ring-violet-400/90 ring-inset dark:ring-violet-500/40"
                             : "",
                         ].join(" ")}
                       >
@@ -542,7 +657,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                         </div>
 
                         {(hostSetup.restaurantPins ?? [])
-                          .filter((p) => p.dateIso === isoFromCell(calYear, calMonth, dom))
+                          .filter((p) => p.dateIso === cellIso)
                           .map((p) => (
                             <div key={p.place.mapsUrl} className="mb-2 last:mb-0">
                               <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
@@ -578,9 +693,66 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                               </div>
                             </div>
                           ))}
+
+                        {(hostSetup.activityPins ?? [])
+                          .filter((p) => p.dateIso === cellIso)
+                          .map((p) => (
+                            <div key={p.experience.bookingUrl} className="mb-2 last:mb-0">
+                              <div className="flex items-start gap-1.5 rounded-md px-1 py-1 text-left leading-snug text-slate-800 transition hover:bg-white/70 dark:text-neutral-100 dark:hover:bg-white/5">
+                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">{p.experience.name}</span>
+                                <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                  Activity
+                                </span>
+                              </div>
+                              <div className="mt-1 flex gap-2 pl-1.5">
+                                {p.kept ? (
+                                  <button
+                                    type="button"
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      toggleActivityPin(p.dateIso, p.experience.bookingUrl, false);
+                                    }}
+                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                  >
+                                    Remove
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      toggleActivityPin(p.dateIso, p.experience.bookingUrl, true);
+                                    }}
+                                    className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 underline-offset-2 hover:underline dark:text-violet-400"
+                                  >
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                        {datePickMode === "day" &&
+                        selectedDayIso === cellIso &&
+                        inTripRangeCell(dom) &&
+                        tripDisplayRange?.startIso &&
+                        tripDisplayRange.endIso ? (
+                          <div className="mt-auto shrink-0 pt-2">
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setAddPlacesOpen(true);
+                              }}
+                              className="w-full rounded-lg border border-violet-200 bg-violet-50/90 px-2 py-1.5 text-[11px] font-semibold text-violet-800 shadow-sm transition hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-950/70"
+                            >
+                              Add meals &amp; activities
+                            </button>
+                          </div>
+                        ) : null}
                       </button>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -655,7 +827,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         <section id="sec-food" className="scroll-mt-28">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Food pinboard</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-            Suggestions are listed in each day cell like events — Remove or Add as needed.
+            Meals and activities you add from the calendar show here per day — use Remove if you change your mind.
           </p>
           {!hostHasKeptRestaurant(plan) ? (
             <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Keep at least one restaurant to publish.</p>
@@ -706,6 +878,16 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         </section>
       </div>
       </div>
+
+      <HostSetupAddPlacesModal
+        open={addPlacesOpen && Boolean(selectedDayIso)}
+        onClose={() => setAddPlacesOpen(false)}
+        tripId={tripId}
+        plan={plan}
+        dateLabel={selectedDayLabel}
+        onAddRestaurant={addRestaurantToDay}
+        onAddExperience={addExperienceToDay}
+      />
     </SiteShell>
   );
 }

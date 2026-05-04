@@ -12,6 +12,7 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   const out: HostSetupState = { ...base };
   if (patch.tripRange !== undefined) out.tripRange = patch.tripRange;
   if (patch.restaurantPins !== undefined) out.restaurantPins = patch.restaurantPins;
+  if (patch.activityPins !== undefined) out.activityPins = patch.activityPins;
   if (patch.hotel !== undefined) out.hotel = patch.hotel;
   if (patch.experiencesOutlined !== undefined) out.experiencesOutlined = patch.experiencesOutlined;
   return out;
