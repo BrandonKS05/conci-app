@@ -440,6 +440,16 @@ export function planHasUsableTripTiming(plan: TripPlan): boolean {
   });
 }
 
+/** True when the original trip-parser message plausibly asked for dining (auto-seed calendar meal pins). */
+const DINING_PROMPT_HINT = /\b(restaurant|restaurants|dinner|lunch|brunch|breakfast|eat|eating|food|meal|meals|dining|cuisine|cafe|café|bistro|where to eat|places to eat|reservation|bars?\s+hop)\b/i;
+
+export function seedTextMentionsDining(seedText: string | null | undefined): boolean {
+  if (typeof seedText !== "string") return false;
+  const s = seedText.trim();
+  if (s.length < 2) return false;
+  return DINING_PROMPT_HINT.test(s);
+}
+
 export function normalizePlan(value: unknown): TripPlan {
   const plan = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const people =

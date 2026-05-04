@@ -45,7 +45,7 @@ export default async function TripHostSetupPage({
     notFound();
   }
 
-  const { data, error } = await svc.from("trip_plans").select("plan, status").eq("id", id).maybeSingle();
+  const { data, error } = await svc.from("trip_plans").select("plan, status, seed_text").eq("id", id).maybeSingle();
   if (error || !data?.plan) {
     notFound();
   }
@@ -56,10 +56,11 @@ export default async function TripHostSetupPage({
   }
 
   const plan = normalizePlan(data.plan);
+  const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
 
   return (
-    <div className="min-h-screen bg-[#161618] py-6 text-neutral-100 sm:py-8">
-      <TripHostSetupDashboard tripId={id} initialPlan={plan} />
+    <div className="min-h-screen bg-slate-50 py-6 text-slate-900 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
+      <TripHostSetupDashboard tripId={id} initialPlan={plan} seedText={seedText} />
     </div>
   );
 }
