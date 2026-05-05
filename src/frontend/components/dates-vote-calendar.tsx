@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactDatePickerCustomHeaderProps } from "react-datepicker";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
@@ -37,6 +38,159 @@ const InlineRangeDatePicker = dynamic(() => import("@/frontend/components/dates-
     </div>
   ),
 });
+
+/** Compact overlay calendar for “Suggest other dates” on confirmed host trips. */
+export function AlternateDatesRangeModal({
+  open,
+  onClose,
+  decisionKey,
+  options,
+  mine,
+  busy,
+  onVote,
+}: {
+  open: boolean;
+  onClose: () => void;
+  decisionKey: string;
+  options: string[];
+  mine: string | null;
+  busy: boolean;
+  onVote: (p: Record<string, unknown>) => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const fallbackCalendarYear = new Date().getFullYear();
+  const y0 = useMemo(
+    () => inferDefaultYearFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
+  const parsed = useMemo(() => buildParsedDateOptions(options, fallbackCalendarYear), [options, fallbackCalendarYear]);
+
+  const minNav = useMemo(() => {
+    const today0 = localDayTime(startOfLocalDay(new Date()));
+    const back = today0 - 14 * 86400000;
+    const e = earliestParsedDay(parsed);
+    if (!e) return new Date(back);
+    return new Date(Math.min(back, localDayTime(e) - 30 * 86400000));
+  }, [parsed]);
+
+  const maxNav = useMemo(() => {
+    const today0 = localDayTime(startOfLocalDay(new Date()));
+    const forward = today0 + 540 * 86400000;
+    const l = latestParsedDay(parsed);
+    if (!l) return new Date(forward);
+    return new Date(Math.max(forward, localDayTime(l) + 120 * 86400000));
+  }, [parsed]);
+
+  const calendarOpenDate = useMemo(
+    () => inferCalendarOpenDateFromDateOptions(options, fallbackCalendarYear),
+    [options, fallbackCalendarYear]
+  );
+
+  const calendarMountKey = useMemo(
+    () => `alt-modal-${options.join("\u001f")}|${formatLocalIsoDate(calendarOpenDate)}`,
+    [options, calendarOpenDate]
+  );
+
+  const [rangeDraft, setRangeDraft] = useState<[Date | null, Date | null]>([null, null]);
+
+  useEffect(() => {
+    if (!open) return;
+    const m = mine?.trim() ?? "";
+    if (!m) {
+      setRangeDraft([null, null]);
+      return;
+    }
+    const r = parseDateOptionToRange(m, y0);
+    if (r) setRangeDraft([r.start, r.end]);
+    else setRangeDraft([null, null]);
+  }, [open, mine, y0]);
+
+  function onRangeCalendarChange(upd: [Date | null, Date | null] | null): void {
+    if (busy) return;
+    if (!upd) {
+      setRangeDraft([null, null]);
+      return;
+    }
+    const [start, end] = upd;
+    setRangeDraft(upd);
+    if (start != null && end != null) {
+      const ordered =
+        localDayTime(start) <= localDayTime(end) ? { s: start, e: end } : { s: end, e: start };
+      const canon = formatLocalIsoRangeVote(ordered.s, ordered.e);
+      if (canon !== (mine?.trim() ?? "")) {
+        onVote({ decisionKey, kind: "dates", option: canon });
+      }
+      onClose();
+    }
+  }
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[240] flex items-end justify-center p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="alternate-dates-title"
+    >
+      <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onClose} />
+      <div className="relative max-h-[min(90vh,560px)] w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+          <div className="min-w-0">
+            <h2 id="alternate-dates-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+              Suggest other dates
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+              Tap the first day, then the last day of the range that works for you. Your suggestion is saved when both ends
+              are set.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[min(70vh,480px)] overflow-y-auto px-5 py-4">
+          <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/50">
+            <div className="conci-datepicker-centered [&_.react-datepicker]:min-h-[14rem]">
+              <InlineRangeDatePicker
+                key={calendarMountKey}
+                inline
+                selectsRange
+                allowSameDay
+                swapRange
+                shouldCloseOnSelect={false}
+                openToDate={calendarOpenDate}
+                startDate={rangeDraft[0]}
+                endDate={rangeDraft[1]}
+                onChange={onRangeCalendarChange}
+                minDate={minNav}
+                maxDate={maxNav}
+                disabled={busy}
+                calendarStartDay={0}
+                calendarClassName="conci-datepicker-calendar"
+                wrapperClassName="conci-datepicker-wrapper"
+                renderCustomHeader={(p) => <RangePickerHeader {...p} />}
+                renderCustomDayName={({ shortName }) => (
+                  <abbr className="conci-datepicker-week-abbr" title={shortName}>
+                    {shortName.charAt(0)}
+                  </abbr>
+                )}
+                renderDayContents={(day: number) => <span className="conci-datepicker-day-num">{day}</span>}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function RangePickerHeader({
   monthDate,
@@ -336,8 +490,7 @@ function CalendarGlyph({ className }: { className?: string }) {
 }
 
 /**
- * Case 1: Single concrete host date — show proposal, “Works for me” vs scroll-to calendar for an alternate range.
- * The calendar stays on-screen at all times (never fully hidden).
+ * Case 1: Single concrete host date — “Works for me”, “Suggest other dates” (modal calendar), plus inline calendar.
  */
 export function DatesSingleProposalMemberVote({
   decisionKey,
@@ -367,8 +520,7 @@ export function DatesSingleProposalMemberVote({
 }) {
   const proposalRaw = options[0]!;
   const proposalNorm = proposalRaw.trim();
-  const calRef = useRef<HTMLDivElement>(null);
-  const [highlightCalendar, setHighlightCalendar] = useState(false);
+  const [alternateModalOpen, setAlternateModalOpen] = useState(false);
 
   const fallbackCalendarYear = new Date().getFullYear();
   const y0 = useMemo(
@@ -382,12 +534,6 @@ export function DatesSingleProposalMemberVote({
     worksForMeMode === "confirmedAck"
       ? viewerAcknowledgedConfirmed
       : mineTrim.length > 0 && mineTrim === proposalNorm;
-
-  const nudgeAlternativeCalendar = () => {
-    calRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setHighlightCalendar(true);
-    window.setTimeout(() => setHighlightCalendar(false), 2200);
-  };
 
   const castWorksForMe = () => {
     if (worksForMeMode === "confirmedAck") {
@@ -443,12 +589,12 @@ export function DatesSingleProposalMemberVote({
         <button
           type="button"
           disabled={busy}
-          onClick={nudgeAlternativeCalendar}
+          onClick={() => setAlternateModalOpen(true)}
           className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-800 transition hover:border-slate-300 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
-          aria-controls="dates-member-alternate-range"
+          aria-haspopup="dialog"
         >
           <CalendarGlyph className="shrink-0 opacity-70" />
-          Suggest different dates
+          Suggest other dates
         </button>
       </div>
 
@@ -457,16 +603,7 @@ export function DatesSingleProposalMemberVote({
         availability window.
       </p>
 
-      <div
-        id="dates-member-alternate-range"
-        ref={calRef}
-        tabIndex={-1}
-        className={`rounded-2xl outline-none transition-shadow duration-300 ${
-          highlightCalendar
-            ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-indigo-400 dark:ring-offset-dm-card"
-            : ""
-        }`}
-      >
+      <div id="dates-member-alternate-range" className="rounded-2xl outline-none">
         <DatesVoteCalendar
           decisionKey={decisionKey}
           options={options}
@@ -479,6 +616,16 @@ export function DatesSingleProposalMemberVote({
           embeddedUnderHostProposal
         />
       </div>
+
+      <AlternateDatesRangeModal
+        open={alternateModalOpen}
+        onClose={() => setAlternateModalOpen(false)}
+        decisionKey={decisionKey}
+        options={options}
+        mine={mine}
+        busy={busy}
+        onVote={onVote}
+      />
 
       <p className="text-xs text-slate-500 dark:text-neutral-500">
         {worksForMeMode === "confirmedAck" ? (

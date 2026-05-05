@@ -22,6 +22,7 @@ export function TripSharedPanel({
   shareMessage,
   tripMemberNames = [],
   viewerUserId,
+  tripOwnerUserId,
   initialCollab,
 }: {
   tripId: string;
@@ -29,6 +30,8 @@ export function TripSharedPanel({
   inviteCode?: string | null;
   tripStatus: TripPlanStatus;
   isHost: boolean;
+  /** Trip creator (`trip_plans.user_id`) — for owner-only UI in collaboration. */
+  tripOwnerUserId?: string | null;
   /** Pre-written invite text for “Share Trip” (host clipboard). */
   shareMessage: string;
   /** Other signed-in travelers on this trip (from memberships). */
@@ -110,6 +113,8 @@ export function TripSharedPanel({
             isHost={isHost}
             collabRefreshSignal={collabRefreshSignal}
             onPlanUpdated={setPlan}
+            viewerUserId={viewerUserId}
+            tripOwnerUserId={tripOwnerUserId ?? null}
             {...(lgTwoColumn ? { groupProgressStickyTarget: groupProgressStickyMount } : {})}
           />
 

@@ -108,7 +108,10 @@ export function TripCardChatWidget({
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex max-w-full flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+    <div
+      id="trip-card-chat"
+      className="pointer-events-none fixed bottom-4 right-4 z-40 flex max-w-full flex-col items-end gap-2 sm:bottom-6 sm:right-6"
+    >
       {open ? (
         <div className="pointer-events-auto flex h-[min(420px,70vh)] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]">
           <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-white/10">

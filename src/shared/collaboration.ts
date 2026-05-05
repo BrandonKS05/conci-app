@@ -57,7 +57,6 @@ const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "activities", key: ACTIVITY_POLL_DECISION_KEY, label: "What should we prioritize?" },
   { bucket: "vibePick", key: VIBE_POLL_DECISION_KEY, label: "Trip vibe" },
   { bucket: "budgetPick", key: "p_budget", label: "Budget per person" },
-  { bucket: "transport", key: TRANSPORT_POLL_DECISION_KEY, label: "Road trip vs fly?" },
 ];
 
 export type CardChatMessage = {
@@ -134,7 +133,7 @@ export function classifyDecisionText(text: string, index: number): Omit<Classifi
   return { label, index, kind: "generic", options: ["Yes", "No"] };
 }
 
-/** Open-decision duplicate when we always synth `p_transport` with Fly / Drive. */
+/** Open-decision duplicate when host copy repeats the fly vs drive choice surfaced elsewhere. */
 export function isRedundantFlyDriveOpenDecision(c: ClassifiedDecision): boolean {
   if ((c.kind !== "binary" && c.kind !== "generic") || !c.options || c.options.length !== 2) return false;
   const [a, b] = c.options;
@@ -216,18 +215,6 @@ function synthPollDecisions(plan: TripPlan, openLength: number): ClassifiedDecis
   const out: ClassifiedDecision[] = [];
   let i = 0;
   for (const row of POLL_SYNTH_ROWS) {
-    if (row.key === TRANSPORT_POLL_DECISION_KEY) {
-      out.push({
-        key: row.key,
-        label: row.label,
-        index: openLength + i,
-        kind: "pick",
-        pickOptions: ["Fly", "Drive"],
-      });
-      i += 1;
-      continue;
-    }
-
     if (row.key === ACTIVITY_POLL_DECISION_KEY || row.key === VIBE_POLL_DECISION_KEY) {
       const raw = lenientPollSliceFromBucket(polls?.[row.bucket]);
       const chips = usableHostPollChipOptions(raw);

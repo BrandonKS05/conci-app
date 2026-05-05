@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveExperienceCard, TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 import type { RestaurantPick } from "@/shared/restaurants";
@@ -42,6 +42,9 @@ const btnDayChipInRange =
   "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition " +
   "border-zinc-500 bg-zinc-700 text-white dark:border-zinc-500 dark:bg-zinc-600";
 
+const btnLoadMore =
+  "mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700";
+
 export type HostSetupHotelAddSpec =
   | { kind: "entireTrip" }
   | { kind: "dateRange"; stayStartIso: string; stayEndIso: string };
@@ -79,7 +82,18 @@ export function HostSetupAddPlacesModal({
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TripLiveRecommendationsPayload | null>(null);
   const [fetchErr, setFetchErr] = useState<string | null>(null);
-  const [hotelPlaces, setHotelPlaces] = useState<PlaceSpotlight[]>([]);
+  const [hotelPlacesAll, setHotelPlacesAll] = useState<PlaceSpotlight[]>([]);
+  const [hotelVisibleCount, setHotelVisibleCount] = useState(3);
+  const [hotelRemoteExhausted, setHotelRemoteExhausted] = useState(false);
+  const [hotelsLoadingMore, setHotelsLoadingMore] = useState(false);
+  const [restaurantVisibleCount, setRestaurantVisibleCount] = useState(3);
+  const [experienceVisibleCount, setExperienceVisibleCount] = useState(3);
+  const hotelsRef = useRef({ all: [] as PlaceSpotlight[], vis: 3, exhausted: false });
+  hotelsRef.current = {
+    all: hotelPlacesAll,
+    vis: hotelVisibleCount,
+    exhausted: hotelRemoteExhausted,
+  };
   const [hotelsErr, setHotelsErr] = useState<string | null>(null);
 
   const [stayPickPlace, setStayPickPlace] = useState<PlaceSpotlight | null>(null);
@@ -106,7 +120,11 @@ export function HostSetupAddPlacesModal({
     setLoading(true);
     setFetchErr(null);
     setHotelsErr(null);
-    setHotelPlaces([]);
+    setHotelPlacesAll([]);
+    setHotelVisibleCount(3);
+    setHotelRemoteExhausted(false);
+    setRestaurantVisibleCount(3);
+    setExperienceVisibleCount(3);
     void (async () => {
       const hint = plan.location?.trim() || plan.title?.trim() || "";
       const hotelQuery = hint
@@ -141,22 +159,31 @@ export function HostSetupAddPlacesModal({
             const hotelRes = await fetch("/api/places/maps-search", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ q: hotelQuery, locationHint: hint || null }),
+              body: JSON.stringify({
+                q: hotelQuery,
+                locationHint: hint || null,
+                start: 0,
+                limit: 30,
+              }),
             });
             const hj = (await hotelRes.json().catch(() => ({}))) as { places?: PlaceSpotlight[] };
             if (!cancelled) {
               if (!hotelRes.ok) {
                 setHotelsErr("Could not load hotel suggestions.");
-                setHotelPlaces([]);
+                setHotelPlacesAll([]);
+                setHotelRemoteExhausted(true);
               } else {
-                setHotelPlaces((hj.places ?? []).slice(0, 3));
+                const rows = hj.places ?? [];
+                setHotelPlacesAll(rows);
+                setHotelRemoteExhausted(rows.length < 30);
                 setHotelsErr(null);
               }
             }
           } catch {
             if (!cancelled) {
               setHotelsErr("Could not reach the server.");
-              setHotelPlaces([]);
+              setHotelPlacesAll([]);
+              setHotelRemoteExhausted(true);
             }
           }
         })(),
@@ -237,8 +264,79 @@ export function HostSetupAddPlacesModal({
     onClose,
   ]);
 
-  const topRestaurants = useMemo(() => (data?.restaurants ?? []).slice(0, 3), [data?.restaurants]);
-  const topExperiences = useMemo(() => (data?.experiences ?? []).slice(0, 3), [data?.experiences]);
+  const onLoadMoreHotels = useCallback(async () => {
+    const { all, vis, exhausted } = hotelsRef.current;
+    if (vis < all.length) {
+      setHotelVisibleCount((v) => v + 3);
+      return;
+    }
+    if (exhausted || hotelsLoadingMore) return;
+
+    const hint = plan.location?.trim() || plan.title?.trim() || "";
+    const hotelQuery = hint
+      ? `${hint.split(",")[0]?.trim() || hint} boutique hotel`
+      : "boutique hotel";
+
+    setHotelsLoadingMore(true);
+    try {
+      const hotelRes = await fetch("/api/places/maps-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          q: hotelQuery,
+          locationHint: hint || null,
+          start: all.length,
+          limit: 20,
+        }),
+      });
+      const hj = (await hotelRes.json().catch(() => ({}))) as { places?: PlaceSpotlight[] };
+      const batch = hj.places ?? [];
+      if (!hotelRes.ok || batch.length === 0) {
+        setHotelRemoteExhausted(true);
+        return;
+      }
+
+      let added = 0;
+      setHotelPlacesAll((prev) => {
+        const seen = new Set(prev.map((p) => p.mapsUrl));
+        const next = [...prev];
+        for (const p of batch) {
+          if (!seen.has(p.mapsUrl)) {
+            seen.add(p.mapsUrl);
+            next.push(p);
+            added++;
+          }
+        }
+        return next;
+      });
+      setHotelRemoteExhausted(batch.length < 20 || added === 0);
+      setHotelVisibleCount((v) => v + 3);
+    } finally {
+      setHotelsLoadingMore(false);
+    }
+  }, [plan.location, plan.title, hotelsLoadingMore]);
+
+  const allRestaurants = data?.restaurants ?? [];
+  const allExperiences = data?.experiences ?? [];
+  const visibleHotels = useMemo(
+    () => hotelPlacesAll.slice(0, hotelVisibleCount),
+    [hotelPlacesAll, hotelVisibleCount]
+  );
+  const visibleRestaurants = useMemo(
+    () => allRestaurants.slice(0, restaurantVisibleCount),
+    [allRestaurants, restaurantVisibleCount]
+  );
+  const visibleExperiences = useMemo(
+    () => allExperiences.slice(0, experienceVisibleCount),
+    [allExperiences, experienceVisibleCount]
+  );
+
+  const showHotelLoadMore =
+    !hotelsErr &&
+    hotelPlacesAll.length > 0 &&
+    (hotelVisibleCount < hotelPlacesAll.length || !hotelRemoteExhausted);
+  const showRestaurantLoadMore = allRestaurants.length > restaurantVisibleCount;
+  const showExperienceLoadMore = allExperiences.length > experienceVisibleCount;
 
   const stayPickValid =
     Boolean(tripRange) &&
@@ -401,10 +499,10 @@ export function HostSetupAddPlacesModal({
                       <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{hotelsErr}</p>
                     ) : null}
                     <ul className="mt-3 space-y-2">
-                      {hotelPlaces.length === 0 ? (
+                      {visibleHotels.length === 0 ? (
                         <li className="text-sm text-slate-500 dark:text-neutral-500">No hotel picks for this trip yet.</li>
                       ) : (
-                        hotelPlaces.map((h) => (
+                        visibleHotels.map((h) => (
                           <li
                             key={h.mapsUrl}
                             className="flex gap-3 rounded-xl border border-zinc-200 p-3 dark:border-white/10"
@@ -427,6 +525,16 @@ export function HostSetupAddPlacesModal({
                         ))
                       )}
                     </ul>
+                    {showHotelLoadMore ? (
+                      <button
+                        type="button"
+                        className={btnLoadMore}
+                        disabled={hotelsLoadingMore || loading}
+                        onClick={() => void onLoadMoreHotels()}
+                      >
+                        {hotelsLoadingMore ? "Loading…" : "Load 3 more"}
+                      </button>
+                    ) : null}
                   </section>
 
                   <section>
@@ -437,10 +545,10 @@ export function HostSetupAddPlacesModal({
                       <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{data.restaurantsError}</p>
                     ) : null}
                     <ul className="mt-3 space-y-2">
-                      {topRestaurants.length === 0 ? (
+                      {visibleRestaurants.length === 0 ? (
                         <li className="text-sm text-slate-500 dark:text-neutral-500">No restaurant picks for this trip yet.</li>
                       ) : (
-                        topRestaurants.map((r) => (
+                        visibleRestaurants.map((r) => (
                           <li
                             key={r.id}
                             className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
@@ -461,6 +569,16 @@ export function HostSetupAddPlacesModal({
                         ))
                       )}
                     </ul>
+                    {showRestaurantLoadMore ? (
+                      <button
+                        type="button"
+                        className={btnLoadMore}
+                        disabled={loading}
+                        onClick={() => setRestaurantVisibleCount((n) => n + 3)}
+                      >
+                        Load 3 more
+                      </button>
+                    ) : null}
                   </section>
 
                   <section>
@@ -471,10 +589,10 @@ export function HostSetupAddPlacesModal({
                       <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{data.experiencesError}</p>
                     ) : null}
                     <ul className="mt-3 space-y-2">
-                      {topExperiences.length === 0 ? (
+                      {visibleExperiences.length === 0 ? (
                         <li className="text-sm text-slate-500 dark:text-neutral-500">No activity picks for this trip yet.</li>
                       ) : (
-                        topExperiences.map((x, i) => (
+                        visibleExperiences.map((x, i) => (
                           <li
                             key={`${x.bookingUrl}-${i}`}
                             className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
@@ -495,6 +613,16 @@ export function HostSetupAddPlacesModal({
                         ))
                       )}
                     </ul>
+                    {showExperienceLoadMore ? (
+                      <button
+                        type="button"
+                        className={btnLoadMore}
+                        disabled={loading}
+                        onClick={() => setExperienceVisibleCount((n) => n + 3)}
+                      >
+                        Load 3 more
+                      </button>
+                    ) : null}
                   </section>
                 </div>
               )}

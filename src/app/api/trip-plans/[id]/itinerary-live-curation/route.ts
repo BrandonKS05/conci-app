@@ -45,6 +45,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (!access.isHost) {
+    return NextResponse.json({ error: "Only the trip host can add or remove live flight, restaurant, and experience picks." }, { status: 403 });
+  }
 
   const { data, error } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();
   if (error || !data?.plan) {

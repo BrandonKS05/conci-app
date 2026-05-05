@@ -97,7 +97,7 @@ export async function fetchGooglePlacesExperiences(plan: TripPlan): Promise<{
       },
       body: JSON.stringify({
         textQuery,
-        maxResultCount: 5,
+        maxResultCount: 15,
         languageCode: "en",
       }),
       cache: "no-store",
@@ -134,7 +134,7 @@ export async function fetchGooglePlacesExperiences(plan: TripPlan): Promise<{
       if (!row || typeof row !== "object") continue;
       const card = mapPlace(row as Record<string, unknown>, city);
       if (card) items.push(card);
-      if (items.length >= 5) break;
+      if (items.length >= 15) break;
     }
 
     return {

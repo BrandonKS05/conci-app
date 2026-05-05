@@ -68,7 +68,7 @@ export function HostSetupCopilot({
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
-      text: "Ask me to change trip dates, budget, group size, or jump to a section — I’ll update your draft when I can.",
+      text: "Ask me to change trip dates, budget, group size, pick a hotel stay, pin a restaurant on a day, or jump to a section — I’ll update your draft when I can.",
     },
   ]);
   const [input, setInput] = useState("");

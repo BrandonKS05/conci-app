@@ -15,7 +15,6 @@ import {
   isDecisionLocked,
   isTransportStyleGroupPoll,
   parseCollabState,
-  TRANSPORT_POLL_DECISION_KEY,
   VIBE_POLL_DECISION_KEY,
   BUDGET_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
@@ -35,8 +34,8 @@ import {
   coerceVoteAgainstList,
   isAllowedPollWriteIn,
 } from "@/shared/collab-pick-vote";
+import { buildAlternateDateSuggestionRows } from "@/shared/collab-date-display";
 import {
-  dateVoteMatchesHostBallot,
   formatBallotProposalHeading,
   inferDefaultYearFromDateOptions,
   isParsableConcreteDateBallotLine,
@@ -49,10 +48,15 @@ import {
 import type { HotelPick } from "@/shared/hotels";
 import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/restaurants";
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
+import { estimateTripCostSummary } from "@/shared/trip-cost-estimate";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { TripRosterPerson } from "@/shared/trip-roster";
 import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
-import { DatesSingleProposalMemberVote, DatesVoteCalendar } from "@/frontend/components/dates-vote-calendar";
+import {
+  AlternateDatesRangeModal,
+  DatesSingleProposalMemberVote,
+  DatesVoteCalendar,
+} from "@/frontend/components/dates-vote-calendar";
 import { HostTripMemberEmailModal } from "@/frontend/components/host-trip-member-email-modal";
 import {
   CuratedExperiencesSection,
@@ -133,6 +137,8 @@ export function TripCollaborationPanel({
   collabRefreshSignal = 0,
   onPlanUpdated,
   groupProgressStickyTarget,
+  viewerUserId,
+  tripOwnerUserId,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -147,6 +153,10 @@ export function TripCollaborationPanel({
    * Omit to use the panel’s built-in grid / stacked layout.
    */
   groupProgressStickyTarget?: HTMLElement | null;
+  /** Current user id — used with tripOwnerUserId for owner-only affordances. */
+  viewerUserId?: string;
+  /** `trip_plans.user_id` — trip creator. */
+  tripOwnerUserId?: string | null;
 }) {
   const router = useRouter();
   const stickyGroupProgressRail = typeof groupProgressStickyTarget !== "undefined";
@@ -167,28 +177,18 @@ export function TripCollaborationPanel({
   const [liveData, setLiveData] = useState<TripLiveRecommendationsPayload | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
-  const [transportMode, setTransportMode] = useState<"fly" | "drive">("fly");
-
-  const transportStorageKey = `conci_trip_transport_${tripId}`;
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(transportStorageKey);
-      if (raw === "drive" || raw === "fly") setTransportMode(raw);
-    } catch {
-      /* ignore */
-    }
-  }, [transportStorageKey]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(transportStorageKey, transportMode);
-    } catch {
-      /* ignore */
-    }
-  }, [transportMode, transportStorageKey]);
+  const [voteFailure, setVoteFailure] = useState<{ decisionKey: string; message: string } | null>(null);
 
   const livePlanContext = tripLiveRecommendationsContextFingerprint(plan);
+
+  const isTripOwner = Boolean(
+    viewerUserId && tripOwnerUserId && viewerUserId === tripOwnerUserId
+  );
+
+  const costEstimate = useMemo(
+    () => estimateTripCostSummary(plan, liveData?.flights ?? []),
+    [plan, liveData?.flights]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -404,7 +404,9 @@ export function TripCollaborationPanel({
   );
 
   const submitVote = async (payload: Record<string, unknown>) => {
-    setBusyKey(typeof payload.decisionKey === "string" ? payload.decisionKey : "x");
+    const dk = typeof payload.decisionKey === "string" ? payload.decisionKey : "x";
+    setBusyKey(dk);
+    setVoteFailure(null);
     try {
       const r = await fetch(`/api/trip-plans/${tripId}/collab/vote`, {
         method: "POST",
@@ -414,11 +416,14 @@ export function TripCollaborationPanel({
       });
       const j = (await r.json().catch(() => ({}))) as { error?: string };
       if (!r.ok) {
-        setError(typeof j.error === "string" ? j.error : "Vote failed.");
+        const msg = typeof j.error === "string" ? j.error : "Vote failed.";
+        setError(msg);
+        setVoteFailure({ decisionKey: dk, message: msg });
         return;
       }
       await load();
       setError(null);
+      setVoteFailure(null);
     } finally {
       setBusyKey(null);
     }
@@ -612,6 +617,43 @@ export function TripCollaborationPanel({
 
   const mainCollaborationColumn = (
     <>
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
+          Estimated trip cost
+        </h3>
+        <p className="mt-2 text-sm font-medium text-slate-800 dark:text-neutral-200">{costEstimate.headline}</p>
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-xs text-slate-600 dark:text-neutral-400">
+          {costEstimate.lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </section>
+
+      {isHost && isTripOwner ? (
+        <section className="mb-6 rounded-2xl border border-amber-300/50 bg-amber-50/90 px-5 py-4 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
+          <p className="mt-2 text-sm text-amber-950/90 dark:text-amber-100/90">
+            You can override group suggestions anytime — update dates, destination, budget, and which flights appear below.
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-950 dark:text-amber-50/95">
+            <li>
+              Use{" "}
+              <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
+                Trip chat
+              </a>{" "}
+              (floating button — jump via link) to change dates, budget, or destination in plain language.
+            </li>
+            <li>
+              Under{" "}
+              <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
+                Flights
+              </a>
+              , keep or dismiss options so the group only sees the itineraries you want.
+            </li>
+          </ul>
+        </section>
+      ) : null}
+
       {showDecideTogetherColumn ? (
         <div className="space-y-6">
           <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>
@@ -632,6 +674,7 @@ export function TripCollaborationPanel({
                 busy={busyKey === meta.key}
                 onVote={(p) => void submitVote(p)}
                 reloadCollab={load}
+                voteFailure={voteFailure?.decisionKey === meta.key ? voteFailure.message : null}
                 blockedByDates={gated}
                 canRunHotelSearch={isHost}
                 liveVenueMerge={meta.key === VENUE_POLL_DECISION_KEY ? liveData?.restaurants ?? null : null}
@@ -702,8 +745,6 @@ export function TripCollaborationPanel({
         liveData={liveData}
         liveLoading={liveLoading}
         liveFetchErr={liveFetchErr}
-        transportMode={transportMode}
-        onTransportModeChange={setTransportMode}
         onPlanUpdated={onPlanUpdated}
       />
     </>
@@ -830,8 +871,6 @@ function TripPlanLiveBlocks({
   liveData,
   liveLoading,
   liveFetchErr,
-  transportMode,
-  onTransportModeChange,
   onPlanUpdated,
 }: {
   tripId: string;
@@ -839,8 +878,6 @@ function TripPlanLiveBlocks({
   liveData: TripLiveRecommendationsPayload | null;
   liveLoading: boolean;
   liveFetchErr: string | null;
-  transportMode: "fly" | "drive";
-  onTransportModeChange: (m: "fly" | "drive") => void;
   onPlanUpdated?: (plan: TripPlan) => void;
 }) {
   const { mutate, busyKey, err, setErr } = useLiveCurationMutation(tripId, onPlanUpdated);
@@ -864,84 +901,50 @@ function TripPlanLiveBlocks({
       {err ? <LiveCurationErrorBanner message={err} onDismiss={() => setErr(null)} /> : null}
 
       {showTransport ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Transport</h3>
+        <section
+          id="trip-live-flights"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+        >
+          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Flights</h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
             From <strong>{plan.departureCity}</strong> to <strong>{plan.location}</strong>
           </p>
-          <div className="mt-3 inline-flex rounded-full border border-slate-200 p-0.5 dark:border-white/10">
-            <button
-              type="button"
-              onClick={() => onTransportModeChange("fly")}
-              className={`rounded-full px-4 py-1.5 text-sm transition ${
-                transportMode === "fly" ? primaryFilledInteractive : "font-semibold text-slate-600 dark:text-neutral-400"
-              }`}
-            >
-              Fly
-            </button>
-            <button
-              type="button"
-              onClick={() => onTransportModeChange("drive")}
-              className={`rounded-full px-4 py-1.5 text-sm transition ${
-                transportMode === "drive" ? primaryFilledInteractive : "font-semibold text-slate-600 dark:text-neutral-400"
-              }`}
-            >
-              Drive
-            </button>
+          <div className="mt-4">
+            <CuratedFlightsRows
+              plan={plan}
+              flights={flights}
+              liveLoading={liveLoading}
+              flightsError={liveData?.flightsError ?? null}
+              mutate={(a, k) => void mutate(a, k)}
+              busyKey={busyKey}
+            />
           </div>
-
-          {transportMode === "fly" ? (
-            <div className="mt-4">
-              <CuratedFlightsRows
-                plan={plan}
-                flights={flights}
-                liveLoading={liveLoading}
-                flightsError={liveData?.flightsError ?? null}
-                mutate={(a, k) => void mutate(a, k)}
-                busyKey={busyKey}
-              />
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {liveLoading ? (
-                <p className="text-sm text-slate-600 dark:text-neutral-400">Loading drive info…</p>
-              ) : liveData?.driveError ? (
-                <p className="text-sm text-amber-800 dark:text-amber-200/90">{liveData.driveError}</p>
-              ) : null}
-              {liveData?.drive?.durationEstimate ? (
-                <p className="text-sm text-slate-700 dark:text-neutral-300">
-                  Estimated drive time: <strong>{liveData.drive.durationEstimate}</strong>
-                  {liveData.drive.distanceMiles != null ? (
-                    <>
-                      {" "}
-                      · ~{liveData.drive.distanceMiles} mi
-                    </>
-                  ) : null}
-                </p>
-              ) : (
-                <p className="text-sm text-slate-600 dark:text-neutral-400">
-                  Open Google Maps for live traffic and exact timing.
-                </p>
-              )}
-              {(() => {
-                const dc = plan.departureCity?.trim();
-                const loc = plan.location?.trim();
-                const href =
-                  liveData?.drive?.mapsDirectionsUrl ??
-                  (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
-                return href ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-                  >
-                    Get directions
-                  </a>
-                ) : null;
-              })()}
-            </div>
-          )}
+          {(() => {
+            const dc = plan.departureCity?.trim();
+            const loc = plan.location?.trim();
+            const href =
+              liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
+            return href ? (
+              <p className="mt-4 text-xs text-slate-500 dark:text-neutral-500">
+                Driving instead?{" "}
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+                >
+                  Open directions in Google Maps
+                </a>
+                {liveData?.drive?.durationEstimate ? (
+                  <>
+                    {" "}
+                    (~{liveData.drive.durationEstimate}
+                    {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
+                  </>
+                ) : null}
+              </p>
+            ) : null;
+          })()}
         </section>
       ) : null}
 
@@ -1339,6 +1342,7 @@ function DecisionCard({
   busy,
   onVote,
   reloadCollab,
+  voteFailure = null,
   blockedByDates = false,
   canRunHotelSearch,
   liveVenueMerge,
@@ -1358,6 +1362,8 @@ function DecisionCard({
   busy: boolean;
   onVote: (p: Record<string, unknown>) => void;
   reloadCollab: () => Promise<void>;
+  /** Shown when the last collab vote failed (e.g. auth, validation). */
+  voteFailure?: string | null;
   blockedByDates?: boolean;
   canRunHotelSearch: boolean;
   /** Live API rows aligned by index with venue poll cards (same `eat-*` ids). */
@@ -1370,6 +1376,7 @@ function DecisionCard({
 }) {
   const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [hotelSearchErr, setHotelSearchErr] = useState<string | null>(null);
+  const [confirmedAlternateModalOpen, setConfirmedAlternateModalOpen] = useState(false);
   const [budgetCustom, setBudgetCustom] = useState("");
   const [againstPrep, setAgainstPrep] = useState<string[]>([]);
   const [pollWriteIn, setPollWriteIn] = useState("");
@@ -1385,7 +1392,9 @@ function DecisionCard({
 
   const wfmMap = blob?.dateWorksForMe ?? {};
   const viewerSaidWorksForConfirmed =
-    Boolean(wfmMap[canonicalVoterKey]) || Boolean(wfmMap[visitorVoteKey(visitorKey)]);
+    Boolean(wfmMap[canonicalVoterKey]) ||
+    Boolean(wfmMap[visitorVoteKey(visitorKey)]) ||
+    (typeof visitorKey === "string" && visitorKey.length > 0 && Boolean(wfmMap[visitorKey]));
 
   useEffect(() => {
     setAgainstPrep([]);
@@ -1438,15 +1447,13 @@ function DecisionCard({
           ? formatBallotProposalHeading(opts[0]!, yHeadline)
           : opts.map((o) => formatBallotProposalHeading(o, yHeadline)).join(" · ");
 
-      const altKeys: string[] = [];
-      for (const [vk, val] of Object.entries(votes)) {
-        if (typeof val !== "string" || !val.trim()) continue;
-        if (dateVoteMatchesHostBallot(val, opts, new Date().getFullYear())) continue;
-        altKeys.push(vk);
-      }
-
       const worksNames = displayNamesForVoteKeys(Object.keys(wfmMap), roster);
-      const altNames = displayNamesForVoteKeys(altKeys, roster);
+      const alternateRows = buildAlternateDateSuggestionRows(
+        votes,
+        roster,
+        opts,
+        new Date().getFullYear()
+      );
 
       const singleLineConcrete =
         opts.length === 1 && isParsableConcreteDateBallotLine(opts[0]!, yHeadline);
@@ -1472,6 +1479,14 @@ function DecisionCard({
 
           {!isHost ? (
             <div className="mt-5 space-y-4">
+              {voteFailure ? (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/35 dark:text-rose-200"
+                >
+                  {voteFailure}
+                </p>
+              ) : null}
               {showSingleProposal ? (
                 <DatesSingleProposalMemberVote
                   decisionKey={meta.key}
@@ -1488,17 +1503,28 @@ function DecisionCard({
                 />
               ) : (
                 <>
-                  <button
-                    type="button"
-                    disabled={busy || viewerSaidWorksForConfirmed || blockedByDates}
-                    onClick={() => onVote({ decisionKey: meta.key, kind: "datesWorksForMe" })}
-                    className={`w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto ${primaryFilledInteractive}`}
-                  >
-                    {viewerSaidWorksForConfirmed ? "Thanks — noted" : "Works for me"}
-                  </button>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <button
+                      type="button"
+                      disabled={busy || viewerSaidWorksForConfirmed || blockedByDates}
+                      onClick={() => onVote({ decisionKey: meta.key, kind: "datesWorksForMe" })}
+                      className={`rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 ${primaryFilledInteractive}`}
+                    >
+                      {viewerSaidWorksForConfirmed ? "Thanks — noted" : "Works for me"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || blockedByDates}
+                      onClick={() => setConfirmedAlternateModalOpen(true)}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-white/5"
+                    >
+                      Suggest other dates
+                    </button>
+                  </div>
                   <p className="text-sm text-slate-600 dark:text-neutral-400">
                     Tap <span className="font-semibold text-slate-800 dark:text-neutral-200">Works for me</span> if these
-                    dates work, or pick any range on the calendar — not limited to the host&apos;s options.
+                    dates work, or use <span className="font-semibold">Suggest other dates</span> / the calendar below to
+                    propose a different range.
                   </p>
                   <DatesVoteCalendar
                     decisionKey={meta.key}
@@ -1510,6 +1536,15 @@ function DecisionCard({
                     voterN={voterN}
                     onVote={onVote}
                     hideUnmappedBallotChips={singleVagueBallotOnly || opts.length === 0}
+                  />
+                  <AlternateDatesRangeModal
+                    open={confirmedAlternateModalOpen}
+                    onClose={() => setConfirmedAlternateModalOpen(false)}
+                    decisionKey={meta.key}
+                    options={opts}
+                    mine={viewerPrimaryPick}
+                    busy={busy}
+                    onVote={onVote}
                   />
                 </>
               )}
@@ -1529,9 +1564,24 @@ function DecisionCard({
                 <span className="font-semibold text-slate-900 dark:text-neutral-100">Works for me: </span>
                 {worksNames.length > 0 ? worksNames.join(", ") : "—"}
               </p>
-              <p className="mt-2 text-slate-800 dark:text-neutral-200">
-                <span className="font-semibold text-slate-900 dark:text-neutral-100">Suggested other dates: </span>
-                {altNames.length > 0 ? altNames.join(", ") : "—"}
+              <div className="mt-2">
+                <p className="font-semibold text-slate-900 dark:text-neutral-100">Suggested other dates</p>
+                {alternateRows.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5 text-sm text-slate-800 dark:text-neutral-200">
+                    {alternateRows.map((row) => (
+                      <li key={row.voterKey}>
+                        <span className="font-semibold">{row.voterName}</span>
+                        <span className="text-slate-600 dark:text-neutral-400"> — {row.rangeLabel}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-500">—</p>
+                )}
+              </div>
+              <p className="mt-3 text-xs text-slate-500 dark:text-neutral-500">
+                Names appear when travelers (not the host) submit “Works for me” or a different date range from their
+                account.
               </p>
             </div>
           ) : null}
@@ -1561,6 +1611,14 @@ function DecisionCard({
             </>
           )}
         </p>
+        {voteFailure ? (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/35 dark:text-rose-200"
+          >
+            {voteFailure}
+          </p>
+        ) : null}
         <div className="mt-4">
           {showSingleProposal ? (
             <DatesSingleProposalMemberVote
@@ -1607,9 +1665,7 @@ function DecisionCard({
   if (meta.kind === "pick") {
     const opts = meta.pickOptions ?? [];
     const alwaysShowsSynthPick =
-      meta.key === TRANSPORT_POLL_DECISION_KEY ||
-      meta.key === ACTIVITY_POLL_DECISION_KEY ||
-      meta.key === VIBE_POLL_DECISION_KEY;
+      meta.key === ACTIVITY_POLL_DECISION_KEY || meta.key === VIBE_POLL_DECISION_KEY;
 
     if (!alwaysShowsSynthPick && opts.length < 2) {
       return (

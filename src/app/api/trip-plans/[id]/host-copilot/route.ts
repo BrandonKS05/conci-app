@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { fetchLiveRestaurantsForPlan } from "@/backend/trip-live-restaurants";
+import { searchPlacesGoogleMaps } from "@/backend/serpapi-places";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import { restaurantPickToSpotlight } from "@/shared/restaurants";
+import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
+  applyHostHotelDateRange,
+  applyHostHotelSelection,
   applyTripPlanChatPatch,
   enumerateLocalIsoDays,
   normalizePlan,
@@ -45,8 +49,13 @@ Return ONLY valid JSON (no markdown) with this exact shape:
   "hostSetupPatch": { },
   "planPatch": { },
   "ui": { },
-  "autoPinRestaurant": null
+  "autoPinRestaurant": null,
+  "autoBookHotel": null
 }
+
+**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** for the trip. The server runs a Google Maps (SerpAPI) search near the destination and saves the top result into host setup (same as choosing a stay in the UI — not a third-party OTA checkout).
+  - Shape: { "searchHint": "boutique hotel" } — optional style/neighborhood; defaults to a short hotel query.
+  - Optional **stayStartIso** / **stayEndIso** (YYYY-MM-DD, within **Trip calendar days**): if both set, the stay is limited to that inclusive night range; otherwise the stay covers the **full trip range**.
 
 **autoPinRestaurant** (optional): Use when the host asks to add/set a **restaurant reservation or dinner** on a **specific trip day** (e.g. "reservation on July 16th", "dinner on the 16th"). The server will call Google Places near the trip destination and pin the top result — do **not** tell them to do it manually.
   - Shape: { "dateIso": "YYYY-MM-DD", "searchHint": "dinner" } — \`dateIso\` must be one of **Trip calendar days** in the user message. Omit or set \`null\` for all other requests.
@@ -57,7 +66,7 @@ Rules:
 - **hostSetupPatch** (optional): only keys the host setup actually needs to change. Same schema as persisted host setup:
   - **tripRange**: { "startIso": "YYYY-MM-DD", "endIso": "YYYY-MM-DD" } — use inclusive local dates. If the user gives month/day without year, assume calendar year ${year} unless they clearly mean another year.
   - When you **change tripRange** to new dates, also set **restaurantPins**: [] and **activityPins**: [] so old day pins do not leak outside the new range.
-  - **hotel**: only set to null to clear; do not invent hotel objects (host picks from search).
+  - **hotel**: only set to null to clear in JSON; for a new stay use **autoBookHotel** (or the host picks manually in the app).
   - **experiencesOutlined**: boolean when they say they skimmed / outlined experiences.
 - **planPatch** (optional): only top-level trip plan fields that should change. Same rules as trip card chat:
   - Allowed: title, location, departureCity, dates, people, budget, vibe, openDecisions, nextStep, confidence.
@@ -74,6 +83,66 @@ If the user only asks for advice with no data changes, use empty objects {} for 
 Example: Host says "set a dinner reservation on July 16" and trip calendar includes 2026-07-16 → set \`autoPinRestaurant\`: { "dateIso": "2026-07-16", "searchHint": "dinner" } (year from trip calendar days).`;
 
 type AutoPinRestaurantReq = { dateIso: string; searchHint?: string };
+
+type AutoBookHotelReq = {
+  searchHint?: string;
+  stayStartIso?: string;
+  stayEndIso?: string;
+};
+
+async function applyAutoBookHotel(
+  plan: TripPlan,
+  req: AutoBookHotelReq
+): Promise<{ plan: TripPlan; placeName: string | null; error: string | null }> {
+  const tr = plan.hostSetup?.tripRange;
+  if (!tr?.startIso || !tr?.endIso) {
+    return { plan, placeName: null, error: "Set your trip date range on the calendar first." };
+  }
+  if (!plan.location?.trim()) {
+    return { plan, placeName: null, error: "Add a trip destination so we can search for hotels." };
+  }
+
+  const hintRaw = (req.searchHint ?? "boutique hotel").trim() || "boutique hotel";
+  const hint = hintRaw.slice(0, 100);
+  const loc = plan.location.trim();
+  const cityHead = loc.split(",")[0]?.trim() || loc;
+  const q = `${cityHead} ${hint}`;
+
+  const picks = await searchPlacesGoogleMaps(q, loc, { limit: 5 });
+  const top = picks[0];
+  if (!top) {
+    return {
+      plan,
+      placeName: null,
+      error: "No hotels matched that search. Try another style or check SerpAPI configuration.",
+    };
+  }
+
+  const place: PlaceSpotlight = { ...top };
+  const tripStart = tr.startIso;
+  const tripEnd = tr.endIso;
+
+  let hotelStays;
+  let hotel: PlaceSpotlight;
+  const a = req.stayStartIso?.trim();
+  const b = req.stayEndIso?.trim();
+  if (a && b && /^\d{4}-\d{2}-\d{2}$/.test(a) && /^\d{4}-\d{2}-\d{2}$/.test(b)) {
+    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tripStart, tripEnd, a, b, place);
+    hotelStays = r.hotelStays;
+    hotel = r.hotel;
+  } else {
+    const r = applyHostHotelSelection(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, place, "full");
+    hotelStays = r.hotelStays;
+    hotel = r.hotel;
+  }
+
+  const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { hotelStays, hotel });
+  const planRecord = {
+    ...(plan as unknown as Record<string, unknown>),
+    hostSetup: mergedSetup,
+  };
+  return { plan: normalizePlan(planRecord), placeName: top.name, error: null };
+}
 
 async function applyAutoPinRestaurant(
   plan: TripPlan,
@@ -153,6 +222,18 @@ function tryInferAutoPinFromMessage(message: string, plan: TripPlan): AutoPinRes
   return undefined;
 }
 
+function tryInferAutoBookHotelFromMessage(message: string, plan: TripPlan): AutoBookHotelReq | undefined {
+  const tr = plan.hostSetup?.tripRange;
+  if (!tr?.startIso || !tr?.endIso) return undefined;
+  if (!/\b(hotel|hotels|lodging|book\s+(a\s+)?(room|stay)|place\s+to\s+stay|where\s+to\s+stay)\b/i.test(message)) {
+    return undefined;
+  }
+  let searchHint = "boutique hotel";
+  if (/\bluxury\b/i.test(message)) searchHint = "luxury hotel";
+  else if (/\b(budget|cheap|affordable)\b/i.test(message)) searchHint = "budget hotel";
+  return { searchHint };
+}
+
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!id || !isUuid(id)) {
@@ -215,6 +296,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   let planPatch: unknown;
   let uiRaw: Record<string, unknown> | undefined;
   let autoPinRequest: AutoPinRestaurantReq | undefined;
+  let autoBookHotelRequest: AutoBookHotelReq | undefined;
 
   const hs = plan.hostSetup;
   const tr = hs?.tripRange;
@@ -277,6 +359,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
               planPatch?: unknown;
               ui?: unknown;
               autoPinRestaurant?: unknown;
+              autoBookHotel?: unknown;
             };
             if (typeof parsed.assistantText === "string" && parsed.assistantText.trim()) {
               assistantText = parsed.assistantText.trim();
@@ -333,6 +416,25 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
                 };
               }
             }
+
+            if (
+              parsed.autoBookHotel &&
+              typeof parsed.autoBookHotel === "object" &&
+              !Array.isArray(parsed.autoBookHotel)
+            ) {
+              const ah = parsed.autoBookHotel as Record<string, unknown>;
+              const stayStartIso =
+                typeof ah.stayStartIso === "string" ? ah.stayStartIso.trim() : undefined;
+              const stayEndIso = typeof ah.stayEndIso === "string" ? ah.stayEndIso.trim() : undefined;
+              autoBookHotelRequest = {
+                searchHint:
+                  typeof ah.searchHint === "string" && ah.searchHint.trim()
+                    ? ah.searchHint.trim().slice(0, 100)
+                    : undefined,
+                stayStartIso: stayStartIso && /^\d{4}-\d{2}-\d{2}$/.test(stayStartIso) ? stayStartIso : undefined,
+                stayEndIso: stayEndIso && /^\d{4}-\d{2}-\d{2}$/.test(stayEndIso) ? stayEndIso : undefined,
+              };
+            }
           } catch {
             assistantText = "I had trouble parsing that response. Try rephrasing in one short sentence.";
           }
@@ -360,8 +462,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     nextPlan = normalizePlan(planRecord);
   }
 
+  if (!autoBookHotelRequest) {
+    autoBookHotelRequest = tryInferAutoBookHotelFromMessage(message, nextPlan);
+  }
+
   if (!autoPinRequest) {
     autoPinRequest = tryInferAutoPinFromMessage(message, nextPlan);
+  }
+
+  let hotelApplied = false;
+  if (autoBookHotelRequest) {
+    const res = await applyAutoBookHotel(nextPlan, autoBookHotelRequest);
+    if (res.placeName && !res.error) {
+      nextPlan = res.plan;
+      hotelApplied = true;
+      assistantText = `${assistantText}\n\nSaved stay: ${res.placeName} (top Maps search).`.trim();
+    } else if (res.error) {
+      assistantText = `${assistantText}\n\n${res.error}`.trim();
+    }
   }
 
   let pinApplied = false;
@@ -371,13 +489,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       nextPlan = res.plan;
       pinApplied = true;
       const locLabel = nextPlan.location?.trim() || "your destination";
-      assistantText = `Pinned ${res.pinName} on ${autoPinRequest.dateIso} (top Google Places result near ${locLabel}).`;
+      assistantText = `${assistantText}\n\nPinned ${res.pinName} on ${autoPinRequest.dateIso} (top Google Places result near ${locLabel}).`.trim();
     } else if (res.error) {
       assistantText = `${assistantText}\n\n${res.error}`.trim();
     }
   }
 
   const changed =
+    hotelApplied ||
     pinApplied ||
     (planPatch !== undefined && JSON.stringify(planPatch) !== "{}") ||
     (hostSetupPatch !== undefined && Object.keys(hostSetupPatch).length > 0);
@@ -402,7 +521,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const s = uiRaw.scrollTo.trim();
     if (NAV_IDS.has(s)) scrollTo = s;
   }
-  if (pinApplied && !scrollTo) scrollTo = "dates";
+  if ((pinApplied || hotelApplied) && !scrollTo) scrollTo = "dates";
   let suggestDatePickMode: "range" | "day" | undefined;
   if (uiRaw && uiRaw.suggestDatePickMode === "range") suggestDatePickMode = "range";
   if (uiRaw && uiRaw.suggestDatePickMode === "day") suggestDatePickMode = "day";

@@ -140,6 +140,7 @@ export default async function SavedTripPlanPage({
             shareMessage={shareMessage}
             tripMemberNames={memberNames}
             viewerUserId={user.id}
+            tripOwnerUserId={ownerId}
             initialCollab={initialCollab}
           />
           <p className="text-center text-xs text-slate-500 dark:text-neutral-500">
