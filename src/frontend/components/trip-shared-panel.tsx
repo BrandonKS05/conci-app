@@ -103,6 +103,8 @@ export function TripSharedPanel({
               initialSpotlightVotes={initialCollab.spotlightVotes}
               onPlanUpdated={setPlan}
               onCollabBump={bumpCollab}
+              collabRefreshSignal={collabRefreshSignal}
+              isHost={isHost}
             />
           ) : null}
 

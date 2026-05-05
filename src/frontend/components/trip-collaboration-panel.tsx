@@ -43,8 +43,10 @@ import {
 } from "@/shared/date-option-parse";
 import { computeGroupBestDates } from "@/shared/group-best-dates";
 import {
+  enumerateLocalIsoDays,
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
+  tripRangeBestEffortFromPlanDates,
   type TripPlan,
 } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
@@ -64,6 +66,7 @@ import {
   CuratedExperiencesSection,
   CuratedFlightsRows,
   CuratedRestaurantsSection,
+  HostLiveScheduleByDay,
   LiveCurationErrorBanner,
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
@@ -750,6 +753,7 @@ export function TripCollaborationPanel({
         liveLoading={liveLoading}
         liveFetchErr={liveFetchErr}
         onPlanUpdated={onPlanUpdated}
+        isHost={isHost}
       />
     </>
   );
@@ -876,6 +880,7 @@ function TripPlanLiveBlocks({
   liveLoading,
   liveFetchErr,
   onPlanUpdated,
+  isHost,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -883,6 +888,7 @@ function TripPlanLiveBlocks({
   liveLoading: boolean;
   liveFetchErr: string | null;
   onPlanUpdated?: (plan: TripPlan) => void;
+  isHost: boolean;
 }) {
   const { mutate, busyKey, err, setErr } = useLiveCurationMutation(tripId, onPlanUpdated);
   const showRestaurants = Boolean(plan.location?.trim());
@@ -894,6 +900,13 @@ function TripPlanLiveBlocks({
   const restaurants = liveData?.restaurants ?? [];
   const experiences = liveData?.experiences ?? [];
 
+  const tripDayOptions = useMemo(() => {
+    const y = new Date().getFullYear();
+    const r = tripRangeBestEffortFromPlanDates(plan, y);
+    if (!r) return [];
+    return enumerateLocalIsoDays(r.startIso, r.endIso);
+  }, [plan]);
+
   return (
     <div className="space-y-8 pt-4">
       {liveFetchErr ? (
@@ -903,6 +916,13 @@ function TripPlanLiveBlocks({
       ) : null}
 
       {err ? <LiveCurationErrorBanner message={err} onDismiss={() => setErr(null)} /> : null}
+
+      <HostLiveScheduleByDay
+        plan={plan}
+        flights={flights}
+        restaurants={restaurants}
+        experiences={experiences}
+      />
 
       {showTransport ? (
         <section
@@ -919,8 +939,10 @@ function TripPlanLiveBlocks({
               flights={flights}
               liveLoading={liveLoading}
               flightsError={liveData?.flightsError ?? null}
-              mutate={(a, k) => void mutate(a, k)}
+              mutate={(a, k, d) => void mutate(a, k, d)}
               busyKey={busyKey}
+              isHost={isHost}
+              tripDays={tripDayOptions}
             />
           </div>
           {(() => {
@@ -958,8 +980,10 @@ function TripPlanLiveBlocks({
           restaurants={restaurants}
           liveLoading={liveLoading}
           restaurantsError={liveData?.restaurantsError ?? null}
-          mutate={(a, k) => void mutate(a, k)}
+          mutate={(a, k, d) => void mutate(a, k, d)}
           busyKey={busyKey}
+          isHost={isHost}
+          tripDays={tripDayOptions}
         />
       ) : null}
 
@@ -969,8 +993,10 @@ function TripPlanLiveBlocks({
           experiences={experiences}
           liveLoading={liveLoading}
           experiencesError={liveData?.experiencesError ?? null}
-          mutate={(a, k) => void mutate(a, k)}
+          mutate={(a, k, d) => void mutate(a, k, d)}
           busyKey={busyKey}
+          isHost={isHost}
+          tripDays={tripDayOptions}
         />
       ) : null}
     </div>
@@ -1188,6 +1214,9 @@ function ActivityVibePollCard({
   voterN,
   quorum,
   onVote,
+  votes,
+  roster,
+  isHost,
 }: {
   tripId: string;
   meta: ClassifiedDecision;
@@ -1197,12 +1226,46 @@ function ActivityVibePollCard({
   voterN: number;
   quorum: number;
   onVote: (p: Record<string, unknown>) => void;
+  votes: Record<string, unknown>;
+  roster: TripRosterPerson[];
+  isHost: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [polishBusy, setPolishBusy] = useState(false);
   const [polishErr, setPolishErr] = useState<string | null>(null);
 
   const mineTrim = viewerPrimaryPick?.trim() ?? "";
+
+  const chipVoteCounts = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(chips.map((c) => [c, 0]));
+    for (const [, raw] of Object.entries(votes)) {
+      const ans =
+        typeof raw === "string" ? (raw.trim() || null) : coerceScalarVoteChoice(raw);
+      if (ans != null && Object.prototype.hasOwnProperty.call(counts, ans)) {
+        counts[ans] = (counts[ans] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [votes, chips]);
+
+  const hostMemberAnswers = useMemo(() => {
+    const rows: { voteKey: string; displayName: string; answer: string }[] = [];
+    for (const [voteKey, raw] of Object.entries(votes)) {
+      const answer =
+        typeof raw === "string" ? (raw.trim() || null) : coerceScalarVoteChoice(raw);
+      if (!answer) continue;
+      const person = roster.find((p) => voteKeysIntersectAliases([voteKey], new Set(p.voteAliases)));
+      rows.push({
+        voteKey,
+        displayName: person?.displayName ?? voteKey,
+        answer,
+      });
+    }
+    rows.sort((a, b) =>
+      a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" })
+    );
+    return rows;
+  }, [votes, roster]);
 
   const submitPolished = useCallback(async () => {
     const raw = draft.trim();
@@ -1255,6 +1318,7 @@ function ActivityVibePollCard({
         <ul className="mt-4 space-y-2.5">
           {chips.map((opt) => {
             const forSelected = viewerPrimaryPick === opt;
+            const nForChip = isHost ? chipVoteCounts[opt] ?? 0 : null;
             return (
               <li
                 key={opt}
@@ -1264,7 +1328,14 @@ function ActivityVibePollCard({
                     : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
                 }`}
               >
-                <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                  {isHost && nForChip != null ? (
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-500">
+                      {nForChip} vote{nForChip === 1 ? "" : "s"}
+                    </p>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   disabled={busy}
@@ -1315,6 +1386,30 @@ function ActivityVibePollCard({
         <p className="mt-3 text-xs text-slate-600 dark:text-neutral-400">
           Your vote: <span className="font-semibold text-slate-900 dark:text-neutral-100">{viewerPrimaryPick}</span>
         </p>
+      ) : null}
+
+      {isHost ? (
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/90 p-4 dark:border-white/10 dark:bg-dm-elevated/70">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            Member answers (host)
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+            {voterN} submitted · quorum {quorum}+ to lock
+          </p>
+          {hostMemberAnswers.length ? (
+            <ul className="mt-3 space-y-2 text-sm">
+              {hostMemberAnswers.map((row) => (
+                <li key={row.voteKey} className="flex flex-wrap gap-x-2 gap-y-0.5">
+                  <span className="font-medium text-slate-900 dark:text-neutral-100">{row.displayName}</span>
+                  <span className="text-slate-400 dark:text-neutral-600">—</span>
+                  <span className="text-slate-700 dark:text-neutral-300">{row.answer}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500 dark:text-neutral-500">No answers yet.</p>
+          )}
+        </div>
       ) : null}
     </section>
   );
@@ -1918,6 +2013,9 @@ function DecisionCard({
           voterN={voterN}
           quorum={quorum}
           onVote={onVote}
+          votes={votes}
+          roster={roster}
+          isHost={isHost}
         />
       );
     }

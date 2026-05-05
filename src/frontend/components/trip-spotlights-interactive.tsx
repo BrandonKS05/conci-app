@@ -2,22 +2,45 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PlacePreview } from "@/shared/place-preview";
+import type { PlacePreview, PlaceSpotlight, SpotlightVenueKind } from "@/shared/place-preview";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import type { TripPlan } from "@/shared/trip-plan";
+import type { TripRosterPerson } from "@/shared/trip-roster";
 import { memberVoteKey } from "@/shared/collab-vote-keys";
 import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
 import { parseCollabState } from "@/shared/collaboration";
+import { voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import {
   inferSpotlightCategory,
   spotlightCategoryBadgeClass,
   spotlightCategoryLabel,
 } from "@/shared/spotlight-category";
 
+/** Resolve roster display names for spotlight vote keys (same logic as collaboration panel). */
+function displayNamesForSpotlightVoters(keys: string[], roster: TripRosterPerson[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const k of keys) {
+    const person = roster.find((p) => voteKeysIntersectAliases([k], new Set(p.voteAliases)));
+    const name = person?.displayName;
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return out;
+}
+
 type BrowseRow = {
   places: PlacePreview[];
   queryUsed: string;
 };
+
+const PICKED_SECTIONS: { kind: SpotlightVenueKind; heading: string }[] = [
+  { kind: "restaurant", heading: "Restaurants" },
+  { kind: "hotel", heading: "Hotels" },
+  { kind: "experience", heading: "Experiences" },
+];
 
 export function TripSpotlightsInteractive({
   tripId,
@@ -26,6 +49,8 @@ export function TripSpotlightsInteractive({
   initialSpotlightVotes,
   onPlanUpdated,
   onCollabBump,
+  collabRefreshSignal = 0,
+  isHost = false,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -33,11 +58,15 @@ export function TripSpotlightsInteractive({
   initialSpotlightVotes?: Record<string, string[]>;
   onPlanUpdated: (next: TripPlan) => void;
   onCollabBump: () => void;
+  /** Increment when collab may have changed (votes elsewhere on the page). */
+  collabRefreshSignal?: number;
+  isHost?: boolean;
 }) {
   const spotlights = useMemo(() => plan.spotlights ?? [], [plan.spotlights]);
   const myKey = memberVoteKey(viewerUserId);
 
   const [votes, setVotes] = useState<Record<string, string[]>>(initialSpotlightVotes ?? {});
+  const [voteRoster, setVoteRoster] = useState<TripRosterPerson[]>([]);
   const [voteBusy, setVoteBusy] = useState<string | null>(null);
   const [browseBusy, setBrowseBusy] = useState<string | null>(null);
   const [replaceBusy, setReplaceBusy] = useState<string | null>(null);
@@ -51,24 +80,48 @@ export function TripSpotlightsInteractive({
     setVotes(initialSpotlightVotes ?? {});
   }, [initialSpotlightVotes]);
 
+  /** Keep tallies in sync for hosts / other tabs — collaboration GET returns latest spotlightVotes + roster. */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/collab`, { credentials: "include" });
+        const j = (await r.json().catch(() => ({}))) as { collab?: unknown; roster?: TripRosterPerson[] };
+        if (!r.ok || cancelled) return;
+        if (j.collab) {
+          const c = parseCollabState(j.collab);
+          setVotes(c.spotlightVotes ?? {});
+        }
+        if (Array.isArray(j.roster)) setVoteRoster(j.roster);
+      } catch {
+        //
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, collabRefreshSignal]);
+
   const pollCollab = useCallback(async () => {
     try {
       const r = await fetch(`/api/trip-plans/${tripId}/collab`, { credentials: "include" });
-      const j = (await r.json()) as { collab?: unknown };
+      const j = (await r.json()) as { collab?: unknown; roster?: TripRosterPerson[] };
       if (!r.ok || !j.collab) return;
       const c = parseCollabState(j.collab);
-      if (c.spotlightVotes) setVotes(c.spotlightVotes);
+      setVotes(c.spotlightVotes ?? {});
+      if (Array.isArray(j.roster)) setVoteRoster(j.roster);
     } catch {
       //
     }
   }, [tripId]);
 
   useEffect(() => {
+    const ms = isHost ? 8000 : 22000;
     const t = window.setInterval(() => {
       void pollCollab();
-    }, 22000);
+    }, ms);
     return () => window.clearInterval(t);
-  }, [pollCollab]);
+  }, [pollCollab, isHost]);
 
   const voteCount = useCallback(
     (sid: string) => (votes[sid] ?? []).length,
@@ -171,6 +224,18 @@ export function TripSpotlightsInteractive({
     [spotlights]
   );
 
+  const groupedRows = useMemo(() => {
+    const buckets: Record<SpotlightVenueKind, { s: PlaceSpotlight; id: string }[]> = {
+      restaurant: [],
+      hotel: [],
+      experience: [],
+    };
+    for (const row of rows) {
+      buckets[inferSpotlightCategory(row.s)].push(row);
+    }
+    return buckets;
+  }, [rows]);
+
   if (!rows.length) return null;
 
   return (
@@ -184,11 +249,20 @@ export function TripSpotlightsInteractive({
         </p>
       </div>
 
-      <ul className="space-y-6">
-        {rows.map(({ s, id }) => {
-          const browse = browseRowById[id];
-          const venueKind = inferSpotlightCategory(s);
+      <div className="space-y-10">
+        {PICKED_SECTIONS.map(({ kind, heading }) => {
+          const sectionRows = groupedRows[kind];
+          if (!sectionRows.length) return null;
           return (
+            <div key={kind}>
+              <h4 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+                {heading}
+              </h4>
+              <ul className="space-y-6">
+                {sectionRows.map(({ s, id }) => {
+                  const browse = browseRowById[id];
+                  const venueKind = inferSpotlightCategory(s);
+                  return (
             <li key={id} className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-dm-elevated">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <a
@@ -268,6 +342,17 @@ export function TripSpotlightsInteractive({
                 </div>
               </div>
 
+              {isHost && voteCount(id) > 0 ? (
+                <div className="mt-3 rounded-xl border border-indigo-200/60 bg-indigo-50/50 px-3 py-2 dark:border-indigo-500/25 dark:bg-indigo-950/25">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300/90">
+                    {voteCount(id)} vote{voteCount(id) === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-1 text-xs leading-snug text-slate-700 dark:text-neutral-300">
+                    {displayNamesForSpotlightVoters(votes[id] ?? [], voteRoster).join(", ") || "Votes recorded"}
+                  </p>
+                </div>
+              ) : null}
+
               {browse?.places?.length ? (
                 <div className="mt-4 space-y-2 border-t border-slate-200/80 pt-4 dark:border-white/10">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-500">
@@ -309,9 +394,13 @@ export function TripSpotlightsInteractive({
                 </div>
               ) : null}
             </li>
+                  );
+                })}
+              </ul>
+            </div>
           );
         })}
-      </ul>
+      </div>
     </section>
   );
 }

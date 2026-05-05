@@ -23,6 +23,7 @@ export function inferSpotlightCategory(s: PlaceSpotlight): SpotlightVenueKind {
   }
 
   if (/\b(hotel|inn|suites|resort|hostel|motel|lodging|accommodation)\b/.test(sq)) return "hotel";
+  /** Name-only: chains and lodging keywords (maps titles often omit category in sourceQuery). */
   if (HOTEL_NAME_HINT.test(name)) return "hotel";
   if (/per night|\$\s*\d+\s*\/\s*night/i.test(price)) return "hotel";
   if (/^\s*\$\s*[1-9]\d{2,3}\s*$/.test(price)) return "hotel";
@@ -31,6 +32,15 @@ export function inferSpotlightCategory(s: PlaceSpotlight): SpotlightVenueKind {
     return "restaurant";
   }
   if (/\$\d+\s*[–-]\s*\$\d+/.test(price)) return "restaurant";
+
+  /** Common dining venue words in business titles (Google Maps names). */
+  if (
+    /\b(restaurant|café|cafe|kitchen|grill|diner|brewery|brewpub|bistro|bar & grill|steakhouse|pizzeria|bakery|deli)\b/i.test(
+      name
+    )
+  ) {
+    return "restaurant";
+  }
 
   return "restaurant";
 }

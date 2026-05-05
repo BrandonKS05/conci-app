@@ -1,19 +1,214 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
-import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
   experienceLiveKey,
   flightLiveKey,
   restaurantLiveKey,
 } from "@/shared/itinerary-live-curation";
-import type { TripPlan } from "@/shared/trip-plan";
+import {
+  enumerateLocalIsoDays,
+  parseLocalIsoDate,
+  tripRangeBestEffortFromPlanDates,
+  type TripPlan,
+} from "@/shared/trip-plan";
 import type { LiveExperienceCard, LiveFlightCard } from "@/shared/trip-live-recommendations";
 import type { RestaurantPick } from "@/shared/restaurants";
 
 const SWIPE_DISMISS_PX = 72;
+
+export type LiveCurationMutate = (
+  action: "keep" | "dismiss" | "unkeep" | "undismiss",
+  key: string,
+  dateIso?: string
+) => void;
+
+function formatShortTripDay(iso: string): string {
+  const d = parseLocalIsoDate(iso);
+  return d
+    ? d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+    : iso;
+}
+
+function labelForLiveKeptKey(
+  key: string,
+  restaurants: RestaurantPick[],
+  experiences: LiveExperienceCard[],
+  flights: LiveFlightCard[]
+): string {
+  if (key.startsWith("r:")) {
+    const r = restaurants.find((x) => restaurantLiveKey(x) === key);
+    return r?.name ?? "Restaurant";
+  }
+  if (key.startsWith("ex:")) {
+    const hit = experiences
+      .map((ex, i) => ({ ex, i }))
+      .find(({ ex, i }) => experienceLiveKey(ex, i) === key);
+    return hit?.ex.name ?? "Experience";
+  }
+  if (key.startsWith("f:")) {
+    const hit = flights.map((f, i) => ({ f, i })).find(({ f, i }) => flightLiveKey(f, i) === key);
+    return hit?.f.airline ?? "Flight";
+  }
+  return "Saved pick";
+}
+
+function LivePickTripDayModal({
+  open,
+  tripDays,
+  busy,
+  onCancel,
+  onPick,
+}: {
+  open: boolean;
+  tripDays: string[];
+  busy: boolean;
+  onCancel: () => void;
+  onPick: (iso: string) => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[300] flex items-end justify-center p-4 sm:items-center sm:p-6" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onCancel} />
+      <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
+        <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Pick a trip day</h3>
+        <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+          Choose which day this reservation belongs on (within your trip date range).
+        </p>
+        {tripDays.length === 0 ? (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/35 dark:text-amber-100">
+            Add concrete trip dates on the trip card first — then you can place picks on the calendar.
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tripDays.map((iso) => (
+              <button
+                key={iso}
+                type="button"
+                disabled={busy}
+                onClick={() => onPick(iso)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+              >
+                {formatShortTripDay(iso)}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LiveHostCurateRowActions({
+  itemKey,
+  isHost,
+  tripDays,
+  busyAll,
+  mutate,
+}: {
+  itemKey: string;
+  isHost: boolean;
+  tripDays: string[];
+  busyAll: boolean;
+  mutate: LiveCurationMutate;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!isHost) {
+    return (
+      <p className="text-[11px] text-slate-500 dark:text-neutral-500">Only the trip host can add or dismiss suggestions.</p>
+    );
+  }
+  return (
+    <>
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          disabled={busyAll}
+          onClick={() => mutate("dismiss", itemKey)}
+          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
+        >
+          Not interested
+        </button>
+        <button
+          type="button"
+          disabled={busyAll}
+          onClick={() => setOpen(true)}
+          className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
+        >
+          Add to trip
+        </button>
+      </div>
+      <LivePickTripDayModal
+        open={open}
+        tripDays={tripDays}
+        busy={busyAll}
+        onCancel={() => setOpen(false)}
+        onPick={(iso) => {
+          void mutate("keep", itemKey, iso);
+          setOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+export function HostLiveScheduleByDay({
+  plan,
+  flights,
+  restaurants,
+  experiences,
+}: {
+  plan: TripPlan;
+  flights: LiveFlightCard[];
+  restaurants: RestaurantPick[];
+  experiences: LiveExperienceCard[];
+}) {
+  const sched = plan.itineraryLiveCuration?.scheduledDates ?? {};
+  const kept = plan.itineraryLiveCuration?.kept ?? [];
+  const dated = kept.filter((k) => typeof sched[k] === "string" && sched[k].length > 0);
+  if (!dated.length) return null;
+
+  const byDay = new Map<string, string[]>();
+  for (const k of dated) {
+    const day = sched[k]!;
+    const label = labelForLiveKeptKey(k, restaurants, experiences, flights);
+    const list = byDay.get(day) ?? [];
+    list.push(label);
+    byDay.set(day, list);
+  }
+  const days = [...byDay.keys()].sort();
+
+  return (
+    <div className="rounded-xl border border-teal-200/70 bg-teal-50/50 p-4 dark:border-teal-800/40 dark:bg-teal-950/25">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-900 dark:text-teal-200/90">
+        Reservations by day
+      </p>
+      <ul className="mt-3 space-y-4">
+        {days.map((day) => (
+          <li key={day}>
+            <p className="text-sm font-semibold text-slate-900 dark:text-neutral-100">{formatShortTripDay(day)}</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-neutral-300">
+              {(byDay.get(day) ?? []).map((label, i) => (
+                <li key={`${day}-${i}-${label}`}>{label}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function SwipeableLiveCard({
   children,
@@ -91,14 +286,18 @@ export function useLiveCurationMutation(tripId: string, onPlanUpdated?: (plan: T
   const [err, setErr] = useState<string | null>(null);
 
   const mutate = useCallback(
-    async (action: "keep" | "dismiss" | "unkeep" | "undismiss", key: string) => {
+    async (action: "keep" | "dismiss" | "unkeep" | "undismiss", key: string, dateIso?: string) => {
       setErr(null);
       setBusyKey(key);
       try {
+        const body: Record<string, unknown> = { action, key };
+        if (action === "keep" && typeof dateIso === "string") {
+          body.dateIso = dateIso;
+        }
         const res = await fetch(`/api/trip-plans/${tripId}/itinerary-live-curation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, key }),
+          body: JSON.stringify(body),
         });
         const j = (await res.json()) as { error?: string; plan?: TripPlan };
         if (!res.ok) {
@@ -176,8 +375,6 @@ function KeptStrip({
   );
 }
 
-type Mutate = (action: "keep" | "dismiss" | "unkeep" | "undismiss", key: string) => void;
-
 export function CuratedFlightsRows({
   plan,
   flights,
@@ -185,22 +382,31 @@ export function CuratedFlightsRows({
   flightsError,
   mutate,
   busyKey,
+  isHost,
+  tripDays,
 }: {
   plan: TripPlan;
   flights: LiveFlightCard[];
   liveLoading: boolean;
   flightsError: string | null;
-  mutate: Mutate;
+  mutate: LiveCurationMutate;
   busyKey: string | null;
+  isHost: boolean;
+  tripDays: string[];
 }) {
   const cur = plan.itineraryLiveCuration;
   const kept = new Set(cur?.kept ?? []);
   const dismissed = new Set(cur?.dismissed ?? []);
+  const sched = cur?.scheduledDates ?? {};
 
   const flightKeptMeta = flights
     .map((f, i) => ({ f, key: flightLiveKey(f, i) }))
     .filter(({ key }) => kept.has(key))
-    .map(({ f, key }) => ({ key, label: f.airline, sub: f.departureTime }));
+    .map(({ f, key }) => ({
+      key,
+      label: f.airline,
+      sub: sched[key] ? `${formatShortTripDay(sched[key]!)} · departs ${f.departureTime}` : f.departureTime,
+    }));
   const flightPool = flights
     .map((f, i) => ({ f, key: flightLiveKey(f, i) }))
     .filter(({ key }) => !kept.has(key) && !dismissed.has(key));
@@ -218,14 +424,21 @@ export function CuratedFlightsRows({
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500 dark:text-neutral-500">
-        Tap <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong> for options you want on the itinerary.
-        Swipe left or use <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> to clear the rest.
+        {isHost ? (
+          <>
+            Tap <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, pick a day in the trip range,
+            then see it under <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Swipe
+            left or use <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> to clear the rest.
+          </>
+        ) : (
+          "Flight suggestions for your group (only the host can add them to the trip)."
+        )}
       </p>
       <KeptStrip title="On your trip" items={flightKeptMeta} busyKey={busyKey} onRemove={(k) => mutate("unkeep", k)} />
       {flightPool.map(({ f, key }) => (
         <SwipeableLiveCard
           key={key}
-          disabled={busyKey !== null}
+          disabled={busyKey !== null || !isHost}
           onSwipeDismiss={() => mutate("dismiss", key)}
           swipeLabel="Swipe left to dismiss this flight suggestion"
         >
@@ -237,24 +450,13 @@ export function CuratedFlightsRows({
                 <p className="text-sm text-slate-600 dark:text-neutral-400">Duration {f.duration}</p>
                 <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{f.pricePerPerson}</p>
               </div>
-              <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  disabled={busyKey !== null}
-                  onClick={() => mutate("dismiss", key)}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
-                >
-                  Not interested
-                </button>
-                <button
-                  type="button"
-                  disabled={busyKey !== null}
-                  onClick={() => mutate("keep", key)}
-                  className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-neutral-100 dark:text-dm-page dark:hover:bg-white"
-                >
-                  Add to trip
-                </button>
-              </div>
+              <LiveHostCurateRowActions
+                itemKey={key}
+                isHost={isHost}
+                tripDays={tripDays}
+                busyAll={busyKey !== null}
+                mutate={mutate}
+              />
             </div>
             <a
               href={f.bookOnGoogleFlightsUrl}
@@ -287,30 +489,47 @@ export function CuratedRestaurantsSection({
   restaurantsError,
   mutate,
   busyKey,
+  isHost,
+  tripDays,
 }: {
   plan: TripPlan;
   restaurants: RestaurantPick[];
   liveLoading: boolean;
   restaurantsError: string | null;
-  mutate: Mutate;
+  mutate: LiveCurationMutate;
   busyKey: string | null;
+  isHost: boolean;
+  tripDays: string[];
 }) {
   const cur = plan.itineraryLiveCuration;
   const kept = new Set(cur?.kept ?? []);
   const dismissed = new Set(cur?.dismissed ?? []);
+  const sched = cur?.scheduledDates ?? {};
 
   const restaurantKeptMeta = restaurants
     .filter((r) => kept.has(restaurantLiveKey(r)))
-    .map((r) => ({ key: restaurantLiveKey(r), label: r.name, sub: r.neighborhood }));
+    .map((r) => {
+      const key = restaurantLiveKey(r);
+      const day = sched[key];
+      const sub =
+        day && r.neighborhood ? `${formatShortTripDay(day)} · ${r.neighborhood}` : day ? formatShortTripDay(day) : r.neighborhood;
+      return { key, label: r.name, sub };
+    });
   const restaurantPool = restaurants.filter((r) => !kept.has(restaurantLiveKey(r)) && !dismissed.has(restaurantLiveKey(r)));
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Restaurants (live)</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-        Add picks with <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, or{' '}
-        <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> for the rest. Suggestions come from
-        Google Places Text Search (group vote food hints per query).
+        {isHost ? (
+          <>
+            Use <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, choose a trip day, then find it
+            under <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Suggestions come from
+            Google Places (group food hints).
+          </>
+        ) : (
+          "Restaurant ideas from Google Places — only the host can add them to the trip."
+        )}
       </p>
       {liveLoading ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
@@ -336,24 +555,13 @@ export function CuratedRestaurantsSection({
                       <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
                       <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
                     </div>
-                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="button"
-                        disabled={busyKey !== null}
-                        onClick={() => mutate("dismiss", key)}
-                        className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
-                      >
-                        Not interested
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyKey !== null}
-                        onClick={() => mutate("keep", key)}
-                        className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${primaryFilledInteractive}`}
-                      >
-                        Add to trip
-                      </button>
-                    </div>
+                    <LiveHostCurateRowActions
+                      itemKey={key}
+                      isHost={isHost}
+                      tripDays={tripDays}
+                      busyAll={busyKey !== null}
+                      mutate={mutate}
+                    />
                   </div>
                   <a
                     href={r.openTableUrl}
@@ -390,22 +598,31 @@ export function CuratedExperiencesSection({
   experiencesError,
   mutate,
   busyKey,
+  isHost,
+  tripDays,
 }: {
   plan: TripPlan;
   experiences: LiveExperienceCard[];
   liveLoading: boolean;
   experiencesError: string | null;
-  mutate: Mutate;
+  mutate: LiveCurationMutate;
   busyKey: string | null;
+  isHost: boolean;
+  tripDays: string[];
 }) {
   const cur = plan.itineraryLiveCuration;
   const kept = new Set(cur?.kept ?? []);
   const dismissed = new Set(cur?.dismissed ?? []);
+  const sched = cur?.scheduledDates ?? {};
 
   const experienceKeptMeta = experiences
     .map((ex, i) => ({ ex, i, key: experienceLiveKey(ex, i) }))
     .filter(({ key }) => kept.has(key))
-    .map(({ ex, key }) => ({ key, label: ex.name, sub: ex.duration }));
+    .map(({ ex, key }) => {
+      const day = sched[key];
+      const sub = day ? `${formatShortTripDay(day)} · ${ex.duration}` : ex.duration;
+      return { key, label: ex.name, sub };
+    });
   const experiencePool = experiences
     .map((ex, i) => ({ ex, i, key: experienceLiveKey(ex, i) }))
     .filter(({ key }) => !kept.has(key) && !dismissed.has(key));
@@ -414,9 +631,14 @@ export function CuratedExperiencesSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Top experiences</h3>
       <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-        Add picks with <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, or{" "}
-        <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> for the rest. Suggestions come from
-        Google Places Text Search for your destination.
+        {isHost ? (
+          <>
+            <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong> and pick a day — it will show under{" "}
+            <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Suggestions from Google Places.
+          </>
+        ) : (
+          "Experience ideas — only the host can add them to the trip."
+        )}
       </p>
       {liveLoading ? (
         <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
@@ -439,24 +661,13 @@ export function CuratedExperiencesSection({
                     <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{ex.rating}</p>
                     <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Duration: {ex.duration}</p>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      disabled={busyKey !== null}
-                      onClick={() => mutate("dismiss", key)}
-                      className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
-                    >
-                      Not interested
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyKey !== null}
-                      onClick={() => mutate("keep", key)}
-                      className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${primaryFilledInteractive}`}
-                    >
-                      Add to trip
-                    </button>
-                  </div>
+                  <LiveHostCurateRowActions
+                    itemKey={key}
+                    isHost={isHost}
+                    tripDays={tripDays}
+                    busyAll={busyKey !== null}
+                    mutate={mutate}
+                  />
                 </div>
                 <a
                   href={ex.bookingUrl}

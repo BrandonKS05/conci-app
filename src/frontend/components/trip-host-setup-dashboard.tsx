@@ -29,6 +29,7 @@ import {
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import {
   CuratedFlightsRows,
+  HostLiveScheduleByDay,
   LiveCurationErrorBanner,
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
@@ -241,6 +242,12 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
 
   /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
   const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
+
+  const flightTripDayOptions = useMemo(() => {
+    if (!tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return [];
+    return enumerateLocalIsoDays(tripDisplayRange.startIso, tripDisplayRange.endIso);
+  }, [tripDisplayRange?.startIso, tripDisplayRange?.endIso]);
+
   /** While confirming a new range on the calendar, preview highlight uses this; otherwise saved/plan range. */
   const effectiveHighlightRange = useMemo(
     () => pendingRangeConfirm ?? tripDisplayRange,
@@ -1023,14 +1030,22 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 From <strong className="text-slate-800 dark:text-neutral-200">{plan.departureCity}</strong> to{" "}
                 <strong className="text-slate-800 dark:text-neutral-200">{plan.location}</strong>
               </p>
-              <div className="mt-4">
+              <div className="mt-4 space-y-4">
+                <HostLiveScheduleByDay
+                  plan={plan}
+                  flights={liveData?.flights ?? []}
+                  restaurants={liveData?.restaurants ?? []}
+                  experiences={liveData?.experiences ?? []}
+                />
                 <CuratedFlightsRows
                   plan={plan}
                   flights={liveData?.flights ?? []}
                   liveLoading={liveLoading}
                   flightsError={liveData?.flightsError ?? null}
-                  mutate={(a, k) => void flightCurationMutate(a, k)}
+                  mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
                   busyKey={flightCurationBusy}
+                  isHost
+                  tripDays={flightTripDayOptions}
                 />
               </div>
               {(() => {
