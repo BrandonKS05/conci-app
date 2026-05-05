@@ -26,6 +26,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 /** Copies `shareMessage`, or the current page URL when `shareMessage` is omitted. */
 export function TripPlanShareButton({ shareMessage }: { shareMessage?: string }) {
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   const handleShare = useCallback(async () => {
     const preset = shareMessage?.trim();
@@ -34,12 +35,22 @@ export function TripPlanShareButton({ shareMessage }: { shareMessage?: string })
     if (!text) return;
     const ok = await copyToClipboard(text);
     if (ok) {
+      setToastMessage(shareMessage?.trim() ? "Message copied" : "Link copied");
       setShowToast(true);
-      window.setTimeout(() => setShowToast(false), 2200);
+      window.setTimeout(() => {
+        setShowToast(false);
+        setToastMessage("");
+      }, 2200);
+    } else {
+      setToastMessage("Could not copy — try again or copy your invite code manually.");
+      setShowToast(true);
+      window.setTimeout(() => {
+        setShowToast(false);
+        setToastMessage("");
+      }, 3200);
     }
   }, [shareMessage]);
 
-  const copiedLabel = shareMessage?.trim() ? "Message copied" : "Link copied";
   const label = shareMessage?.trim() ? "Share Trip" : "Share";
 
   return (
@@ -57,7 +68,7 @@ export function TripPlanShareButton({ shareMessage }: { shareMessage?: string })
           aria-live="polite"
           className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-lg shadow-slate-900/10 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-black/40"
         >
-          {copiedLabel}
+          {toastMessage}
         </div>
       ) : null}
     </>

@@ -6,6 +6,7 @@ export function parseSubscriptionTier(raw: string | null | undefined): Subscript
   return "free";
 }
 
-export function subscriptionTierCanCreateTrips(tier: SubscriptionTier): boolean {
-  return tier === "host" || tier === "host_pro";
+/** Temporarily always true for testing — re-enable paid tiers before launch. */
+export function subscriptionTierCanCreateTrips(_tier: SubscriptionTier): boolean {
+  return true;
 }

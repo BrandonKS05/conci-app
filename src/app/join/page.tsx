@@ -12,12 +12,14 @@ import { PRIMARY_APP_NAV } from "@/shared/app-nav";
 export default async function JoinTripPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; code?: string }>;
 }) {
-  const { from } = await searchParams;
+  const { from, code } = await searchParams;
   if (from !== "create") {
     redirect("/trip-parser");
   }
+
+  const initialCode = typeof code === "string" ? code : "";
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#141414] dark:text-[#ebe9e4]">
@@ -58,7 +60,7 @@ export default async function JoinTripPage({
         </nav>
       </header>
       <main className="mx-auto max-w-3xl px-4 pb-20 pt-2 sm:px-6 sm:pt-4">
-        <JoinTripByCodeForm />
+        <JoinTripByCodeForm initialCode={initialCode} />
         <p className="mt-8 text-center text-sm text-slate-500 dark:text-neutral-500">
           <Link href="/trip-parser" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
             ← Back to Create a Trip

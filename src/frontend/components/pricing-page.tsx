@@ -106,7 +106,9 @@ function PricingContent() {
             Simple pricing
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-slate-600 dark:text-neutral-400">
-            Join trips for free. Upgrade to host your own plans with the AI trip parser and sharing tools.
+            Testing mode: every tier is <span className="font-semibold text-slate-800 dark:text-neutral-200">$0/mo</span>{" "}
+            in the UI. Trip creation is open to all signed-in users — subscription billing is bypassed until we turn the
+            gate back on.
           </p>
         </div>
 
@@ -146,7 +148,7 @@ function PricingContent() {
             </span>
             <p className="text-sm font-semibold text-slate-500 dark:text-neutral-500">Host</p>
             <p className="mt-2 font-display text-4xl font-semibold text-slate-900 dark:text-white">
-              $9
+              $0
               <span className="text-lg font-normal text-slate-500 dark:text-neutral-500">/mo</span>
             </p>
             <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
@@ -178,7 +180,7 @@ function PricingContent() {
           <article className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-dm-card">
             <p className="text-sm font-semibold text-slate-500 dark:text-neutral-500">Host Pro</p>
             <p className="mt-2 font-display text-4xl font-semibold text-slate-900 dark:text-white">
-              $29
+              $0
               <span className="text-lg font-normal text-slate-500 dark:text-neutral-500">/mo</span>
             </p>
             <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">

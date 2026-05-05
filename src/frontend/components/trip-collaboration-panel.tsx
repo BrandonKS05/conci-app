@@ -71,6 +71,8 @@ type CollabPayload = {
   roster: TripRosterPerson[];
   viewerIsTripOwner?: boolean;
   nudgeEmailReady?: boolean;
+  /** Trip `trip_plans.user_id` — used to hide remove on the owner row. */
+  tripOwnerUserId?: string;
   planSnapshot: { datesOptions: string[]; peopleNames: string[]; peopleCount: number | null };
 };
 
@@ -157,6 +159,8 @@ export function TripCollaborationPanel({
   const [datesHostConfirmErr, setDatesHostConfirmErr] = useState<string | null>(null);
   const [nudgeBusyKey, setNudgeBusyKey] = useState<string | null>(null);
   const [nudgeNotice, setNudgeNotice] = useState<string | null>(null);
+  const [removeMemberBusyId, setRemoveMemberBusyId] = useState<string | null>(null);
+  const [removeMemberErr, setRemoveMemberErr] = useState<string | null>(null);
   const [notifySelectedMemberIds, setNotifySelectedMemberIds] = useState(() => new Set<string>());
   const [notifyEmailModalOpen, setNotifyEmailModalOpen] = useState(false);
   const [notifyEmailModalRecipients, setNotifyEmailModalRecipients] = useState<string[]>([]);
@@ -368,6 +372,37 @@ export function TripCollaborationPanel({
     }
   };
 
+  const removeMemberFromTrip = useCallback(
+    async (memberUserId: string, displayName: string) => {
+      if (
+        !window.confirm(
+          `Remove ${displayName} from this trip? They will lose access; their votes on group decisions will be cleared.`
+        )
+      ) {
+        return;
+      }
+      setRemoveMemberBusyId(memberUserId);
+      setRemoveMemberErr(null);
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/members/${memberUserId}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        if (!r.ok) {
+          setRemoveMemberErr(typeof j.error === "string" ? j.error : "Could not remove member.");
+          return;
+        }
+        await load();
+      } catch {
+        setRemoveMemberErr("Network error — try again.");
+      } finally {
+        setRemoveMemberBusyId(null);
+      }
+    },
+    [tripId, load]
+  );
+
   const submitVote = async (payload: Record<string, unknown>) => {
     setBusyKey(typeof payload.decisionKey === "string" ? payload.decisionKey : "x");
     try {
@@ -460,6 +495,11 @@ export function TripCollaborationPanel({
           {nudgeNotice ? (
             <p className="mt-2 text-[11px] text-slate-600 dark:text-neutral-400">{nudgeNotice}</p>
           ) : null}
+          {removeMemberErr ? (
+            <p className="mt-2 text-[11px] text-rose-600 dark:text-rose-400" role="alert">
+              {removeMemberErr}
+            </p>
+          ) : null}
           {showHostNotifyUi && notifyEligibleMemberIds.size > 0 ? (
             <div className="mt-3 space-y-2 border-t border-slate-200/80 pt-3 dark:border-white/10">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -500,6 +540,13 @@ export function TripCollaborationPanel({
                 typeof p.memberId === "string" && p.memberId.length > 0 ? p.memberId : null;
               const showEmailCheckbox =
                 Boolean(showHostNotifyUi && recipientId && notifyEligibleMemberIds.has(recipientId));
+              const ownerId = data.tripOwnerUserId;
+              const canRemoveMember =
+                isHost &&
+                Boolean(recipientId) &&
+                typeof ownerId === "string" &&
+                recipientId !== ownerId &&
+                recipientId !== viewerMemberId;
               return (
                 <li
                   key={`${p.kind}-${p.memberId ?? ""}-${p.displayName}-${i}`}
@@ -524,16 +571,28 @@ export function TripCollaborationPanel({
                       <span className="text-[11px] text-slate-500 dark:text-neutral-500">{p.maskedContact}</span>
                     ) : null}
                   </div>
-                  {showNudge ? (
-                    <button
-                      type="button"
-                      disabled={nudgeBusyKey !== null}
-                      onClick={() => void sendOneNudge(p)}
-                      className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
-                    >
-                      {nudgeBusyKey === nk ? "…" : "Nudge"}
-                    </button>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {showNudge ? (
+                      <button
+                        type="button"
+                        disabled={nudgeBusyKey !== null}
+                        onClick={() => void sendOneNudge(p)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
+                      >
+                        {nudgeBusyKey === nk ? "…" : "Nudge"}
+                      </button>
+                    ) : null}
+                    {canRemoveMember && recipientId ? (
+                      <button
+                        type="button"
+                        disabled={removeMemberBusyId !== null}
+                        onClick={() => void removeMemberFromTrip(recipientId, p.displayName)}
+                        className="rounded-md border border-rose-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-rose-950/40"
+                      >
+                        {removeMemberBusyId === recipientId ? "…" : "Remove"}
+                      </button>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}
@@ -1314,7 +1373,6 @@ function DecisionCard({
   const [budgetCustom, setBudgetCustom] = useState("");
   const [againstPrep, setAgainstPrep] = useState<string[]>([]);
   const [pollWriteIn, setPollWriteIn] = useState("");
-  const [datesSuggestExpanded, setDatesSuggestExpanded] = useState(false);
 
   const hotels = (blob?.hotels ?? meta.hotels) as HotelPick[] | undefined;
   const spots = (blob?.restaurants ?? meta.restaurants) as RestaurantPick[] | undefined;
@@ -1332,7 +1390,6 @@ function DecisionCard({
   useEffect(() => {
     setAgainstPrep([]);
     setPollWriteIn("");
-    setDatesSuggestExpanded(false);
   }, [meta.key]);
 
   useEffect(() => {
@@ -1400,8 +1457,8 @@ function DecisionCard({
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
           <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
           <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-300/90">
-            The host has confirmed these trip dates for the group. Your responses here don&apos;t change that — they help
-            everyone see who&apos;s aligned.
+            The host has confirmed these trip dates for the group. Everyone should still use the calendar to share when
+            they&apos;re available — including ranges outside the host window if needed.
           </p>
 
           <div className="mt-4 rounded-2xl border-2 border-emerald-500/35 bg-gradient-to-br from-emerald-50 to-white px-4 py-5 dark:border-emerald-600/30 dark:from-emerald-950/45 dark:to-dm-card sm:px-6 sm:py-6">
@@ -1415,61 +1472,51 @@ function DecisionCard({
 
           {!isHost ? (
             <div className="mt-5 space-y-4">
-              <button
-                type="button"
-                disabled={busy || viewerSaidWorksForConfirmed || blockedByDates}
-                onClick={() => onVote({ decisionKey: meta.key, kind: "datesWorksForMe" })}
-                className={`w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto ${primaryFilledInteractive}`}
-              >
-                {viewerSaidWorksForConfirmed ? "Thanks — noted" : "Works for me"}
-              </button>
-              <div>
-                <button
-                  type="button"
-                  disabled={blockedByDates}
-                  onClick={() => setDatesSuggestExpanded((open) => !open)}
-                  className="text-sm font-medium text-slate-500 underline decoration-slate-400/70 underline-offset-2 transition hover:text-slate-800 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
-                >
-                  {datesSuggestExpanded ? "Hide date suggestions" : "Suggest a different date"}
-                </button>
-                {datesSuggestExpanded ? (
-                  <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
-                    Propose an alternative range — the host can review; confirmed dates stay unless they change the trip.
+              {showSingleProposal ? (
+                <DatesSingleProposalMemberVote
+                  decisionKey={meta.key}
+                  options={opts}
+                  votes={votes}
+                  mine={viewerPrimaryPick}
+                  busy={busy}
+                  quorum={quorum}
+                  voterN={voterN}
+                  onVote={onVote}
+                  worksForMeMode="confirmedAck"
+                  viewerAcknowledgedConfirmed={viewerSaidWorksForConfirmed}
+                  blockedByDates={blockedByDates}
+                />
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy || viewerSaidWorksForConfirmed || blockedByDates}
+                    onClick={() => onVote({ decisionKey: meta.key, kind: "datesWorksForMe" })}
+                    className={`w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto ${primaryFilledInteractive}`}
+                  >
+                    {viewerSaidWorksForConfirmed ? "Thanks — noted" : "Works for me"}
+                  </button>
+                  <p className="text-sm text-slate-600 dark:text-neutral-400">
+                    Tap <span className="font-semibold text-slate-800 dark:text-neutral-200">Works for me</span> if these
+                    dates work, or pick any range on the calendar — not limited to the host&apos;s options.
                   </p>
-                ) : null}
-              </div>
-              {datesSuggestExpanded ? (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/40 p-3 dark:border-white/10 dark:bg-dm-elevated/40">
-                  {showSingleProposal ? (
-                    <DatesSingleProposalMemberVote
-                      decisionKey={meta.key}
-                      options={opts}
-                      votes={votes}
-                      mine={viewerPrimaryPick}
-                      busy={busy}
-                      quorum={quorum}
-                      voterN={voterN}
-                      onVote={onVote}
-                    />
-                  ) : (
-                    <DatesVoteCalendar
-                      decisionKey={meta.key}
-                      options={opts}
-                      votes={votes}
-                      mine={viewerPrimaryPick}
-                      busy={busy}
-                      quorum={quorum}
-                      voterN={voterN}
-                      onVote={onVote}
-                      hideUnmappedBallotChips={singleVagueBallotOnly}
-                    />
-                  )}
-                </div>
-              ) : null}
+                  <DatesVoteCalendar
+                    decisionKey={meta.key}
+                    options={opts}
+                    votes={votes}
+                    mine={viewerPrimaryPick}
+                    busy={busy}
+                    quorum={quorum}
+                    voterN={voterN}
+                    onVote={onVote}
+                    hideUnmappedBallotChips={singleVagueBallotOnly || opts.length === 0}
+                  />
+                </>
+              )}
             </div>
           ) : (
             <p className="mt-5 text-sm text-slate-600 dark:text-neutral-400">
-              Travelers can tap <span className="font-semibold">Works for me</span> or suggest another range below that.
+              Travelers tap <span className="font-semibold">Works for me</span> and use the calendar to record availability.
             </p>
           )}
 

@@ -93,3 +93,45 @@ export async function assertMayJoinAsMember(
     throw new Error("You can't join your own invite code — you're the host of this trip. Open it from My Trips instead.");
   }
 }
+
+/** Host-only: removes a member row and clears their participation from the trip (not the owner). */
+export async function removeTripMemberAsHost(
+  svc: SupabaseClient,
+  tripPlanId: string,
+  targetUserId: string,
+  actorUserId: string
+): Promise<{ ok: true } | { error: string; status: number }> {
+  const access = await resolveTripAccess(svc, tripPlanId, actorUserId);
+  if (!access?.isHost) {
+    return { error: "Only the trip host can remove members.", status: 403 };
+  }
+
+  const { data: plan } = await svc.from("trip_plans").select("user_id").eq("id", tripPlanId).maybeSingle();
+  const ownerId = typeof plan?.user_id === "string" ? plan.user_id : null;
+  if (ownerId && targetUserId === ownerId) {
+    return { error: "You can't remove the trip owner.", status: 400 };
+  }
+  if (targetUserId === actorUserId) {
+    return { error: "You can't remove yourself here.", status: 400 };
+  }
+
+  const { data: deleted, error } = await svc
+    .from("trip_memberships")
+    .delete()
+    .eq("trip_plan_id", tripPlanId)
+    .eq("user_id", targetUserId)
+    .eq("role", "member")
+    .select("id");
+
+  if (error) {
+    console.error("[trip-memberships] removeTripMemberAsHost", error.message);
+    return { error: "Could not remove member.", status: 500 };
+  }
+  if (!deleted?.length) {
+    return {
+      error: "That traveler isn't listed as a member, or they're the host.",
+      status: 404,
+    };
+  }
+  return { ok: true };
+}

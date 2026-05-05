@@ -348,6 +348,10 @@ export function DatesSingleProposalMemberVote({
   quorum,
   voterN,
   onVote,
+  /** When the host has locked dates on the plan, "Works for me" records an ack (`datesWorksForMe`) instead of a ballot vote. */
+  worksForMeMode = "ballot",
+  viewerAcknowledgedConfirmed = false,
+  blockedByDates = false,
 }: {
   decisionKey: string;
   options: string[];
@@ -357,6 +361,9 @@ export function DatesSingleProposalMemberVote({
   quorum: number;
   voterN: number;
   onVote: (p: Record<string, unknown>) => void;
+  worksForMeMode?: "ballot" | "confirmedAck";
+  viewerAcknowledgedConfirmed?: boolean;
+  blockedByDates?: boolean;
 }) {
   const proposalRaw = options[0]!;
   const proposalNorm = proposalRaw.trim();
@@ -371,7 +378,10 @@ export function DatesSingleProposalMemberVote({
   const heading = useMemo(() => formatBallotProposalHeading(proposalRaw, y0), [proposalRaw, y0]);
 
   const mineTrim = mine?.trim() ?? "";
-  const votedForProposal = mineTrim.length > 0 && mineTrim === proposalNorm;
+  const votedForProposal =
+    worksForMeMode === "confirmedAck"
+      ? viewerAcknowledgedConfirmed
+      : mineTrim.length > 0 && mineTrim === proposalNorm;
 
   const nudgeAlternativeCalendar = () => {
     calRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -380,30 +390,46 @@ export function DatesSingleProposalMemberVote({
   };
 
   const castWorksForMe = () => {
-    onVote({ decisionKey, kind: "dates", option: proposalRaw });
+    if (worksForMeMode === "confirmedAck") {
+      onVote({ decisionKey, kind: "datesWorksForMe" });
+    } else {
+      onVote({ decisionKey, kind: "dates", option: proposalRaw });
+    }
   };
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-5 py-4 dark:border-indigo-500/30 dark:bg-indigo-950/25">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">
-          Host proposed trip dates
-        </p>
-        <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-3xl">
-          {heading}
-        </p>
-      </div>
+      {worksForMeMode !== "confirmedAck" ? (
+        <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-5 py-4 dark:border-indigo-500/30 dark:bg-indigo-950/25">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">
+            Host proposed trip dates
+          </p>
+          <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-3xl">
+            {heading}
+          </p>
+        </div>
+      ) : null}
 
       <p className="text-sm text-slate-700 dark:text-neutral-300">
-        Tap <strong className="font-semibold text-slate-900 dark:text-neutral-100">Works for me</strong> to vote yes on
-        the host&apos;s dates, or choose a different start and end below. Your vote is required — you can&apos;t skip
-        availability.
+        {worksForMeMode === "confirmedAck" ? (
+          <>
+            Tap <strong className="font-semibold text-slate-900 dark:text-neutral-100">Works for me</strong> if these
+            dates work for you, or pick any availability window on the calendar below — including dates outside this range
+            if you need to flag a conflict.
+          </>
+        ) : (
+          <>
+            Tap <strong className="font-semibold text-slate-900 dark:text-neutral-100">Works for me</strong> to vote yes on
+            the host&apos;s dates, or choose a different start and end below. Your vote is required — you can&apos;t skip
+            availability.
+          </>
+        )}
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || (worksForMeMode === "confirmedAck" && viewerAcknowledgedConfirmed) || blockedByDates}
           onClick={() => castWorksForMe()}
           className={`rounded-full px-6 py-2.5 text-sm transition disabled:opacity-50 ${
             votedForProposal
@@ -411,7 +437,7 @@ export function DatesSingleProposalMemberVote({
               : "border border-slate-200 bg-white font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/25 dark:hover:bg-white/5"
           }`}
         >
-          Works for me
+          {worksForMeMode === "confirmedAck" && viewerAcknowledgedConfirmed ? "Thanks — noted" : "Works for me"}
         </button>
 
         <button
@@ -455,7 +481,17 @@ export function DatesSingleProposalMemberVote({
       </div>
 
       <p className="text-xs text-slate-500 dark:text-neutral-500">
-        {mineTrim ? (
+        {worksForMeMode === "confirmedAck" ? (
+          mineTrim || viewerAcknowledgedConfirmed ? (
+            <>
+              {viewerAcknowledgedConfirmed && !mineTrim
+                ? "Noted — you can still add or change your availability on the calendar above."
+                : "Your availability is recorded. The host can see votes and suggestions here."}
+            </>
+          ) : (
+            <>Share whether these dates work or use the calendar for your real availability ({voterN}/{quorum}+ travelers).</>
+          )
+        ) : mineTrim ? (
           <>
             Your availability is recorded. The host may confirm the locked date once there are enough votes, or sooner if
             needed.

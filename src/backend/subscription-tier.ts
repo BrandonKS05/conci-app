@@ -1,11 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  parseSubscriptionTier,
-  type SubscriptionTier,
-  subscriptionTierCanCreateTrips,
-} from "@/shared/subscription";
+import { parseSubscriptionTier, type SubscriptionTier } from "@/shared/subscription";
 
 export async function fetchSubscriptionTierForUser(
   svc: SupabaseClient,
@@ -24,6 +20,7 @@ export async function fetchSubscriptionTierForUser(
   return parseSubscriptionTier(data?.subscription_tier as string | undefined);
 }
 
-export function userCanCreateTrips(tier: SubscriptionTier): boolean {
-  return subscriptionTierCanCreateTrips(tier);
+/** Temporarily always true for testing — mirrors shared subscriptionTierCanCreateTrips bypass. */
+export function userCanCreateTrips(_tier: SubscriptionTier): boolean {
+  return true;
 }

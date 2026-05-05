@@ -1,3 +1,4 @@
+import { memberVoteKey } from "@/shared/collab-vote-keys";
 import {
   budgetVoteNumericUsd,
   isValidBudgetCustomVoteToken,
@@ -160,8 +161,8 @@ function openDecisionsToClassified(plan: TripPlan): ClassifiedDecision[] {
 
 function synthDatePollIfNeeded(plan: TripPlan, open: ClassifiedDecision[]): ClassifiedDecision | null {
   const already = open.some((c) => c.kind === "dates");
-  if (already || plan.dates.confirmed) return null;
-  /** Always surface a dates decision (even with 0–1 host `plan.dates.options`) so members can vote concrete ranges. */
+  if (already) return null;
+  /** Always surface a dates decision (even with 0–1 host `plan.dates.options`) so members can vote concrete ranges — including after the host publishes with confirmed dates. */
   const index = open.length;
   return {
     key: SYNTH_DATES_KEY,
@@ -369,6 +370,40 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
     ...(spotlightVotes ? { spotlightVotes } : {}),
     ...(cardChat ? { cardChat } : {}),
   };
+}
+
+/** Remove a signed-in member’s votes from collab after they’re removed from the trip roster. */
+export function stripMemberVotesFromCollabState(collab: CollabStateV1, memberUserId: string): CollabStateV1 {
+  const mk = memberVoteKey(memberUserId);
+  const drop = new Set([mk, memberUserId]);
+
+  const decisions: Record<string, CollabDecisionBlob> = {};
+  for (const [dKey, blob] of Object.entries(collab.decisions)) {
+    const votes = { ...(blob.votes as Record<string, unknown>) };
+    for (const k of Object.keys(votes)) {
+      if (drop.has(k)) delete votes[k];
+    }
+    let dateWorksForMe = blob.dateWorksForMe ? { ...blob.dateWorksForMe } : undefined;
+    if (dateWorksForMe) {
+      for (const k of Object.keys(dateWorksForMe)) {
+        if (drop.has(k)) delete dateWorksForMe[k];
+      }
+      if (Object.keys(dateWorksForMe).length === 0) dateWorksForMe = undefined;
+    }
+    decisions[dKey] = { ...blob, votes, dateWorksForMe };
+  }
+
+  let spotlightVotes = collab.spotlightVotes ? { ...collab.spotlightVotes } : undefined;
+  if (spotlightVotes) {
+    for (const [sid, arr] of Object.entries(spotlightVotes)) {
+      const next = arr.filter((x) => x !== mk && x !== memberUserId);
+      if (next.length) spotlightVotes[sid] = next;
+      else delete spotlightVotes[sid];
+    }
+    if (Object.keys(spotlightVotes).length === 0) spotlightVotes = undefined;
+  }
+
+  return { ...collab, decisions, spotlightVotes };
 }
 
 function pluralityWinner(counts: Record<string, number>, preferenceOrder: string[]): string | null {

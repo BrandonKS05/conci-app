@@ -9,6 +9,8 @@ import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 
 /** Trip home: share (host); invite code lives inside `TripPlanCard`, then collaboration. */
 export function TripSharedPanel({
@@ -73,6 +75,11 @@ export function TripSharedPanel({
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[70%_30%] lg:items-start">
         <div className="min-w-0 space-y-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <TripDepositTracker tripId={tripId} />
+            <TripContributeButton tripId={tripId} />
+          </div>
+
           <TripPlanCard
             plan={plan}
             badge="Saved"

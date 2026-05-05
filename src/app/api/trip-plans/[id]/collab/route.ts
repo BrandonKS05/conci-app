@@ -82,6 +82,10 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   const quorum = collaborationQuorum(plan);
   const canonicalVoterKey = memberVoteKey(user.id);
 
+  const { data: ownerRow } = await svc.from("trip_plans").select("user_id").eq("id", id).maybeSingle();
+  const tripOwnerUserId =
+    typeof ownerRow?.user_id === "string" && ownerRow.user_id.length > 0 ? ownerRow.user_id : undefined;
+
   let roster: TripRosterPerson[] = [];
   try {
     roster = await fetchTripPlanRoster(svc, id, collab, classified);
@@ -101,6 +105,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
       ? {
           viewerIsTripOwner: true as const,
           nudgeEmailReady: nudgeEmailConfigured(),
+          ...(tripOwnerUserId ? { tripOwnerUserId } : {}),
         }
       : {}),
     planSnapshot: {

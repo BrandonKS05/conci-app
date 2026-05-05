@@ -17,8 +17,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Conci",
-  description: "A consumer-friendly AI executive assistant MVP.",
+  title: "Conci — Everyone’s Personal “Executive” Assistant",
+  description:
+    "Conci: everyone’s personal “Executive” assistant for group trips — paste a text, link, or screenshot and turn messy chats into a shareable plan.",
 };
 
 export default function RootLayout({

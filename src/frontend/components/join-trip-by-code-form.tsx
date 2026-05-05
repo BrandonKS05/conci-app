@@ -1,13 +1,17 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 
-export function JoinTripByCodeForm() {
+export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string }) {
   const router = useRouter();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => initialCode);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setCode(initialCode);
+  }, [initialCode]);
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit = useCallback(

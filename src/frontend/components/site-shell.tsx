@@ -39,7 +39,9 @@ export function SiteShell({
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-700 dark:text-neutral-400">
                   Conci
                 </p>
-                <p className="text-sm text-slate-500 dark:text-neutral-500">AI executive assistant MVP</p>
+                <p className="text-sm text-slate-500 dark:text-neutral-500">
+                  Everyone&apos;s Personal &ldquo;Executive&rdquo; Assistant
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
