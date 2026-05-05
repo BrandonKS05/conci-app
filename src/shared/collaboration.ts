@@ -54,7 +54,6 @@ const POLL_MAX_SYNTH_OPTIONS = 3;
 const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "destinations", key: "p_dest", label: "Destination" },
   { bucket: "venues", key: VENUE_POLL_DECISION_KEY, label: "Where should we eat?" },
-  { bucket: "activities", key: ACTIVITY_POLL_DECISION_KEY, label: "What should we prioritize?" },
   { bucket: "vibePick", key: VIBE_POLL_DECISION_KEY, label: "Trip vibe" },
   { bucket: "budgetPick", key: "p_budget", label: "Budget per person" },
 ];
@@ -215,7 +214,7 @@ function synthPollDecisions(plan: TripPlan, openLength: number): ClassifiedDecis
   const out: ClassifiedDecision[] = [];
   let i = 0;
   for (const row of POLL_SYNTH_ROWS) {
-    if (row.key === ACTIVITY_POLL_DECISION_KEY || row.key === VIBE_POLL_DECISION_KEY) {
+    if (row.key === VIBE_POLL_DECISION_KEY) {
       const raw = lenientPollSliceFromBucket(polls?.[row.bucket]);
       const chips = usableHostPollChipOptions(raw);
       out.push({

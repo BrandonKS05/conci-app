@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
-  ACTIVITY_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
   countLocked,
@@ -37,9 +36,12 @@ import {
 import { buildAlternateDateSuggestionRows } from "@/shared/collab-date-display";
 import {
   formatBallotProposalHeading,
+  formatLocalIsoDate,
+  formatLocalIsoRangeVote,
   inferDefaultYearFromDateOptions,
   isParsableConcreteDateBallotLine,
 } from "@/shared/date-option-parse";
+import { computeGroupBestDates } from "@/shared/group-best-dates";
 import {
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
@@ -682,6 +684,8 @@ export function TripCollaborationPanel({
                 datesHostConfirmBusy={datesHostConfirmBusy}
                 datesHostConfirmErr={datesHostConfirmErr}
                 onHostConfirmDates={confirmHostTripDates}
+                onPlanUpdated={onPlanUpdated}
+                collabTripOwnerUserId={tripOwnerUserId ?? data?.tripOwnerUserId ?? null}
               />
             );
           })}
@@ -1316,6 +1320,153 @@ function ActivityVibePollCard({
   );
 }
 
+function bestRangeMatchesHost(
+  best: { start: Date; end: Date },
+  host: { start: Date; end: Date } | null
+): boolean {
+  if (!host) return false;
+  return (
+    formatLocalIsoRangeVote(best.start, best.end) === formatLocalIsoRangeVote(host.start, host.end)
+  );
+}
+
+function HostBestDatesFinder({
+  hostOptions,
+  votes,
+  dateWorksForMe,
+  roster,
+  tripOwnerUserId,
+  tripId,
+  onPlanUpdated,
+  reloadCollab,
+}: {
+  hostOptions: string[];
+  votes: Record<string, unknown>;
+  dateWorksForMe: Record<string, true | undefined>;
+  roster: TripRosterPerson[];
+  tripOwnerUserId: string | null | undefined;
+  tripId: string;
+  onPlanUpdated?: (plan: TripPlan) => void;
+  reloadCollab: () => Promise<void>;
+}) {
+  const [ran, setRan] = useState(false);
+  const [insight, setInsight] = useState<ReturnType<typeof computeGroupBestDates> | null>(null);
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockErr, setLockErr] = useState<string | null>(null);
+
+  const calendarYear = useMemo(() => new Date().getFullYear(), []);
+
+  const run = () => {
+    setRan(true);
+    setLockErr(null);
+    setInsight(computeGroupBestDates(hostOptions, votes, dateWorksForMe, roster, tripOwnerUserId, calendarYear));
+  };
+
+  const lockSuggested = async (r: { start: Date; end: Date }) => {
+    setLockBusy(true);
+    setLockErr(null);
+    try {
+      const res = await fetch(`/api/trip-plans/${tripId}/dates/lock-range`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startIso: formatLocalIsoDate(r.start),
+          endIso: formatLocalIsoDate(r.end),
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
+      if (!res.ok) {
+        setLockErr(typeof j.error === "string" ? j.error : "Could not update dates.");
+        return;
+      }
+      if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+      await reloadCollab();
+      setInsight(null);
+      setRan(false);
+    } catch {
+      setLockErr("Network error — try again.");
+    } finally {
+      setLockBusy(false);
+    }
+  };
+
+  const y = insight?.eligibleTravelerCount ?? 0;
+  const x = insight?.bestOverlapCount ?? 0;
+  const ratioLabel = y > 0 ? `${x}/${y}` : `${x}`;
+
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
+      <button
+        type="button"
+        onClick={() => run()}
+        className="text-sm font-medium text-slate-600 underline decoration-slate-400/70 underline-offset-4 transition hover:text-slate-900 dark:text-neutral-400 dark:decoration-neutral-600 dark:hover:text-neutral-100"
+      >
+        Find best dates for everyone
+      </button>
+
+      {ran && insight ? (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-dm-card">
+          {insight.error ? (
+            <p className="text-slate-700 dark:text-neutral-300">{insight.error}</p>
+          ) : insight.hostIsOptimal ? (
+            <>
+              <p className="font-semibold text-emerald-800 dark:text-emerald-200/95">
+                Your confirmed dates work best for the group
+              </p>
+              <p className="mt-1 text-slate-600 dark:text-neutral-400">
+                Overlap on your current window: {ratioLabel} travelers
+                {insight.respondedTravelerCount > 0
+                  ? ` · ${insight.respondedTravelerCount} shared availability`
+                  : ""}
+                .
+              </p>
+            </>
+          ) : insight.suggestAlternative ? (
+            <>
+              <p className="font-semibold text-slate-900 dark:text-neutral-100">
+                Consider {insight.bestRangeLabel} instead (works for {ratioLabel} members)
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+                More travelers overlap this range than your confirmed dates.
+              </p>
+              <button
+                type="button"
+                disabled={lockBusy}
+                onClick={() => void lockSuggested(insight.bestRange)}
+                className={`mt-3 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${primaryFilledInteractive}`}
+              >
+                {lockBusy ? "Saving…" : "Lock these dates"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-slate-900 dark:text-neutral-100">
+                Best dates: {insight.bestRangeLabel} (works for {ratioLabel} members)
+              </p>
+              {!bestRangeMatchesHost(insight.bestRange, insight.hostRange) ? (
+                <button
+                  type="button"
+                  disabled={lockBusy}
+                  onClick={() => void lockSuggested(insight.bestRange)}
+                  className={`mt-3 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${primaryFilledInteractive}`}
+                >
+                  {lockBusy ? "Saving…" : "Lock these dates"}
+                </button>
+              ) : null}
+            </>
+          )}
+          {lockErr ? (
+            <p className="mt-2 text-sm text-rose-600 dark:text-rose-300" role="alert">
+              {lockErr}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function displayNamesForVoteKeys(keys: string[], roster: TripRosterPerson[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -1350,6 +1501,8 @@ function DecisionCard({
   datesHostConfirmBusy = false,
   datesHostConfirmErr = null,
   onHostConfirmDates,
+  onPlanUpdated,
+  collabTripOwnerUserId = null,
 }: {
   tripId: string;
   meta: ClassifiedDecision;
@@ -1373,6 +1526,8 @@ function DecisionCard({
   datesHostConfirmErr?: string | null;
   /** Host-only trip plan date confirmation (below dates calendar). */
   onHostConfirmDates?: () => Promise<boolean>;
+  onPlanUpdated?: (plan: TripPlan) => void;
+  collabTripOwnerUserId?: string | null;
 }) {
   const [hotelSearchBusy, setHotelSearchBusy] = useState(false);
   const [hotelSearchErr, setHotelSearchErr] = useState<string | null>(null);
@@ -1583,6 +1738,17 @@ function DecisionCard({
                 Names appear when travelers (not the host) submit “Works for me” or a different date range from their
                 account.
               </p>
+
+              <HostBestDatesFinder
+                hostOptions={opts}
+                votes={votes}
+                dateWorksForMe={(wfmMap ?? {}) as Record<string, true | undefined>}
+                roster={roster}
+                tripOwnerUserId={collabTripOwnerUserId}
+                tripId={tripId}
+                onPlanUpdated={onPlanUpdated}
+                reloadCollab={reloadCollab}
+              />
             </div>
           ) : null}
         </section>
@@ -1664,8 +1830,7 @@ function DecisionCard({
 
   if (meta.kind === "pick") {
     const opts = meta.pickOptions ?? [];
-    const alwaysShowsSynthPick =
-      meta.key === ACTIVITY_POLL_DECISION_KEY || meta.key === VIBE_POLL_DECISION_KEY;
+    const alwaysShowsSynthPick = meta.key === VIBE_POLL_DECISION_KEY;
 
     if (!alwaysShowsSynthPick && opts.length < 2) {
       return (
@@ -1742,7 +1907,7 @@ function DecisionCard({
       );
     }
 
-    if (meta.key === ACTIVITY_POLL_DECISION_KEY || meta.key === VIBE_POLL_DECISION_KEY) {
+    if (meta.key === VIBE_POLL_DECISION_KEY) {
       return (
         <ActivityVibePollCard
           tripId={tripId}

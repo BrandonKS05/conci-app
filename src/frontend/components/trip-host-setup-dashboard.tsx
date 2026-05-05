@@ -20,11 +20,18 @@ import {
   isHostPublishReady,
   parseLocalIsoDate,
   seedTextMentionsDining,
+  tripLiveRecommendationsContextFingerprint,
   type HostActivityExperience,
   type HostRestaurantPin,
   type HostSetupState,
   type TripPlan,
 } from "@/shared/trip-plan";
+import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
+import {
+  CuratedFlightsRows,
+  LiveCurationErrorBanner,
+  useLiveCurationMutation,
+} from "@/frontend/components/trip-plan-live-curate";
 import {
   HostSetupAddPlacesModal,
   type HostSetupHotelAddSpec,
@@ -45,8 +52,13 @@ import type { PlaceSpotlight } from "@/shared/place-preview";
 
 const NAV_INPAGE = [
   { id: "dates", label: "Trip calendar" },
+  { id: "flights", label: "Flights" },
   { id: "budget", label: "Budget" },
 ] as const;
+
+function googleMapsDirUrl(origin: string, dest: string): string {
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
+}
 
 type Props = {
   tripId: string;
@@ -153,6 +165,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     bookingUrl?: string;
     title: string;
   } | null>(null);
+  const [liveData, setLiveData] = useState<TripLiveRecommendationsPayload | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
   /** Set after the second tap in range mode; saved only when the host confirms. */
   const [pendingRangeConfirm, setPendingRangeConfirm] = useState<{
     startIso: string;
@@ -163,6 +178,43 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     () => tripRangeBestEffortFromPlanDates(plan, new Date().getFullYear()),
     [plan]
   );
+
+  const livePlanContext = useMemo(() => tripLiveRecommendationsContextFingerprint(plan), [plan]);
+
+  const {
+    mutate: flightCurationMutate,
+    busyKey: flightCurationBusy,
+    err: flightCurationErr,
+    setErr: setFlightCurationErr,
+  } = useLiveCurationMutation(tripId, setPlan);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLiveLoading(true);
+    setLiveFetchErr(null);
+    void (async () => {
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/live-recommendations`, { credentials: "include" });
+        const j = (await r.json().catch(() => ({}))) as Partial<TripLiveRecommendationsPayload> & { error?: string };
+        if (!r.ok) {
+          if (!cancelled) {
+            setLiveFetchErr(typeof j.error === "string" ? j.error : "Could not load flight suggestions.");
+          }
+          return;
+        }
+        if (!cancelled) setLiveData(j as TripLiveRecommendationsPayload);
+      } catch {
+        if (!cancelled) setLiveFetchErr("Could not reach the server for flight suggestions.");
+      } finally {
+        if (!cancelled) setLiveLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, livePlanContext]);
+
+  const showFlightTransport = Boolean(plan.departureCity?.trim()) && Boolean(plan.location?.trim());
 
   const [calYear, setCalYear] = useState(() => {
     const y0 = new Date().getFullYear();
@@ -946,6 +998,77 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               </p>
             ) : null}
           </div>
+        </section>
+
+        <section id="sec-flights" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Flights</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+            Live fare rows from Google Flights (SerpApi). Once your trip lists a departure city and destination, you can add
+            options to the published itinerary the same way as after publish — tap <strong className="text-slate-800 dark:text-neutral-200">Add to trip</strong>{" "}
+            for the flights you want the group to see.
+          </p>
+          {liveFetchErr ? (
+            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+              {liveFetchErr}
+            </p>
+          ) : null}
+          {flightCurationErr ? (
+            <div className="mt-3">
+              <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
+            </div>
+          ) : null}
+          {showFlightTransport ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+              <p className="text-xs text-slate-500 dark:text-neutral-500">
+                From <strong className="text-slate-800 dark:text-neutral-200">{plan.departureCity}</strong> to{" "}
+                <strong className="text-slate-800 dark:text-neutral-200">{plan.location}</strong>
+              </p>
+              <div className="mt-4">
+                <CuratedFlightsRows
+                  plan={plan}
+                  flights={liveData?.flights ?? []}
+                  liveLoading={liveLoading}
+                  flightsError={liveData?.flightsError ?? null}
+                  mutate={(a, k) => void flightCurationMutate(a, k)}
+                  busyKey={flightCurationBusy}
+                />
+              </div>
+              {(() => {
+                const dc = plan.departureCity?.trim();
+                const loc = plan.location?.trim();
+                const href =
+                  liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
+                return href ? (
+                  <p className="mt-4 text-xs text-slate-500 dark:text-neutral-500">
+                    Driving instead?{" "}
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+                    >
+                      Open directions in Google Maps
+                    </a>
+                    {liveData?.drive?.durationEstimate ? (
+                      <>
+                        {" "}
+                        (~{liveData.drive.durationEstimate}
+                        {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
+                      </>
+                    ) : null}
+                  </p>
+                ) : null;
+              })()}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
+              Add a <strong className="text-slate-900 dark:text-white">departure city</strong> and{" "}
+              <strong className="text-slate-900 dark:text-white">destination</strong> on your trip — use{" "}
+              <strong className="text-slate-900 dark:text-white">Trip Copilot</strong> (floating panel) or your parser draft — then
+              flight rows appear here. Server needs <code className="rounded bg-slate-200/80 px-1 text-xs dark:bg-white/10">SERPAPI_KEY</code>{" "}
+              for live prices.
+            </p>
+          )}
         </section>
 
         <section id="sec-budget" className="scroll-mt-28">

@@ -13,7 +13,11 @@ export type PlacePreviewBlock = {
   items: PlacePreview[];
 };
 
+export type SpotlightVenueKind = "hotel" | "restaurant" | "experience";
+
 /** User-confirmed venue from chat (saved on plan, shown on card). */
 export type PlaceSpotlight = PlacePreview & {
   sourceQuery?: string;
+  /** Saved when known (publish fold, card flows); UI falls back to inference. */
+  spotlightCategory?: SpotlightVenueKind;
 };

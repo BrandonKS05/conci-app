@@ -1,6 +1,11 @@
 import Image from "next/image";
 import { formatBudgetPollChipLabel } from "@/shared/budget-poll";
 import type { TripPlan } from "@/shared/trip-plan";
+import {
+  inferSpotlightCategory,
+  spotlightCategoryBadgeClass,
+  spotlightCategoryLabel,
+} from "@/shared/spotlight-category";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
 
@@ -176,7 +181,9 @@ export function TripPlanCard({
             Picked places
           </p>
           <ul className="space-y-3">
-            {plan.spotlights.map((s, idx) => (
+            {plan.spotlights.map((s, idx) => {
+              const venueKind = inferSpotlightCategory(s);
+              return (
               <li key={`${s.mapsUrl}-${idx}`}>
                 <a
                   href={s.mapsUrl}
@@ -199,6 +206,13 @@ export function TripPlanCard({
                     </div>
                   )}
                   <div className="min-w-0 flex-1 p-3">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${spotlightCategoryBadgeClass(venueKind)}`}
+                      >
+                        {spotlightCategoryLabel(venueKind)}
+                      </span>
+                    </div>
                     <p className="font-semibold text-slate-900 dark:text-white">{s.name}</p>
                     <p className="mt-0.5 text-xs text-slate-600 dark:text-neutral-400">
                       {s.rating != null ? (
@@ -217,7 +231,8 @@ export function TripPlanCard({
                   </div>
                 </a>
               </li>
-            ))}
+            );
+            })}
           </ul>
         </section>
       ) : null}

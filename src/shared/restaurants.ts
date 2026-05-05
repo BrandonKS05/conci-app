@@ -79,6 +79,7 @@ export function restaurantPickToSpotlight(r: RestaurantPick): PlaceSpotlight {
     priceRange: r.priceRange,
     photoUrl: r.coverPhotoUrl ?? null,
     address: r.neighborhood,
+    spotlightCategory: "restaurant",
   };
 }
 

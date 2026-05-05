@@ -14,6 +14,10 @@ function parseSpotlight(raw: unknown): PlaceSpotlight | null {
   const name = typeof o.name === "string" ? o.name.trim() : "";
   const mapsUrl = typeof o.mapsUrl === "string" && o.mapsUrl.startsWith("http") ? o.mapsUrl : "";
   if (!name || !mapsUrl) return null;
+  const cat = o.spotlightCategory;
+  const spotlightCategory =
+    cat === "hotel" || cat === "restaurant" || cat === "experience" ? cat : undefined;
+
   return {
     name,
     mapsUrl,
@@ -23,6 +27,7 @@ function parseSpotlight(raw: unknown): PlaceSpotlight | null {
     priceRange: typeof o.priceRange === "string" ? o.priceRange : undefined,
     photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
     sourceQuery: typeof o.sourceQuery === "string" ? o.sourceQuery : undefined,
+    ...(spotlightCategory ? { spotlightCategory } : {}),
   };
 }
 
@@ -76,9 +81,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Unknown spotlight" }, { status: 400 });
   }
 
+  const prev = list[idx]!;
   list[idx] = {
     ...place,
-    sourceQuery: place.sourceQuery ?? list[idx]!.sourceQuery,
+    sourceQuery: place.sourceQuery ?? prev.sourceQuery,
+    spotlightCategory: place.spotlightCategory ?? prev.spotlightCategory,
   };
 
   const nextPlan = { ...plan, spotlights: list };

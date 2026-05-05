@@ -1,4 +1,4 @@
-import type { PlaceSpotlight } from "@/shared/place-preview";
+import type { PlaceSpotlight, SpotlightVenueKind } from "@/shared/place-preview";
 import {
   formatLocalIsoDate,
   inferDefaultYearFromDateOptions,
@@ -161,6 +161,7 @@ export function experienceToSpotlight(e: HostActivityExperience): PlaceSpotlight
     rating: Number.isFinite(rating) ? rating : undefined,
     priceRange: typeof e.pricePerPerson === "string" ? e.pricePerPerson : undefined,
     photoUrl: typeof e.coverPhotoUrl === "string" && e.coverPhotoUrl.startsWith("http") ? e.coverPhotoUrl : null,
+    spotlightCategory: "experience",
   };
 }
 
@@ -171,6 +172,10 @@ export function spotlightFromUnknown(row: unknown): PlaceSpotlight | null {
   if (!name) return null;
   const mapsUrl = typeof o.mapsUrl === "string" && o.mapsUrl.startsWith("http") ? o.mapsUrl : "";
   if (!mapsUrl) return null;
+  let spotlightCategory: SpotlightVenueKind | undefined;
+  const cat = o.spotlightCategory;
+  if (cat === "hotel" || cat === "restaurant" || cat === "experience") spotlightCategory = cat;
+
   return {
     name,
     mapsUrl,
@@ -180,6 +185,7 @@ export function spotlightFromUnknown(row: unknown): PlaceSpotlight | null {
     priceRange: typeof o.priceRange === "string" ? o.priceRange : undefined,
     photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
     sourceQuery: typeof o.sourceQuery === "string" ? o.sourceQuery : undefined,
+    ...(spotlightCategory ? { spotlightCategory } : {}),
   };
 }
 
@@ -960,11 +966,21 @@ export function planAfterHostPublish(plan: TripPlan): TripPlan {
   const urls = new Set((plan.spotlights ?? []).map((s) => s.mapsUrl.trim().toLowerCase()));
   const folded: PlaceSpotlight[] = [...(plan.spotlights ?? [])];
   if (stayPlaces.length) {
-    folded.push(...dedupeSpotlights(urls, stayPlaces));
+    folded.push(
+      ...dedupeSpotlights(
+        urls,
+        stayPlaces.map((p) => ({ ...p, spotlightCategory: "hotel" as const }))
+      )
+    );
   } else if (hotel?.name && hotel.mapsUrl.startsWith("http")) {
-    folded.push(...dedupeSpotlights(urls, [hotel]));
+    folded.push(...dedupeSpotlights(urls, [{ ...hotel, spotlightCategory: "hotel" }]));
   }
-  folded.push(...dedupeSpotlights(urls, pins.map((p) => p.place)));
+  folded.push(
+    ...dedupeSpotlights(
+      urls,
+      pins.map((p) => ({ ...p.place, spotlightCategory: "restaurant" as const }))
+    )
+  );
   folded.push(...dedupeSpotlights(urls, actPins));
 
   let dates = { ...plan.dates };

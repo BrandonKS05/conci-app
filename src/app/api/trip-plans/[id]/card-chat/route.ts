@@ -25,11 +25,66 @@ import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
 import type { PlacePreview } from "@/shared/place-preview";
 import { isUuid } from "@/shared/is-uuid";
 
+function humanTripPlanDiffSummary(before: TripPlan, after: TripPlan): string | null {
+  const sentences: string[] = [];
+
+  const t0 = (before.title ?? "").trim();
+  const t1 = (after.title ?? "").trim();
+  if (t0 !== t1 && t1) sentences.push(`saved the title as “${t1}”`);
+
+  const l0 = (before.location ?? "").trim();
+  const l1 = (after.location ?? "").trim();
+  if (l0 !== l1 && l1) sentences.push(`set the destination to ${l1}`);
+
+  const dc0 = (before.departureCity ?? "").trim();
+  const dc1 = (after.departureCity ?? "").trim();
+  if (dc0 !== dc1 && dc1) sentences.push(`set departure city to ${dc1}`);
+
+  const do0 = (before.dates?.options ?? []).join("\u0001");
+  const do1 = (after.dates?.options ?? []).join("\u0001");
+  if (do0 !== do1 && (after.dates?.options?.length ?? 0) > 0) {
+    sentences.push(`updated the trip dates to ${(after.dates!.options ?? []).join(" · ")}`);
+  }
+  if (before.dates?.confirmed !== after.dates?.confirmed) {
+    sentences.push(after.dates?.confirmed ? "marked the dates as confirmed on the card" : "left dates unconfirmed");
+  }
+
+  const pc0 = before.people.count ?? null;
+  const pc1 = after.people.count ?? null;
+  const pn0 = (before.people.names ?? []).join(", ");
+  const pn1 = (after.people.names ?? []).join(", ");
+  if (pc0 !== pc1 || pn0 !== pn1) {
+    const bits: string[] = [];
+    if (pc0 !== pc1 && pc1 != null) bits.push(`${pc1} travelers`);
+    if (pn0 !== pn1 && pn1) bits.push(`names: ${pn1}`);
+    else if (pn0 !== pn1 && !pn1 && pc1 != null) bits.push(`group size ${pc1}`);
+    if (bits.length) sentences.push(`updated the group (${bits.join("; ")})`);
+  }
+
+  const bt0 = `${before.budget.tier ?? ""}|${before.budget.perPerson ?? ""}`;
+  const bt1 = `${after.budget.tier ?? ""}|${after.budget.perPerson ?? ""}`;
+  if (bt0 !== bt1) {
+    const tier = after.budget.tier?.trim();
+    const pp = after.budget.perPerson?.trim();
+    const bud = [tier, pp].filter(Boolean).join(" · ");
+    if (bud) sentences.push(`set budget to ${bud}`);
+  }
+
+  const v0 = (before.vibe ?? []).join(", ");
+  const v1 = (after.vibe ?? []).join(", ");
+  if (v0 !== v1 && v1) sentences.push(`set vibe to ${v1}`);
+
+  if (!sentences.length) return null;
+  return `Done — I've ${sentences.join(", and I've ")}.`;
+}
+
 const SYSTEM = `You help a travel group refine a saved trip card: (1) optional edits to trip metadata and (2) place discovery on Google Maps.
+
+**Voice:** Write assistantText in **first person**, like you just did the work for them. Examples: "Done — I've updated your dates to …", "Got it — I’ve set the destination to …", "On it — here are a few spots I pulled up." Sound human and confirm what you changed or what you’re offering. Never reply with only generic filler — always tie your reply to their ask.
 
 Return ONLY valid JSON (no markdown) with this shape:
 {
-  "assistantText": "1-3 short sentences acknowledging the request.",
+  "assistantText": "1-4 short sentences in first person; confirm edits or introduce place cards.",
   "searchQueries": ["1-3 short Google Maps style search strings", "include city or neighborhood when known"],
   "planPatch": { }
 }
@@ -220,6 +275,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const loc = (nextPlan.location || "").trim() || "";
 
+  const planDirty = tripPlanPersistenceFingerprint(plan) !== tripPlanPersistenceFingerprint(nextPlan);
+  const diffConfirmation = planDirty ? humanTripPlanDiffSummary(plan, nextPlan) : null;
+  if (diffConfirmation) {
+    assistantText = assistantText.trim()
+      ? `${diffConfirmation}\n\n${assistantText.trim()}`
+      : diffConfirmation;
+  }
+
   const seen = new Set<string>();
   const merged: PlacePreview[] = [];
   for (const q of queries) {
@@ -235,6 +298,21 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
   const cards = merged.slice(0, 3);
 
+  if (
+    cards.length === 0 &&
+    assistantText === "Here are a few options that might fit."
+  ) {
+    assistantText =
+      "I couldn’t pull matching spots this round — try naming a neighborhood, cuisine, or landmark and I’ll search again.";
+  }
+
+  if (
+    cards.length > 0 &&
+    !/\b(below|options|cards|pull|found|here)\b/i.test(assistantText)
+  ) {
+    assistantText = `${assistantText.trim()}\n\nI’ve added a few options below — tap a card to explore, or use Replace if you’re swapping a spotlight.`.trim();
+  }
+
   const assistantMsg: CardChatMessage = {
     id: randomUUID(),
     role: "assistant",
@@ -249,7 +327,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     cardChat: { messages },
   };
 
-  const planDirty = tripPlanPersistenceFingerprint(plan) !== tripPlanPersistenceFingerprint(nextPlan);
   const rowUpdate: { collab_state: typeof collab; updated_at: string; plan?: TripPlan } = {
     collab_state: collab,
     updated_at: new Date().toISOString(),

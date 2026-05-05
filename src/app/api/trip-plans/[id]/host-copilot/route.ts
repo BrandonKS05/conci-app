@@ -118,7 +118,7 @@ async function applyAutoBookHotel(
     };
   }
 
-  const place: PlaceSpotlight = { ...top };
+  const place: PlaceSpotlight = { ...top, spotlightCategory: "hotel" };
   const tripStart = tr.startIso;
   const tripEnd = tr.endIso;
 

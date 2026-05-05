@@ -4,16 +4,12 @@ import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { POLL_WRITE_IN_MAX_LEN } from "@/shared/collab-pick-vote";
-import {
-  ACTIVITY_POLL_DECISION_KEY,
-  buildClassifiedDecisions,
-  VIBE_POLL_DECISION_KEY,
-} from "@/shared/collaboration";
+import { buildClassifiedDecisions, VIBE_POLL_DECISION_KEY } from "@/shared/collaboration";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import { isUuid } from "@/shared/is-uuid";
 import { normalizePlan, safeParseJson } from "@/shared/trip-plan";
 
-const ALLOWED_KEYS = new Set<string>([ACTIVITY_POLL_DECISION_KEY, VIBE_POLL_DECISION_KEY]);
+const ALLOWED_KEYS = new Set<string>([VIBE_POLL_DECISION_KEY]);
 
 function heuristicPolish(text: string): string {
   const t = text.trim().replace(/\s+/g, " ");

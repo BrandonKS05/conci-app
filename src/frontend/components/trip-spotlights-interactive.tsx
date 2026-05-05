@@ -8,6 +8,11 @@ import type { TripPlan } from "@/shared/trip-plan";
 import { memberVoteKey } from "@/shared/collab-vote-keys";
 import { spotlightStableIdFromMapsUrl } from "@/shared/spotlight-stable-id";
 import { parseCollabState } from "@/shared/collaboration";
+import {
+  inferSpotlightCategory,
+  spotlightCategoryBadgeClass,
+  spotlightCategoryLabel,
+} from "@/shared/spotlight-category";
 
 type BrowseRow = {
   places: PlacePreview[];
@@ -182,6 +187,7 @@ export function TripSpotlightsInteractive({
       <ul className="space-y-6">
         {rows.map(({ s, id }) => {
           const browse = browseRowById[id];
+          const venueKind = inferSpotlightCategory(s);
           return (
             <li key={id} className="rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-dm-elevated">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -206,6 +212,13 @@ export function TripSpotlightsInteractive({
                     </div>
                   )}
                   <div className="min-w-0 flex-1 p-3">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${spotlightCategoryBadgeClass(venueKind)}`}
+                      >
+                        {spotlightCategoryLabel(venueKind)}
+                      </span>
+                    </div>
                     <p className="font-semibold text-slate-900 dark:text-white">{s.name}</p>
                     <p className="mt-0.5 text-xs text-slate-600 dark:text-neutral-400">
                       {s.rating != null ? (
