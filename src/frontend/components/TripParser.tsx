@@ -38,9 +38,11 @@ import {
   looksLikeStandalonePeopleCount,
 } from "@/shared/trip-input-quality";
 
-type SlotKey = "location" | "dates" | "people" | "budget" | "vibe";
+type SlotKey = "location" | "dates" | "people" | "budget" | "vibe" | "interests" | "pace";
 
-const SLOT_ORDER: SlotKey[] = ["location", "dates", "people", "budget", "vibe"];
+const REQUIRED_SLOT_ORDER: SlotKey[] = ["location", "dates", "people", "budget", "vibe"];
+const OPTIONAL_SLOT_ORDER: SlotKey[] = ["interests", "pace"];
+const SLOT_ORDER: SlotKey[] = [...REQUIRED_SLOT_ORDER, ...OPTIONAL_SLOT_ORDER];
 
 const SLOT_QUESTIONS: Record<SlotKey, string> = {
   location: "Where are you headed—or any region you’re eyeing?",
@@ -48,6 +50,8 @@ const SLOT_QUESTIONS: Record<SlotKey, string> = {
   people: "How many people are coming?",
   budget: "What’s your budget per person (rough range is fine)?",
   vibe: "What’s the vibe—party, chill, culture, outdoors?",
+  interests: "Any must-do activities? (e.g. hiking, food tours, nightlife, museums, shopping)",
+  pace: "Packed schedule or relaxed with free time?",
 };
 
 function newId(): string {
@@ -58,6 +62,14 @@ function newId(): string {
 
 function missingSlots(slots: Partial<Record<SlotKey, string>>): SlotKey[] {
   return SLOT_ORDER.filter((k) => !(slots[k] ?? "").trim());
+}
+
+function missingRequiredSlots(slots: Partial<Record<SlotKey, string>>): SlotKey[] {
+  return REQUIRED_SLOT_ORDER.filter((k) => !(slots[k] ?? "").trim());
+}
+
+function missingOptionalSlots(slots: Partial<Record<SlotKey, string>>): SlotKey[] {
+  return OPTIONAL_SLOT_ORDER.filter((k) => !(slots[k] ?? "").trim());
 }
 
 /** Map structured plan JSON into chat slot strings so we only ask for gaps the model didn't extract. */
@@ -238,7 +250,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const placePickResolverRef = useRef<(() => void) | null>(null);
   const draftSpotlightsRef = useRef<PlaceSpotlight[]>([]);
 
-  const missing = useMemo(() => missingSlots(slots), [slots]);
+  const missing = useMemo(() => missingRequiredSlots(slots), [slots]);
 
   const resolvePlacePickFlow = useCallback((messageId: string, picked: PlacePreview | null) => {
     setMessages((prev) =>
@@ -400,6 +412,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           return false;
         }
         if (body.id) {
+          fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
+            method: "POST",
+            credentials: "include",
+          }).catch(() => {});
           router.replace(`/trip/${body.id}/setup`);
           return true;
         }
@@ -816,6 +832,29 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       return;
     }
 
+    if (OPTIONAL_SLOT_ORDER.includes(slotKey) && /^\s*skip\s*$/i.test(answer)) {
+      setMessages((prev) => [
+        ...prev,
+        { id: newId(), role: "user", text: "skip" },
+      ]);
+      setReplyDraft("");
+      setActiveSlot(null);
+      const nextOpt = OPTIONAL_SLOT_ORDER.filter(
+        (k) => k !== slotKey && !(slots[k] ?? "").trim()
+      );
+      if (nextOpt.length > 0) {
+        const optKey = nextOpt[0];
+        setMessages((prev) => [
+          ...prev,
+          { id: newId(), role: "assistant", text: `No problem! One more (type "skip" to skip):\n${SLOT_QUESTIONS[optKey]}` },
+        ]);
+        setActiveSlot(optKey);
+        return;
+      }
+      await finalizePlan(slots);
+      return;
+    }
+
     const peopleCountOk =
       slotKey === "people" &&
       looksLikeStandalonePeopleCount(answer);
@@ -851,15 +890,25 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       //
     }
 
-    const rest = missingSlots(updated);
+    const requiredRest = missingRequiredSlots(updated);
+    const optionalRest = missingOptionalSlots(updated);
 
     if (awaitingFirstChipAnswer) {
       setAwaitingFirstChipAnswer(false);
-      const progress = ackAfterFilledSlot(rest.length);
+      const progress = ackAfterFilledSlot(requiredRest.length);
       if (progress) {
         setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: progress }]);
       }
-      if (rest.length === 0) {
+      if (requiredRest.length === 0) {
+        if (optionalRest.length > 0) {
+          const optKey = optionalRest[0];
+          setMessages((prev) => [
+            ...prev,
+            { id: newId(), role: "assistant", text: `Almost done! Quick optional question (type "skip" to skip):\n${SLOT_QUESTIONS[optKey]}` },
+          ]);
+          setActiveSlot(optKey);
+          return;
+        }
         await finalizePlan(updated);
         return;
       }
@@ -867,12 +916,21 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       return;
     }
 
-    if (rest.length === 0) {
+    if (requiredRest.length === 0) {
+      if (optionalRest.length > 0 && !OPTIONAL_SLOT_ORDER.includes(slotKey)) {
+        const optKey = optionalRest[0];
+        setMessages((prev) => [
+          ...prev,
+          { id: newId(), role: "assistant", text: `Quick optional question (type "skip" to skip):\n${SLOT_QUESTIONS[optKey]}` },
+        ]);
+        setActiveSlot(optKey);
+        return;
+      }
       await finalizePlan(updated);
       return;
     }
 
-    const progress = ackAfterFilledSlot(rest.length);
+    const progress = ackAfterFilledSlot(requiredRest.length);
     if (progress) {
       setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: progress }]);
     }

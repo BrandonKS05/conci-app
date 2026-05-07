@@ -47,6 +47,7 @@ import {
   type HostCopilotUiHint,
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
+import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -1109,6 +1110,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               Save budget
             </button>
           </div>
+        </section>
+
+        <section id="sec-itinerary" className="scroll-mt-28">
+          <GeneratedItineraryView
+            tripId={tripId}
+            initialItinerary={plan.generatedItinerary ?? null}
+            headcount={plan.people.count ?? (plan.people.names.length || 2)}
+          />
         </section>
       </div>
       </div>

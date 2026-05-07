@@ -11,6 +11,7 @@ import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
 
 /** Trip home: share (host); invite code lives inside `TripPlanCard`, then collaboration. */
 export function TripSharedPanel({
@@ -127,6 +128,14 @@ export function TripSharedPanel({
             onPlanReplaced={setPlan}
             onCollabBump={bumpCollab}
           />
+
+          {plan.generatedItinerary ? (
+            <GeneratedItineraryView
+              tripId={tripId}
+              initialItinerary={plan.generatedItinerary}
+              headcount={plan.people.count ?? (plan.people.names.length || 2)}
+            />
+          ) : null}
         </div>
         {lgTwoColumn ? (
           <aside

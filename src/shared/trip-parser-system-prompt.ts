@@ -29,7 +29,7 @@ Critical — no hallucinations:
 - **openDecisions**: [] unless the user asked an explicit open question you are echoing. Do not add “Which hotel?” / “Flights or drive?” unless they said something like that.
 - **spotlights**: always [] from you. The app resolves specific named hotels/restaurants/activities via place search after parsing; do not invent mapsUrl or venue cards in JSON.
 - **dates.options**: only ranges or phrases the user mentioned (max 3). Never use “TBD” or empty deferrals as the timing—use [] if they gave no timeframe yet. Prefer any rough window they said (e.g. “late May”, “June-ish”, “summer 2026”, “somewhere in Q3”, “between Thanksgiving and NYE”). Months/seasons steer the voting calendar even without exact checkout dates.
-- **location** / **departureCity**: only if they named a city, region, or “flying from X”. Otherwise null.
+- **location** / **departureCity**: only if they named a city, region, or “flying from X”. Otherwise null. Always expand abbreviations and nicknames to the full canonical city name (e.g. LA → Los Angeles, NYC → New York City, SF → San Francisco, NOLA → New Orleans, Philly → Philadelphia, Vegas → Las Vegas). The app grounding layer recognizes these expansions.
 - **budget**: only if they mentioned money, “cheap/splurge”, or a tier in their own words. Otherwise null fields.
 - **vibe**: tags only from phrases they used (e.g. “chill”, “beach”). Else [].
 - **people.count**: only if they stated a number or headcount. **people.names**: NEVER invent; only names appearing in their text (see below).

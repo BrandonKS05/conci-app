@@ -9,6 +9,7 @@ import {
   startOfLocalDay,
 } from "@/shared/date-option-parse";
 import { parseItineraryLiveCuration, type ItineraryLiveCuration } from "@/shared/itinerary-live-curation";
+import { isKnownAliasExpansion } from "@/shared/location-aliases";
 
 /** Narrowed votes the app surfaced (≤3 options each). Omit or empty = no poll for that axis. */
 export type TripPolls = {
@@ -90,6 +91,29 @@ export type HostSetupState = {
   experiencesOutlined?: boolean;
 };
 
+export type ItineraryActivity = {
+  time: string;
+  title: string;
+  description: string;
+  category: "transport" | "food" | "activity" | "lodging" | "free-time";
+  estimatedCostPp: number | null;
+  bookingUrl?: string | null;
+};
+
+export type ItineraryDay = {
+  dateIso: string;
+  label: string;
+  activities: ItineraryActivity[];
+  estimatedDayCostPp: number | null;
+};
+
+export type GeneratedItinerary = {
+  days: ItineraryDay[];
+  totalEstimatePp: number | null;
+  totalEstimateGroup: number | null;
+  generatedAt: string;
+};
+
 export type TripPlan = {
   title: string;
   location: string | null;
@@ -110,6 +134,8 @@ export type TripPlan = {
    * See `@/shared/itinerary-live-curation` for key format.
    */
   itineraryLiveCuration?: ItineraryLiveCuration;
+  /** AI-generated day-by-day itinerary with cost estimates. */
+  generatedItinerary?: GeneratedItinerary;
   nextStep: string | null;
   confidence: number;
 };
@@ -402,8 +428,44 @@ const GROUND_STOPWORDS = new Set([
 ]);
 
 /**
+ * Naive English suffix stripping for grounding comparisons.
+ * Not a full stemmer — just handles the most common morphological variants
+ * that cause false negatives (e.g. "beachy" vs "beach", "partying" vs "party").
+ */
+function roughStem(word: string): string {
+  if (word.length <= 3) return word;
+  if (word.endsWith("ying")) return word.slice(0, -4) + "y";
+  if (word.endsWith("ing")) return word.slice(0, -3);
+  if (word.endsWith("tion")) return word.slice(0, -4) + "te";
+  if (word.endsWith("ness")) return word.slice(0, -4);
+  if (word.endsWith("ful")) return word.slice(0, -3);
+  if (word.endsWith("ous")) return word.slice(0, -3);
+  if (word.endsWith("ive")) return word.slice(0, -3);
+  if (word.endsWith("ly")) return word.slice(0, -2);
+  if (word.endsWith("ed")) return word.slice(0, -2);
+  if (word.endsWith("er")) return word.slice(0, -2);
+  if (word.endsWith("es")) return word.slice(0, -2);
+  if (word.endsWith("sy")) return word.slice(0, -1);
+  if (word.endsWith("y") && word.length > 4) return word.slice(0, -1);
+  if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
+function stemMatchInText(word: string, text: string): boolean {
+  if (text.includes(word)) return true;
+  const stemmed = roughStem(word);
+  if (stemmed !== word && stemmed.length >= 3 && text.includes(stemmed)) return true;
+  const textWords = text.match(/[a-z0-9']+/g) ?? [];
+  return textWords.some((tw) => {
+    if (tw === word) return true;
+    const twStem = roughStem(tw);
+    return (twStem === stemmed || twStem === word || tw === stemmed) && stemmed.length >= 3;
+  });
+}
+
+/**
  * True if a poll option, vibe tag, or short label plausibly comes from the user's message
- * (substring, money tokens, or all significant tokens present). Used to drop model hallucinations.
+ * (substring, money tokens, or all significant tokens present with stemming). Used to drop model hallucinations.
  */
 export function textChunkMentionedInUserInput(chunk: string, userLower: string): boolean {
   const c = chunk.trim().toLowerCase();
@@ -423,7 +485,7 @@ export function textChunkMentionedInUserInput(chunk: string, userLower: string):
     .map((w) => w.toLowerCase())
     .filter((w) => w.length >= 2 && !GROUND_STOPWORDS.has(w));
   if (significant.length === 0) return false;
-  return significant.every((w) => userLower.includes(w));
+  return significant.every((w) => stemMatchInText(w, userLower));
 }
 
 function budgetFieldsGroundedInUserInput(
@@ -495,7 +557,11 @@ export function groundPlanInUserInput(
   if (next.location?.trim()) {
     const loc = next.location.trim();
     const head = loc.split(",")[0]?.trim() ?? loc;
-    if (!textChunkMentionedInUserInput(head, userLower) && !textChunkMentionedInUserInput(loc, userLower)) {
+    if (
+      !textChunkMentionedInUserInput(head, userLower) &&
+      !textChunkMentionedInUserInput(loc, userLower) &&
+      !isKnownAliasExpansion(loc, userLower)
+    ) {
       next.location = null;
     }
   }
@@ -503,7 +569,11 @@ export function groundPlanInUserInput(
   if (next.departureCity?.trim()) {
     const dc = next.departureCity.trim();
     const head = dc.split(",")[0]?.trim() ?? dc;
-    if (!textChunkMentionedInUserInput(head, userLower) && !textChunkMentionedInUserInput(dc, userLower)) {
+    if (
+      !textChunkMentionedInUserInput(head, userLower) &&
+      !textChunkMentionedInUserInput(dc, userLower) &&
+      !isKnownAliasExpansion(dc, userLower)
+    ) {
       next.departureCity = null;
     }
   }

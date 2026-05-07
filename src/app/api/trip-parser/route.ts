@@ -53,6 +53,7 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       model: "gpt-4o",
+      temperature: 0.3,
       input: [
         { role: "system", content: TRIP_PARSER_SYSTEM_PROMPT },
         { role: "user", content: userContent },
