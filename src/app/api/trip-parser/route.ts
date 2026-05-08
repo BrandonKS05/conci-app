@@ -44,7 +44,12 @@ Polling rules:
 
 Extract concrete details from informal language: city nicknames (e.g. NYC), weekend or date phrases,
 named travelers only when explicitly written ("me, Sarah, and Mike" → names ["Sarah","Mike"] or similar + accurate count; never guess),
-and vibe phrases (food, bars, relaxing, etc.). Prefer populated fields over null when the user clearly implied them.`;
+and vibe phrases (food, bars, relaxing, etc.). Prefer populated fields over null when the user clearly implied them.
+
+Dates (critical — calendar stays):
+- When the user gives ONE concrete contiguous stay span (avoid listing every day separately), emit a single ISO-bounded entry in dates.options that includes BOTH endpoints, for example ["2026-07-01 to 2026-07-05"] or ["2026-07-01 through 2026-07-31"], and set dates.confirmed true.
+- Prefer real ISO yyyy-mm-dd anchors inside that string wherever the traveler implied exact dates; calendars highlight only nights between parsed ISO bounds—not an entire calendar month inferred from shorthand.
+- Polls still obey the rule: ≤3 competing date strings when the group genuinely cannot decide yet — only then omit confirmed or keep confirmed false with 2–3 weekend-style options without stretching one trip across a bogus full month span.`;
 
 function buildUserContent(
   text: string,

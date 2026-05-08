@@ -1,4 +1,4 @@
-import type { TripPlan } from "@/shared/trip-plan";
+import { inferTripStayInclusiveIsoBounds, type TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import {
   getRapidApiKey,
@@ -114,6 +114,8 @@ function fmtYmd(d: Date): string {
 }
 
 function inferStayDates(plan: TripPlan): { checkIn: string; checkOut: string } {
+  const stay = inferTripStayInclusiveIsoBounds(plan);
+  if (stay) return { checkIn: stay.startIso, checkOut: stay.endIso };
   for (const opt of plan.dates.options) {
     const iso = opt.match(/\b(\d{4}-\d{2}-\d{2})\b/g);
     if (iso && iso.length >= 2) {

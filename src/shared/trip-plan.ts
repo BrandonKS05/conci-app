@@ -113,6 +113,56 @@ export function retainPeopleNamesOnlyIfMentionedInInput(plan: TripPlan, userInpu
   return { ...plan, people: { ...plan.people, names: kept } };
 }
 
+const ISO_YMD = /\b(\d{4}-\d{2}-\d{2})\b/g;
+
+/**
+ * Calendar / stay-length helpers: derive an inclusive UTC date-only range when the traveler
+ * specified exactly one ISO-bounded dates string (never across multiple competing poll options).
+ */
+export function inferTripStayInclusiveIsoBounds(plan: TripPlan): { startIso: string; endIso: string } | null {
+  if (plan.dates.options.length !== 1) return null;
+  const rawIso = [...plan.dates.options[0].matchAll(ISO_YMD)].map((m) => m[1] as string).filter(Boolean);
+  const iso = [...new Set(rawIso)].sort();
+  if (iso.length >= 2) {
+    return { startIso: iso[0], endIso: iso[iso.length - 1] };
+  }
+  if (iso.length === 1) {
+    return { startIso: iso[0], endIso: iso[0] };
+  }
+  return null;
+}
+
+function utcNoonTs(isoYmd: string): number {
+  const [yStr, moStr, dStr] = isoYmd.split("-");
+  const y = Number(yStr);
+  const mo = Number(moStr);
+  const d = Number(dStr);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return Number.NaN;
+  return Date.UTC(y, mo - 1, d, 12, 0, 0);
+}
+
+function fmtUtcYmd(ts: number): string {
+  const x = new Date(ts);
+  const y = x.getUTCFullYear();
+  const m = String(x.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(x.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Every calendar day (YYYY-MM-DD) inclusively covered by inferred stay bounds — empty when ambiguous. */
+export function listTripStayInclusiveIsoDays(plan: TripPlan): string[] {
+  const b = inferTripStayInclusiveIsoBounds(plan);
+  if (!b) return [];
+  let t = utcNoonTs(b.startIso);
+  const end = utcNoonTs(b.endIso);
+  if (!Number.isFinite(t) || !Number.isFinite(end) || end < t) return [];
+  const out: string[] = [];
+  for (; t <= end; t += 86400000) {
+    out.push(fmtUtcYmd(t));
+  }
+  return out;
+}
+
 export function normalizePlan(value: unknown): TripPlan {
   const plan = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const people =

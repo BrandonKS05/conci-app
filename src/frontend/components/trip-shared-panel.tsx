@@ -1,5 +1,6 @@
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
+import { TripStayCalendar } from "@/frontend/components/trip-stay-calendar";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
@@ -59,6 +60,8 @@ export function TripSharedPanel({
         showInviteRow={false}
         guestJoinNames={tripMemberNames}
       />
+
+      <TripStayCalendar plan={plan} />
 
       <TripCollaborationPanel tripId={tripId} plan={plan} tripStatus={tripStatus} isHost={isHost} />
     </div>

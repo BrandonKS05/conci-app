@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import type { TripPlan } from "@/shared/trip-plan";
@@ -278,7 +279,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             model: "claude-sonnet-4-20250514",
             max_tokens: 1200,
             system:
-              'You are a trip planning assistant. Extract trip details from the user\'s input and return ONLY a valid JSON object with these exact fields: { "title": "short catchy trip name", "location": "city or region", "departureCity": null, "dates": { "confirmed": false, "options": ["May 10-12", "May 17-19"] }, "people": { "count": 6, "names": [] }, "budget": { "tier": "mid-range", "perPerson": "$200-300" }, "vibe": ["beach", "nightlife"], "openDecisions": ["Which hotel?", "Flights or drive?"], "nextStep": "Create a poll for dates", "confidence": 0.85 } Only return the JSON. No explanation. Use null for unknown fields. departureCity = city people leave from for flights/driving when stated; else null. CRITICAL for people: never invent names; "names" must be [] unless the user explicitly listed people by name. Use "count" for group size when known.',
+              'You are a trip planning assistant. Extract trip details from the user\'s input and return ONLY a valid JSON object with these exact fields: { "title": "short catchy trip name", "location": "city or region", "departureCity": null, "dates": { "confirmed": false, "options": ["May 10-12", "May 17-19"] }, "people": { "count": 6, "names": [] }, "budget": { "tier": "mid-range", "perPerson": "$200-300" }, "vibe": ["beach", "nightlife"], "openDecisions": ["Which hotel?", "Flights or drive?"], "nextStep": "Create a poll for dates", "confidence": 0.85 } Only return the JSON. No explanation. Use null for unknown fields. departureCity = city people leave from for flights/driving when stated; else null. CRITICAL for people: never invent names; "names" must be [] unless the user explicitly listed people by name. Use "count" for group size when known. Dates: when someone states one contiguous stay span with precise calendar dates, encode it as ONE string containing ISO yyyy-mm-dd endpoints (e.g. ["2026-07-01 to 2026-07-05"]) with dates.confirmed true so calendars do not extrapolate unrelated days.',
             messages: [
               {
                 role: "user",
@@ -641,6 +642,25 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
+      {phase === "building" && loading ? (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-auto bg-[#C7B1FF] px-4 py-8 dark:bg-[#8f73c9]"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <p className="sr-only">Building your trip plan, please wait.</p>
+          <Image
+            src="/trip-plan-generating.png"
+            alt=""
+            width={1024}
+            height={688}
+            priority
+            className="h-auto max-h-[88vh] w-auto max-w-full rounded-2xl shadow-[0_24px_80px_-16px_rgba(65,43,118,0.45)] ring-1 ring-black/5 select-none"
+          />
+        </div>
+      ) : null}
+
       <header className="flex items-start gap-3.5">
         <span
           className="mt-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-semibold text-slate-900 ring-1 ring-slate-200 dark:bg-[#1f1f1f] dark:text-[#ebe9e4] dark:ring-white/10"
@@ -668,8 +688,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         )}
 
         {prefetchingSlots ? <AssistantBubble text="" typing /> : null}
-
-        {phase === "building" && loading ? <AssistantBubble text="" typing /> : null}
 
         {error ? (
           <div className="flex flex-col gap-2">
