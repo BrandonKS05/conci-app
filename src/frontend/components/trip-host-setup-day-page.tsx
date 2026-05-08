@@ -18,12 +18,6 @@ type Props = {
   /** Optional — use first plan-derived label if missing */
   locale?: string;
   initialPlan: TripPlan;
-  /** Rendered inline under the host calendar instead of standalone full-screen */
-  embedded?: boolean;
-  onClose?: () => void;
-  onNavigateDay?: (nextIso: string) => void;
-  /** After host copilot updates the plan — parent can merge into dashboard state */
-  onPlanSynced?: (plan: TripPlan) => void;
 };
 
 function startOfDay(x: Date) {
@@ -106,16 +100,7 @@ function EmptyHint({ label }: { label: string }) {
   );
 }
 
-export function TripHostSetupDayPage({
-  tripId,
-  dateIso,
-  locale,
-  initialPlan,
-  embedded,
-  onClose,
-  onNavigateDay,
-  onPlanSynced,
-}: Props) {
+export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState(initialPlan);
 
@@ -131,10 +116,9 @@ export function TripHostSetupDayPage({
   const syncPlanFromServer = useCallback(
     (next: TripPlan) => {
       setPlan(next);
-      onPlanSynced?.(next);
-      if (!onPlanSynced) void router.refresh();
+      void router.refresh();
     },
-    [onPlanSynced, router]
+    [router]
   );
 
   const submitDayDream = useCallback(async () => {
@@ -183,7 +167,7 @@ export function TripHostSetupDayPage({
       : dateIso;
 
     let dayIndexLabel: string | null = null;
-    const tr = hostSetup?.tripRange;
+    const tr = plan.hostSetup?.tripRange;
     if (tr?.startIso && tr.endIso && d) {
       const start = parseLocalIsoDate(tr.startIso);
       const end = parseLocalIsoDate(tr.endIso);
@@ -229,28 +213,14 @@ export function TripHostSetupDayPage({
   const nextIso = shiftIsoDay(dateIso, 1);
 
   return (
-    <div
-      className={
-        embedded ? "mx-auto max-w-5xl px-3 pb-6 pt-1 sm:px-4 lg:px-6" : "mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8"
-      }
-    >
-      <nav className={`mb-6 flex flex-wrap items-center gap-4 text-sm ${embedded ? "mb-5" : "mb-8"}`}>
-        {embedded ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
-          >
-            ← Close day details
-          </button>
-        ) : (
-          <Link
-            href={`/trip/${tripId}/setup#sec-dates`}
-            className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
-          >
-            ← Trip calendar
-          </Link>
-        )}
+    <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8">
+      <nav className="mb-8 flex flex-wrap items-center gap-4 text-sm">
+        <Link
+          href={`/trip/${tripId}/setup#sec-dates`}
+          className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+        >
+          ← Trip calendar
+        </Link>
         <span className="text-slate-300 dark:text-white/25">/</span>
         <span className="text-slate-600 dark:text-neutral-400">Host day view</span>
       </nav>
@@ -319,48 +289,26 @@ export function TripHostSetupDayPage({
           </p>
           <div className="mt-4 flex justify-center gap-6">
             {prevIso ? (
-              onNavigateDay ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigateDay(prevIso)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                  aria-label="Previous day"
-                >
-                  ‹
-                </button>
-              ) : (
-                <Link
-                  href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                  aria-label="Previous day"
-                >
-                  ‹
-                </Link>
-              )
+              <Link
+                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                aria-label="Previous day"
+              >
+                ‹
+              </Link>
             ) : (
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-slate-300 opacity-40 dark:text-neutral-600">
                 ‹
               </span>
             )}
             {nextIso ? (
-              onNavigateDay ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigateDay(nextIso)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                  aria-label="Next day"
-                >
-                  ›
-                </button>
-              ) : (
-                <Link
-                  href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                  aria-label="Next day"
-                >
-                  ›
-                </Link>
-              )
+              <Link
+                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                aria-label="Next day"
+              >
+                ›
+              </Link>
             ) : (
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-slate-300 opacity-40 dark:text-neutral-600">
                 ›

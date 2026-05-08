@@ -12,8 +12,6 @@ import {
   applyHostHotelSelection,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
-  hostHasHotel,
-  hostHasKeptRestaurant,
   hotelStayForDay,
   isHostPublishReady,
   normalizePlan,
@@ -61,8 +59,6 @@ import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
-import { TripHostSetupDayPage } from "@/frontend/components/trip-host-setup-day-page";
-
 const NAV_INPAGE = [
   { id: "dates", label: "Trip calendar" },
   { id: "flights", label: "Flights" },
@@ -204,7 +200,6 @@ export function TripHostSetupDashboard({
     hostHasConcreteTripRange(initialPlan) ? "day" : "range"
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
-  const [expandedDayIso, setExpandedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
   const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
   const [removePinConfirm, setRemovePinConfirm] = useState<{
@@ -485,7 +480,6 @@ export function TripHostSetupDashboard({
     setErr(null);
     suggestedSeededRef.current = false;
     setSelectedDayIso(null);
-    setExpandedDayIso(null);
     const ok = await persistHostSetup({
       hotel: null,
       hotelStays: [],
@@ -540,10 +534,10 @@ export function TripHostSetupDashboard({
       }
 
       if (!tripDayIsoSet?.has(iso)) return;
-      setExpandedDayIso((prev) => (prev === iso ? null : iso));
       setSelectedDayIso(iso);
+      router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(iso)}`);
     },
-    [calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet]
+    [calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet, router, tripId]
   );
 
   const addRestaurantToDay = useCallback(
@@ -810,7 +804,6 @@ export function TripHostSetupDashboard({
                       setDatePickMode("range");
                       setRangeAnchor(null);
                       setSelectedDayIso(null);
-                      setExpandedDayIso(null);
                       setAddPlacesOpen(false);
                       setPendingRangeConfirm(null);
                     }}
@@ -921,7 +914,7 @@ export function TripHostSetupDashboard({
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
-                          datePickMode === "day" && (selectedDayIso === cellIso || expandedDayIso === cellIso)
+                          datePickMode === "day" && selectedDayIso === cellIso
                             ? "ring-1 ring-teal-400/80 ring-inset dark:ring-teal-500/50"
                             : "",
                         ].join(" ")}
@@ -1055,23 +1048,6 @@ export function TripHostSetupDashboard({
             ) : null}
           </div>
 
-          {expandedDayIso && tripDayIsoSet?.has(expandedDayIso) ? (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card">
-              <TripHostSetupDayPage
-                tripId={tripId}
-                dateIso={expandedDayIso}
-                initialPlan={plan}
-                embedded
-                onPlanSynced={setPlan}
-                onClose={() => setExpandedDayIso(null)}
-                onNavigateDay={(next) => {
-                  if (!tripDayIsoSet?.has(next)) return;
-                  setExpandedDayIso(next);
-                  setSelectedDayIso(next);
-                }}
-              />
-            </div>
-          ) : null}
         </section>
 
         <section id="sec-flights" className="scroll-mt-28">
