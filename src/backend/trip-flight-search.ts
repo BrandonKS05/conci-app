@@ -81,9 +81,14 @@ function rowFromFlightOption(bf: Record<string, unknown>, index: number): Flight
         ? `https://www.google.com/travel/flights?${new URLSearchParams({ tfs: bt }).toString()}`
         : "https://www.google.com/travel/flights";
 
+  const logoFromFirst = typeof first?.airline_logo === "string" ? first.airline_logo : "";
+  const logoFromTop = typeof bf.airline_logo === "string" ? bf.airline_logo : "";
+  const airlineLogoUrl = logoFromFirst || logoFromTop || undefined;
+
   return {
     id,
     airline,
+    airlineLogoUrl,
     departureTime: typeof dep?.time === "string" ? dep.time : "—",
     departureAirport: typeof dep?.id === "string" ? dep.id : typeof dep?.name === "string" ? dep.name : "—",
     arrivalTime: typeof arr?.time === "string" ? arr.time : "—",

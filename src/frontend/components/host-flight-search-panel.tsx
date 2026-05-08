@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AirportSuggestionDto, CabinClass, FlightLegRowDto } from "@/shared/flight-search";
 import { CABIN_OPTIONS } from "@/shared/flight-search";
 
@@ -164,6 +165,7 @@ function stopsLabel(stops: number): string {
 }
 
 export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; enabled: boolean }) {
+  const router = useRouter();
   const { ctx, ctxLoading } = useFlightSearchContext(tripId, enabled);
 
   const [leaveInput, setLeaveInput] = useState("");
@@ -463,10 +465,19 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
           <button
             type="button"
             disabled={!searchEnabled}
-            onClick={() => void runLeg("outbound")}
+            onClick={() => {
+              if (!pickedOrigin) return;
+              const q = new URLSearchParams({
+                originId: pickedOrigin.id,
+                originLabel: leaveInput,
+                cabinClass: cabin,
+                leg: "outbound",
+              });
+              router.push(`/trip/${tripId}/setup/flights?${q.toString()}`);
+            }}
             className="rounded-xl border border-teal-600/80 bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-neutral-500"
           >
-            {legLoading ? "Searching…" : "Search outbound flights"}
+            Search flights
           </button>
         </div>
       ) : null}

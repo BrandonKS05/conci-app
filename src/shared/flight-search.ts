@@ -9,6 +9,7 @@ export type AirportSuggestionDto = {
 export type FlightLegRowDto = {
   id: string;
   airline: string;
+  airlineLogoUrl?: string;
   departureTime: string;
   departureAirport: string;
   arrivalTime: string;
