@@ -316,8 +316,8 @@ export function HostSetupAddPlacesModal({
     }
   }, [plan.location, plan.title, hotelsLoadingMore]);
 
-  const allRestaurants = data?.restaurants ?? [];
-  const allExperiences = data?.experiences ?? [];
+  const allRestaurants = useMemo(() => data?.restaurants ?? [], [data?.restaurants]);
+  const allExperiences = useMemo(() => data?.experiences ?? [], [data?.experiences]);
   const visibleHotels = useMemo(
     () => hotelPlacesAll.slice(0, hotelVisibleCount),
     [hotelPlacesAll, hotelVisibleCount]

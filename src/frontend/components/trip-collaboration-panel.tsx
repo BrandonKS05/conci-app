@@ -29,7 +29,6 @@ import {
 } from "@/shared/budget-poll";
 import { visitorVoteKey, voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import {
-  POLL_WRITE_IN_MAX_LEN,
   coerceScalarVoteChoice,
   coerceVoteAgainstList,
   isAllowedPollWriteIn,

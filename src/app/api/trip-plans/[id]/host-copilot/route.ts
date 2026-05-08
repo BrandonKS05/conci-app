@@ -55,7 +55,7 @@ function coerceRestaurantPinsFromParsed(
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    let dateIso = typeof r.dateIso === "string" ? r.dateIso.trim() : "";
+    const dateIso = typeof r.dateIso === "string" ? r.dateIso.trim() : "";
     const placeUnknown = r.place && typeof r.place === "object" ? (r.place as Record<string, unknown>) : null;
     const name = placeUnknown?.name !== undefined ? String(placeUnknown.name).trim() : "";
     const mapsUrl =
