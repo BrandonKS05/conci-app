@@ -24,6 +24,12 @@ function stopsLabel(stops: number): string {
   return `${stops} stop${stops === 1 ? "" : "s"}`;
 }
 
+function formatPrice(price: string): string {
+  const p = price.trim();
+  if (!p) return "$—";
+  return p.startsWith("$") ? p : `$${p}`;
+}
+
 function airlineMonogram(name: string): string {
   const parts = name
     .replace(/[^A-Za-z0-9 ]/g, " ")
@@ -100,7 +106,7 @@ export function TripHostFlightsPage(props: {
             <p className="font-semibold">Selected outbound flight</p>
             <p className="mt-1">
               {props.outboundSummary.airline} · {props.outboundSummary.departureTime} → {props.outboundSummary.arrivalTime} ·{" "}
-              {props.outboundSummary.duration} · {props.outboundSummary.price}
+              {props.outboundSummary.duration} · {formatPrice(props.outboundSummary.price)}
             </p>
           </div>
         ) : null}
@@ -152,7 +158,7 @@ export function TripHostFlightsPage(props: {
                   </div>
 
                   <div className="text-right md:min-w-[132px]">
-                    <p className="text-[34px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{f.price}</p>
+                    <p className="text-[34px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{formatPrice(f.price)}</p>
                     <p className="mt-1 text-[11px] text-slate-500 dark:text-neutral-500">Roundtrip per traveler</p>
                   </div>
                 </div>
@@ -221,10 +227,10 @@ export function TripHostFlightsPage(props: {
             <p className="font-semibold">Round-trip summary</p>
             <p className="mt-1">
               Out: {props.outboundSummary.airline}, {props.outboundSummary.departureTime} → {props.outboundSummary.arrivalTime} (
-              {props.outboundSummary.price})
+              {formatPrice(props.outboundSummary.price)})
             </p>
             <p>
-              Back: {selected.airline}, {selected.departureTime} → {selected.arrivalTime} ({selected.price})
+              Back: {selected.airline}, {selected.departureTime} → {selected.arrivalTime} ({formatPrice(selected.price)})
             </p>
             <p className="mt-2 flex flex-wrap gap-3">
               <a
