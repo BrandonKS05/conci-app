@@ -17,6 +17,7 @@ import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
   applyDatesSlotToPlan,
+  applyUserAnchoredTripDates,
   isDatesSlotTbdValue,
   planHasUsableTripTiming,
   groundPlanInUserInput,
@@ -509,6 +510,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(safeParseJson(outputText)), inputForRetain),
         trimmed
       );
+      plan = applyUserAnchoredTripDates(plan, inputForRetain);
       const fixed = fixedTripTitleRef.current?.trim();
       if (fixed) {
         plan = { ...plan, title: fixed };
@@ -1008,6 +1010,25 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
+      {phase === "building" && loading ? (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-auto bg-[#C7B1FF] px-4 py-8 dark:bg-[#8f73c9]"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <p className="sr-only">Building your trip plan, please wait.</p>
+          <NextImage
+            src="/trip-plan-generating.png"
+            alt=""
+            width={1024}
+            height={673}
+            priority
+            className="h-auto max-h-[88vh] w-auto max-w-full rounded-2xl shadow-[0_24px_80px_-16px_rgba(65,43,118,0.45)] ring-1 ring-black/5 select-none"
+          />
+        </div>
+      ) : null}
+
       <header className="flex items-start gap-3.5">
         <span
           className="mt-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-semibold text-slate-900 ring-1 ring-slate-200 dark:bg-[#1f1f1f] dark:text-[#ebe9e4] dark:ring-white/10"
@@ -1064,8 +1085,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         )}
 
         {prefetchingSlots ? <AssistantBubble text="" typing /> : null}
-
-        {phase === "building" && loading ? <AssistantBubble text="" typing /> : null}
 
         {error ? (
           <div className="flex flex-col gap-2">
