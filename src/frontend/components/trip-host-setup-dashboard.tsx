@@ -484,16 +484,10 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         return;
       }
 
-      const inRange =
-        tripDisplayRange?.startIso &&
-        tripDisplayRange?.endIso &&
-        enumerateLocalIsoDays(tripDisplayRange.startIso, tripDisplayRange.endIso).includes(iso);
-      if (!inRange) return;
-
-      /* Focus this day for keyboard / mobile; hover uses the same cell for actions. */
-      setSelectedDayIso(iso);
+      /* Day mode / after range is saved: any date cell opens the full-day host page. */
+      router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(iso)}`);
     },
-    [calYear, calMonth, rangeAnchor, datePickMode, tripDisplayRange?.startIso, tripDisplayRange?.endIso]
+    [calYear, calMonth, rangeAnchor, datePickMode, router, tripId]
   );
 
   const addRestaurantToDay = useCallback(
@@ -718,7 +712,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — hover a trip day (saved range) to reveal Edit activities.`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — click any day in the calendar to open a dedicated page with hotels, restaurants, and activities, or hover a trip day for Edit activities.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
