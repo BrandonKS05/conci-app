@@ -37,6 +37,7 @@ import {
   looksLikeMeaninglessTripSeed,
   looksLikeStandalonePeopleCount,
 } from "@/shared/trip-input-quality";
+import { buildBudgetSoftWarning } from "@/shared/budget-trip-soft-warning";
 
 type SlotKey = "location" | "dates" | "people" | "budget" | "vibe" | "interests" | "pace";
 
@@ -872,8 +873,16 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const updated = { ...slots, [slotKey]: answer };
     const msgId = newId();
     const locHint = ((slotKey === "location" ? answer : updated.location) || slots.location || "").trim();
+    const budgetSoftNote =
+      slotKey === "budget" ? buildBudgetSoftWarning(updated, seedMessage.trim()) : null;
 
-    setMessages((prev) => [...prev, { id: msgId, role: "user", text: answer }]);
+    setMessages((prev) => {
+      const next = [...prev, { id: msgId, role: "user", text: answer } as ChatMessage];
+      if (budgetSoftNote) {
+        next.push({ id: newId(), role: "assistant", text: budgetSoftNote });
+      }
+      return next;
+    });
     setSlots(updated);
     setReplyDraft("");
     setActiveSlot(null);

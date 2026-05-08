@@ -85,7 +85,7 @@ export default async function TripHostSetupDayDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 text-slate-900 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
+    <div className="min-h-screen bg-[#f7f6f8] py-6 text-neutral-950 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
       <TripHostSetupDayPage tripId={id} dateIso={rawDate} initialPlan={plan} />
     </div>
   );

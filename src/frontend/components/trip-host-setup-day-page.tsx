@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import {
@@ -29,29 +29,64 @@ function shiftIsoDay(iso: string, delta: number): string | null {
   return formatLocalIsoDate(n);
 }
 
-/** Placeholder section shell (matches “boxes” layout from host mock). */
-function SectionShell({
+/** Bold pink downward triangle (accordion affordance — mock reference). Rotates when open. */
+function PinkAccordionChevron({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 18"
+      className={`h-4 w-6 shrink-0 text-[#e91e8c] transition-transform duration-200 dark:text-[#ff4da6] ${open ? "rotate-180" : ""} ${className ?? ""}`}
+      aria-hidden
+    >
+      <polygon points="12,17 3,4 21,4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function DropSection({
   title,
-  eyebrow,
-  actions,
+  subtitle,
+  sectionId,
+  defaultOpen,
   children,
 }: {
   title: string;
-  eyebrow?: string;
-  actions?: ReactNode;
+  subtitle?: string;
+  sectionId: string;
+  /** When true (default), section starts expanded */
+  defaultOpen?: boolean;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  const panelId = `${sectionId}-panel`;
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card">
-      <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-white/10 sm:px-6">
-        <div>
-          <h2 className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
-          {eyebrow ? <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-neutral-500">{eyebrow}</p> : null}
+    <div className="overflow-hidden rounded-xl border border-neutral-900/15 bg-neutral-50/80 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:bg-white/[0.04]">
+      <button
+        type="button"
+        id={`${sectionId}-header`}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition hover:bg-neutral-200/55 dark:hover:bg-white/[0.07] sm:px-6 sm:py-4"
+      >
+        <div className="min-w-0">
+          <span className="font-sans text-lg font-black uppercase tracking-[0.04em] text-neutral-950 dark:text-white">
+            {title}
+          </span>
+          {subtitle ? (
+            <p className="mt-1 font-sans text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-600 dark:text-neutral-400">
+              {subtitle}
+            </p>
+          ) : null}
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
-      </div>
-      <div className="min-h-[8rem] p-5 sm:min-h-[10rem] sm:p-6">{children}</div>
-    </section>
+        <PinkAccordionChevron open={open} className="mt-1 sm:mt-1.5" />
+      </button>
+      {open ? (
+        <div id={panelId} role="region" aria-labelledby={`${sectionId}-header`} className="border-t border-neutral-900/10 dark:border-white/10">
+          <div className="px-5 pb-6 pt-4 sm:px-6 sm:pb-8 sm:pt-5">{children}</div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -133,44 +168,43 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
       </nav>
 
       <header className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,220px)_1fr_minmax(0,280px)] lg:items-start">
-        <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white px-5 py-4 shadow-sm dark:border-rose-900/40 dark:from-rose-950/50 dark:to-dm-card">
-          <p className="font-display text-xs font-bold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-200">{dest}</p>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-neutral-400">Hotel tonight</p>
-          <p className="mt-2 text-sm font-medium text-slate-800 dark:text-neutral-100">
-            {hotel ? hotel.place.name : "TBD — add stays on calendar setup"}
+        <div className="rounded-[1.35rem] border-4 border-black bg-[#ffb6d9]/35 px-5 py-4 shadow-[inset_0_0_0_1px_rgba(236,72,153,0.35)] dark:border-white/25 dark:bg-rose-950/40 dark:shadow-none">
+          <p className="font-sans text-sm font-black uppercase tracking-[0.12em] text-neutral-950 dark:text-white">{dest}</p>
+          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-300">Hotel</p>
+          <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">
+            {hotel ? hotel.place.name : "TBD"}
           </p>
-          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-neutral-400">Main plans</p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
-            {scheduleItems.length > 0 ? `${scheduleItems.length} pinned stops` : "Nothing pinned yet"}
+          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-300">Main Plans</p>
+          <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">
+            {scheduleItems.length > 0 ? `${scheduleItems.length} stops` : "TBD"}
           </p>
         </div>
 
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-            {formatted.dayIndexLabel ? `${formatted.dayIndexLabel} · ${formatted.line2}` : formatted.line2}
+          <h1 className="font-display text-3xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-[2.125rem] sm:leading-tight">
+            {formatted.dayIndexLabel ? `${formatted.dayIndexLabel}: ${formatted.line2}` : formatted.line2}
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-            What should this day become? Sketch it here — Conci can turn this paragraph into pinned meals, stays, and activities
-            once your backend flow is wired.
-          </p>
-          <label className="mt-4 block">
-            <span className="sr-only">Describe your ideal day</span>
+          <label htmlFor={`daydream-${dateIso}`} className="mt-6 block rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.08)] dark:border-white/20 dark:bg-dm-card">
+            <span className="font-sans text-sm font-black text-neutral-950 dark:text-white">What do you want to do?</span>
             <textarea
-              placeholder={`Describe your dream day in ${dest}…`}
+              id={`daydream-${dateIso}`}
+              placeholder={`Describe your dream day’s vacation in ${dest} — Conci will make it reality…`}
               rows={5}
-              className="mt-2 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-900 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-rose-300 focus:ring-2 focus:ring-rose-200/60 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-rose-500/40 dark:focus:ring-rose-500/25"
+              className="mt-4 w-full resize-y border-0 bg-transparent p-0 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 dark:text-neutral-200 dark:placeholder:text-neutral-500"
               defaultValue=""
             />
           </label>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card">
-          <p className="text-center text-[10px] font-bold uppercase tracking-[0.26em] text-slate-500 dark:text-neutral-500">Nearby days</p>
+        <div className="rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.06)] dark:border-white/15 dark:bg-dm-card">
+          <p className="text-center text-[10px] font-black uppercase tracking-[0.26em] text-neutral-700 dark:text-neutral-400">
+            Nearby days
+          </p>
           <div className="mt-4 flex justify-center gap-6">
             {prevIso ? (
               <Link
                 href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
                 aria-label="Previous day"
               >
                 ‹
@@ -183,7 +217,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
             {nextIso ? (
               <Link
                 href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
                 aria-label="Next day"
               >
                 ›
@@ -194,65 +228,68 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
               </span>
             )}
           </div>
-          <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-neutral-500">Day budget</p>
-          <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
-            Slider arrives with pricing — track spend per day once flights and hotels settle.
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-neutral-800 dark:text-neutral-300">
+            Day budget
           </p>
+          <div className="mt-3 flex justify-between font-sans text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">
+            <span>0</span>
+            <span>50k</span>
+          </div>
           <input
             type="range"
             min={0}
             max={100}
             defaultValue={50}
-            className="mt-5 w-full accent-rose-500"
-            aria-label="Day budget placeholder"
+            className="mt-2 w-full accent-[#e91e8c]"
+            aria-label="Day budget (placeholder scale 0–50k)"
           />
         </div>
       </header>
 
-      <SectionShell title="Schedule" eyebrow="Auto-populated from pins">
-        {scheduleItems.length === 0 ? (
-          <EmptyHint label="No meals or activities pinned yet — use Edit activities on the calendar or add picks after." />
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="flex min-w-[36rem] gap-3 pb-1">
-              {scheduleItems.map((row) => (
-                <article
-                  key={row.key}
-                  className="min-w-[10.5rem] flex-1 rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-3 dark:border-rose-900/30 dark:bg-rose-950/30"
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-800 dark:text-rose-100">
-                    {row.sub}
-                  </span>
-                  <p className="mt-2 font-display text-sm font-semibold text-slate-900 dark:text-white">{row.label}</p>
-                  {row.href ? (
-                    <a
-                      href={row.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-flex text-[11px] font-semibold uppercase tracking-wide text-sky-700 underline-offset-2 hover:underline dark:text-sky-400"
-                    >
-                      Map / open
-                    </a>
-                  ) : null}
-                </article>
-              ))}
+      <div className="mt-10 space-y-4">
+        <DropSection title="Schedule" subtitle="— Auto populated" sectionId="day-schedule" defaultOpen>
+          {scheduleItems.length === 0 ? (
+            <EmptyHint label="No meals or activities pinned yet — use Add places on the trip calendar, or pull from live picks after." />
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="flex min-w-[36rem] gap-3 pb-1">
+                {scheduleItems.map((row) => (
+                  <article
+                    key={row.key}
+                    className="min-w-[10.5rem] flex-1 rounded-xl border-2 border-neutral-900/10 bg-[#ffe4f1]/50 px-3 py-3 dark:border-white/10 dark:bg-rose-950/25"
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c4176d] dark:text-[#ff7eb8]">
+                      {row.sub}
+                    </span>
+                    <p className="mt-2 font-sans text-sm font-bold text-neutral-950 dark:text-white">{row.label}</p>
+                    {row.href ? (
+                      <a
+                        href={row.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex font-sans text-[10px] font-black uppercase tracking-wide text-[#0066cc] underline-offset-2 hover:underline dark:text-sky-400"
+                      >
+                        Map me there
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </SectionShell>
+          )}
+        </DropSection>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-1">
-        <SectionShell title="Hotels" eyebrow="Stay for this night">
+        <DropSection title="Hotels" subtitle="Stay for this night" sectionId="day-hotels">
           {hotel ? (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-dm-page/80">
-              <p className="font-semibold text-slate-900 dark:text-white">{hotel.place.name}</p>
-              {hotel.place.address ? <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">{hotel.place.address}</p> : null}
+            <div className="rounded-xl border-2 border-neutral-900/15 bg-neutral-50/90 p-4 dark:border-white/10 dark:bg-dm-page/80">
+              <p className="font-sans text-base font-bold text-neutral-950 dark:text-white">{hotel.place.name}</p>
+              {hotel.place.address ? <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{hotel.place.address}</p> : null}
               {hotel.place.mapsUrl ? (
                 <a
                   href={hotel.place.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 inline-flex text-sm font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
+                  className="mt-3 inline-flex text-sm font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
                 >
                   Open in Maps
                 </a>
@@ -261,9 +298,9 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
           ) : (
             <EmptyHint label="No hotel night matched to this date — assign stay dates in host setup." />
           )}
-        </SectionShell>
+        </DropSection>
 
-        <SectionShell title="Activities" eyebrow="Suggested just for you" actions={<span className="text-slate-400 dark:text-neutral-600">⏷</span>}>
+        <DropSection title="Activities" subtitle="Suggested just for you" sectionId="day-activities">
           {activities.length === 0 ? (
             <EmptyHint label="No activities pinned for this day." />
           ) : (
@@ -271,7 +308,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
               {activities.map((p) => (
                 <li
                   key={p.experience.bookingUrl}
-                  className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-white/10 dark:bg-dm-page/60"
+                  className="flex gap-4 rounded-xl border-2 border-neutral-900/10 bg-neutral-50/70 p-3 dark:border-white/10 dark:bg-dm-page/60"
                 >
                   {p.experience.coverPhotoUrl ? (
                     <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-200 dark:bg-white/10">
@@ -285,14 +322,16 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
                       />
                     </div>
                   ) : (
-                    <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-xs text-slate-500 dark:bg-white/10 dark:text-neutral-500">
+                    <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500 dark:bg-white/10 dark:text-neutral-500">
                       Activity
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-neutral-500">Activity</span>
-                    <p className="mt-1 font-semibold text-slate-900 dark:text-white">{p.experience.name}</p>
-                    <p className="mt-1 text-xs text-slate-600 dark:text-neutral-400">
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-500">
+                      Activity
+                    </span>
+                    <p className="mt-1 font-sans text-base font-bold text-neutral-950 dark:text-white">{p.experience.name}</p>
+                    <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
                       {[p.experience.duration, p.experience.pricePerPerson].filter(Boolean).join(" · ")}
                     </p>
                     {p.experience.bookingUrl ? (
@@ -300,7 +339,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
                         href={p.experience.bookingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 inline-flex text-xs font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
+                        className="mt-2 inline-flex text-xs font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
                       >
                         Booking link
                       </a>
@@ -310,41 +349,50 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
               ))}
             </ul>
           )}
-        </SectionShell>
+        </DropSection>
 
-        <SectionShell title="Restaurants" eyebrow="" actions={<span className="text-slate-400 dark:text-neutral-600">⏷</span>}>
+        <DropSection title="Restaurants" subtitle="Catered to your group's taste" sectionId="day-restaurants">
           {meals.length === 0 ? (
             <EmptyHint label="No restaurant pins yet for this day." />
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
               {meals.map((p) => (
-                <li key={p.place.mapsUrl} className="flex gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-dm-elevated">
+                <li
+                  key={p.place.mapsUrl}
+                  className="flex gap-3 rounded-xl border-2 border-neutral-900/10 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated"
+                >
                   {p.place.photoUrl ? (
                     <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-white/10">
                       <Image src={p.place.photoUrl} alt="" fill className="object-cover" sizes="112px" unoptimized />
                     </div>
                   ) : (
-                    <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-semibold uppercase text-slate-400 dark:bg-white/10 dark:text-neutral-500">
+                    <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black uppercase text-slate-400 dark:bg-white/10 dark:text-neutral-500">
                       Restaurant
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-neutral-500">Restaurant</span>
-                    <p className="font-semibold text-slate-900 dark:text-white">{p.place.name}</p>
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-500">
+                      Restaurant
+                    </span>
+                    <p className="font-sans font-bold text-neutral-950 dark:text-white">{p.place.name}</p>
                     {p.place.rating != null ? (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                         {typeof p.place.rating === "number" ? p.place.rating.toFixed(1) : p.place.rating} ★
                       </p>
                     ) : null}
-                    {p.place.address ? <p className="mt-2 text-xs text-slate-600 dark:text-neutral-400">{p.place.address}</p> : null}
+                    {p.place.address ? <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{p.place.address}</p> : null}
                     <button
                       type="button"
-                      className="mt-3 mr-2 inline-flex rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold dark:border-white/10"
+                      className="mt-3 mr-2 inline-flex rounded-full border-2 border-neutral-900/20 px-3 py-1 text-[11px] font-bold dark:border-white/15"
                       disabled
                     >
                       Vote · 0
                     </button>
-                    <button type="button" className="mt-3 inline-flex text-[11px] font-semibold text-slate-500 dark:text-neutral-500" disabled>
+                    <button
+                      type="button"
+                      className="mt-3 inline-flex text-[11px] font-bold text-neutral-500 dark:text-neutral-500"
+                      disabled
+                    >
                       Different option
                     </button>
                   </div>
@@ -352,7 +400,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
               ))}
             </ul>
           )}
-        </SectionShell>
+        </DropSection>
       </div>
     </div>
   );

@@ -593,18 +593,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [effectiveHighlightRange, calYear, calMonth]
   );
 
-  /** Persisted host range only — used for “Edit activities” visibility (not inferred-from-parser fallback). */
-  const inHostSavedTripRangeCell = useCallback(
-    (dom: number | null): boolean => {
-      if (!dom) return false;
-      const tr = hostSetup.tripRange;
-      if (!tr?.startIso || !tr?.endIso) return false;
-      const iso = isoFromCell(calYear, calMonth, dom);
-      return enumerateLocalIsoDays(tr.startIso, tr.endIso).includes(iso);
-    },
-    [hostSetup.tripRange?.startIso, hostSetup.tripRange?.endIso, calYear, calMonth]
-  );
-
   const selectedDayLabel = useMemo(() => {
     if (!selectedDayIso) return "";
     const d = parseLocalIsoDate(selectedDayIso);
@@ -712,7 +700,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — click any day in the calendar to open a dedicated page with hotels, restaurants, and activities, or hover a trip day for Edit activities.`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — click any calendar day to open its itinerary page with hotels, restaurants, and activities, or use Add places above the grid for meals and experiences on the trip start day.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
@@ -733,6 +721,18 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-xl">
                   {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
                 </h3>
+                {hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayIso(hostSetup.tripRange!.startIso);
+                      setAddPlacesOpen(true);
+                    }}
+                    className="shrink-0 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:py-1.5 dark:border-teal-800/50 dark:bg-teal-950/40 dark:text-teal-100 dark:hover:bg-teal-900/50"
+                  >
+                    Add places
+                  </button>
+                ) : null}
                 {hostHasConcreteTripRange(plan) ? (
                   <button
                     type="button"
@@ -822,8 +822,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
-                    const showEditActivities =
-                      datePickMode === "day" && inHostSavedTripRangeCell(dom);
                     const dayLabel = formatPinDayLabel(cellIso);
                     return (
                       <div
@@ -961,27 +959,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                               </div>
                             ))}
                         </div>
-
-                        {showEditActivities ? (
-                          <div
-                            className="pointer-events-none absolute bottom-2 left-2 right-2 z-10 opacity-0 shadow-sm transition-opacity duration-150 group-hover/cell:pointer-events-auto group-hover/cell:opacity-100 group-focus-within/cell:pointer-events-auto group-focus-within/cell:opacity-100"
-                            onClick={(ev) => ev.stopPropagation()}
-                            onKeyDown={(ev) => ev.stopPropagation()}
-                            role="presentation"
-                          >
-                            <button
-                              type="button"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setSelectedDayIso(cellIso);
-                                setAddPlacesOpen(true);
-                              }}
-                              className="pointer-events-auto w-full rounded-lg border border-amber-800/30 bg-zinc-800 px-2.5 py-2 text-center font-sans text-[11px] font-medium leading-snug text-white transition hover:bg-zinc-700 sm:px-3 sm:text-xs dark:border-amber-500/25 dark:bg-zinc-700 dark:hover:bg-zinc-600"
-                            >
-                              Edit activities
-                            </button>
-                          </div>
-                        ) : null}
                       </div>
                     );
                   })}
