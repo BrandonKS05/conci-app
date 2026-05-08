@@ -959,14 +959,17 @@ export function tripRangeBestEffortFromPlanDates(
 }
 
 /**
- * Host draft save: same as {@link tripRangeBestEffortFromPlanDates} (concrete → loose option strings
- * → joined blob → vague month phrases). Call this when persisting `hostSetup.tripRange` for new drafts.
+ * When creating a draft, persist {@link HostSetupState.tripRange} only from **concrete** date text
+ * (ISO ranges, spelled-out day spans, etc.). Loose “July 2026” / `Date` parses are excluded so we
+ * do not silently save whole-month spans that fight the planner’s narrower windows.
+ *
+ * {@link tripRangeBestEffortFromPlanDates} stays available for ancillary features that still want a fuzzy guess.
  */
 export function tripRangeForHostDraftSave(
   plan: TripPlan,
   fallbackYear: number
 ): { startIso: string; endIso: string } | null {
-  return tripRangeBestEffortFromPlanDates(plan, fallbackYear);
+  return concreteTripRangeFromPlanDates(plan, fallbackYear);
 }
 
 /** @deprecated Use concreteTripRangeFromPlanDates */

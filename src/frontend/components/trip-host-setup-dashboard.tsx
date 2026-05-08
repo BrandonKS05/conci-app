@@ -10,12 +10,12 @@ import {
 import {
   applyHostHotelDateRange,
   applyHostHotelSelection,
+  concreteTripRangeFromPlanDates,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
   hotelStayForDay,
   isHostPublishReady,
   normalizePlan,
-  tripRangeBestEffortFromPlanDates,
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
@@ -193,8 +193,9 @@ export function TripHostSetupDashboard({
     endIso: string;
   } | null>(null);
 
-  const concreteRangeFromPlan = useMemo(
-    () => tripRangeBestEffortFromPlanDates(plan, new Date().getFullYear()),
+  /** Inferred strictly from planner text with real calendar days — not loose full-month guesses. */
+  const parserConcreteRange = useMemo(
+    () => concreteTripRangeFromPlanDates(plan, new Date().getFullYear()),
     [plan]
   );
 
@@ -238,7 +239,7 @@ export function TripHostSetupDashboard({
   const [calYear, setCalYear] = useState(() => {
     const y0 = new Date().getFullYear();
     const tr =
-      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
+      initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     if (base) return base.getFullYear();
@@ -249,7 +250,7 @@ export function TripHostSetupDashboard({
   const [calMonth, setCalMonth] = useState(() => {
     const y0 = new Date().getFullYear();
     const tr =
-      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
+      initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     if (base) return base.getMonth();
@@ -258,8 +259,8 @@ export function TripHostSetupDashboard({
     return new Date().getMonth();
   });
 
-  /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
-  const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
+  /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
+  const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
 
   const flightTripDayOptions = useMemo(() => {
     if (!tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return [];
@@ -339,10 +340,10 @@ export function TripHostSetupDashboard({
     setBudgetLine(plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "");
   }, [plan.budget.perPerson, plan.budget.tier]);
 
-  /** Legacy drafts: persist explicit parser dates once if `hostSetup.tripRange` was never saved (new trips get this from POST). */
+  /** Legacy drafts: persist **concrete** parser dates once if `hostSetup.tripRange` was never saved. */
   useEffect(() => {
     const y0 = new Date().getFullYear();
-    const inferred = tripRangeBestEffortFromPlanDates(initialPlan, y0);
+    const inferred = concreteTripRangeFromPlanDates(initialPlan, y0);
     if (!inferred || initialPlan.hostSetup?.tripRange?.startIso) return;
     void persistHostSetup({ tripRange: inferred });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from initial plan only
