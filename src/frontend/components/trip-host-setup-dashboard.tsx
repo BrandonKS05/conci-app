@@ -51,21 +51,9 @@ import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaur
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 import type { TripPlanStatus } from "@/shared/trip-status";
+import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { CollabStateV1 } from "@/shared/collaboration";
-import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
-import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
-import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
-import { TripPlanCard } from "@/frontend/components/trip-plan-card";
-import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
-import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
-const NAV_INPAGE = [
-  { id: "dates", label: "Trip calendar" },
-  { id: "flights", label: "Flights" },
-  { id: "budget", label: "Budget" },
-  { id: "trip-chat", label: "Trip chat" },
-  { id: "collab-sidebar", label: "Group progress" },
-] as const;
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -77,12 +65,6 @@ type Props = {
   /** Original parser message — used only to decide if meal pins auto-seed. */
   seedText?: string | null;
   initialTripStatus: TripPlanStatus;
-  inviteCode: string | null;
-  /** Host clipboard invite text — same semantics as TripSharedPanel. */
-  shareMessage: string;
-  tripMemberNames?: string[];
-  viewerUserId: string;
-  tripOwnerUserId?: string | null;
   initialCollab: CollabStateV1;
 };
 
@@ -162,20 +144,14 @@ export function TripHostSetupDashboard({
   initialPlan,
   seedText = null,
   initialTripStatus,
-  inviteCode,
-  shareMessage,
-  tripMemberNames = [],
-  viewerUserId,
-  tripOwnerUserId = null,
   initialCollab,
 }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
   const [effectiveTripStatus, setEffectiveTripStatus] = useState<TripPlanStatus>(initialTripStatus);
-  const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
   const bumpCollab = useCallback(() => {
-    setCollabRefreshSignal((n) => n + 1);
-  }, []);
+    void router.refresh();
+  }, [router]);
 
   useEffect(() => {
     setPlan(initialPlan);
@@ -186,7 +162,6 @@ export function TripHostSetupDashboard({
   }, [initialTripStatus]);
 
   const hostSetup = useMemo(() => plan.hostSetup ?? {}, [plan.hostSetup]);
-  const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
   const [budgetLine, setBudgetLine] = useState(
     () =>
@@ -372,16 +347,6 @@ export function TripHostSetupDashboard({
     void persistHostSetup({ tripRange: inferred });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from initial plan only
   }, []);
-
-  useEffect(() => {
-    const loc = plan.location?.trim() || plan.title?.trim();
-    if (!loc) return;
-    void (async () => {
-      const res = await fetch(`/api/places/destination-cover?q=${encodeURIComponent(loc)}`);
-      const j = (await res.json().catch(() => ({}))) as { photoUrl?: string | null };
-      if (j.photoUrl?.startsWith("http")) setHeroUrl(j.photoUrl);
-    })();
-  }, [plan.location, plan.title]);
 
   /** Seed restaurant pins only when the host’s parser message mentioned dining. */
   useEffect(() => {
@@ -658,8 +623,15 @@ export function TripHostSetupDashboard({
       : selectedDayIso;
   }, [selectedDayIso]);
 
-  const hasSpotlights = Boolean(plan.spotlights?.length);
   const chatSeed = initialCollab.cardChat?.messages ?? [];
+
+  const resolveWorkspaceNavHref = useCallback(
+    (id: HostSetupNavItemId): string =>
+      id === "collab-sidebar"
+        ? `/trip/${tripId}/setup/overview#sec-collab-sidebar`
+        : `#sec-${id}`,
+    [tripId]
+  );
 
   return (
     <>
@@ -669,27 +641,16 @@ export function TripHostSetupDashboard({
       tripTypography
       contentWide
     >
-      <div className="mx-auto grid h-[100vh] max-h-[100vh] min-h-0 w-full max-w-[min(100%,1800px)] grid-cols-[minmax(0,300px)_1fr] gap-x-6 overflow-hidden lg:gap-x-10">
-      <aside className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-r border-slate-200/90 pr-3 pt-0.5 dark:border-white/10">
-        <div className="space-y-4 pb-4">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <div
-            className="aspect-[16/11] bg-slate-200 bg-cover bg-center dark:bg-neutral-800"
-            style={heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined}
-          />
-          <p className="border-t border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 dark:border-white/10 dark:text-neutral-400">
-            {plan.location?.trim() || plan.title?.trim() || "Destination"}
-          </p>
-        </div>
-
-        <nav className="space-y-1 text-sm">
-          {NAV_INPAGE.map((item) => (
+      <div className="mx-auto w-full pb-14">
+      <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+        <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
+          {HOST_SETUP_NAV_ITEMS.map((item) => (
             <a
               key={item.id}
-              href={`#sec-${item.id}`}
+              href={resolveWorkspaceNavHref(item.id)}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
               {item.label}
             </a>
           ))}
@@ -697,64 +658,24 @@ export function TripHostSetupDashboard({
             href={`/trip/${tripId}/setup/packing`}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
           >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+            <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
             Packing list
           </Link>
         </nav>
-
-        <div className="flex flex-wrap gap-2">
-          <TripDepositTracker tripId={tripId} />
-          <TripContributeButton tripId={tripId} />
+        <div className="flex shrink-0 flex-col gap-2 sm:max-w-sm sm:text-right">
+          <Link
+            href={`/trip/${tripId}/setup/overview`}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500 sm:justify-end"
+          >
+            Trip overview &amp; collaboration
+          </Link>
+          <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+            Trip card, invites, deposits, spotlight votes, and group decisions moved here for a clearer calendar workspace.
+          </p>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-            Share trip
-          </span>
-          <TripPlanShareButton shareMessage={shareMessage} />
-        </div>
-
-        <TripPlanCard
-          plan={plan}
-          badge={effectiveTripStatus === "draft" ? "Draft" : "Saved"}
-          showShare={false}
-          hideOpenDecisions
-          inviteCode={inviteCode}
-          showInviteRow={Boolean(inviteCode)}
-          inviteCodeProminent={Boolean(inviteCode)}
-          guestJoinNames={tripMemberNames}
-          hideSpotlightsSection={hasSpotlights}
-        />
-
-        {hasSpotlights ? (
-          <TripSpotlightsInteractive
-            tripId={tripId}
-            plan={plan}
-            viewerUserId={viewerUserId}
-            initialSpotlightVotes={initialCollab.spotlightVotes}
-            onPlanUpdated={setPlan}
-            onCollabBump={bumpCollab}
-            collabRefreshSignal={collabRefreshSignal}
-            isHost
-          />
-        ) : null}
-
-        <div id="sec-collab-sidebar" className="scroll-mt-28">
-          <TripCollaborationPanel
-            tripId={tripId}
-            plan={plan}
-            tripStatus={effectiveTripStatus}
-            isHost
-            collabRefreshSignal={collabRefreshSignal}
-            onPlanUpdated={setPlan}
-            viewerUserId={viewerUserId}
-            tripOwnerUserId={tripOwnerUserId}
-          />
-        </div>
-        </div>
-      </aside>
-
-      <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden space-y-10 pl-1 pt-0.5">
+      <div className="space-y-10">
         <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -764,7 +685,7 @@ export function TripHostSetupDashboard({
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day below to expand hotel, meals, activities, and day details right on this calendar. Use Add places for shortcuts on the first day or open a day before adding.`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day below to open a dedicated host day screen (hotel, meals, activities, Trip Copilot for that date). Use Add places for shortcuts on the first day or choose a day first.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
