@@ -54,7 +54,7 @@ const POLL_MAX_SYNTH_OPTIONS = 3;
 const POLL_SYNTH_ROWS: readonly PollSynthRow[] = [
   { bucket: "destinations", key: "p_dest", label: "Destination" },
   { bucket: "venues", key: VENUE_POLL_DECISION_KEY, label: "Where should we eat?" },
-  { bucket: "vibePick", key: VIBE_POLL_DECISION_KEY, label: "Trip vibe" },
+  { bucket: "vibePick", key: VIBE_POLL_DECISION_KEY, label: "Any preferences/adjustments you'd like to see" },
   { bucket: "budgetPick", key: "p_budget", label: "Budget per person" },
 ];
 
@@ -68,6 +68,17 @@ export type CardChatMessage = {
 
 export const MAX_CARD_CHAT_MESSAGES = 60;
 
+/** Trip-wide free-text adjustments from travelers; host reviews in collab UI. */
+export type AdjustmentSubmissionV1 = {
+  id: string;
+  createdAt: string;
+  authorUserId: string;
+  authorDisplayName: string;
+  text: string;
+  status: "pending" | "applied" | "dismissed";
+  resolvedAt?: string;
+};
+
 export type CollabStateV1 = {
   v: typeof COLLAB_VERSION;
   decisions: Record<string, CollabDecisionBlob>;
@@ -75,6 +86,7 @@ export type CollabStateV1 = {
   spotlightVotes?: Record<string, string[]>;
   /** Trip card page: persistent group chat + inline place cards. */
   cardChat?: { messages: CardChatMessage[] };
+  adjustmentSubmissions?: AdjustmentSubmissionV1[];
 };
 
 export type CollabDecisionBlob = {
@@ -336,6 +348,43 @@ export function trimCardChatMessages(messages: CardChatMessage[]): CardChatMessa
   return messages.slice(messages.length - MAX_CARD_CHAT_MESSAGES);
 }
 
+function parseAdjustmentSubmissions(raw: unknown): AdjustmentSubmissionV1[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: AdjustmentSubmissionV1[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const id = typeof r.id === "string" ? r.id.trim() : "";
+    const createdAt = typeof r.createdAt === "string" ? r.createdAt.trim() : "";
+    const authorUserId = typeof r.authorUserId === "string" ? r.authorUserId.trim() : "";
+    const authorDisplayName =
+      typeof r.authorDisplayName === "string" ? r.authorDisplayName.trim() : "Traveler";
+    const text = typeof r.text === "string" ? r.text.trim() : "";
+    const status = r.status === "pending" || r.status === "applied" || r.status === "dismissed" ? r.status : "";
+    const resolvedAt = typeof r.resolvedAt === "string" ? r.resolvedAt.trim() : undefined;
+    if (
+      !id ||
+      !createdAt ||
+      !authorUserId ||
+      text.length < 1 ||
+      text.length > 4000 ||
+      !status
+    ) {
+      continue;
+    }
+    out.push({
+      id,
+      createdAt,
+      authorUserId,
+      authorDisplayName: authorDisplayName || "Traveler",
+      text,
+      status,
+      ...(resolvedAt ? { resolvedAt } : {}),
+    });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export function parseCollabState(raw: unknown): CollabStateV1 {
   if (!raw || typeof raw !== "object") {
     return { v: COLLAB_VERSION, decisions: {} };
@@ -350,11 +399,13 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
     const msgs = parseCardChatMessages(o.cardChat);
     if (msgs.length) cardChat = { messages: msgs };
   }
+  const adjustmentSubmissions = parseAdjustmentSubmissions(o.adjustmentSubmissions);
   return {
     v: COLLAB_VERSION,
     decisions: o.decisions as Record<string, CollabDecisionBlob>,
     ...(spotlightVotes ? { spotlightVotes } : {}),
     ...(cardChat ? { cardChat } : {}),
+    ...(adjustmentSubmissions ? { adjustmentSubmissions } : {}),
   };
 }
 
@@ -389,7 +440,13 @@ export function stripMemberVotesFromCollabState(collab: CollabStateV1, memberUse
     if (Object.keys(spotlightVotes).length === 0) spotlightVotes = undefined;
   }
 
-  return { ...collab, decisions, spotlightVotes };
+  let adjustmentSubmissions = collab.adjustmentSubmissions;
+  if (adjustmentSubmissions?.length) {
+    adjustmentSubmissions = adjustmentSubmissions.filter((s) => s.authorUserId !== memberUserId);
+    if (adjustmentSubmissions.length === 0) adjustmentSubmissions = undefined;
+  }
+
+  return { ...collab, decisions, spotlightVotes, adjustmentSubmissions };
 }
 
 function pluralityWinner(counts: Record<string, number>, preferenceOrder: string[]): string | null {

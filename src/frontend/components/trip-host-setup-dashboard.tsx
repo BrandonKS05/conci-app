@@ -15,9 +15,9 @@ import {
   hostHasHotel,
   hostHasKeptRestaurant,
   hotelStayForDay,
-  hostSetupCompletionPercent,
-  tripRangeBestEffortFromPlanDates,
   isHostPublishReady,
+  normalizePlan,
+  tripRangeBestEffortFromPlanDates,
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
@@ -52,11 +52,23 @@ import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
+import type { TripPlanStatus } from "@/shared/trip-status";
+import type { CollabStateV1 } from "@/shared/collaboration";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
+import { TripPlanCard } from "@/frontend/components/trip-plan-card";
+import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
+import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
+import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
+import { TripHostSetupDayPage } from "@/frontend/components/trip-host-setup-day-page";
 
 const NAV_INPAGE = [
   { id: "dates", label: "Trip calendar" },
   { id: "flights", label: "Flights" },
   { id: "budget", label: "Budget" },
+  { id: "trip-chat", label: "Trip chat" },
+  { id: "collab-sidebar", label: "Group progress" },
 ] as const;
 
 function googleMapsDirUrl(origin: string, dest: string): string {
@@ -68,6 +80,14 @@ type Props = {
   initialPlan: TripPlan;
   /** Original parser message — used only to decide if meal pins auto-seed. */
   seedText?: string | null;
+  initialTripStatus: TripPlanStatus;
+  inviteCode: string | null;
+  /** Host clipboard invite text — same semantics as TripSharedPanel. */
+  shareMessage: string;
+  tripMemberNames?: string[];
+  viewerUserId: string;
+  tripOwnerUserId?: string | null;
+  initialCollab: CollabStateV1;
 };
 
 function daysInMonth(y: number, m0: number): number {
@@ -141,9 +161,34 @@ function ChevRight({ className }: { className?: string }) {
   );
 }
 
-export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }: Props) {
+export function TripHostSetupDashboard({
+  tripId,
+  initialPlan,
+  seedText = null,
+  initialTripStatus,
+  inviteCode,
+  shareMessage,
+  tripMemberNames = [],
+  viewerUserId,
+  tripOwnerUserId = null,
+  initialCollab,
+}: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
+  const [effectiveTripStatus, setEffectiveTripStatus] = useState<TripPlanStatus>(initialTripStatus);
+  const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
+  const bumpCollab = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+  }, [initialPlan]);
+
+  useEffect(() => {
+    setEffectiveTripStatus(initialTripStatus);
+  }, [initialTripStatus]);
+
   const hostSetup = useMemo(() => plan.hostSetup ?? {}, [plan.hostSetup]);
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -159,6 +204,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     hostHasConcreteTripRange(initialPlan) ? "day" : "range"
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
+  const [expandedDayIso, setExpandedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
   const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
   const [removePinConfirm, setRemovePinConfirm] = useState<{
@@ -255,6 +301,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     () => pendingRangeConfirm ?? tripDisplayRange,
     [pendingRangeConfirm, tripDisplayRange]
   );
+
+  const tripDayIsoSet = useMemo(() => {
+    const start = effectiveHighlightRange?.startIso;
+    const end = effectiveHighlightRange?.endIso;
+    if (!start || !end) return null as Set<string> | null;
+    return new Set(enumerateLocalIsoDays(start, end));
+  }, [effectiveHighlightRange?.startIso, effectiveHighlightRange?.endIso]);
 
   const suggestedSeededRef = useRef(false);
 
@@ -432,6 +485,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     setErr(null);
     suggestedSeededRef.current = false;
     setSelectedDayIso(null);
+    setExpandedDayIso(null);
     const ok = await persistHostSetup({
       hotel: null,
       hotelStays: [],
@@ -485,10 +539,11 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         return;
       }
 
-      /* Day mode / after range is saved: any date cell opens the full-day host page. */
-      router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(iso)}`);
+      if (!tripDayIsoSet?.has(iso)) return;
+      setExpandedDayIso((prev) => (prev === iso ? null : iso));
+      setSelectedDayIso(iso);
     },
-    [calYear, calMonth, rangeAnchor, datePickMode, router, tripId]
+    [calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet]
   );
 
   const addRestaurantToDay = useCallback(
@@ -522,7 +577,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [hostSetup.activityPins, persistHostSetup, selectedDayIso]
   );
 
-  const pct = hostSetupCompletionPercent(plan);
   const pubReady = isHostPublishReady(plan);
 
   const onCopilotResult = useCallback((nextPlan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => {
@@ -559,12 +613,15 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         method: "POST",
         credentials: "include",
       });
-      const j = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
+      const j = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean; plan?: TripPlan };
       if (!res.ok) {
         setErr(j.error || "Publish failed.");
         return;
       }
-      router.replace(`/trip/${tripId}`);
+      if (j.plan) {
+        setPlan(normalizePlan(j.plan));
+      }
+      setEffectiveTripStatus("voting");
       router.refresh();
     } finally {
       setPublishBusy(false);
@@ -607,56 +664,18 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       : selectedDayIso;
   }, [selectedDayIso]);
 
-  const completionCard = (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-white/15 dark:bg-dm-card dark:shadow-black/20 sm:px-4 sm:py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-slate-900 dark:text-white">Trip {pct}% complete</p>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-[width]"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:justify-end sm:text-[11px]">
-          <li
-            className={`flex items-center gap-1.5 ${hostHasConcreteTripRange(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Dates</span>
-            {hostHasConcreteTripRange(plan) ? "✓" : "—"}
-          </li>
-          <li
-            className={`flex items-center gap-1.5 ${hostHasHotel(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Hotel</span>
-            {hostHasHotel(plan) ? "✓" : "—"}
-          </li>
-          <li
-            className={`flex items-center gap-1.5 ${hostHasKeptRestaurant(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Restaurant</span>
-            {hostHasKeptRestaurant(plan) ? "✓" : "—"}
-          </li>
-        </ul>
-      </div>
-      <p className="mt-2 border-t border-slate-200 pt-2 text-[10px] leading-snug text-slate-500 dark:border-white/10 dark:text-neutral-500">
-        Publish from the calendar when ready.
-      </p>
-      {err ? <p className="mt-1.5 text-center text-[10px] text-rose-600 dark:text-rose-400">{err}</p> : null}
-    </div>
-  );
+  const hasSpotlights = Boolean(plan.spotlights?.length);
+  const chatSeed = initialCollab.cardChat?.messages ?? [];
 
   return (
     <>
     <SiteShell
-      title={plan.title || "Trip setup"}
-      eyebrow="Host setup"
+      title={plan.title?.trim() || "Trip"}
+      eyebrow={effectiveTripStatus === "draft" ? "Host setup" : "Your trip"}
       tripTypography
-      titleRight={completionCard}
       contentWide
     >
-      <div className="mx-auto grid h-[100vh] max-h-[100vh] min-h-0 w-full max-w-[min(100%,1800px)] grid-cols-[260px_1fr] gap-x-6 overflow-hidden lg:gap-x-10">
+      <div className="mx-auto grid h-[100vh] max-h-[100vh] min-h-0 w-full max-w-[min(100%,1800px)] grid-cols-[minmax(0,300px)_1fr] gap-x-6 overflow-hidden lg:gap-x-10">
       <aside className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-r border-slate-200/90 pr-3 pt-0.5 dark:border-white/10">
         <div className="space-y-4 pb-4">
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -688,6 +707,56 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             Packing list
           </Link>
         </nav>
+
+        <div className="flex flex-wrap gap-2">
+          <TripDepositTracker tripId={tripId} />
+          <TripContributeButton tripId={tripId} />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            Share trip
+          </span>
+          <TripPlanShareButton shareMessage={shareMessage} />
+        </div>
+
+        <TripPlanCard
+          plan={plan}
+          badge={effectiveTripStatus === "draft" ? "Draft" : "Saved"}
+          showShare={false}
+          hideOpenDecisions
+          inviteCode={inviteCode}
+          showInviteRow={Boolean(inviteCode)}
+          inviteCodeProminent={Boolean(inviteCode)}
+          guestJoinNames={tripMemberNames}
+          hideSpotlightsSection={hasSpotlights}
+        />
+
+        {hasSpotlights ? (
+          <TripSpotlightsInteractive
+            tripId={tripId}
+            plan={plan}
+            viewerUserId={viewerUserId}
+            initialSpotlightVotes={initialCollab.spotlightVotes}
+            onPlanUpdated={setPlan}
+            onCollabBump={bumpCollab}
+            collabRefreshSignal={collabRefreshSignal}
+            isHost
+          />
+        ) : null}
+
+        <div id="sec-collab-sidebar" className="scroll-mt-28">
+          <TripCollaborationPanel
+            tripId={tripId}
+            plan={plan}
+            tripStatus={effectiveTripStatus}
+            isHost
+            collabRefreshSignal={collabRefreshSignal}
+            onPlanUpdated={setPlan}
+            viewerUserId={viewerUserId}
+            tripOwnerUserId={tripOwnerUserId}
+          />
+        </div>
         </div>
       </aside>
 
@@ -701,7 +770,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — click any calendar day to open its itinerary page with hotels, restaurants, and activities, or use Add places above the grid for meals and experiences on the trip start day.`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day below to expand hotel, meals, activities, and day details right on this calendar. Use Add places for shortcuts on the first day or open a day before adding.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
@@ -741,6 +810,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                       setDatePickMode("range");
                       setRangeAnchor(null);
                       setSelectedDayIso(null);
+                      setExpandedDayIso(null);
                       setAddPlacesOpen(false);
                       setPendingRangeConfirm(null);
                     }}
@@ -783,14 +853,20 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  disabled={!pubReady || publishBusy}
-                  onClick={() => void onPublish()}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500 sm:px-4 sm:py-2 sm:text-sm dark:disabled:bg-neutral-700 dark:disabled:text-neutral-500"
-                >
-                  {publishBusy ? "Publishing…" : "Publish trip"}
-                </button>
+                {effectiveTripStatus === "draft" ? (
+                  <button
+                    type="button"
+                    disabled={!pubReady || publishBusy}
+                    onClick={() => void onPublish()}
+                    className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500 sm:px-4 sm:py-2 sm:text-sm dark:disabled:bg-neutral-700 dark:disabled:text-neutral-500"
+                  >
+                    {publishBusy ? "Publishing…" : "Publish trip"}
+                  </button>
+                ) : (
+                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 sm:px-4 sm:py-2 sm:text-sm">
+                    Published · invite in sidebar
+                  </span>
+                )}
               </div>
             </div>
 
@@ -845,7 +921,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
-                          datePickMode === "day" && selectedDayIso === cellIso
+                          datePickMode === "day" && (selectedDayIso === cellIso || expandedDayIso === cellIso)
                             ? "ring-1 ring-teal-400/80 ring-inset dark:ring-teal-500/50"
                             : "",
                         ].join(" ")}
@@ -978,6 +1054,24 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               </p>
             ) : null}
           </div>
+
+          {expandedDayIso && tripDayIsoSet?.has(expandedDayIso) ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card">
+              <TripHostSetupDayPage
+                tripId={tripId}
+                dateIso={expandedDayIso}
+                initialPlan={plan}
+                embedded
+                onPlanSynced={setPlan}
+                onClose={() => setExpandedDayIso(null)}
+                onNavigateDay={(next) => {
+                  if (!tripDayIsoSet?.has(next)) return;
+                  setExpandedDayIso(next);
+                  setSelectedDayIso(next);
+                }}
+              />
+            </div>
+          ) : null}
         </section>
 
         <section id="sec-flights" className="scroll-mt-28">
@@ -1087,12 +1181,40 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
           </div>
         </section>
 
+        <section id="sec-trip-chat" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Trip chat</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-neutral-400">
+            Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
+          </p>
+          <div className="mt-4">
+            <TripCardChatWidget
+              tripId={tripId}
+              spotlights={plan.spotlights ?? []}
+              initialMessages={chatSeed}
+              onPlanReplaced={setPlan}
+              onCollabBump={bumpCollab}
+            />
+          </div>
+        </section>
+
         <section id="sec-itinerary" className="scroll-mt-28">
-          <GeneratedItineraryView
-            tripId={tripId}
-            initialItinerary={plan.generatedItinerary ?? null}
-            headcount={plan.people.count ?? (plan.people.names.length || 2)}
-          />
+          {plan.generatedItinerary ? (
+            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card">
+              <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+                <span className="text-base font-semibold text-slate-900 dark:text-white">Full text itinerary</span>
+                <span className="mt-1 block text-sm font-normal leading-relaxed text-slate-600 dark:text-neutral-400">
+                  Optional long-form planner text. Pins and votes on the calendar are what guests see day by day.
+                </span>
+              </summary>
+              <div className="border-t border-slate-200 dark:border-white/10">
+                <GeneratedItineraryView
+                  tripId={tripId}
+                  initialItinerary={plan.generatedItinerary ?? null}
+                  headcount={plan.people.count ?? (plan.people.names.length || 2)}
+                />
+              </div>
+            </details>
+          ) : null}
         </section>
       </div>
       </div>

@@ -160,7 +160,7 @@ export function parseDateOptionToRange(opt: string, defaultYear: number): { star
    * Vague-month expansion only when no ISO yyyy-mm-dd appears in the blob.
    * Otherwise “July…” + embedded ISO anchors would incorrectly widen to full calendar months after structured parse misses.
    */
-  if (uniqIsoDaysInText(raw).length === 0) {
+  if (uniqueIsoDaysInText(raw).length === 0) {
     const vague = parseVagueMonthQualifierToRange(raw, defaultYear);
     if (vague) return vague;
   }

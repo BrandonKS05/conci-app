@@ -5,7 +5,6 @@ import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripHostSetupDayPage } from "@/frontend/components/trip-host-setup-day-page";
 import { normalizePlan } from "@/shared/trip-plan";
-import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,14 +50,9 @@ export default async function TripHostSetupDayDetailPage({
     notFound();
   }
 
-  const { data, error } = await svc.from("trip_plans").select("plan, status").eq("id", id).maybeSingle();
+  const { data, error } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();
   if (error || !data?.plan) {
     notFound();
-  }
-
-  const status = parseTripPlanStatus(data.status);
-  if (status !== "draft") {
-    redirect(`/trip/${id}`);
   }
 
   const plan = normalizePlan(data.plan);

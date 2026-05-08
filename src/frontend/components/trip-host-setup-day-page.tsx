@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import {
   hotelStayForDay,
+  normalizePlan,
   parseLocalIsoDate,
   type TripPlan,
 } from "@/shared/trip-plan";
@@ -16,6 +18,12 @@ type Props = {
   /** Optional — use first plan-derived label if missing */
   locale?: string;
   initialPlan: TripPlan;
+  /** Rendered inline under the host calendar instead of standalone full-screen */
+  embedded?: boolean;
+  onClose?: () => void;
+  onNavigateDay?: (nextIso: string) => void;
+  /** After host copilot updates the plan — parent can merge into dashboard state */
+  onPlanSynced?: (plan: TripPlan) => void;
 };
 
 function startOfDay(x: Date) {
@@ -98,9 +106,75 @@ function EmptyHint({ label }: { label: string }) {
   );
 }
 
-export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: Props) {
-  const hostSetup = initialPlan.hostSetup;
-  const dest = initialPlan.location?.trim() || "Destination TBD";
+export function TripHostSetupDayPage({
+  tripId,
+  dateIso,
+  locale,
+  initialPlan,
+  embedded,
+  onClose,
+  onNavigateDay,
+  onPlanSynced,
+}: Props) {
+  const router = useRouter();
+  const [plan, setPlan] = useState(initialPlan);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+  }, [initialPlan]);
+
+  const [dreamText, setDreamText] = useState("");
+  const [dreamBusy, setDreamBusy] = useState(false);
+  const [dreamErr, setDreamErr] = useState<string | null>(null);
+  const [dreamReply, setDreamReply] = useState<string | null>(null);
+
+  const syncPlanFromServer = useCallback(
+    (next: TripPlan) => {
+      setPlan(next);
+      onPlanSynced?.(next);
+      if (!onPlanSynced) void router.refresh();
+    },
+    [onPlanSynced, router]
+  );
+
+  const submitDayDream = useCallback(async () => {
+    const t = dreamText.trim();
+    if (!t || t.length > 4000) {
+      setDreamErr("Say something shorter (under 4000 characters).");
+      return;
+    }
+    setDreamBusy(true);
+    setDreamErr(null);
+    setDreamReply(null);
+    try {
+      const res = await fetch(`/api/trip-plans/${tripId}/host-copilot`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `[Day ${dateIso}] ${t}`,
+          focusDateIso: dateIso,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        assistantText?: string;
+        plan?: TripPlan;
+        applied?: boolean;
+      };
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Copilot unavailable.");
+      if (typeof j.assistantText === "string") setDreamReply(j.assistantText.trim());
+      else setDreamReply("Done.");
+      if (j.plan) syncPlanFromServer(normalizePlan(j.plan));
+    } catch (e) {
+      setDreamErr(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setDreamBusy(false);
+    }
+  }, [dateIso, dreamText, syncPlanFromServer, tripId]);
+
+  const hostSetup = plan.hostSetup;
+  const dest = plan.location?.trim() || "Destination TBD";
 
   const formatted = useMemo(() => {
     const d = parseLocalIsoDate(dateIso);
@@ -123,7 +197,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
       }
     }
     return { line2, dayIndexLabel };
-  }, [dateIso, hostSetup?.tripRange, locale]);
+  }, [dateIso, locale, plan]);
 
   const hotel = hotelStayForDay(hostSetup?.hotelStays ?? [], dateIso);
 
@@ -155,14 +229,28 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
   const nextIso = shiftIsoDay(dateIso, 1);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-      <nav className="mb-8 flex flex-wrap items-center gap-4 text-sm">
-        <Link
-          href={`/trip/${tripId}/setup#sec-dates`}
-          className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
-        >
-          ← Trip calendar
-        </Link>
+    <div
+      className={
+        embedded ? "mx-auto max-w-5xl px-3 pb-6 pt-1 sm:px-4 lg:px-6" : "mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8"
+      }
+    >
+      <nav className={`mb-6 flex flex-wrap items-center gap-4 text-sm ${embedded ? "mb-5" : "mb-8"}`}>
+        {embedded ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+          >
+            ← Close day details
+          </button>
+        ) : (
+          <Link
+            href={`/trip/${tripId}/setup#sec-dates`}
+            className="font-semibold text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+          >
+            ← Trip calendar
+          </Link>
+        )}
         <span className="text-slate-300 dark:text-white/25">/</span>
         <span className="text-slate-600 dark:text-neutral-400">Host day view</span>
       </nav>
@@ -184,16 +272,45 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
           <h1 className="font-display text-3xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-[2.125rem] sm:leading-tight">
             {formatted.dayIndexLabel ? `${formatted.dayIndexLabel}: ${formatted.line2}` : formatted.line2}
           </h1>
-          <label htmlFor={`daydream-${dateIso}`} className="mt-6 block rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.08)] dark:border-white/20 dark:bg-dm-card">
-            <span className="font-sans text-sm font-black text-neutral-950 dark:text-white">What do you want to do?</span>
+          <div className="mt-6 block rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.08)] dark:border-white/20 dark:bg-dm-card">
+            <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-black text-neutral-950 dark:text-white">
+              What do you want to do?
+            </label>
+            <p className="mt-2 text-xs font-normal leading-relaxed text-neutral-600 dark:text-neutral-400">
+              Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
+              experience — we scope edits to{" "}
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
+            </p>
             <textarea
               id={`daydream-${dateIso}`}
-              placeholder={`Describe your dream day’s vacation in ${dest} — Conci will make it reality…`}
+              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
               rows={5}
-              className="mt-4 w-full resize-y border-0 bg-transparent p-0 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 dark:text-neutral-200 dark:placeholder:text-neutral-500"
-              defaultValue=""
+              value={dreamText}
+              onChange={(e) => setDreamText(e.target.value)}
+              disabled={dreamBusy}
+              className="mt-4 w-full resize-y rounded-lg border border-neutral-900/15 bg-transparent px-2 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-white/15 dark:text-neutral-200 dark:placeholder:text-neutral-500"
             />
-          </label>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={dreamBusy || !dreamText.trim()}
+                onClick={() => void submitDayDream()}
+                className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white shadow-[2px_2px_0_0_rgba(0,0,0,0.12)] transition hover:bg-teal-500 disabled:pointer-events-none disabled:opacity-40 dark:shadow-black/40"
+              >
+                {dreamBusy ? "Updating day…" : "Update day with Copilot"}
+              </button>
+            </div>
+            {dreamErr ? (
+              <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
+                {dreamErr}
+              </p>
+            ) : null}
+            {dreamReply ? (
+              <p className="mt-4 rounded-xl border border-teal-200/70 bg-teal-50/80 px-3 py-3 text-sm text-teal-950 dark:border-teal-800/40 dark:bg-teal-950/35 dark:text-teal-50">
+                {dreamReply}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.06)] dark:border-white/15 dark:bg-dm-card">
@@ -202,26 +319,48 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
           </p>
           <div className="mt-4 flex justify-center gap-6">
             {prevIso ? (
-              <Link
-                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                aria-label="Previous day"
-              >
-                ‹
-              </Link>
+              onNavigateDay ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateDay(prevIso)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                  aria-label="Previous day"
+                >
+                  ‹
+                </button>
+              ) : (
+                <Link
+                  href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                  aria-label="Previous day"
+                >
+                  ‹
+                </Link>
+              )
             ) : (
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-slate-300 opacity-40 dark:text-neutral-600">
                 ‹
               </span>
             )}
             {nextIso ? (
-              <Link
-                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
-                aria-label="Next day"
-              >
-                ›
-              </Link>
+              onNavigateDay ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateDay(nextIso)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                  aria-label="Next day"
+                >
+                  ›
+                </button>
+              ) : (
+                <Link
+                  href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-900 bg-white text-lg font-bold text-neutral-900 transition hover:bg-[#ffb6d9]/25 dark:border-white/25 dark:bg-dm-card dark:text-white dark:hover:bg-white/10"
+                  aria-label="Next day"
+                >
+                  ›
+                </Link>
+              )
             ) : (
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-slate-300 opacity-40 dark:text-neutral-600">
                 ›

@@ -1,9 +1,21 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
-import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
+import { fetchTripHostDisplayName } from "@/backend/trip-host-profile";
+import { fetchTripMemberDisplayNames } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
+import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { TripHostSetupDashboard } from "@/frontend/components/trip-host-setup-dashboard";
+import {
+  buildJoinPageUrlWithCode,
+  buildTripShareInviteMessage,
+  publicSiteHostFromEnv,
+  publicSiteOriginFromEnv,
+  siteOriginFromRequestHeaders,
+} from "@/shared/trip-share-copy";
+import { parseCollabState } from "@/shared/collaboration";
 import { normalizePlan } from "@/shared/trip-plan";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
@@ -30,8 +42,7 @@ export default async function TripHostSetupPage({
       <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-slate-600 dark:bg-dm-page dark:text-neutral-400">
         <p className="mb-4">
           Trip setup needs{" "}
-          <code className="rounded bg-slate-100 px-1 dark:bg-dm-card dark:text-neutral-200">SUPABASE_SERVICE_ROLE_KEY</code>{" "}
-          on the server.
+          <code className="rounded bg-slate-100 px-1 dark:bg-dm-card dark:text-neutral-200">SUPABASE_SERVICE_ROLE_KEY</code> on the server.
         </p>
         <Link href="/trip-parser" className="font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400">
           Back to trip parser
@@ -45,22 +56,63 @@ export default async function TripHostSetupPage({
     notFound();
   }
 
-  const { data, error } = await svc.from("trip_plans").select("plan, status, seed_text").eq("id", id).maybeSingle();
+  const { data, error } = await svc
+    .from("trip_plans")
+    .select("plan, status, seed_text, invite_code, collab_state, user_id")
+    .eq("id", id)
+    .maybeSingle();
+
   if (error || !data?.plan) {
     notFound();
   }
 
-  const status = parseTripPlanStatus(data.status);
-  if (status !== "draft") {
-    redirect(`/trip/${id}`);
+  const plan = normalizePlan(data.plan);
+  const initialTripStatus = parseTripPlanStatus(data.status);
+  const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
+  const initialCollab = parseCollabState(data.collab_state);
+  const ownerId = typeof data.user_id === "string" ? data.user_id : null;
+
+  let memberNames: string[] = [];
+  try {
+    memberNames = await fetchTripMemberDisplayNames(svc, id, user.id);
+  } catch {
+    memberNames = [];
   }
 
-  const plan = normalizePlan(data.plan);
+  const creatorName = await fetchTripHostDisplayName(svc, ownerId);
+  const siteHost = publicSiteHostFromEnv();
+  const hdrs = await headers();
+  const siteOrigin = siteOriginFromRequestHeaders(hdrs) ?? publicSiteOriginFromEnv();
+  const tripTitle = plan.title?.trim() || "Trip";
+  const normalizedInvite = inviteRaw ? normalizeInviteCode(inviteRaw) : "";
+  const hasInvite = normalizedInvite.length === 6;
+  const inviteDisplay = hasInvite ? formatInviteCodeDisplay(inviteRaw) : "";
+  const shareMessage = hasInvite
+    ? buildTripShareInviteMessage({
+        creatorName,
+        tripTitle,
+        inviteCodeDisplay: inviteDisplay,
+        siteHost,
+        joinPageUrl: buildJoinPageUrlWithCode(siteOrigin, inviteDisplay),
+      })
+    : `${creatorName} invited you to plan ${tripTitle} 🗓️ Open ${siteOrigin}/join?from=create to enter your invite code, or view this trip while signed in:\n${siteOrigin}/trip/${id}`;
+
   const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
 
   return (
     <div className="min-h-screen bg-slate-50 py-6 text-slate-900 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
-      <TripHostSetupDashboard tripId={id} initialPlan={plan} seedText={seedText} />
+      <TripHostSetupDashboard
+        tripId={id}
+        initialPlan={plan}
+        seedText={seedText}
+        initialTripStatus={initialTripStatus}
+        inviteCode={inviteRaw || null}
+        shareMessage={shareMessage}
+        tripMemberNames={memberNames}
+        viewerUserId={user.id}
+        tripOwnerUserId={ownerId}
+        initialCollab={initialCollab}
+      />
     </div>
   );
 }
