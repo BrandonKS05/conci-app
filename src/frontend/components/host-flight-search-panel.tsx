@@ -148,6 +148,21 @@ function Paginator({
 
 type WizardStep = "form" | "outbound" | "return";
 
+function airlineMonogram(name: string): string {
+  const parts = name
+    .replace(/[^A-Za-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "FL";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
+function stopsLabel(stops: number): string {
+  if (stops <= 0) return "Nonstop";
+  return `${stops} stop${stops === 1 ? "" : "s"}`;
+}
+
 export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; enabled: boolean }) {
   const { ctx, ctxLoading } = useFlightSearchContext(tripId, enabled);
 
@@ -300,6 +315,60 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
     setRetPage(1);
   }, []);
 
+  const renderFlightCard = useCallback(
+    (f: FlightLegRowDto, selected: boolean, onSelect: () => void) => (
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`w-full overflow-hidden rounded-2xl border text-left transition ${
+          selected
+            ? "border-teal-500 bg-teal-50 dark:border-teal-500 dark:bg-teal-950/30"
+            : "border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated"
+        }`}
+      >
+        <div className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_auto] md:items-start">
+          <div className="min-w-0">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[11px] font-semibold tracking-wide text-slate-700 dark:border-white/15 dark:bg-white/5 dark:text-neutral-200">
+                {airlineMonogram(f.airline)}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[22px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+                  <span>{f.departureTime}</span>
+                  <span className="text-slate-400 dark:text-neutral-600">→</span>
+                  <span>{f.arrivalTime}</span>
+                </div>
+                <p className="mt-1 truncate text-sm text-slate-700 dark:text-neutral-300">
+                  {f.departureAirport} - {f.arrivalAirport}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-neutral-500">{f.airline}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-w-0 md:px-1">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-neutral-300">
+              <span className="whitespace-nowrap">{f.duration}</span>
+              <span className="h-px flex-1 bg-emerald-500/70 dark:bg-emerald-400/60" />
+              <span className="whitespace-nowrap text-emerald-700 dark:text-emerald-300">{stopsLabel(f.stops)}</span>
+            </div>
+          </div>
+
+          <div className="text-right md:min-w-[132px]">
+            <p className="text-[34px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{f.price}</p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-neutral-500">Roundtrip per traveler</p>
+          </div>
+        </div>
+        <div className="border-t border-slate-200/80 px-4 py-2 text-right dark:border-white/10">
+          <span className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline dark:text-neutral-400">
+            Flight details
+          </span>
+        </div>
+      </button>
+    ),
+    []
+  );
+
   if (!enabled) return null;
 
   return (
@@ -429,24 +498,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
                 const sel = pickOut?.id === f.id;
                 return (
                   <li key={f.id}>
-                    <button
-                      type="button"
-                      onClick={() => setPickOut(f)}
-                      className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm transition ${
-                        sel
-                          ? "border-teal-500 bg-teal-50 dark:border-teal-500 dark:bg-teal-950/30"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="font-medium text-slate-900 dark:text-neutral-100">{f.airline}</span>
-                        <span className="text-sm font-semibold text-teal-800 dark:text-teal-200">{f.price}</span>
-                      </div>
-                      <div className="mt-1 tabular-nums text-xs text-slate-600 dark:text-neutral-400">
-                        {f.departureTime} {f.departureAirport} → {f.arrivalTime} {f.arrivalAirport} · {f.duration} ·{" "}
-                        {f.stops === 0 ? "Nonstop" : `${f.stops} stop${f.stops === 1 ? "" : "s"}`}
-                      </div>
-                    </button>
+                    {renderFlightCard(f, sel, () => setPickOut(f))}
                   </li>
                 );
               })}
@@ -498,24 +550,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
                 const sel = pickRet?.id === f.id;
                 return (
                   <li key={f.id}>
-                    <button
-                      type="button"
-                      onClick={() => setPickRet(f)}
-                      className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm transition ${
-                        sel
-                          ? "border-teal-500 bg-teal-50 dark:border-teal-500 dark:bg-teal-950/30"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="font-medium text-slate-900 dark:text-neutral-100">{f.airline}</span>
-                        <span className="text-sm font-semibold text-teal-800 dark:text-teal-200">{f.price}</span>
-                      </div>
-                      <div className="mt-1 tabular-nums text-xs text-slate-600 dark:text-neutral-400">
-                        {f.departureTime} {f.departureAirport} → {f.arrivalTime} {f.arrivalAirport} · {f.duration} ·{" "}
-                        {f.stops === 0 ? "Nonstop" : `${f.stops} stop${f.stops === 1 ? "" : "s"}`}
-                      </div>
-                    </button>
+                    {renderFlightCard(f, sel, () => setPickRet(f))}
                   </li>
                 );
               })}
