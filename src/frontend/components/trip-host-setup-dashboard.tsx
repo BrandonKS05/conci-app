@@ -48,6 +48,7 @@ import {
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
+import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-panel";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -995,6 +996,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             <div className="mt-3">
               <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
             </div>
+          ) : null}
+          {hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
+            <HostFlightSearchPanel tripId={tripId} enabled />
           ) : null}
           {showFlightTransport ? (
             <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
