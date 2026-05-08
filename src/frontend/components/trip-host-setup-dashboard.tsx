@@ -662,14 +662,14 @@ export function TripHostSetupDashboard({
             Packing list
           </Link>
         </nav>
-        <div className="flex shrink-0 flex-col gap-2 sm:max-w-sm sm:text-right">
+        <div className="flex w-full shrink-0 flex-col items-start gap-2 sm:w-auto sm:max-w-xs sm:items-end sm:text-right">
           <Link
             href={`/trip/${tripId}/setup/overview`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500 sm:justify-end"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500"
           >
             Trip overview &amp; collaboration
           </Link>
-          <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+          <p className="max-w-[min(100%,17rem)] text-xs leading-relaxed text-slate-500 sm:max-w-[18rem] dark:text-neutral-500">
             Trip card, invites, deposits, spotlight votes, and group decisions moved here for a clearer calendar workspace.
           </p>
         </div>
