@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
 import {
@@ -8,12 +8,7 @@ import {
   flightLiveKey,
   restaurantLiveKey,
 } from "@/shared/itinerary-live-curation";
-import {
-  enumerateLocalIsoDays,
-  parseLocalIsoDate,
-  tripRangeBestEffortFromPlanDates,
-  type TripPlan,
-} from "@/shared/trip-plan";
+import { parseLocalIsoDate, type TripPlan } from "@/shared/trip-plan";
 import type { LiveExperienceCard, LiveFlightCard } from "@/shared/trip-live-recommendations";
 import type { RestaurantPick } from "@/shared/restaurants";
 

@@ -21,6 +21,7 @@ export async function fetchSubscriptionTierForUser(
 }
 
 /** Temporarily always true for testing — mirrors shared subscriptionTierCanCreateTrips bypass. */
-export function userCanCreateTrips(_tier: SubscriptionTier): boolean {
+export function userCanCreateTrips(tier: SubscriptionTier): boolean {
+  void tier;
   return true;
 }
