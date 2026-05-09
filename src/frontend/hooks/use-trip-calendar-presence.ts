@@ -167,13 +167,17 @@ async function waitForUserSession(
 
   return await new Promise((resolve) => {
     let done = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let subscription: { unsubscribe: () => void } | undefined;
 
     const finish = (value: { user: User; session: Session } | null) => {
       if (done) return;
       done = true;
-      clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
       try {
-        subscription.unsubscribe();
+        subscription?.unsubscribe();
       } catch {
         /* noop */
       }
@@ -190,9 +194,8 @@ async function waitForUserSession(
         finish({ user: session.user, session });
       }
     });
-    const subscription = data.subscription;
-
-    const timeoutId = setTimeout(() => finish(null), 10_000);
+    subscription = data.subscription;
+    timeoutId = setTimeout(() => finish(null), 10_000);
 
     void sb.auth.getSession().then(({ data: d }) => {
       if (cancelled() || done) return;
@@ -202,6 +205,9 @@ async function waitForUserSession(
     });
   });
 }
+
+/** Poll interval while tab is visible (5–10s range). */
+const PRESENCE_POLL_MS = 8000;
 
 /**
  * Google-Docs-style presence on the trip calendar: who's here + optional cell focus for indicators.
@@ -256,6 +262,26 @@ export function useTripCalendarPresence(
 
     let cancelled = false;
     let ch: RealtimeChannel | null = null;
+    let lastRealtimeOpen = sb.realtime.isConnected();
+
+    const runPresencePoll = () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const topicFull = presenceRealtimeTopic(tripId);
+      const live =
+        activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
+      const sid = selfIdRef.current;
+      const socketOpen = sb.realtime.isConnected();
+      if (live && sid) {
+        syncFromPresence(live, sid);
+      }
+      if (socketOpen && !lastRealtimeOpen) {
+        void trackRef();
+      }
+      lastRealtimeOpen = socketOpen;
+    };
+
+    const presencePollTimer = setInterval(runPresencePoll, PRESENCE_POLL_MS);
 
     void (async () => {
       const auth = await waitForUserSession(sb, () => cancelled);
@@ -339,9 +365,18 @@ export function useTripCalendarPresence(
 
     const onOnline = () => {
       void trackRef();
+      const topicFull = presenceRealtimeTopic(tripId);
+      const live =
+        activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
+      const sid = selfIdRef.current;
+      if (live && sid) {
+        syncFromPresence(live, sid);
+      }
+      lastRealtimeOpen = sb.realtime.isConnected();
     };
     const onVisible = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        lastRealtimeOpen = sb.realtime.isConnected();
         void trackRef();
         const topicFull = presenceRealtimeTopic(tripId);
         const live =
@@ -360,6 +395,7 @@ export function useTripCalendarPresence(
 
     return () => {
       cancelled = true;
+      clearInterval(presencePollTimer);
       if (typeof window !== "undefined") {
         window.removeEventListener("online", onOnline);
         document.removeEventListener("visibilitychange", onVisible);
