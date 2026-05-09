@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { DynamicTripItinerary } from "@/frontend/components/dynamic-trip-itinerary";
+import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 import { SiteShell } from "@/frontend/components/site-shell";
 import {
   concreteTripRangeFromPlanDates,
+  normalizePlan,
   parseLocalIsoDate,
   tripRangeBestEffortFromPlanDates,
   type TripPlan,
@@ -24,17 +26,33 @@ function rangeLabel(plan: TripPlan): string {
 }
 
 export function TripOverviewApp({ tripId, plan }: { tripId: string; plan: TripPlan }) {
+  const [livePlan, setLivePlan] = useState<TripPlan>(plan);
   const printRootRef = useRef<HTMLDivElement>(null);
+  const suppressRealtimeUntilRef = useRef(0);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfErr, setPdfErr] = useState<string | null>(null);
 
-  const datesLine = useMemo(() => rangeLabel(plan), [plan]);
-  const budgetLine = useMemo(
-    () => plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "Not set",
-    [plan.budget.perPerson, plan.budget.tier]
+  useTripWorkspaceRealtime(
+    tripId,
+    (row) => {
+      if (row.plan != null) {
+        try {
+          setLivePlan(normalizePlan(row.plan));
+        } catch {
+          /* ignore bad payload */
+        }
+      }
+    },
+    { enabled: true, suppressRealtimeUntilRef }
   );
-  const title = plan.title?.trim() || "Trip overview";
-  const location = plan.location?.trim() || "Location not set";
+
+  const datesLine = useMemo(() => rangeLabel(livePlan), [livePlan]);
+  const budgetLine = useMemo(
+    () => livePlan.budget.perPerson?.trim() || livePlan.budget.tier?.trim() || "Not set",
+    [livePlan.budget.perPerson, livePlan.budget.tier]
+  );
+  const title = livePlan.title?.trim() || "Trip overview";
+  const location = livePlan.location?.trim() || "Location not set";
 
   const downloadPdf = useCallback(async () => {
     const el = printRootRef.current;
@@ -103,7 +121,7 @@ export function TripOverviewApp({ tripId, plan }: { tripId: string; plan: TripPl
             </div>
           </section>
 
-          <DynamicTripItinerary plan={plan} />
+          <DynamicTripItinerary plan={livePlan} />
         </div>
       </div>
     </SiteShell>
