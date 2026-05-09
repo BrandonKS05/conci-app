@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import {
@@ -16,6 +16,15 @@ type Props = {
   /** Optional — use first plan-derived label if missing */
   locale?: string;
   initialPlan: TripPlan;
+};
+
+type ManualRestaurantResult = {
+  name: string;
+  mapsUrl: string;
+  address?: string;
+  photoUrl?: string | null;
+  rating?: number;
+  priceRange?: string;
 };
 
 function startOfDay(x: Date) {
@@ -99,8 +108,15 @@ function EmptyHint({ label }: { label: string }) {
 }
 
 export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: Props) {
-  const hostSetup = initialPlan.hostSetup;
-  const dest = initialPlan.location?.trim() || "Destination TBD";
+  const [plan, setPlan] = useState<TripPlan>(initialPlan);
+  const [restaurantQuery, setRestaurantQuery] = useState("");
+  const [restaurantResults, setRestaurantResults] = useState<ManualRestaurantResult[]>([]);
+  const [restaurantSearching, setRestaurantSearching] = useState(false);
+  const [restaurantSearchErr, setRestaurantSearchErr] = useState<string | null>(null);
+  const [addingMapsUrl, setAddingMapsUrl] = useState<string | null>(null);
+
+  const hostSetup = plan.hostSetup;
+  const dest = plan.location?.trim() || "Destination TBD";
 
   const formatted = useMemo(() => {
     const d = parseLocalIsoDate(dateIso);
@@ -129,6 +145,105 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
 
   const meals = (hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
   const activities = (hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+
+  const searchRestaurants = useCallback(async () => {
+    const q = restaurantQuery.trim();
+    if (q.length < 2) {
+      setRestaurantResults([]);
+      setRestaurantSearchErr("Type at least 2 characters to search.");
+      return;
+    }
+    setRestaurantSearching(true);
+    setRestaurantSearchErr(null);
+    try {
+      const res = await fetch("/api/places/maps-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          q,
+          locationHint: plan.location?.trim() || null,
+          start: 0,
+          limit: 8,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        places?: {
+          name?: string;
+          mapsUrl?: string;
+          address?: string;
+          photoUrl?: string | null;
+          rating?: number;
+          priceRange?: string;
+        }[];
+      };
+      if (!res.ok) {
+        setRestaurantResults([]);
+        setRestaurantSearchErr("Could not search restaurants right now.");
+        return;
+      }
+      const places = (j.places ?? []).filter((p) => typeof p?.name === "string" && typeof p?.mapsUrl === "string");
+      setRestaurantResults(
+        places.map((p) => ({
+          name: p.name!.trim(),
+          mapsUrl: p.mapsUrl!,
+          address: p.address,
+          photoUrl: p.photoUrl ?? null,
+          rating: typeof p.rating === "number" ? p.rating : undefined,
+          priceRange: p.priceRange,
+        }))
+      );
+    } catch {
+      setRestaurantResults([]);
+      setRestaurantSearchErr("Could not reach the server.");
+    } finally {
+      setRestaurantSearching(false);
+    }
+  }, [restaurantQuery, plan.location]);
+
+  const addRestaurantToDay = useCallback(
+    async (place: ManualRestaurantResult) => {
+      if (!place.mapsUrl) return;
+      const current = hostSetup?.restaurantPins ?? [];
+      if (current.some((p) => p.dateIso === dateIso && p.place.mapsUrl === place.mapsUrl && p.kept)) {
+        return;
+      }
+      setAddingMapsUrl(place.mapsUrl);
+      const nextPins = [
+        ...current,
+        {
+          dateIso,
+          kept: true,
+          place: {
+            name: place.name,
+            mapsUrl: place.mapsUrl,
+            address: place.address,
+            photoUrl: place.photoUrl ?? null,
+            rating: place.rating,
+            priceRange: place.priceRange,
+            spotlightCategory: "restaurant" as const,
+          },
+        },
+      ];
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hostSetup: { restaurantPins: nextPins } }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { plan?: TripPlan; error?: string };
+        if (!res.ok || !j.plan) {
+          setRestaurantSearchErr(typeof j.error === "string" ? j.error : "Could not save restaurant pin.");
+          return;
+        }
+        setPlan(j.plan);
+      } catch {
+        setRestaurantSearchErr("Could not save restaurant pin.");
+      } finally {
+        setAddingMapsUrl(null);
+      }
+    },
+    [dateIso, hostSetup?.restaurantPins, tripId]
+  );
 
   const scheduleItems = useMemo(() => {
     const rows: { key: string; label: string; sub: string; href?: string }[] = [];
@@ -352,6 +467,68 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
         </DropSection>
 
         <DropSection title="Restaurants" subtitle="Catered to your group's taste" sectionId="day-restaurants">
+          <div className="mb-4 rounded-xl border border-neutral-900/10 bg-neutral-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-neutral-700 dark:text-neutral-300">Manual search</p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={restaurantQuery}
+                onChange={(e) => setRestaurantQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void searchRestaurants();
+                  }
+                }}
+                placeholder={`Search restaurants in ${dest}`}
+                className="w-full rounded-lg border border-neutral-900/20 bg-white px-3 py-2 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-[#e91e8c] dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100"
+              />
+              <button
+                type="button"
+                onClick={() => void searchRestaurants()}
+                disabled={restaurantSearching}
+                className="rounded-lg border border-neutral-900/20 bg-white px-3 py-2 text-sm font-bold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-50 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/10"
+              >
+                {restaurantSearching ? "Searching…" : "Search"}
+              </button>
+            </div>
+            {restaurantSearchErr ? <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{restaurantSearchErr}</p> : null}
+            {restaurantResults.length ? (
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {restaurantResults.map((p) => {
+                  const alreadyAdded = meals.some((m) => m.place.mapsUrl === p.mapsUrl);
+                  return (
+                    <li
+                      key={p.mapsUrl}
+                      className="rounded-lg border border-neutral-900/10 bg-white px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
+                    >
+                      <p className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{p.name}</p>
+                      {p.address ? <p className="mt-1 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{p.address}</p> : null}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <a
+                          href={p.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
+                        >
+                          Open in Maps
+                        </a>
+                        <button
+                          type="button"
+                          disabled={alreadyAdded || addingMapsUrl === p.mapsUrl}
+                          onClick={() => void addRestaurantToDay(p)}
+                          className="rounded-full border border-neutral-900/20 px-2.5 py-1 text-[11px] font-bold text-neutral-900 disabled:opacity-50 dark:border-white/15 dark:text-neutral-100"
+                        >
+                          {alreadyAdded ? "Added" : addingMapsUrl === p.mapsUrl ? "Adding…" : "Add to this day"}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+
           {meals.length === 0 ? (
             <EmptyHint label="No restaurant pins yet for this day." />
           ) : (
