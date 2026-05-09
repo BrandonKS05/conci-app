@@ -55,6 +55,9 @@ type BasePresence = {
   avatarUrl: string | null;
 };
 
+/** Temporary: remove after presence debugging. Filter console with `[trip-cal-presence]`. */
+const DBG = "[trip-cal-presence]";
+
 /**
  * Google-Docs-style presence on the trip calendar: who's here + optional cell focus for indicators.
  */
@@ -104,13 +107,23 @@ export function useTripCalendarPresence(
         });
       }
     }
+    console.log(DBG, "peers state updated", {
+      count: out.length,
+      peers: out.map((p) => ({ userId: p.userId, name: p.name, focus: p.focusCellIso })),
+    });
     setPeers(out);
   }, []);
 
   useEffect(() => {
-    if (!enabled || !tripId) return undefined;
+    if (!enabled || !tripId) {
+      console.log(DBG, "hook disabled or no tripId", { enabled, tripId });
+      return undefined;
+    }
     const sb = getSupabaseClient();
-    if (!sb) return undefined;
+    if (!sb) {
+      console.warn(DBG, "no Supabase browser client — presence disabled");
+      return undefined;
+    }
 
     let cancelled = false;
     let ch: RealtimeChannel | null = null;
@@ -120,7 +133,10 @@ export function useTripCalendarPresence(
         data: { session },
       } = await sb.auth.getSession();
       const user = session?.user;
-      if (!user || cancelled) return;
+      if (!user || cancelled) {
+        console.warn(DBG, "no auth session — cannot join presence channel", { cancelled });
+        return;
+      }
 
       selfIdRef.current = user.id;
       const meta = user.user_metadata as Record<string, unknown> | undefined;
@@ -140,21 +156,38 @@ export function useTripCalendarPresence(
         avatarUrl,
       };
 
+      const channelName = `presence:trip-cal:${tripId}`;
+      console.log(DBG, "joining presence channel", { channelName, selfUserId: user.id });
+
       ch = sb
-        .channel(`presence:trip-cal:${tripId}`, {
+        .channel(channelName, {
           config: { presence: { key: user.id } },
         })
         .on("presence", { event: "sync" }, () => {
+          console.log(DBG, "presence event: sync");
           if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "join" }, () => {
+        .on("presence", { event: "join" }, (payload) => {
+          console.log(DBG, "presence event: join", payload);
           if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "leave" }, () => {
+        .on("presence", { event: "leave" }, (payload) => {
+          console.log(DBG, "presence event: leave", payload);
           if (ch) syncFromPresence(ch, user.id);
         })
-        .subscribe(async (status) => {
-          if (status !== "SUBSCRIBED" || cancelled || !ch) return;
+        .subscribe(async (status, err) => {
+          console.log(DBG, "channel subscribe callback", {
+            status,
+            err: err?.message ?? err ?? null,
+            channel: channelName,
+            tripId,
+          });
+          if (status !== "SUBSCRIBED" || cancelled || !ch) {
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+              console.warn(DBG, "presence channel not SUBSCRIBED", { status, err });
+            }
+            return;
+          }
           channelRef.current = ch;
           activeChannelRef.current = ch;
           const track = buildTrackPayload({
@@ -167,11 +200,21 @@ export function useTripCalendarPresence(
             viewYear: calendarYear,
             viewMonth0: calendarMonth0,
           });
-          await ch.track(track);
+          try {
+            const trackStatus = await ch.track(track);
+            console.log(DBG, "subscribed + track() finished", {
+              channel: channelName,
+              trackStatus,
+              payloadPreview: { name: track.name, view: `${calendarYear}-${calendarMonth0}` },
+            });
+          } catch (e) {
+            console.error(DBG, "track() failed", e);
+          }
         });
     })();
 
     return () => {
+      console.log(DBG, "cleanup: removing presence channel", { tripId });
       cancelled = true;
       const toRemove = activeChannelRef.current;
       activeChannelRef.current = null;
