@@ -63,9 +63,7 @@ import {
 } from "@/frontend/components/dates-vote-calendar";
 import { HostTripMemberEmailModal } from "@/frontend/components/host-trip-member-email-modal";
 import {
-  CuratedExperiencesSection,
   CuratedFlightsRows,
-  CuratedRestaurantsSection,
   HostLiveScheduleByDay,
   LiveCurationErrorBanner,
   useLiveCurationMutation,
@@ -935,8 +933,6 @@ function TripPlanLiveBlocks({
   isHost: boolean;
 }) {
   const { mutate, busyKey, err, setErr } = useLiveCurationMutation(tripId, onPlanUpdated);
-  const showRestaurants = Boolean(plan.location?.trim());
-  const showExperiences = Boolean(plan.location?.trim());
   const showTransport =
     Boolean(plan.departureCity?.trim()) && Boolean(plan.location?.trim());
 
@@ -1018,31 +1014,6 @@ function TripPlanLiveBlocks({
         </section>
       ) : null}
 
-      {showRestaurants ? (
-        <CuratedRestaurantsSection
-          plan={plan}
-          restaurants={restaurants}
-          liveLoading={liveLoading}
-          restaurantsError={liveData?.restaurantsError ?? null}
-          mutate={(a, k, d) => void mutate(a, k, d)}
-          busyKey={busyKey}
-          isHost={isHost}
-          tripDays={tripDayOptions}
-        />
-      ) : null}
-
-      {showExperiences ? (
-        <CuratedExperiencesSection
-          plan={plan}
-          experiences={experiences}
-          liveLoading={liveLoading}
-          experiencesError={liveData?.experiencesError ?? null}
-          mutate={(a, k, d) => void mutate(a, k, d)}
-          busyKey={busyKey}
-          isHost={isHost}
-          tripDays={tripDayOptions}
-        />
-      ) : null}
     </div>
   );
 }
