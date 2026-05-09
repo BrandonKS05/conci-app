@@ -208,8 +208,8 @@ async function waitForUserSession(
   });
 }
 
-/** Poll interval while tab is visible (5–10s range). */
-const PRESENCE_POLL_MS = 8000;
+/** Poll interval to resync presence and catch reconnects (runs while session is mounted). */
+const PRESENCE_POLL_MS = 2000;
 
 /**
  * Google-Docs-style presence on the trip calendar: who's here + optional cell focus for indicators.
@@ -268,7 +268,6 @@ export function useTripCalendarPresence(
 
     const runPresencePoll = () => {
       if (cancelled) return;
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       const topicFull = presenceRealtimeTopic(tripId);
       const live =
         activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
@@ -376,23 +375,25 @@ export function useTripCalendarPresence(
       }
       lastRealtimeOpen = sb.realtime.isConnected();
     };
-    const onVisible = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        lastRealtimeOpen = sb.realtime.isConnected();
-        void trackRef();
-        const topicFull = presenceRealtimeTopic(tripId);
-        const live =
-          activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
-        const sid = selfIdRef.current;
-        if (live && sid) {
-          syncFromPresence(live, sid);
-        }
+    const onVisibilityChange = () => {
+      if (typeof document === "undefined") return;
+      const topicFull = presenceRealtimeTopic(tripId);
+      const live =
+        activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
+      const sid = selfIdRef.current;
+
+      lastRealtimeOpen = sb.realtime.isConnected();
+      // Keep presence keyed to the browser session: refresh when foregrounded *and*
+      // when backgrounded so peers do not rely on timers that may throttle while hidden.
+      void trackRef();
+      if (live && sid) {
+        syncFromPresence(live, sid);
       }
     };
 
     if (typeof window !== "undefined") {
       window.addEventListener("online", onOnline);
-      document.addEventListener("visibilitychange", onVisible);
+      document.addEventListener("visibilitychange", onVisibilityChange);
     }
 
     return () => {
@@ -400,7 +401,7 @@ export function useTripCalendarPresence(
       clearInterval(presencePollTimer);
       if (typeof window !== "undefined") {
         window.removeEventListener("online", onOnline);
-        document.removeEventListener("visibilitychange", onVisible);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
       }
       const topicFull = presenceRealtimeTopic(tripId);
       const toRemove =
