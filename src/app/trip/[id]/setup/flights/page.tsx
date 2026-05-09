@@ -6,6 +6,7 @@ import { resolveDestinationAirportId, searchFlightsOneWayLeg, tripPlannerAdults 
 import { TripHostFlightsPage } from "@/frontend/components/trip-host-flights-page";
 import { CABIN_TO_TRAVEL_CLASS, type CabinClass } from "@/shared/flight-search";
 import { hostHasConcreteTripRange, normalizePlan } from "@/shared/trip-plan";
+import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
 const CABINS = new Set<CabinClass>(["economy", "premium_economy", "business", "first"]);
@@ -38,7 +39,8 @@ export default async function TripHostFlightsSetupPage({
   if (!access?.isHost) notFound();
 
   const { data, error } = await svc.from("trip_plans").select("plan, status").eq("id", id).maybeSingle();
-  if (error || !data?.plan || data.status !== "draft") notFound();
+  if (error || !data?.plan) notFound();
+  if (parseTripPlanStatus(data.status) === "finalized") notFound();
 
   const q = await searchParams;
   const originId = asSingle(q.originId).trim();

@@ -79,8 +79,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  if (row.status !== "draft") {
-    return NextResponse.json({ error: "This trip is already published." }, { status: 409 });
+  if (row.status === "finalized") {
+    return NextResponse.json({ error: "This trip is finalized — setup cannot be changed here." }, { status: 409 });
   }
 
   const planObj = typeof row.plan === "object" && row.plan !== null ? (row.plan as Record<string, unknown>) : {};

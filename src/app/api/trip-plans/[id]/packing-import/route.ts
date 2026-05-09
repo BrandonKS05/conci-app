@@ -98,8 +98,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (rowErr || !row) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
-  if (row.status !== "draft") {
-    return NextResponse.json({ error: "This trip is already published." }, { status: 409 });
+  if (row.status === "finalized") {
+    return NextResponse.json({ error: "This trip is finalized — packing import is locked." }, { status: 409 });
   }
 
   let form: FormData;

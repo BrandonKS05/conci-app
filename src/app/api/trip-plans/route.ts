@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     id?: string;
     plan?: unknown;
     seedText?: string | null;
-    /** When true: save as draft without minting an invite (host setup dashboard next). */
+    /** When true: first save from parser → host setup hydrate (still mints invite + voting status). */
     hostSetupDraft?: boolean;
   };
 
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     existingCode?.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6) ?? null;
   if (codeToSave && codeToSave.length !== 6) codeToSave = null;
 
-  if (!codeToSave && !hostSetupDraft && !finalized) {
+  if (!codeToSave && !finalized) {
     try {
       const raw = await allocateUniqueInviteCode(svc);
       codeToSave = String(raw).replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
@@ -102,13 +102,12 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!hostSetupDraft && !finalized && (!codeToSave || codeToSave.length !== 6)) {
+  if (!finalized && (!codeToSave || codeToSave.length !== 6)) {
     console.error("[trip-plans POST] invalid invite_code after normalize:", codeToSave);
     return NextResponse.json({ error: "Invalid invite code state." }, { status: 500 });
   }
 
-  const nextStatus =
-    finalized ? "finalized" : hostSetupDraft ? "draft" : "voting";
+  const nextStatus = finalized ? "finalized" : "voting";
 
   let planForSave = normalizedPlan;
   if (hostSetupDraft) {

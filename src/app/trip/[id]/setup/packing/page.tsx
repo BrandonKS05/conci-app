@@ -53,7 +53,7 @@ export default async function TripHostPackingSetupPage({
   }
 
   const status = parseTripPlanStatus(data.status);
-  if (status !== "draft") {
+  if (status === "finalized") {
     redirect(`/trip/${id}`);
   }
 

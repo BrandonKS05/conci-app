@@ -14,8 +14,6 @@ import {
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
   hotelStayForDay,
-  isHostPublishReady,
-  normalizePlan,
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
@@ -178,8 +176,35 @@ export function TripHostSetupDashboard({
     setEffectiveTripStatus(initialTripStatus);
   }, [initialTripStatus]);
 
+  const [resolvedInviteCode, setResolvedInviteCode] = useState<string | null>(inviteCode);
+  useEffect(() => {
+    setResolvedInviteCode(inviteCode);
+  }, [inviteCode]);
+
+  useEffect(() => {
+    if (resolvedInviteCode) return;
+    let cancelled = false;
+    void (async () => {
+      const r = await fetch(`/api/trip-plans/${tripId}/mint-invite`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = (await r.json().catch(() => ({}))) as {
+        inviteCode?: string;
+        ok?: boolean;
+        alreadyHad?: boolean;
+      };
+      if (cancelled || !r.ok || !j.inviteCode) return;
+      setResolvedInviteCode(j.inviteCode);
+      if (!j.alreadyHad) setEffectiveTripStatus("voting");
+      router.refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedInviteCode, tripId, router]);
+
   const hostSetup = useMemo(() => plan.hostSetup ?? {}, [plan.hostSetup]);
-  const [publishBusy, setPublishBusy] = useState(false);
   const [budgetLine, setBudgetLine] = useState(
     () =>
       initialPlan.budget.perPerson?.trim() ||
@@ -555,8 +580,6 @@ export function TripHostSetupDashboard({
     [hostSetup.activityPins, persistHostSetup, selectedDayIso]
   );
 
-  const pubReady = isHostPublishReady(plan);
-
   const onCopilotResult = useCallback((nextPlan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => {
     if (applied) {
       setPlan(nextPlan);
@@ -581,30 +604,6 @@ export function TripHostSetupDashboard({
       });
     }
   }, []);
-
-  const onPublish = useCallback(async () => {
-    if (!pubReady) return;
-    setPublishBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch(`/api/trip-plans/${tripId}/publish`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const j = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean; plan?: TripPlan };
-      if (!res.ok) {
-        setErr(j.error || "Publish failed.");
-        return;
-      }
-      if (j.plan) {
-        setPlan(normalizePlan(j.plan));
-      }
-      setEffectiveTripStatus("voting");
-      router.refresh();
-    } finally {
-      setPublishBusy(false);
-    }
-  }, [pubReady, tripId, router]);
 
   const cells = useMemo(() => calendarCellsMondayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
@@ -678,7 +677,7 @@ export function TripHostSetupDashboard({
     <>
     <SiteShell
       title={plan.title?.trim() || "Trip"}
-      eyebrow={effectiveTripStatus === "draft" ? "Host setup" : "Your trip"}
+      eyebrow={effectiveTripStatus === "finalized" ? "Your trip" : "Host setup"}
       tripTypography
       contentWide
     >
@@ -718,26 +717,24 @@ export function TripHostSetupDashboard({
               </div>
               <div className="mb-6">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Join code · invite people</p>
-                {inviteCode ? (
-                  <InviteCodeRow rawCode={inviteCode} prominent />
+                {resolvedInviteCode ? (
+                  <InviteCodeRow rawCode={resolvedInviteCode} prominent />
                 ) : (
                   <div className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-neutral-300">
                     <p>
-                      A 6-character join code is issued when you{" "}
-                      <strong className="font-semibold text-white">publish</strong> this trip. Guests enter it on{" "}
+                      Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
                       <Link
                         href="/join?from=create"
                         className="font-medium text-teal-400 underline-offset-2 hover:underline"
                       >
                         Join a Trip
                       </Link>
-                      . You can also copy a full invite from <span className="text-neutral-200">Share trip</span> in the trip
-                      card section below.
+                      . Full share text is under <span className="text-neutral-200">Share trip</span> in the trip card below.
                     </p>
                   </div>
                 )}
-                {inviteCode ? (
-                  <p className="mt-2 text-xs text-neutral-500">Guests sign in and enter this code on Join a Trip to join your draft.</p>
+                {resolvedInviteCode ? (
+                  <p className="mt-2 text-xs text-neutral-500">Guests sign in and enter this code on Join a Trip.</p>
                 ) : null}
               </div>
               <div className="mb-6 rounded-2xl border border-teal-500/30 bg-teal-950/25 p-4 sm:p-5">
@@ -847,20 +844,6 @@ export function TripHostSetupDashboard({
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
-                {effectiveTripStatus === "draft" ? (
-                  <button
-                    type="button"
-                    disabled={!pubReady || publishBusy}
-                    onClick={() => void onPublish()}
-                    className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500 sm:px-4 sm:py-2 sm:text-sm dark:disabled:bg-neutral-700 dark:disabled:text-neutral-500"
-                  >
-                    {publishBusy ? "Publishing…" : "Publish trip"}
-                  </button>
-                ) : (
-                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 sm:px-4 sm:py-2 sm:text-sm">
-                    Published · join code above
-                  </span>
-                )}
               </div>
             </div>
 
@@ -1039,7 +1022,7 @@ export function TripHostSetupDashboard({
 
             {!hostHasConcreteTripRange(plan) ? (
               <p className="border-t border-slate-100 bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-white/10 dark:bg-amber-950/40 dark:text-amber-100">
-                Choose a trip range — two taps on the calendar — before you can publish.
+                Choose a trip range — two taps on the calendar — to anchor your plan and invites.
               </p>
             ) : null}
             {err ? (
@@ -1061,7 +1044,7 @@ export function TripHostSetupDashboard({
               <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
           <p className="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-400">
             Live fare rows from Google Flights (SerpApi). Once your trip lists a departure city and destination, you can add
-            options to the published itinerary the same way as after publish — tap <strong className="text-slate-800 dark:text-neutral-200">Add to trip</strong>{" "}
+            options to the group itinerary — tap <strong className="text-slate-800 dark:text-neutral-200">Add to trip</strong>{" "}
             for the flights you want the group to see.
           </p>
           {liveFetchErr ? (
@@ -1247,7 +1230,7 @@ export function TripHostSetupDashboard({
                 plan={plan}
                 tripStatus={effectiveTripStatus}
                 onPlanUpdated={setPlan}
-                inviteCode={inviteCode}
+                inviteCode={resolvedInviteCode}
                 shareMessage={shareMessage}
                 tripMemberNames={tripMemberNames}
                 viewerUserId={viewerUserId}
