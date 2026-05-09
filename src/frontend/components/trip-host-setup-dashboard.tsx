@@ -58,6 +58,7 @@ import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration
 import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -715,6 +716,30 @@ export function TripHostSetupDashboard({
                   <TripContributeButton tripId={tripId} />
                 </div>
               </div>
+              <div className="mb-6">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Join code · invite people</p>
+                {inviteCode ? (
+                  <InviteCodeRow rawCode={inviteCode} prominent />
+                ) : (
+                  <div className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-neutral-300">
+                    <p>
+                      A 6-character join code is issued when you{" "}
+                      <strong className="font-semibold text-white">publish</strong> this trip. Guests enter it on{" "}
+                      <Link
+                        href="/join?from=create"
+                        className="font-medium text-teal-400 underline-offset-2 hover:underline"
+                      >
+                        Join a Trip
+                      </Link>
+                      . You can also copy a full invite from <span className="text-neutral-200">Share trip</span> in the trip
+                      card section below.
+                    </p>
+                  </div>
+                )}
+                {inviteCode ? (
+                  <p className="mt-2 text-xs text-neutral-500">Guests sign in and enter this code on Join a Trip to join your draft.</p>
+                ) : null}
+              </div>
               <div className="mb-6 rounded-2xl border border-teal-500/30 bg-teal-950/25 p-4 sm:p-5">
                 <h3 className="font-display text-base font-semibold text-white">Which dates work for you?</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">
@@ -833,7 +858,7 @@ export function TripHostSetupDashboard({
                   </button>
                 ) : (
                   <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 sm:px-4 sm:py-2 sm:text-sm">
-                    Published · invite in sidebar
+                    Published · join code above
                   </span>
                 )}
               </div>
