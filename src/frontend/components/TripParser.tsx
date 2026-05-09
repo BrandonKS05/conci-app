@@ -217,7 +217,6 @@ type ChatMessage = {
 export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [tripName, setTripName] = useState("");
   const [composerText, setComposerText] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [slots, setSlots] = useState<Partial<Record<SlotKey, string>>>({});
@@ -246,8 +245,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   const threadRef = useRef<HTMLDivElement>(null);
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
-  /** When set, overrides LLM `title` on every parse in this flow (empty = use model title). */
-  const fixedTripTitleRef = useRef<string | null>(null);
   const persistClientId = useRef<string>(generateTripPersistId());
   const placePickResolverRef = useRef<(() => void) | null>(null);
   const draftSpotlightsRef = useRef<PlaceSpotlight[]>([]);
@@ -511,10 +508,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         trimmed
       );
       plan = applyUserAnchoredTripDates(plan, inputForRetain);
-      const fixed = fixedTripTitleRef.current?.trim();
-      if (fixed) {
-        plan = { ...plan, title: fixed };
-      }
       return plan;
     },
     [anthropicApiKey]
@@ -634,15 +627,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const imageUrlsSnapshot = imageSlots.map((s) => s.dataUrl);
     if ((!text && imageUrlsSnapshot.length === 0) || phase !== "chat" || seedMessage) return;
 
-    const nameTrim = tripName.trim();
-    if (!nameTrim) {
-      setError("Add a trip name above before you send.");
-      return;
-    }
-
     if (!imageUrlsSnapshot.length && looksLikeMeaninglessTripSeed(text)) {
       setError(null);
-      const userBubbleText = `${nameTrim}\n\n${text}`.trim();
+      const userBubbleText = text.trim() || "Attached images";
       setMessages((prev) => [
         ...prev,
         { id: newId(), role: "user", text: userBubbleText },
@@ -652,12 +639,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     }
 
     setError(null);
-    fixedTripTitleRef.current = nameTrim;
 
     const seed = text || "(Trip details from attached images)";
     const msgId = newId();
     setSeedMessage(seed);
-    setTripName("");
     setComposerText("");
     setImageSlots([]);
     setSlots({});
@@ -669,15 +654,14 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     const imgNote = imageUrlsSnapshot.length
       ? `\n[${imageUrlsSnapshot.length} reference image${imageUrlsSnapshot.length > 1 ? "s" : ""}]`
       : "";
-    const userBubbleText = nameTrim ? `${nameTrim}\n\n${text}${imgNote}` : `${text}${imgNote}`.trim() || "Attached images";
+    const userBubbleText = `${text}${imgNote}`.trim() || "Attached images";
     setMessages((prev) => [...prev, { id: msgId, role: "user", text: userBubbleText }]);
 
     void (async () => {
       setPrefetchingSlots(true);
       setError(null);
       const locHint = (slots.location || "").trim();
-      // Venue detection runs only on the trip details message — not the trip title. Titles like
-      // "Visit Miami" or "Try Chicago" would otherwise match place-candidate triggers and show bogus cards.
+      // Venue detection runs only on the trip details message from the user.
       const placeSearchText = text.trim();
       try {
         const [placeJson, plan] = await Promise.all([
@@ -972,8 +956,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   }
 
   function resetTrip() {
-    fixedTripTitleRef.current = null;
-    setTripName("");
     setComposerText("");
     setMessages([]);
     setSlots({});
@@ -1257,14 +1239,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         >
           <div className="rounded-[1.2rem] bg-white p-4 sm:p-5 dark:bg-[#1e1e1e]">
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={(e) => void onPickImages(e.target.files)} />
-            <input
-              type="text"
-              value={tripName}
-              onChange={(e) => setTripName(e.target.value)}
-              placeholder="Trip name (required)"
-              autoComplete="off"
-              className="mb-3 w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
-            />
             <textarea
               value={composerText}
               onChange={(e) => setComposerText(e.target.value)}
@@ -1328,7 +1302,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               </div>
               <button
                 type="submit"
-                disabled={(!composerText.trim() && imageSlots.length === 0) || !tripName.trim()}
+                disabled={!composerText.trim() && imageSlots.length === 0}
                 className={`rounded-full px-6 py-2 text-sm disabled:cursor-not-allowed ${primaryFilledInteractive}`}
               >
                 Send

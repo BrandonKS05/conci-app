@@ -55,6 +55,7 @@ import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-hos
 import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
+import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -69,6 +70,9 @@ type Props = {
   initialCollab: CollabStateV1;
   viewerUserId: string;
   tripOwnerUserId: string | null;
+  inviteCode: string | null;
+  shareMessage: string;
+  tripMemberNames: string[];
 };
 
 function daysInMonth(y: number, m0: number): number {
@@ -150,6 +154,9 @@ export function TripHostSetupDashboard({
   initialCollab,
   viewerUserId,
   tripOwnerUserId,
+  inviteCode,
+  shareMessage,
+  tripMemberNames,
 }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
@@ -634,11 +641,15 @@ export function TripHostSetupDashboard({
   const chatSeed = initialCollab.cardChat?.messages ?? [];
 
   const resolveWorkspaceNavHref = useCallback(
-    (id: HostSetupNavItemId): string =>
-      id === "collab-sidebar"
-        ? `/trip/${tripId}/setup/overview#sec-collab-sidebar`
-        : `#sec-${id}`,
-    [tripId]
+    (navId: HostSetupNavItemId): string =>
+      navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
+    []
+  );
+
+  const resolveSidebarNavHref = useCallback(
+    (navId: HostSetupNavItemId): string =>
+      navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
+    []
   );
 
   return (
@@ -649,7 +660,7 @@ export function TripHostSetupDashboard({
       tripTypography
     >
       <div className="mx-auto w-full max-w-5xl pb-14">
-      <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+      <div className="mb-10 border-b border-slate-200 pb-8 dark:border-white/10">
         <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
           {HOST_SETUP_NAV_ITEMS.map((item) => (
             <a
@@ -669,17 +680,6 @@ export function TripHostSetupDashboard({
             Packing list
           </Link>
         </nav>
-        <div className="flex w-full shrink-0 flex-col items-start gap-2 sm:w-auto sm:max-w-xs sm:items-end sm:text-right">
-          <Link
-            href={`/trip/${tripId}/setup/overview`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500"
-          >
-            Trip overview &amp; collaboration
-          </Link>
-          <p className="max-w-[min(100%,17rem)] text-xs leading-relaxed text-slate-500 sm:max-w-[18rem] dark:text-neutral-500">
-            Trip card, invites, deposits, spotlight votes, and group decisions moved here for a clearer calendar workspace.
-          </p>
-        </div>
       </div>
 
       <div className="space-y-12">
@@ -1136,6 +1136,34 @@ export function TripHostSetupDashboard({
               onPlanReplaced={setPlan}
               onCollabBump={bumpCollab}
             />
+          </div>
+        </section>
+
+        <section className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Trip card, sharing &amp; group decisions
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Invites, deposits, spotlight votes, and open decisions — on the same workspace as your calendar.
+            </p>
+            <div className="mt-6">
+              <TripHostSetupSidebar
+                tripId={tripId}
+                plan={plan}
+                tripStatus={effectiveTripStatus}
+                onPlanUpdated={setPlan}
+                inviteCode={inviteCode}
+                shareMessage={shareMessage}
+                tripMemberNames={tripMemberNames}
+                viewerUserId={viewerUserId}
+                tripOwnerUserId={tripOwnerUserId}
+                initialCollab={initialCollab}
+                collabRefreshSignal={collabRefreshSignal}
+                bumpCollab={bumpCollab}
+                resolveNavHref={resolveSidebarNavHref}
+              />
+            </div>
           </div>
         </section>
 

@@ -9,6 +9,9 @@ import {
   demoTripDateSet,
   getDemoDayPlan,
 } from "@/frontend/demo/cancun-trip-calendar-data";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
+import { isUuid } from "@/shared/is-uuid";
 import { primaryFilledInteractive, primaryFocusRing } from "@/frontend/ui/primary-action";
 
 const MONTH_LABELS = [
@@ -260,7 +263,58 @@ export function CalendarDayStandalone({ dateParam }: { dateParam: string | null 
   );
 }
 
-export function TripCalendarDemoPage() {
+function CalendarTripFundFallback() {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="inline-flex items-center gap-2.5 rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm shadow-sm">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <rect x="2" y="3" width="12" height="10" rx="2" />
+            <path d="M2 7h12" />
+            <path d="M5.5 10h2" />
+          </svg>
+        </span>
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-xs text-neutral-500">Trip fund</span>
+          <span className="font-semibold text-neutral-100">$0</span>
+        </span>
+        <span className="ml-1 text-xs text-neutral-600">demo</span>
+      </div>
+      <Link
+        href="/trip-parser"
+        className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] dark:bg-emerald-500 dark:hover:bg-emerald-600"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M8 5v6M5 8h6" />
+        </svg>
+        Contribute
+      </Link>
+    </div>
+  );
+}
+
+export function TripCalendarDemoPage({ linkedTripId = null }: { linkedTripId?: string | null }) {
   const tripDates = useMemo(() => demoTripDateSet(), []);
   const initialMonth = useMemo(() => ({ y: 2026, m0: 11 }), []);
 
@@ -275,6 +329,7 @@ export function TripCalendarDemoPage() {
     seating: "No airline preference logged yet",
     pacing: "One slow morning + one nightlife night",
   });
+  const [availabilityNote, setAvailabilityNote] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([
     {
@@ -339,6 +394,35 @@ export function TripCalendarDemoPage() {
                   Next
                 </button>
               </div>
+            </div>
+
+            <div className="mt-5">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Trip fund</p>
+              {linkedTripId && isUuid(linkedTripId) ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <TripDepositTracker tripId={linkedTripId} />
+                  <TripContributeButton tripId={linkedTripId} />
+                </div>
+              ) : (
+                <CalendarTripFundFallback />
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-teal-500/30 bg-teal-950/25 p-4 sm:p-5">
+              <h3 className="font-display text-base font-semibold text-white">Which dates work for you?</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">
+                Note when everyone&apos;s free or what to avoid — keep it next to the calendar while you compare with trip days.
+              </p>
+              <label className="mt-3 block">
+                <span className="sr-only">Availability</span>
+                <textarea
+                  value={availabilityNote}
+                  onChange={(e) => setAvailabilityNote(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Prefer long weekend · avoid New Year’s week…"
+                  className="w-full resize-y rounded-xl border border-white/15 bg-black/35 px-3 py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-teal-500/45"
+                />
+              </label>
             </div>
 
             <div className="mt-6 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500 sm:text-xs">
