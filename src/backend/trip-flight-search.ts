@@ -220,6 +220,29 @@ export async function searchFlightsOneWayLeg(args: {
 
     const flights = pool.slice(0, 60).map((row, idx) => rowFromFlightOption(row, idx));
 
+    if (flights.length > 0 && pool.length > 0) {
+      const sampleRaw = pool[0]!;
+      const sample = {
+        booking_token:
+          typeof sampleRaw.booking_token === "string"
+            ? `${sampleRaw.booking_token.slice(0, 40)}...`
+            : null,
+        link: typeof sampleRaw.link === "string" ? sampleRaw.link : null,
+      };
+      const sampleBuilt = flights[0]!;
+      console.info("[flight-search] sample-booking-url", {
+        route: `${departureAirportId}->${arrivalAirportId}`,
+        dateIso: iso,
+        raw: sample,
+        generatedBookUrl: sampleBuilt.bookUrl,
+      });
+    } else {
+      console.info("[flight-search] no-flight-results", {
+        route: `${departureAirportId}->${arrivalAirportId}`,
+        dateIso: iso,
+      });
+    }
+
     return {
       flights,
       error: flights.length ? undefined : "No flights returned for these inputs.",

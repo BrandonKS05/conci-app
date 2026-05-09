@@ -76,6 +76,8 @@ export function TripHostFlightsPage(props: {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<FlightLegRowDto | null>(null);
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(props.flights.length / PAGE_SIZE));
   const pageRows = useMemo(() => {
@@ -234,15 +236,42 @@ export function TripHostFlightsPage(props: {
               Back: {selected.airline}, {selected.departureTime} → {selected.arrivalTime} ({formatPrice(selected.price)})
             </p>
             <p className="mt-2 flex flex-wrap gap-3">
-              <a
-                href={selected.bookUrl || props.outboundSummary.bookUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+              <button
+                type="button"
+                disabled={savingSelection}
+                onClick={async () => {
+                  if (!props.outboundSummary) return;
+                  setSavingSelection(true);
+                  setSaveMessage(null);
+                  try {
+                    const res = await fetch(`/api/trip-plans/${props.tripId}/flights/save-selection`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        outbound: props.outboundSummary,
+                        ret: selected,
+                        startIso: props.startIso,
+                        endIso: props.endIso,
+                      }),
+                    });
+                    const json = (await res.json().catch(() => ({}))) as { error?: string };
+                    if (!res.ok) throw new Error(json.error || "Could not save this flight yet.");
+                    setSaveMessage("Flight added to your calendar + dynamic itinerary.");
+                    router.push(`/trip/${props.tripId}/setup`);
+                    router.refresh();
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : "Could not save this flight yet.";
+                    setSaveMessage(msg);
+                  } finally {
+                    setSavingSelection(false);
+                  }
+                }}
+                className="font-semibold text-emerald-800 underline-offset-2 hover:underline disabled:opacity-60 dark:text-emerald-300"
               >
-                Book
-              </a>
+                {savingSelection ? "Saving..." : "Add to trip itinerary"}
+              </button>
             </p>
+            {saveMessage ? <p className="mt-2 text-xs">{saveMessage}</p> : null}
           </div>
         ) : null}
       </div>

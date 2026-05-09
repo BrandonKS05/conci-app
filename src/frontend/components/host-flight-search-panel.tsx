@@ -184,6 +184,8 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
   const [retPage, setRetPage] = useState(1);
   const [pickOut, setPickOut] = useState<FlightLegRowDto | null>(null);
   const [pickRet, setPickRet] = useState<FlightLegRowDto | null>(null);
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suggestReqId = useRef(0);
@@ -582,30 +584,42 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
               <p>
                 Back: {pickRet.airline}, {pickRet.departureTime} → {pickRet.arrivalTime} ({pickRet.price})
               </p>
-              {(pickOut.bookUrl || pickRet.bookUrl) && (
-                <p className="mt-2 flex flex-wrap gap-3">
-                  {pickOut.bookUrl ? (
-                    <a
-                      href={pickOut.bookUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
-                    >
-                      Open outbound booking
-                    </a>
-                  ) : null}
-                  {pickRet.bookUrl ? (
-                    <a
-                      href={pickRet.bookUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
-                    >
-                      Open return booking
-                    </a>
-                  ) : null}
-                </p>
-              )}
+              <p className="mt-2 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={savingSelection || !ctx?.startIso || !ctx?.endIso}
+                  onClick={async () => {
+                    if (!ctx?.startIso || !ctx?.endIso) return;
+                    setSavingSelection(true);
+                    setSaveMessage(null);
+                    try {
+                      const res = await fetch(`/api/trip-plans/${tripId}/flights/save-selection`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          outbound: pickOut,
+                          ret: pickRet,
+                          startIso: ctx.startIso,
+                          endIso: ctx.endIso,
+                        }),
+                      });
+                      const json = (await res.json().catch(() => ({}))) as { error?: string };
+                      if (!res.ok) throw new Error(json.error || "Could not save this flight yet.");
+                      setSaveMessage("Flight added to your calendar + dynamic itinerary.");
+                      router.refresh();
+                    } catch (e) {
+                      const msg = e instanceof Error ? e.message : "Could not save this flight yet.";
+                      setSaveMessage(msg);
+                    } finally {
+                      setSavingSelection(false);
+                    }
+                  }}
+                  className="font-semibold text-emerald-800 underline-offset-2 hover:underline disabled:opacity-60 dark:text-emerald-300"
+                >
+                  {savingSelection ? "Saving..." : "Add to trip itinerary"}
+                </button>
+              </p>
+              {saveMessage ? <p className="mt-2">{saveMessage}</p> : null}
             </div>
           ) : (
             <p className="mt-3 text-xs text-slate-500 dark:text-neutral-500">Select a return flight to finish.</p>
