@@ -12,6 +12,7 @@ import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import { buildRestaurantPicksFromVenueHints, type RestaurantPick } from "@/shared/restaurants";
 import type { PlacePreview } from "@/shared/place-preview";
+import { parseDayVoteState, type DayVoteStateByDate } from "@/shared/day-collaboration";
 
 export const COLLAB_VERSION = 1 as const;
 
@@ -82,6 +83,8 @@ export type AdjustmentSubmissionV1 = {
 export type CollabStateV1 = {
   v: typeof COLLAB_VERSION;
   decisions: Record<string, CollabDecisionBlob>;
+  /** Day-level collaborative options (restaurants/hotels/flights/activities/etc). */
+  dayVoting?: DayVoteStateByDate;
   /** Upvotes per spotlight stable id (`spotlightStableIdFromMapsUrl`) → voter keys (`member:<uuid>`). */
   spotlightVotes?: Record<string, string[]>;
   /** Trip card page: persistent group chat + inline place cards. */
@@ -394,6 +397,7 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
     return { v: COLLAB_VERSION, decisions: {} };
   }
   const spotlightVotes = parseSpotlightVotes(o.spotlightVotes);
+  const dayVoting = parseDayVoteState(o.dayVoting);
   let cardChat: { messages: CardChatMessage[] } | undefined;
   if (o.cardChat && typeof o.cardChat === "object") {
     const msgs = parseCardChatMessages(o.cardChat);
@@ -403,6 +407,7 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
   return {
     v: COLLAB_VERSION,
     decisions: o.decisions as Record<string, CollabDecisionBlob>,
+    ...(Object.keys(dayVoting).length ? { dayVoting } : {}),
     ...(spotlightVotes ? { spotlightVotes } : {}),
     ...(cardChat ? { cardChat } : {}),
     ...(adjustmentSubmissions ? { adjustmentSubmissions } : {}),

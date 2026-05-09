@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { CollabStateV1 } from "@/shared/collaboration";
+import { DAY_VOTE_CATEGORIES, mergeDayVoteStateForDate, parseDayVoteState, type DayVoteCategory } from "@/shared/day-collaboration";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
+import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 import {
   enumerateLocalIsoDays,
   hotelStayForDay,
@@ -20,6 +22,9 @@ type Props = {
   /** Optional — use first plan-derived label if missing */
   locale?: string;
   initialPlan: TripPlan;
+  initialCollab: CollabStateV1;
+  viewerUserId: string;
+  isHost: boolean;
 };
 
 function startOfDay(x: Date) {
@@ -209,13 +214,61 @@ function EmptyHint({ label }: { label: string }) {
   );
 }
 
-export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: Props) {
+function dayCategoryTitle(category: DayVoteCategory): string {
+  switch (category) {
+    case "restaurants":
+      return "Restaurants";
+    case "hotels":
+      return "Hotels";
+    case "flights":
+      return "Flights";
+    case "activities":
+      return "Activities";
+    default:
+      return "Other options";
+  }
+}
+
+function lockPromptText(category: DayVoteCategory): string {
+  switch (category) {
+    case "restaurants":
+      return "Add restaurant confirmation detail (example: 7:30 PM reservation under Kim).";
+    case "hotels":
+      return "Add hotel confirmation detail (example: check-in 3:00 PM, confirmation #12345).";
+    case "flights":
+      return "Add flight confirmation detail (example: DL 123, departs 8:15 AM).";
+    case "activities":
+      return "Add activity confirmation detail (example: starts 10:00 AM, tickets booked).";
+    default:
+      return "Add confirmation detail.";
+  }
+}
+
+export function TripHostSetupDayPage({
+  tripId,
+  dateIso,
+  locale,
+  initialPlan,
+  initialCollab,
+  viewerUserId,
+  isHost,
+}: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState(initialPlan);
+  const [dayVotingByDate, setDayVotingByDate] = useState(() =>
+    mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso)
+  );
+  const [dayErr, setDayErr] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [suggestDraft, setSuggestDraft] = useState<
+    Partial<Record<DayVoteCategory, { label: string; detail: string; href: string }>>
+  >({});
+  const suppressRealtimeUntilRef = useRef(0);
 
   useEffect(() => {
     setPlan(initialPlan);
-  }, [initialPlan]);
+    setDayVotingByDate(mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso));
+  }, [initialPlan, initialCollab.dayVoting, dateIso]);
 
   const [dreamText, setDreamText] = useState("");
   const [dreamBusy, setDreamBusy] = useState(false);
@@ -228,6 +281,53 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
       void router.refresh();
     },
     [router]
+  );
+
+  useTripWorkspaceRealtime(
+    tripId,
+    useCallback(
+      (row) => {
+        if (row.plan != null) {
+          try {
+            setPlan(normalizePlan(row.plan));
+          } catch {
+            /* ignore */
+          }
+        }
+        const payload = row.collab_state as { dayVoting?: unknown } | undefined;
+        if (payload?.dayVoting !== undefined) {
+          setDayVotingByDate((prev) => mergeDayVoteStateForDate(plan, { ...prev, ...parseDayVoteState(payload.dayVoting) }, dateIso));
+        }
+      },
+      [plan, dateIso]
+    ),
+    { enabled: true, suppressRealtimeUntilRef }
+  );
+
+  const runDayAction = useCallback(
+    async (payload: Record<string, unknown>) => {
+      setDayErr(null);
+      const key = `${String(payload.action)}:${String(payload.category ?? "")}`;
+      setBusyKey(key);
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/day-vote`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dateIso, ...payload }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { error?: string; dayVoting?: unknown };
+        if (!res.ok) throw new Error(j.error || "Could not save");
+        if (j.dayVoting) {
+          setDayVotingByDate(mergeDayVoteStateForDate(plan, parseDayVoteState(j.dayVoting), dateIso));
+        }
+      } catch (e) {
+        setDayErr(e instanceof Error ? e.message : "Could not save.");
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [tripId, dateIso, plan]
   );
 
   const submitDayDream = useCallback(async () => {
@@ -296,6 +396,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
 
   const meals = (hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
   const activities = (hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+  const dayVoting = useMemo(() => mergeDayVoteStateForDate(plan, dayVotingByDate, dateIso)[dateIso], [plan, dayVotingByDate, dateIso]);
 
   const scheduleItems = useMemo(() => {
     const rows: { key: string; label: string; sub: string; href?: string }[] = [];
@@ -494,128 +595,158 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
           )}
         </DropSection>
 
-        <DropSection title="Hotels" subtitle="Stay for this night" sectionId="day-hotels">
-          {hotel ? (
-            <div className="rounded-xl border-2 border-neutral-900/15 bg-neutral-50/90 p-4 dark:border-white/10 dark:bg-dm-page/80">
-              <p className="font-sans text-base font-bold text-neutral-950 dark:text-white">{hotel.place.name}</p>
-              {hotel.place.address ? <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{hotel.place.address}</p> : null}
-              {hotel.place.mapsUrl ? (
-                <a
-                  href={hotel.place.mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex text-sm font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
-                >
-                  Open in Maps
-                </a>
-              ) : null}
-            </div>
-          ) : (
-            <EmptyHint label="No hotel night matched to this date — assign stay dates in host setup." />
-          )}
-        </DropSection>
-
-        <DropSection title="Activities" subtitle="Suggested just for you" sectionId="day-activities">
-          {activities.length === 0 ? (
-            <EmptyHint label="No activities pinned for this day." />
-          ) : (
-            <ul className="space-y-4">
-              {activities.map((p) => (
-                <li
-                  key={p.experience.bookingUrl}
-                  className="flex gap-4 rounded-xl border-2 border-neutral-900/10 bg-neutral-50/70 p-3 dark:border-white/10 dark:bg-dm-page/60"
-                >
-                  {p.experience.coverPhotoUrl ? (
-                    <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-200 dark:bg-white/10">
-                      <Image
-                        src={p.experience.coverPhotoUrl}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="112px"
-                        unoptimized
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500 dark:bg-white/10 dark:text-neutral-500">
-                      Activity
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-500">
-                      Activity
-                    </span>
-                    <p className="mt-1 font-sans text-base font-bold text-neutral-950 dark:text-white">{p.experience.name}</p>
-                    <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-                      {[p.experience.duration, p.experience.pricePerPerson].filter(Boolean).join(" · ")}
-                    </p>
-                    {p.experience.bookingUrl ? (
-                      <a
-                        href={p.experience.bookingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex text-xs font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
+        {DAY_VOTE_CATEGORIES.map((category) => {
+          const cat = dayVoting[category];
+          const lockedId = cat.lockedOptionId ?? null;
+          const subtitle =
+            category === "restaurants"
+              ? "Catered to your group's taste"
+              : category === "hotels"
+                ? "Stay for this night"
+                : "Collaborative options";
+          const draft = suggestDraft[category] ?? { label: "", detail: "", href: "" };
+          return (
+            <DropSection
+              key={category}
+              title={dayCategoryTitle(category)}
+              subtitle={subtitle}
+              sectionId={`day-${category}`}
+            >
+              <div className="mb-4 rounded-xl border border-slate-200/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+                  Suggest an option
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <input
+                    value={draft.label}
+                    onChange={(e) =>
+                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
+                    }
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    placeholder={`${dayCategoryTitle(category)} option`}
+                  />
+                  <input
+                    value={draft.detail}
+                    onChange={(e) =>
+                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
+                    }
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    placeholder="Optional detail"
+                  />
+                  <input
+                    value={draft.href}
+                    onChange={(e) =>
+                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
+                    }
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    placeholder="Optional URL"
+                  />
+                  <button
+                    type="button"
+                    disabled={busyKey === `suggest:${category}` || !draft.label.trim()}
+                    onClick={() =>
+                      void runDayAction({
+                        action: "suggest",
+                        category,
+                        label: draft.label,
+                        detail: draft.detail,
+                        href: draft.href,
+                      }).then(() =>
+                        setSuggestDraft((prev) => ({ ...prev, [category]: { label: "", detail: "", href: "" } }))
+                      )
+                    }
+                    className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              {cat.options.length === 0 ? (
+                <EmptyHint label={`No ${dayCategoryTitle(category).toLowerCase()} options yet for this day.`} />
+              ) : (
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {cat.options.map((opt) => {
+                    const voted = opt.votes.includes(viewerUserId);
+                    const isLocked = lockedId === opt.id;
+                    const dimmed = Boolean(lockedId && lockedId !== opt.id);
+                    return (
+                      <li
+                        key={opt.id}
+                        className={`rounded-xl border p-3 transition ${
+                          dimmed
+                            ? "border-slate-200/60 bg-slate-50/60 opacity-45 dark:border-white/10 dark:bg-white/5"
+                            : "border-neutral-900/10 bg-white dark:border-white/10 dark:bg-dm-elevated"
+                        }`}
                       >
-                        Booking link
-                      </a>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </DropSection>
-
-        <DropSection title="Restaurants" subtitle="Catered to your group's taste" sectionId="day-restaurants">
-          {meals.length === 0 ? (
-            <EmptyHint label="No restaurant pins yet for this day." />
-          ) : (
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {meals.map((p) => (
-                <li
-                  key={p.place.mapsUrl}
-                  className="flex gap-3 rounded-xl border-2 border-neutral-900/10 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated"
-                >
-                  {p.place.photoUrl ? (
-                    <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-white/10">
-                      <Image src={p.place.photoUrl} alt="" fill className="object-cover" sizes="112px" unoptimized />
-                    </div>
-                  ) : (
-                    <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black uppercase text-slate-400 dark:bg-white/10 dark:text-neutral-500">
-                      Restaurant
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-500">
-                      Restaurant
-                    </span>
-                    <p className="font-sans font-bold text-neutral-950 dark:text-white">{p.place.name}</p>
-                    {p.place.rating != null ? (
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                        {typeof p.place.rating === "number" ? p.place.rating.toFixed(1) : p.place.rating} ★
-                      </p>
-                    ) : null}
-                    {p.place.address ? <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{p.place.address}</p> : null}
-                    <button
-                      type="button"
-                      className="mt-3 mr-2 inline-flex rounded-full border-2 border-neutral-900/20 px-3 py-1 text-[11px] font-bold dark:border-white/15"
-                      disabled
-                    >
-                      Vote · 0
-                    </button>
-                    <button
-                      type="button"
-                      className="mt-3 inline-flex text-[11px] font-bold text-neutral-500 dark:text-neutral-500"
-                      disabled
-                    >
-                      Different option
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </DropSection>
+                        <p className="font-sans text-base font-bold text-neutral-950 dark:text-white">{opt.label}</p>
+                        {opt.detail ? <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{opt.detail}</p> : null}
+                        {opt.href ? (
+                          <a
+                            href={opt.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-flex text-xs font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
+                          >
+                            Open link
+                          </a>
+                        ) : null}
+                        {isLocked && opt.lockedDetail ? (
+                          <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                            Locked in: {opt.lockedDetail}
+                          </p>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={busyKey === `vote:${category}` || Boolean(lockedId)}
+                            onClick={() => void runDayAction({ action: "vote", category, optionId: opt.id })}
+                            className={`rounded-full border px-3 py-1 text-[11px] font-bold ${
+                              voted
+                                ? "border-teal-600 bg-teal-50 text-teal-900 dark:border-teal-400/60 dark:bg-teal-950/30 dark:text-teal-100"
+                                : "border-neutral-900/20 dark:border-white/15"
+                            }`}
+                          >
+                            {voted ? "Voted" : "Vote"} · {opt.votes.length}
+                          </button>
+                          {isHost ? (
+                            isLocked ? (
+                              <button
+                                type="button"
+                                disabled={busyKey === `unlock:${category}`}
+                                onClick={() => void runDayAction({ action: "unlock", category })}
+                                className="rounded-full border border-amber-500/60 px-3 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-200"
+                              >
+                                Unlock
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={busyKey === `lock:${category}`}
+                                onClick={() => {
+                                  const detail = window.prompt(lockPromptText(category), "");
+                                  if (!detail || !detail.trim()) return;
+                                  void runDayAction({ action: "lock", category, optionId: opt.id, detail });
+                                }}
+                                className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] font-bold text-indigo-800 dark:text-indigo-200"
+                              >
+                                Lock in
+                              </button>
+                            )
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </DropSection>
+          );
+        })}
+        {dayErr ? (
+          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+            {dayErr}
+          </p>
+        ) : null}
       </div>
     </div>
   );

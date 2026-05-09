@@ -4,6 +4,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripHostSetupDayPage } from "@/frontend/components/trip-host-setup-day-page";
+import { parseCollabState } from "@/shared/collaboration";
 import { normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -50,12 +51,13 @@ export default async function TripHostSetupDayDetailPage({
     notFound();
   }
 
-  const { data, error } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();
+  const { data, error } = await svc.from("trip_plans").select("plan, collab_state").eq("id", id).maybeSingle();
   if (error || !data?.plan) {
     notFound();
   }
 
   const plan = normalizePlan(data.plan);
+  const collab = parseCollabState(data.collab_state);
 
   const rawDate = typeof dateParam === "string" ? dateParam.trim() : "";
   if (!ISO_DAY.test(rawDate)) {
@@ -80,7 +82,14 @@ export default async function TripHostSetupDayDetailPage({
 
   return (
     <div className="min-h-screen bg-[#f7f6f8] py-6 text-neutral-950 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
-      <TripHostSetupDayPage tripId={id} dateIso={rawDate} initialPlan={plan} />
+      <TripHostSetupDayPage
+        tripId={id}
+        dateIso={rawDate}
+        initialPlan={plan}
+        initialCollab={collab}
+        viewerUserId={user.id}
+        isHost={access.isHost}
+      />
     </div>
   );
 }

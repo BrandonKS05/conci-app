@@ -325,14 +325,6 @@ export function TripSpotlightsInteractive({
                     <button
                       type="button"
                       disabled={browseBusy === id}
-                      onClick={() => void fetchBrowse(id, "different")}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-800 hover:border-orange-400/50 dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#e4e2de]"
-                    >
-                      {browseBusy === id ? "Loading…" : "Different option"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={browseBusy === id}
                       onClick={() => void fetchBrowse(id, "more")}
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-800 hover:border-orange-400/50 dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#e4e2de]"
                     >
