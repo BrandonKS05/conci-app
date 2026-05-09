@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
+import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
 import {
+  enumerateLocalIsoDays,
   hotelStayForDay,
+  normalizePlan,
   parseLocalIsoDate,
   type TripPlan,
 } from "@/shared/trip-plan";
@@ -16,15 +20,6 @@ type Props = {
   /** Optional — use first plan-derived label if missing */
   locale?: string;
   initialPlan: TripPlan;
-};
-
-type ManualRestaurantResult = {
-  name: string;
-  mapsUrl: string;
-  address?: string;
-  photoUrl?: string | null;
-  rating?: number;
-  priceRange?: string;
 };
 
 function startOfDay(x: Date) {
@@ -99,6 +94,113 @@ function DropSection({
   );
 }
 
+function formatUsd(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
+}
+
+function DaySpendEstimateBar({
+  baselineGroupUsd,
+  hotelUsd,
+  mealsUsd,
+  activitiesUsd,
+  estimatedTotalUsd,
+}: {
+  baselineGroupUsd: number | null;
+  hotelUsd: number;
+  mealsUsd: number;
+  activitiesUsd: number;
+  estimatedTotalUsd: number;
+}) {
+  const baseline = baselineGroupUsd;
+  const fillPct = baseline != null && baseline > 0 ? Math.min(100, (estimatedTotalUsd / baseline) * 100) : 100;
+  const over = baseline != null && baseline > 0 && estimatedTotalUsd > baseline;
+
+  const parts = [
+    { key: "h", usd: hotelUsd, className: "bg-teal-500 dark:bg-teal-600" },
+    { key: "m", usd: mealsUsd, className: "bg-amber-400 dark:bg-amber-500" },
+    { key: "a", usd: activitiesUsd, className: "bg-pink-500 dark:bg-pink-600" },
+  ].filter((p) => p.usd > 0);
+
+  return (
+    <div className="mt-3 space-y-2">
+      {estimatedTotalUsd <= 0 ? (
+        <p className="font-sans text-xs text-neutral-500 dark:text-neutral-500">
+          Pin a hotel night, restaurants, or experiences on this day to build an estimate.
+        </p>
+      ) : (
+        <div className="h-3 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/15">
+          <div
+            className="flex h-full min-w-[2px] overflow-hidden rounded-full"
+            style={{ width: `${Math.min(100, fillPct)}%` }}
+          >
+            {parts.map((p) => (
+              <div key={p.key} className={`min-w-0 ${p.className}`} style={{ flex: p.usd }} title={formatUsd(p.usd)} />
+            ))}
+          </div>
+        </div>
+      )}
+      <ul className="space-y-1 font-sans text-[11px] text-neutral-600 dark:text-neutral-400">
+        {estimatedTotalUsd <= 0 ? null : hotelUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-teal-700 dark:text-teal-300">Hotel (night share)</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(hotelUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd <= 0 ? null : mealsUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-amber-800 dark:text-amber-200">Restaurants (est.)</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(mealsUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd <= 0 ? null : activitiesUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-pink-700 dark:text-pink-300">Experiences</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(activitiesUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd > 0 ? (
+          <li className="flex justify-between gap-2 border-t border-neutral-200 pt-1.5 dark:border-white/10">
+            <span className="font-bold text-neutral-800 dark:text-neutral-200">Estimated day total</span>
+            <span className="tabular-nums font-bold text-neutral-950 dark:text-white">
+              {formatUsd(estimatedTotalUsd)}
+            </span>
+          </li>
+        ) : null}
+        {baseline != null && baseline > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span>Your trip budget / day (group)</span>
+            <span className="tabular-nums font-semibold text-neutral-700 dark:text-neutral-300">
+              {formatUsd(baseline)}
+            </span>
+          </li>
+        ) : (
+          <li className="text-neutral-500 dark:text-neutral-500">
+            Add a dollar amount in <span className="font-semibold">Budget</span> on the workspace to compare.
+          </li>
+        )}
+      </ul>
+      {over ? (
+        <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          About {formatUsd(estimatedTotalUsd - baseline!)} over today&apos;s share — rough estimate only.
+        </p>
+      ) : null}
+      <p className="text-[10px] leading-snug text-neutral-500 dark:text-neutral-500">
+        Based on pinned places, party size, and trip length. Not a quote.
+      </p>
+    </div>
+  );
+}
+
 function EmptyHint({ label }: { label: string }) {
   return (
     <div className="flex h-full min-h-[6rem] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-dm-page/80 dark:text-neutral-500">
@@ -108,12 +210,61 @@ function EmptyHint({ label }: { label: string }) {
 }
 
 export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: Props) {
-  const [plan, setPlan] = useState<TripPlan>(initialPlan);
-  const [restaurantQuery, setRestaurantQuery] = useState("");
-  const [restaurantResults, setRestaurantResults] = useState<ManualRestaurantResult[]>([]);
-  const [restaurantSearching, setRestaurantSearching] = useState(false);
-  const [restaurantSearchErr, setRestaurantSearchErr] = useState<string | null>(null);
-  const [addingMapsUrl, setAddingMapsUrl] = useState<string | null>(null);
+  const router = useRouter();
+  const [plan, setPlan] = useState(initialPlan);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+  }, [initialPlan]);
+
+  const [dreamText, setDreamText] = useState("");
+  const [dreamBusy, setDreamBusy] = useState(false);
+  const [dreamErr, setDreamErr] = useState<string | null>(null);
+  const [dreamReply, setDreamReply] = useState<string | null>(null);
+
+  const syncPlanFromServer = useCallback(
+    (next: TripPlan) => {
+      setPlan(next);
+      void router.refresh();
+    },
+    [router]
+  );
+
+  const submitDayDream = useCallback(async () => {
+    const t = dreamText.trim();
+    if (!t || t.length > 4000) {
+      setDreamErr("Say something shorter (under 4000 characters).");
+      return;
+    }
+    setDreamBusy(true);
+    setDreamErr(null);
+    setDreamReply(null);
+    try {
+      const res = await fetch(`/api/trip-plans/${tripId}/host-copilot`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `[Day ${dateIso}] ${t}`,
+          focusDateIso: dateIso,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        assistantText?: string;
+        plan?: TripPlan;
+        applied?: boolean;
+      };
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Copilot unavailable.");
+      if (typeof j.assistantText === "string") setDreamReply(j.assistantText.trim());
+      else setDreamReply("Done.");
+      if (j.plan) syncPlanFromServer(normalizePlan(j.plan));
+    } catch (e) {
+      setDreamErr(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setDreamBusy(false);
+    }
+  }, [dateIso, dreamText, syncPlanFromServer, tripId]);
 
   const hostSetup = plan.hostSetup;
   const dest = plan.location?.trim() || "Destination TBD";
@@ -125,7 +276,7 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
       : dateIso;
 
     let dayIndexLabel: string | null = null;
-    const tr = hostSetup?.tripRange;
+    const tr = plan.hostSetup?.tripRange;
     if (tr?.startIso && tr.endIso && d) {
       const start = parseLocalIsoDate(tr.startIso);
       const end = parseLocalIsoDate(tr.endIso);
@@ -139,111 +290,12 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
       }
     }
     return { line2, dayIndexLabel };
-  }, [dateIso, hostSetup?.tripRange, locale]);
+  }, [dateIso, locale, plan]);
 
   const hotel = hotelStayForDay(hostSetup?.hotelStays ?? [], dateIso);
 
   const meals = (hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
   const activities = (hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
-
-  const searchRestaurants = useCallback(async () => {
-    const q = restaurantQuery.trim();
-    if (q.length < 2) {
-      setRestaurantResults([]);
-      setRestaurantSearchErr("Type at least 2 characters to search.");
-      return;
-    }
-    setRestaurantSearching(true);
-    setRestaurantSearchErr(null);
-    try {
-      const res = await fetch("/api/places/maps-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          q,
-          locationHint: plan.location?.trim() || null,
-          start: 0,
-          limit: 8,
-        }),
-      });
-      const j = (await res.json().catch(() => ({}))) as {
-        places?: {
-          name?: string;
-          mapsUrl?: string;
-          address?: string;
-          photoUrl?: string | null;
-          rating?: number;
-          priceRange?: string;
-        }[];
-      };
-      if (!res.ok) {
-        setRestaurantResults([]);
-        setRestaurantSearchErr("Could not search restaurants right now.");
-        return;
-      }
-      const places = (j.places ?? []).filter((p) => typeof p?.name === "string" && typeof p?.mapsUrl === "string");
-      setRestaurantResults(
-        places.map((p) => ({
-          name: p.name!.trim(),
-          mapsUrl: p.mapsUrl!,
-          address: p.address,
-          photoUrl: p.photoUrl ?? null,
-          rating: typeof p.rating === "number" ? p.rating : undefined,
-          priceRange: p.priceRange,
-        }))
-      );
-    } catch {
-      setRestaurantResults([]);
-      setRestaurantSearchErr("Could not reach the server.");
-    } finally {
-      setRestaurantSearching(false);
-    }
-  }, [restaurantQuery, plan.location]);
-
-  const addRestaurantToDay = useCallback(
-    async (place: ManualRestaurantResult) => {
-      if (!place.mapsUrl) return;
-      const current = hostSetup?.restaurantPins ?? [];
-      if (current.some((p) => p.dateIso === dateIso && p.place.mapsUrl === place.mapsUrl && p.kept)) {
-        return;
-      }
-      setAddingMapsUrl(place.mapsUrl);
-      const nextPins = [
-        ...current,
-        {
-          dateIso,
-          kept: true,
-          place: {
-            name: place.name,
-            mapsUrl: place.mapsUrl,
-            address: place.address,
-            photoUrl: place.photoUrl ?? null,
-            rating: place.rating,
-            priceRange: place.priceRange,
-            spotlightCategory: "restaurant" as const,
-          },
-        },
-      ];
-      try {
-        const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hostSetup: { restaurantPins: nextPins } }),
-        });
-        const j = (await res.json().catch(() => ({}))) as { plan?: TripPlan; error?: string };
-        if (!res.ok || !j.plan) {
-          setRestaurantSearchErr(typeof j.error === "string" ? j.error : "Could not save restaurant pin.");
-          return;
-        }
-        setPlan(j.plan);
-      } catch {
-        setRestaurantSearchErr("Could not save restaurant pin.");
-      } finally {
-        setAddingMapsUrl(null);
-      }
-    },
-    [dateIso, hostSetup?.restaurantPins, tripId]
-  );
 
   const scheduleItems = useMemo(() => {
     const rows: { key: string; label: string; sub: string; href?: string }[] = [];
@@ -268,6 +320,24 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
 
   const prevIso = shiftIsoDay(dateIso, -1);
   const nextIso = shiftIsoDay(dateIso, 1);
+
+  const tripRange = plan.hostSetup?.tripRange;
+  const spendBreakdown = useMemo(() => {
+    if (!tripRange?.startIso || !tripRange.endIso) return null;
+    if (!enumerateLocalIsoDays(tripRange.startIso, tripRange.endIso).includes(dateIso)) return null;
+    const dayMeals = (plan.hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+    const dayActs = (plan.hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+    const dayHotel = hotelStayForDay(plan.hostSetup?.hotelStays ?? [], dateIso);
+    return estimateHostDaySpendUsd(
+      plan,
+      dateIso,
+      tripRange.startIso,
+      tripRange.endIso,
+      dayMeals.length,
+      dayActs,
+      dayHotel
+    );
+  }, [plan, dateIso, tripRange?.startIso, tripRange?.endIso]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8">
@@ -299,16 +369,45 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
           <h1 className="font-display text-3xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-[2.125rem] sm:leading-tight">
             {formatted.dayIndexLabel ? `${formatted.dayIndexLabel}: ${formatted.line2}` : formatted.line2}
           </h1>
-          <label htmlFor={`daydream-${dateIso}`} className="mt-6 block rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.08)] dark:border-white/20 dark:bg-dm-card">
-            <span className="font-sans text-sm font-black text-neutral-950 dark:text-white">What do you want to do?</span>
+          <div className="mt-6 block rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.08)] dark:border-white/20 dark:bg-dm-card">
+            <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-black text-neutral-950 dark:text-white">
+              What do you want to do?
+            </label>
+            <p className="mt-2 text-xs font-normal leading-relaxed text-neutral-600 dark:text-neutral-400">
+              Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
+              experience — we scope edits to{" "}
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
+            </p>
             <textarea
               id={`daydream-${dateIso}`}
-              placeholder={`Describe your dream day’s vacation in ${dest} — Conci will make it reality…`}
+              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
               rows={5}
-              className="mt-4 w-full resize-y border-0 bg-transparent p-0 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 dark:text-neutral-200 dark:placeholder:text-neutral-500"
-              defaultValue=""
+              value={dreamText}
+              onChange={(e) => setDreamText(e.target.value)}
+              disabled={dreamBusy}
+              className="mt-4 w-full resize-y rounded-lg border border-neutral-900/15 bg-transparent px-2 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-white/15 dark:text-neutral-200 dark:placeholder:text-neutral-500"
             />
-          </label>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={dreamBusy || !dreamText.trim()}
+                onClick={() => void submitDayDream()}
+                className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white shadow-[2px_2px_0_0_rgba(0,0,0,0.12)] transition hover:bg-teal-500 disabled:pointer-events-none disabled:opacity-40 dark:shadow-black/40"
+              >
+                {dreamBusy ? "Updating day…" : "Update day with Copilot"}
+              </button>
+            </div>
+            {dreamErr ? (
+              <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
+                {dreamErr}
+              </p>
+            ) : null}
+            {dreamReply ? (
+              <p className="mt-4 rounded-xl border border-teal-200/70 bg-teal-50/80 px-3 py-3 text-sm text-teal-950 dark:border-teal-800/40 dark:bg-teal-950/35 dark:text-teal-50">
+                {dreamReply}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="rounded-2xl border-2 border-neutral-900 bg-white p-5 shadow-[2px_4px_0_0_rgba(0,0,0,0.06)] dark:border-white/15 dark:bg-dm-card">
@@ -344,20 +443,21 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
             )}
           </div>
           <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-neutral-800 dark:text-neutral-300">
-            Day budget
+            Day spend estimate
           </p>
-          <div className="mt-3 flex justify-between font-sans text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">
-            <span>0</span>
-            <span>50k</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            defaultValue={50}
-            className="mt-2 w-full accent-[#e91e8c]"
-            aria-label="Day budget (placeholder scale 0–50k)"
-          />
+          {spendBreakdown ? (
+            <DaySpendEstimateBar
+              baselineGroupUsd={spendBreakdown.baselineGroupUsd}
+              hotelUsd={spendBreakdown.hotelUsd}
+              mealsUsd={spendBreakdown.mealsUsd}
+              activitiesUsd={spendBreakdown.activitiesUsd}
+              estimatedTotalUsd={spendBreakdown.estimatedTotalUsd}
+            />
+          ) : (
+            <p className="mt-3 font-sans text-xs leading-relaxed text-neutral-500 dark:text-neutral-500">
+              Save trip dates on the host calendar to see how this day lines up with your per-day budget.
+            </p>
+          )}
         </div>
       </header>
 
@@ -467,68 +567,6 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
         </DropSection>
 
         <DropSection title="Restaurants" subtitle="Catered to your group's taste" sectionId="day-restaurants">
-          <div className="mb-4 rounded-xl border border-neutral-900/10 bg-neutral-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-neutral-700 dark:text-neutral-300">Manual search</p>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={restaurantQuery}
-                onChange={(e) => setRestaurantQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void searchRestaurants();
-                  }
-                }}
-                placeholder={`Search restaurants in ${dest}`}
-                className="w-full rounded-lg border border-neutral-900/20 bg-white px-3 py-2 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-[#e91e8c] dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100"
-              />
-              <button
-                type="button"
-                onClick={() => void searchRestaurants()}
-                disabled={restaurantSearching}
-                className="rounded-lg border border-neutral-900/20 bg-white px-3 py-2 text-sm font-bold text-neutral-900 transition hover:bg-neutral-100 disabled:opacity-50 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/10"
-              >
-                {restaurantSearching ? "Searching…" : "Search"}
-              </button>
-            </div>
-            {restaurantSearchErr ? <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{restaurantSearchErr}</p> : null}
-            {restaurantResults.length ? (
-              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {restaurantResults.map((p) => {
-                  const alreadyAdded = meals.some((m) => m.place.mapsUrl === p.mapsUrl);
-                  return (
-                    <li
-                      key={p.mapsUrl}
-                      className="rounded-lg border border-neutral-900/10 bg-white px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
-                    >
-                      <p className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{p.name}</p>
-                      {p.address ? <p className="mt-1 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{p.address}</p> : null}
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <a
-                          href={p.mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-bold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400"
-                        >
-                          Open in Maps
-                        </a>
-                        <button
-                          type="button"
-                          disabled={alreadyAdded || addingMapsUrl === p.mapsUrl}
-                          onClick={() => void addRestaurantToDay(p)}
-                          className="rounded-full border border-neutral-900/20 px-2.5 py-1 text-[11px] font-bold text-neutral-900 disabled:opacity-50 dark:border-white/15 dark:text-neutral-100"
-                        >
-                          {alreadyAdded ? "Added" : addingMapsUrl === p.mapsUrl ? "Adding…" : "Add to this day"}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-          </div>
-
           {meals.length === 0 ? (
             <EmptyHint label="No restaurant pins yet for this day." />
           ) : (

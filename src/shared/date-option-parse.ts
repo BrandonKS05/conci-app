@@ -156,16 +156,96 @@ export function parseDateOptionToRange(opt: string, defaultYear: number): { star
     const one = startOfLocalDay(native);
     return { start: one, end: one };
   }
-  const vague = parseVagueMonthQualifierToRange(raw, defaultYear);
-  if (vague) return vague;
+  /**
+   * Vague-month expansion only when no ISO yyyy-mm-dd appears in the blob.
+   * Otherwise “July…” + embedded ISO anchors would incorrectly widen to full calendar months after structured parse misses.
+   */
+  if (uniqueIsoDaysInText(raw).length === 0) {
+    const vague = parseVagueMonthQualifierToRange(raw, defaultYear);
+    if (vague) return vague;
+  }
   return null;
 }
 
 /** ISO / slash / named month+day patterns shared by concrete and loose parsing. */
+const MAX_INFERRED_TRIP_SPAN_DAYS = 366;
+
+/** Extract unique ISO yyyy-mm-dd tokens in source order appearances. */
+function uniqueIsoDaysInText(s: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of s.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)) {
+    const tok = m[1]!;
+    if (seen.has(tok)) continue;
+    seen.add(tok);
+    out.push(tok);
+  }
+  return out;
+}
+
+function isoStringsToInclusiveRange(aIso: string, bIso: string): { start: Date; end: Date } | null {
+  const a = new Date(`${aIso}T12:00:00`);
+  const b = new Date(`${bIso}T12:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+  let sa = startOfLocalDay(a);
+  let sb = startOfLocalDay(b);
+  if (localDayTime(sa) > localDayTime(sb)) [sa, sb] = [sb, sa];
+  const spanDays = (localDayTime(sb) - localDayTime(sa)) / (24 * 60 * 60 * 1000);
+  if (spanDays > MAX_INFERRED_TRIP_SPAN_DAYS) return null;
+  return { start: sa, end: sb };
+}
+
 function parseDateOptionToRangeStructured(
   raw: string,
   defaultYear: number
 ): { start: Date; end: Date } | null {
+  /** Model copy often wraps ISO anchors (“…2026-07-10 through 2026-07-15…”) — grab first explicit pair inline. */
+  const isoPairKw = /\b(\d{4}-\d{2}-\d{2})\b\s*(?:to|through|thru|until|→)\s*\b(\d{4}-\d{2}-\d{2})\b/i.exec(
+    raw
+  );
+  if (isoPairKw) {
+    const r = isoStringsToInclusiveRange(isoPairKw[1]!, isoPairKw[2]!);
+    if (r) return r;
+  }
+  const isoPairHyphen = /\b(\d{4}-\d{2}-\d{2})\b\s*[–\-—]\s*\b(\d{4}-\d{2}-\d{2})\b/.exec(raw);
+  if (isoPairHyphen) {
+    const r = isoStringsToInclusiveRange(isoPairHyphen[1]!, isoPairHyphen[2]!);
+    if (r) return r;
+  }
+
+  /** Exactly two ISO mentions in one option string → treat as trip window (distinct from vague “July”). */
+  const uniqIso = uniqueIsoDaysInText(raw);
+  if (uniqIso.length === 2) {
+    const sortedPair = [...uniqIso].sort();
+    const one = sortedPair[0];
+    const two = sortedPair[1];
+    if (one != null && two != null) {
+      const pair = isoStringsToInclusiveRange(one, two);
+      if (pair) return pair;
+    }
+  }
+
+  /** Single anchored calendar day buried in prose. */
+  if (uniqIso.length === 1 && uniqIso[0]) {
+    const r = isoStringsToInclusiveRange(uniqIso[0], uniqIso[0]);
+    if (r) return r;
+  }
+
+  /** “Flexible — July 10-21, 2026”: must not rely on leading `^` so ISO-in-prose beats vague month widening. */
+  const relaxedMoSpan =
+    /\b([A-Za-z]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})(?:\s*,\s*(\d{4}))?\b/i.exec(raw);
+  if (relaxedMoSpan) {
+    const mon = monthFromToken(relaxedMoSpan[1]!);
+    const dStart = parseInt(relaxedMoSpan[2]!, 10);
+    const dEnd = parseInt(relaxedMoSpan[3]!, 10);
+    const y = relaxedMoSpan[4] ? parseInt(relaxedMoSpan[4], 10) : defaultYear;
+    if (mon != null && dStart >= 1 && dEnd >= 1 && !Number.isNaN(y)) {
+      const sa = ymd(y, mon, dStart);
+      const sb = ymd(y, mon, dEnd);
+      return localDayTime(sa) <= localDayTime(sb) ? { start: sa, end: sb } : { start: sb, end: sa };
+    }
+  }
+
   const isoSingle = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoSingle) {
     const y = parseInt(isoSingle[1]!, 10);
@@ -178,7 +258,7 @@ function parseDateOptionToRangeStructured(
   }
 
   const isoRange = raw.match(
-    /^(\d{4}-\d{2}-\d{2})\s*(?:to|-)\s*(\d{4}-\d{2}-\d{2})$/i
+    /^(\d{4}-\d{2}-\d{2})\s*(?:to|through|thru|until|-|–)\s*(\d{4}-\d{2}-\d{2})$/i
   );
   if (isoRange) {
     const a = new Date(`${isoRange[1]}T12:00:00`);

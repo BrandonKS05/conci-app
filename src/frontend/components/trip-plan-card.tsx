@@ -268,7 +268,7 @@ export function TripPlanCard({
           ["Destination", plan.polls?.destinations],
           ["Food & venues", plan.polls?.venues],
           ["Activities", plan.polls?.activities],
-          ["Vibe", plan.polls?.vibePick],
+          ["Prefs / adjustments", plan.polls?.vibePick],
           ["Budget bands", plan.polls?.budgetPick],
           ["Transport", plan.polls?.transport],
         ] as const;

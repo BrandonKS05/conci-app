@@ -14,6 +14,7 @@ import {
   isDecisionLocked,
   isTransportStyleGroupPoll,
   parseCollabState,
+  type AdjustmentSubmissionV1,
   VIBE_POLL_DECISION_KEY,
   BUDGET_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
@@ -28,7 +29,6 @@ import {
 } from "@/shared/budget-poll";
 import { visitorVoteKey, voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import {
-  POLL_WRITE_IN_MAX_LEN,
   coerceScalarVoteChoice,
   coerceVoteAgainstList,
   isAllowedPollWriteIn,
@@ -144,6 +144,8 @@ export function TripCollaborationPanel({
   groupProgressStickyTarget,
   viewerUserId,
   tripOwnerUserId,
+  variant = "full",
+  omitDecisionKeys,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -162,6 +164,10 @@ export function TripCollaborationPanel({
   viewerUserId?: string;
   /** `trip_plans.user_id` — trip creator. */
   tripOwnerUserId?: string | null;
+  /** `preferencesOnly` — only the trip-wide preferences / adjustments card (host workspace). */
+  variant?: "full" | "preferencesOnly";
+  /** Hide these decision keys in “Decide together” / locked lists (e.g. duplicate prefs strip elsewhere). */
+  omitDecisionKeys?: string[];
 }) {
   const router = useRouter();
   const stickyGroupProgressRail = typeof groupProgressStickyTarget !== "undefined";
@@ -186,6 +192,8 @@ export function TripCollaborationPanel({
 
   const livePlanContext = tripLiveRecommendationsContextFingerprint(plan);
 
+  const omitKeySet = useMemo(() => new Set(omitDecisionKeys ?? []), [omitDecisionKeys]);
+
   const isTripOwner = Boolean(
     viewerUserId && tripOwnerUserId && viewerUserId === tripOwnerUserId
   );
@@ -196,6 +204,10 @@ export function TripCollaborationPanel({
   );
 
   useEffect(() => {
+    if (variant === "preferencesOnly") {
+      setLiveLoading(false);
+      return;
+    }
     let cancelled = false;
     setLiveLoading(true);
     setLiveFetchErr(null);
@@ -217,7 +229,7 @@ export function TripCollaborationPanel({
     return () => {
       cancelled = true;
     };
-  }, [tripId, livePlanContext]);
+  }, [tripId, livePlanContext, variant]);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/trip-plans/${tripId}/collab`, { credentials: "include" });
@@ -290,6 +302,7 @@ export function TripCollaborationPanel({
   const activeDecisionOrder = useMemo(
     () =>
       classified
+        .filter((meta) => !omitKeySet.has(meta.key))
         .filter((meta) => {
           if (meta.kind === "dates" && plan.dates.confirmed) return true;
           return !isDecisionLocked(collab.decisions[meta.key]);
@@ -300,7 +313,7 @@ export function TripCollaborationPanel({
           if (ga !== gb) return ga ? 1 : -1;
           return a.index - b.index;
         }),
-    [classified, collab, datesLockedByGroup, plan.dates.confirmed]
+    [classified, collab, datesLockedByGroup, omitKeySet, plan.dates.confirmed]
   );
 
   const total = classified.length;
@@ -620,6 +633,30 @@ export function TripCollaborationPanel({
     );
   }
 
+  if (variant === "preferencesOnly") {
+    if (!classified.some((m) => m.key === VIBE_POLL_DECISION_KEY)) return null;
+    return (
+      <div className="space-y-3">
+        <ActivityVibePollCard
+          tripId={tripId}
+          isTripOwner={isTripOwner}
+          adjustmentSubmissions={collab.adjustmentSubmissions}
+          viewerUserId={viewerUserId ?? null}
+          reloadCollab={load}
+          onPlanUpdated={onPlanUpdated}
+        />
+        <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+          Everyone on the trip can submit from the{" "}
+          <Link href={`/trip/${tripId}`} className="font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400">
+            shared trip page
+          </Link>
+          . Their notes appear here for you to review; tap <strong className="text-slate-700 dark:text-neutral-300">Approve &amp; apply (AI)</strong>{" "}
+          to merge with Trip Copilot, or <strong className="text-slate-700 dark:text-neutral-300">Not now</strong> to skip.
+        </p>
+      </div>
+    );
+  }
+
   const mainCollaborationColumn = (
     <>
       <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -676,6 +713,9 @@ export function TripCollaborationPanel({
                 visitorKey={data?.visitorKey ?? ""}
                 canonicalVoterKey={data?.canonicalVoterKey ?? visitorVoteKey(data?.visitorKey ?? "")}
                 roster={data?.roster ?? []}
+                viewerUserId={viewerUserId}
+                adjustmentSubmissions={collab.adjustmentSubmissions}
+                isTripOwner={isTripOwner}
                 busy={busyKey === meta.key}
                 onVote={(p) => void submitVote(p)}
                 reloadCollab={load}
@@ -702,6 +742,7 @@ export function TripCollaborationPanel({
           </h3>
           <ul className="space-y-3">
             {classified.map((meta) => {
+              if (omitKeySet.has(meta.key)) return null;
               const blob = collab.decisions[meta.key];
               if (!isDecisionLocked(blob)) return null;
               if (meta.kind === "dates" && plan.dates.confirmed) return null;
@@ -1205,212 +1246,233 @@ function DatesLockedGate({ active, children }: { active: boolean; children: Reac
   );
 }
 
-function ActivityVibePollCard({
+export function ActivityVibePollCard({
   tripId,
-  meta,
-  chips,
-  viewerPrimaryPick,
-  busy,
-  voterN,
-  quorum,
-  onVote,
-  votes,
-  roster,
-  isHost,
+  isTripOwner,
+  adjustmentSubmissions,
+  viewerUserId,
+  reloadCollab,
+  onPlanUpdated,
 }: {
   tripId: string;
-  meta: ClassifiedDecision;
-  chips: readonly string[];
-  viewerPrimaryPick: string | null | undefined;
-  busy: boolean;
-  voterN: number;
-  quorum: number;
-  onVote: (p: Record<string, unknown>) => void;
-  votes: Record<string, unknown>;
-  roster: TripRosterPerson[];
-  isHost: boolean;
+  isTripOwner: boolean;
+  adjustmentSubmissions?: AdjustmentSubmissionV1[];
+  viewerUserId?: string | null;
+  reloadCollab: () => Promise<void>;
+  onPlanUpdated?: (plan: TripPlan) => void;
 }) {
   const [draft, setDraft] = useState("");
-  const [polishBusy, setPolishBusy] = useState(false);
-  const [polishErr, setPolishErr] = useState<string | null>(null);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [uiErr, setUiErr] = useState<string | null>(null);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
 
-  const mineTrim = viewerPrimaryPick?.trim() ?? "";
+  const rows = [...(adjustmentSubmissions ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const pending = rows.filter((r) => r.status === "pending");
+  const archives = rows.filter((r) => r.status !== "pending").slice(0, 15);
 
-  const chipVoteCounts = useMemo(() => {
-    const counts: Record<string, number> = Object.fromEntries(chips.map((c) => [c, 0]));
-    for (const [, raw] of Object.entries(votes)) {
-      const ans =
-        typeof raw === "string" ? (raw.trim() || null) : coerceScalarVoteChoice(raw);
-      if (ans != null && Object.prototype.hasOwnProperty.call(counts, ans)) {
-        counts[ans] = (counts[ans] ?? 0) + 1;
-      }
-    }
-    return counts;
-  }, [votes, chips]);
-
-  const hostMemberAnswers = useMemo(() => {
-    const rows: { voteKey: string; displayName: string; answer: string }[] = [];
-    for (const [voteKey, raw] of Object.entries(votes)) {
-      const answer =
-        typeof raw === "string" ? (raw.trim() || null) : coerceScalarVoteChoice(raw);
-      if (!answer) continue;
-      const person = roster.find((p) => voteKeysIntersectAliases([voteKey], new Set(p.voteAliases)));
-      rows.push({
-        voteKey,
-        displayName: person?.displayName ?? voteKey,
-        answer,
-      });
-    }
-    rows.sort((a, b) =>
-      a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" })
-    );
-    return rows;
-  }, [votes, roster]);
-
-  const submitPolished = useCallback(async () => {
-    const raw = draft.trim();
-    if (raw.length < 1 || raw.length > POLL_WRITE_IN_MAX_LEN) {
-      setPolishErr("Use 1–80 characters.");
+  const submitSuggestion = useCallback(async () => {
+    const t = draft.trim();
+    if (t.length < 1 || t.length > 2000) {
+      setUiErr("Use 1–2000 characters.");
       return;
     }
-    setPolishBusy(true);
-    setPolishErr(null);
+    setSubmitBusy(true);
+    setUiErr(null);
     try {
-      const res = await fetch(`/api/trip-plans/${tripId}/collab/polish-vote-text`, {
+      const res = await fetch(`/api/trip-plans/${tripId}/collab/adjustment-submissions`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decisionKey: meta.key, text: raw }),
+        body: JSON.stringify({ text: t }),
       });
-      const j = (await res.json().catch(() => ({}))) as { error?: string; polished?: string };
-      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not polish answer");
-      const polished = (j.polished ?? "").trim();
-      if (!polished || !isAllowedPollWriteIn(polished, chips)) {
-        setPolishErr("That didn’t come back as a valid short answer—try rephrasing.");
-        return;
-      }
-      onVote({ decisionKey: meta.key, kind: "pick", option: polished });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not submit");
       setDraft("");
+      await reloadCollab();
     } catch (e) {
-      setPolishErr(e instanceof Error ? e.message : "Something went wrong");
+      setUiErr(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
-      setPolishBusy(false);
+      setSubmitBusy(false);
     }
-  }, [chips, draft, meta.key, onVote, tripId]);
+  }, [draft, reloadCollab, tripId]);
+
+  const dismissSubmission = useCallback(
+    async (submissionId: string) => {
+      setActionBusyId(submissionId);
+      setUiErr(null);
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/collab/adjustment-submissions`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ submissionId, action: "dismiss" }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not dismiss");
+        await reloadCollab();
+      } catch (e) {
+        setUiErr(e instanceof Error ? e.message : "Dismiss failed.");
+      } finally {
+        setActionBusyId(null);
+      }
+    },
+    [reloadCollab, tripId]
+  );
+
+  const applyWithCopilot = useCallback(
+    async (submission: AdjustmentSubmissionV1) => {
+      if (!isTripOwner || submission.status !== "pending") return;
+      setActionBusyId(submission.id);
+      setUiErr(null);
+      try {
+        const msg = `Trip member (${submission.authorDisplayName}) suggests:\n"${submission.text}"\n\nApply what makes sense across hotels, restaurant pins on relevant days, activities, vibe, destination, departure city, dates, budget, etc. Prefer minimal-but-clear edits aligned with today's trip calendar.`;
+        const res = await fetch(`/api/trip-plans/${tripId}/host-copilot`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
+        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Copilot could not apply that.");
+        if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+
+        const patch = await fetch(`/api/trip-plans/${tripId}/collab/adjustment-submissions`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ submissionId: submission.id, action: "mark_applied" }),
+        });
+        const pj = (await patch.json().catch(() => ({}))) as { error?: string };
+        if (!patch.ok) throw new Error(typeof pj.error === "string" ? pj.error : "Saved plan but couldn't mark suggestion applied.");
+        await reloadCollab();
+      } catch (e) {
+        setUiErr(e instanceof Error ? e.message : "Apply failed.");
+      } finally {
+        setActionBusyId(null);
+      }
+    },
+    [isTripOwner, onPlanUpdated, reloadCollab, tripId]
+  );
+
+  const title = "Any preferences/adjustments you'd like to see";
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{title}</h3>
       <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-        {chips.length > 0
-          ? `Vote for a suggestion or add your own (${voterN} vote(s); ${quorum}+ to lock).`
-          : `The host left this open—type your answer (${voterN} vote(s); ${quorum}+ to lock).`}
+        Anyone who joins this trip can share tweaks below. The trip owner reviews each note and can run Trip Copilot with{" "}
+        <strong className="text-slate-800 dark:text-neutral-200">Approve &amp; apply (AI)</strong>, or choose{" "}
+        <strong className="text-slate-800 dark:text-neutral-200">Not now</strong>.
       </p>
 
-      {!mineTrim ? (
-        <p className="mt-3 rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/45 dark:bg-amber-950/35 dark:text-amber-100">
-          Please submit your vote: pick a suggestion or use the text box (your wording is cleaned up automatically when you
-          submit).
-        </p>
-      ) : null}
-
-      {chips.length > 0 ? (
-        <ul className="mt-4 space-y-2.5">
-          {chips.map((opt) => {
-            const forSelected = viewerPrimaryPick === opt;
-            const nForChip = isHost ? chipVoteCounts[opt] ?? 0 : null;
-            return (
-              <li
-                key={opt}
-                className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                  forSelected
-                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
-                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
-                  {isHost && nForChip != null ? (
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-500">
-                      {nForChip} vote{nForChip === 1 ? "" : "s"}
-                    </p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: opt })}
-                  className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
-                    forSelected ? primaryFilledInteractive : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
-                  }`}
-                >
-                  Vote
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-
       <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-          {chips.length > 0 ? "Or type your own answer" : "Your answer"}
-        </p>
-        <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-          We fix typos and phrasing before saving (e.g. &ldquo;beacj vibes lol&rdquo; → &ldquo;Beach vibes&rdquo;).
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            autoComplete="off"
-            maxLength={POLL_WRITE_IN_MAX_LEN}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="e.g. beach days, food-first, chill nights…"
-            disabled={busy || polishBusy}
-            className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
+        <textarea
+          rows={4}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
+          maxLength={2000}
+          disabled={submitBusy}
+          className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+        />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-slate-500 dark:text-neutral-500">{draft.trim().length} / 2000</span>
           <button
             type="button"
-            disabled={busy || polishBusy || draft.trim().length < 1}
-            onClick={() => void submitPolished()}
+            disabled={submitBusy || draft.trim().length < 1}
+            onClick={() => void submitSuggestion()}
             className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
           >
-            {polishBusy ? "Polishing…" : "Submit answer"}
+            {submitBusy ? "Sending…" : "Submit suggestion"}
           </button>
         </div>
-        {polishErr ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">{polishErr}</p> : null}
       </div>
 
-      {mineTrim ? (
-        <p className="mt-3 text-xs text-slate-600 dark:text-neutral-400">
-          Your vote: <span className="font-semibold text-slate-900 dark:text-neutral-100">{viewerPrimaryPick}</span>
+      {uiErr ? (
+        <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/35 dark:text-rose-100">
+          {uiErr}
         </p>
       ) : null}
 
-      {isHost ? (
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/90 p-4 dark:border-white/10 dark:bg-dm-elevated/70">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-            Member answers (host)
-          </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-            {voterN} submitted · quorum {quorum}+ to lock
-          </p>
-          {hostMemberAnswers.length ? (
-            <ul className="mt-3 space-y-2 text-sm">
-              {hostMemberAnswers.map((row) => (
-                <li key={row.voteKey} className="flex flex-wrap gap-x-2 gap-y-0.5">
-                  <span className="font-medium text-slate-900 dark:text-neutral-100">{row.displayName}</span>
-                  <span className="text-slate-400 dark:text-neutral-600">—</span>
-                  <span className="text-slate-700 dark:text-neutral-300">{row.answer}</span>
+      <div className="mt-6">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          Suggestions
+        </p>
+        {!pending.length && !archives.length ? (
+          <p className="mt-2 text-sm text-slate-500 dark:text-neutral-500">Nothing here yet.</p>
+        ) : null}
+        {pending.length ? (
+          <ul className="mt-3 space-y-3">
+            {pending.map((row) => {
+              const isMine = viewerUserId && row.authorUserId === viewerUserId;
+              const busyHere = actionBusyId === row.id;
+              return (
+                <li
+                  key={row.id}
+                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/40"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-xs font-medium text-slate-500 dark:text-neutral-500">
+                      {row.authorDisplayName}
+                      {isMine ? " · you" : null}
+                      <span className="text-slate-400 dark:text-neutral-600">
+                        {" "}
+                        · {new Date(row.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                      </span>
+                    </p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-900 dark:bg-amber-950/45 dark:text-amber-100">
+                      Pending review
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-800 dark:text-neutral-200">{row.text}</p>
+                  {isTripOwner ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busyHere}
+                        onClick={() => void applyWithCopilot(row)}
+                        className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
+                      >
+                        {busyHere ? "Working…" : "Approve & apply (AI)"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyHere}
+                        onClick={() => void dismissSubmission(row.id)}
+                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+                      Waiting for the trip owner to review.
+                    </p>
+                  )}
                 </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-slate-500 dark:text-neutral-500">No answers yet.</p>
-          )}
-        </div>
+              );
+            })}
+          </ul>
+        ) : null}
+
+      {archives.length ? (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-300">
+            History ({archives.length})
+          </summary>
+          <ul className="mt-2 space-y-2 text-sm text-slate-600 dark:text-neutral-400">
+            {archives.map((row) => (
+              <li key={row.id} className="border-t border-slate-100 pt-2 dark:border-white/10">
+                <span className="font-medium text-slate-800 dark:text-neutral-300">{row.authorDisplayName}</span>
+                {" · "}
+                <span>{row.status === "applied" ? "Applied by host" : "Declined"}</span>
+                <p className="mt-1 text-slate-700 dark:text-neutral-300">{row.text}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
+      </div>
     </section>
   );
 }
@@ -1585,6 +1647,9 @@ function DecisionCard({
   visitorKey,
   canonicalVoterKey,
   roster = [],
+  viewerUserId,
+  adjustmentSubmissions,
+  isTripOwner = false,
   busy,
   onVote,
   reloadCollab,
@@ -1607,6 +1672,10 @@ function DecisionCard({
   visitorKey: string;
   canonicalVoterKey: string;
   roster?: TripRosterPerson[];
+  viewerUserId?: string | null;
+  adjustmentSubmissions?: AdjustmentSubmissionV1[];
+  /** Only the creator can approve/free-text suggestions backed by AI. */
+  isTripOwner?: boolean;
   busy: boolean;
   onVote: (p: Record<string, unknown>) => void;
   reloadCollab: () => Promise<void>;
@@ -2006,16 +2075,11 @@ function DecisionCard({
       return (
         <ActivityVibePollCard
           tripId={tripId}
-          meta={meta}
-          chips={opts}
-          viewerPrimaryPick={viewerPrimaryPick}
-          busy={busy}
-          voterN={voterN}
-          quorum={quorum}
-          onVote={onVote}
-          votes={votes}
-          roster={roster}
-          isHost={isHost}
+          isTripOwner={isTripOwner}
+          adjustmentSubmissions={adjustmentSubmissions}
+          viewerUserId={viewerUserId ?? null}
+          reloadCollab={reloadCollab}
+          onPlanUpdated={onPlanUpdated}
         />
       );
     }

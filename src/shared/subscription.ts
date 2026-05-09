@@ -7,6 +7,7 @@ export function parseSubscriptionTier(raw: string | null | undefined): Subscript
 }
 
 /** Temporarily always true for testing — re-enable paid tiers before launch. */
-export function subscriptionTierCanCreateTrips(_tier: SubscriptionTier): boolean {
+export function subscriptionTierCanCreateTrips(tier: SubscriptionTier): boolean {
+  void tier;
   return true;
 }

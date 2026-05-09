@@ -1,6 +1,12 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export async function fetchAuthUserDisplayLabel(svc: SupabaseClient, userId: string): Promise<string> {
+  const { data: u, error } = await svc.auth.admin.getUserById(userId);
+  if (error || !u?.user) return "Traveler";
+  return displayFromUser(u.user);
+}
+
 function displayFromUser(u: { email?: string | null; user_metadata?: Record<string, unknown> }): string {
   const meta = u.user_metadata;
   const full = meta && typeof meta.full_name === "string" ? meta.full_name.trim() : "";

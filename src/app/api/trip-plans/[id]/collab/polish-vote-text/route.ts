@@ -74,7 +74,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ polished: heuristicPolish(rawText) }, { status: 200 });
   }
 
-  const labelHint = decisionKey === VIBE_POLL_DECISION_KEY ? "trip vibe answer" : "priority / focus answer";
+  const labelHint =
+    decisionKey === VIBE_POLL_DECISION_KEY ? "short trip preference or adjustment caption" : "priority / focus answer";
   const system = [
     `You clean up messy short user replies for a group trip poll (${labelHint}).`,
     `Return ONLY valid JSON with a single key "polished": a short readable phrase.`,

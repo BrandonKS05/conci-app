@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
+  applyUserAnchoredTripDates,
   groundPlanInUserInput,
   normalizePlan,
   retainPeopleNamesOnlyIfMentionedInInput,
@@ -84,10 +85,11 @@ export async function POST(request: Request) {
   let finalText = outputText;
   try {
     const inputForRetain = [input, ...images.map(() => "[image]")].filter(Boolean).join("\n");
-    const plan = groundPlanInUserInput(
+    let plan = groundPlanInUserInput(
       retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(safeParseJson(outputText)), inputForRetain),
       input.trim()
     );
+    plan = applyUserAnchoredTripDates(plan, inputForRetain);
     finalText = JSON.stringify(plan);
   } catch {
     /* return raw model output if JSON pipeline fails */

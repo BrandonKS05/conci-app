@@ -1,21 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
-import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
-import { fetchTripHostDisplayName } from "@/backend/trip-host-profile";
 import { fetchTripMemberDisplayNames } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripSharedPanel } from "@/frontend/components/trip-shared-panel";
 import { SiteShell } from "@/frontend/components/site-shell";
-import {
-  buildJoinPageUrlWithCode,
-  buildTripShareInviteMessage,
-  publicSiteHostFromEnv,
-  publicSiteOriginFromEnv,
-  siteOriginFromRequestHeaders,
-} from "@/shared/trip-share-copy";
 import { normalizePlan } from "@/shared/trip-plan";
 import { parseCollabState } from "@/shared/collaboration";
 import { parseTripPlanStatus } from "@/shared/trip-status";
@@ -97,6 +87,11 @@ export default async function SavedTripPlanPage({
     redirect(`/trip/${id}/setup`);
   }
 
+  /** Host-facing trip home is always the unified calendar/setup experience. */
+  if (isHost) {
+    redirect(`/trip/${id}/setup`);
+  }
+
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
   let memberNames: string[] = [];
   try {
@@ -106,26 +101,7 @@ export default async function SavedTripPlanPage({
   }
 
   const ownerId = typeof data.user_id === "string" ? data.user_id : null;
-  let shareMessage = "";
-  if (isHost) {
-    const creatorName = await fetchTripHostDisplayName(svc, ownerId);
-    const siteHost = publicSiteHostFromEnv();
-    const hdrs = await headers();
-    const siteOrigin = siteOriginFromRequestHeaders(hdrs) ?? publicSiteOriginFromEnv();
-    const tripTitle = plan.title?.trim() || "Trip";
-    const normalizedInvite = inviteRaw ? normalizeInviteCode(inviteRaw) : "";
-    const hasInvite = normalizedInvite.length === 6;
-    const inviteDisplay = hasInvite ? formatInviteCodeDisplay(inviteRaw) : "";
-    shareMessage = hasInvite
-      ? buildTripShareInviteMessage({
-          creatorName,
-          tripTitle,
-          inviteCodeDisplay: inviteDisplay,
-          siteHost,
-          joinPageUrl: buildJoinPageUrlWithCode(siteOrigin, inviteDisplay),
-        })
-      : `${creatorName} invited you to plan ${tripTitle} 🗓️ Open ${siteOrigin}/join?from=create to enter your invite code, or view this trip while signed in:\n${siteOrigin}/trip/${id}`;
-  }
+  const shareMessage = "";
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">

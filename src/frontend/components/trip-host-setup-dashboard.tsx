@@ -10,14 +10,12 @@ import {
 import {
   applyHostHotelDateRange,
   applyHostHotelSelection,
+  concreteTripRangeFromPlanDates,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
-  hostHasHotel,
-  hostHasKeptRestaurant,
   hotelStayForDay,
-  hostSetupCompletionPercent,
-  tripRangeBestEffortFromPlanDates,
   isHostPublishReady,
+  normalizePlan,
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
@@ -52,12 +50,11 @@ import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
-
-const NAV_INPAGE = [
-  { id: "dates", label: "Trip calendar" },
-  { id: "flights", label: "Flights" },
-  { id: "budget", label: "Budget" },
-] as const;
+import type { TripPlanStatus } from "@/shared/trip-status";
+import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
+import type { CollabStateV1 } from "@/shared/collaboration";
+import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
+import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -68,6 +65,10 @@ type Props = {
   initialPlan: TripPlan;
   /** Original parser message — used only to decide if meal pins auto-seed. */
   seedText?: string | null;
+  initialTripStatus: TripPlanStatus;
+  initialCollab: CollabStateV1;
+  viewerUserId: string;
+  tripOwnerUserId: string | null;
 };
 
 function daysInMonth(y: number, m0: number): number {
@@ -141,11 +142,33 @@ function ChevRight({ className }: { className?: string }) {
   );
 }
 
-export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }: Props) {
+export function TripHostSetupDashboard({
+  tripId,
+  initialPlan,
+  seedText = null,
+  initialTripStatus,
+  initialCollab,
+  viewerUserId,
+  tripOwnerUserId,
+}: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
+  const [effectiveTripStatus, setEffectiveTripStatus] = useState<TripPlanStatus>(initialTripStatus);
+  const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
+  const bumpCollab = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
+    void router.refresh();
+  }, [router]);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+  }, [initialPlan]);
+
+  useEffect(() => {
+    setEffectiveTripStatus(initialTripStatus);
+  }, [initialTripStatus]);
+
   const hostSetup = useMemo(() => plan.hostSetup ?? {}, [plan.hostSetup]);
-  const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
   const [budgetLine, setBudgetLine] = useState(
     () =>
@@ -177,8 +200,9 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     endIso: string;
   } | null>(null);
 
-  const concreteRangeFromPlan = useMemo(
-    () => tripRangeBestEffortFromPlanDates(plan, new Date().getFullYear()),
+  /** Inferred strictly from planner text with real calendar days — not loose full-month guesses. */
+  const parserConcreteRange = useMemo(
+    () => concreteTripRangeFromPlanDates(plan, new Date().getFullYear()),
     [plan]
   );
 
@@ -222,7 +246,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const [calYear, setCalYear] = useState(() => {
     const y0 = new Date().getFullYear();
     const tr =
-      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
+      initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     if (base) return base.getFullYear();
@@ -233,7 +257,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
   const [calMonth, setCalMonth] = useState(() => {
     const y0 = new Date().getFullYear();
     const tr =
-      initialPlan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(initialPlan, y0);
+      initialPlan.hostSetup?.tripRange ?? concreteTripRangeFromPlanDates(initialPlan, y0);
     const startIso = tr?.startIso;
     const base = startIso ? parseLocalIsoDate(startIso) : null;
     if (base) return base.getMonth();
@@ -242,8 +266,8 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     return new Date().getMonth();
   });
 
-  /** Persisted preferred for saving pins; concrete parser dates fill the grid when the host gave explicit days. */
-  const tripDisplayRange = hostSetup.tripRange ?? concreteRangeFromPlan ?? null;
+  /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
+  const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
 
   const flightTripDayOptions = useMemo(() => {
     if (!tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return [];
@@ -255,6 +279,13 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     () => pendingRangeConfirm ?? tripDisplayRange,
     [pendingRangeConfirm, tripDisplayRange]
   );
+
+  const tripDayIsoSet = useMemo(() => {
+    const start = effectiveHighlightRange?.startIso;
+    const end = effectiveHighlightRange?.endIso;
+    if (!start || !end) return null as Set<string> | null;
+    return new Set(enumerateLocalIsoDays(start, end));
+  }, [effectiveHighlightRange?.startIso, effectiveHighlightRange?.endIso]);
 
   const suggestedSeededRef = useRef(false);
 
@@ -316,24 +347,14 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     setBudgetLine(plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "");
   }, [plan.budget.perPerson, plan.budget.tier]);
 
-  /** Legacy drafts: persist explicit parser dates once if `hostSetup.tripRange` was never saved (new trips get this from POST). */
+  /** Legacy drafts: persist **concrete** parser dates once if `hostSetup.tripRange` was never saved. */
   useEffect(() => {
     const y0 = new Date().getFullYear();
-    const inferred = tripRangeBestEffortFromPlanDates(initialPlan, y0);
+    const inferred = concreteTripRangeFromPlanDates(initialPlan, y0);
     if (!inferred || initialPlan.hostSetup?.tripRange?.startIso) return;
     void persistHostSetup({ tripRange: inferred });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time hydrate from initial plan only
   }, []);
-
-  useEffect(() => {
-    const loc = plan.location?.trim() || plan.title?.trim();
-    if (!loc) return;
-    void (async () => {
-      const res = await fetch(`/api/places/destination-cover?q=${encodeURIComponent(loc)}`);
-      const j = (await res.json().catch(() => ({}))) as { photoUrl?: string | null };
-      if (j.photoUrl?.startsWith("http")) setHeroUrl(j.photoUrl);
-    })();
-  }, [plan.location, plan.title]);
 
   /** Seed restaurant pins only when the host’s parser message mentioned dining. */
   useEffect(() => {
@@ -485,10 +506,11 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         return;
       }
 
-      /* Day mode / after range is saved: any date cell opens the full-day host page. */
+      if (!tripDayIsoSet?.has(iso)) return;
+      setSelectedDayIso(iso);
       router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(iso)}`);
     },
-    [calYear, calMonth, rangeAnchor, datePickMode, router, tripId]
+    [calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet, router, tripId]
   );
 
   const addRestaurantToDay = useCallback(
@@ -522,7 +544,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
     [hostSetup.activityPins, persistHostSetup, selectedDayIso]
   );
 
-  const pct = hostSetupCompletionPercent(plan);
   const pubReady = isHostPublishReady(plan);
 
   const onCopilotResult = useCallback((nextPlan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => {
@@ -559,12 +580,15 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         method: "POST",
         credentials: "include",
       });
-      const j = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
+      const j = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean; plan?: TripPlan };
       if (!res.ok) {
         setErr(j.error || "Publish failed.");
         return;
       }
-      router.replace(`/trip/${tripId}`);
+      if (j.plan) {
+        setPlan(normalizePlan(j.plan));
+      }
+      setEffectiveTripStatus("voting");
       router.refresh();
     } finally {
       setPublishBusy(false);
@@ -607,76 +631,33 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
       : selectedDayIso;
   }, [selectedDayIso]);
 
-  const completionCard = (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-white/15 dark:bg-dm-card dark:shadow-black/20 sm:px-4 sm:py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-slate-900 dark:text-white">Trip {pct}% complete</p>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-[width]"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:justify-end sm:text-[11px]">
-          <li
-            className={`flex items-center gap-1.5 ${hostHasConcreteTripRange(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Dates</span>
-            {hostHasConcreteTripRange(plan) ? "✓" : "—"}
-          </li>
-          <li
-            className={`flex items-center gap-1.5 ${hostHasHotel(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Hotel</span>
-            {hostHasHotel(plan) ? "✓" : "—"}
-          </li>
-          <li
-            className={`flex items-center gap-1.5 ${hostHasKeptRestaurant(plan) ? "text-slate-600 dark:text-neutral-300" : "text-amber-600 dark:text-amber-400"}`}
-          >
-            <span>Restaurant</span>
-            {hostHasKeptRestaurant(plan) ? "✓" : "—"}
-          </li>
-        </ul>
-      </div>
-      <p className="mt-2 border-t border-slate-200 pt-2 text-[10px] leading-snug text-slate-500 dark:border-white/10 dark:text-neutral-500">
-        Publish from the calendar when ready.
-      </p>
-      {err ? <p className="mt-1.5 text-center text-[10px] text-rose-600 dark:text-rose-400">{err}</p> : null}
-    </div>
+  const chatSeed = initialCollab.cardChat?.messages ?? [];
+
+  const resolveWorkspaceNavHref = useCallback(
+    (id: HostSetupNavItemId): string =>
+      id === "collab-sidebar"
+        ? `/trip/${tripId}/setup/overview#sec-collab-sidebar`
+        : `#sec-${id}`,
+    [tripId]
   );
 
   return (
     <>
     <SiteShell
-      title={plan.title || "Trip setup"}
-      eyebrow="Host setup"
+      title={plan.title?.trim() || "Trip"}
+      eyebrow={effectiveTripStatus === "draft" ? "Host setup" : "Your trip"}
       tripTypography
-      titleRight={completionCard}
-      contentWide
     >
-      <div className="mx-auto grid h-[100vh] max-h-[100vh] min-h-0 w-full max-w-[min(100%,1800px)] grid-cols-[260px_1fr] gap-x-6 overflow-hidden lg:gap-x-10">
-      <aside className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-r border-slate-200/90 pr-3 pt-0.5 dark:border-white/10">
-        <div className="space-y-4 pb-4">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <div
-            className="aspect-[16/11] bg-slate-200 bg-cover bg-center dark:bg-neutral-800"
-            style={heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined}
-          />
-          <p className="border-t border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 dark:border-white/10 dark:text-neutral-400">
-            {plan.location?.trim() || plan.title?.trim() || "Destination"}
-          </p>
-        </div>
-
-        <nav className="space-y-1 text-sm">
-          {NAV_INPAGE.map((item) => (
+      <div className="mx-auto w-full max-w-5xl pb-14">
+      <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+        <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
+          {HOST_SETUP_NAV_ITEMS.map((item) => (
             <a
               key={item.id}
-              href={`#sec-${item.id}`}
+              href={resolveWorkspaceNavHref(item.id)}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
               {item.label}
             </a>
           ))}
@@ -684,14 +665,62 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
             href={`/trip/${tripId}/setup/packing`}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
           >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+            <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
             Packing list
           </Link>
         </nav>
+        <div className="flex w-full shrink-0 flex-col items-start gap-2 sm:w-auto sm:max-w-xs sm:items-end sm:text-right">
+          <Link
+            href={`/trip/${tripId}/setup/overview`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500"
+          >
+            Trip overview &amp; collaboration
+          </Link>
+          <p className="max-w-[min(100%,17rem)] text-xs leading-relaxed text-slate-500 sm:max-w-[18rem] dark:text-neutral-500">
+            Trip card, invites, deposits, spotlight votes, and group decisions moved here for a clearer calendar workspace.
+          </p>
         </div>
-      </aside>
+      </div>
 
-      <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden space-y-10 pl-1 pt-0.5">
+      <div className="space-y-12">
+        <section id="sec-setup-copilot" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Setup copilot
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies them.
+            </p>
+            <div className="mt-6 flex justify-center sm:justify-start">
+              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
+            </div>
+          </div>
+        </section>
+
+        <section id="sec-preferences-adjustments" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Preferences &amp; adjustments
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Guests type suggestions on the shared trip page; they queue here for you to run Trip Copilot or decline.
+            </p>
+            <div className="mt-6">
+              <TripCollaborationPanel
+                tripId={tripId}
+                plan={plan}
+                tripStatus={effectiveTripStatus}
+                isHost
+                variant="preferencesOnly"
+                collabRefreshSignal={collabRefreshSignal}
+                onPlanUpdated={setPlan}
+                viewerUserId={viewerUserId}
+                tripOwnerUserId={tripOwnerUserId}
+              />
+            </div>
+          </div>
+        </section>
+
         <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -701,7 +730,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                     : "Tap two days to set your trip; days in range are highlighted below."
                   : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — click any calendar day to open its itinerary page with hotels, restaurants, and activities, or use Add places above the grid for meals and experiences on the trip start day.`
+                    ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day below to open a dedicated host day screen (hotel, meals, activities, Trip Copilot for that date). Use Add places for shortcuts on the first day or choose a day first.`
                     : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
@@ -783,14 +812,20 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  disabled={!pubReady || publishBusy}
-                  onClick={() => void onPublish()}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500 sm:px-4 sm:py-2 sm:text-sm dark:disabled:bg-neutral-700 dark:disabled:text-neutral-500"
-                >
-                  {publishBusy ? "Publishing…" : "Publish trip"}
-                </button>
+                {effectiveTripStatus === "draft" ? (
+                  <button
+                    type="button"
+                    disabled={!pubReady || publishBusy}
+                    onClick={() => void onPublish()}
+                    className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-500 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-500 sm:px-4 sm:py-2 sm:text-sm dark:disabled:bg-neutral-700 dark:disabled:text-neutral-500"
+                  >
+                    {publishBusy ? "Publishing…" : "Publish trip"}
+                  </button>
+                ) : (
+                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-200 sm:px-4 sm:py-2 sm:text-sm">
+                    Published · invite in sidebar
+                  </span>
+                )}
               </div>
             </div>
 
@@ -978,6 +1013,7 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
               </p>
             ) : null}
           </div>
+
         </section>
 
         <section id="sec-flights" className="scroll-mt-28">
@@ -1087,12 +1123,40 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
           </div>
         </section>
 
+        <section id="sec-trip-chat" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Trip chat</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-neutral-400">
+            Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
+          </p>
+          <div className="mt-4">
+            <TripCardChatWidget
+              tripId={tripId}
+              spotlights={plan.spotlights ?? []}
+              initialMessages={chatSeed}
+              onPlanReplaced={setPlan}
+              onCollabBump={bumpCollab}
+            />
+          </div>
+        </section>
+
         <section id="sec-itinerary" className="scroll-mt-28">
-          <GeneratedItineraryView
-            tripId={tripId}
-            initialItinerary={plan.generatedItinerary ?? null}
-            headcount={plan.people.count ?? (plan.people.names.length || 2)}
-          />
+          {plan.generatedItinerary ? (
+            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card">
+              <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+                <span className="text-base font-semibold text-slate-900 dark:text-white">Full text itinerary</span>
+                <span className="mt-1 block text-sm font-normal leading-relaxed text-slate-600 dark:text-neutral-400">
+                  Optional long-form planner text. Pins and votes on the calendar are what guests see day by day.
+                </span>
+              </summary>
+              <div className="border-t border-slate-200 dark:border-white/10">
+                <GeneratedItineraryView
+                  tripId={tripId}
+                  initialItinerary={plan.generatedItinerary ?? null}
+                  headcount={plan.people.count ?? (plan.people.names.length || 2)}
+                />
+              </div>
+            </details>
+          ) : null}
         </section>
       </div>
       </div>
@@ -1177,7 +1241,6 @@ export function TripHostSetupDashboard({ tripId, initialPlan, seedText = null }:
         }}
       />
     </SiteShell>
-    <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
     </>
   );
 }

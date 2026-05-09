@@ -51,8 +51,12 @@ type Props = {
   tripId: string;
   onResult: (plan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => void;
   /**
+   * `floating` — draggable overlay (default). `embedded` — inline section panel (no portal).
+   */
+  layout?: "floating" | "embedded";
+  /**
    * When true (default), the panel stays hidden until the host scrolls to the trip calendar block (`#sec-dates`).
-   * Set false to show immediately (e.g. tests).
+   * Set false to show immediately (e.g. tests). Ignored when `layout="embedded"`.
    */
   revealWhenCalendarVisible?: boolean;
   /** Query selector for the calendar section to observe; default `#sec-dates` on host setup. */
@@ -62,9 +66,11 @@ type Props = {
 export function HostSetupCopilot({
   tripId,
   onResult,
+  layout = "floating",
   revealWhenCalendarVisible = true,
   calendarSectionSelector = "#sec-dates",
 }: Props) {
+  const embedded = layout === "embedded";
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
@@ -74,7 +80,7 @@ export function HostSetupCopilot({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [revealReady, setRevealReady] = useState(() => !revealWhenCalendarVisible);
+  const [revealReady, setRevealReady] = useState(() => embedded || !revealWhenCalendarVisible);
   const [surfaceEntered, setSurfaceEntered] = useState(false);
   const [bounds, setBounds] = useState<{
     left: number;
@@ -106,6 +112,10 @@ export function HostSetupCopilot({
   const entrancePlayedRef = useRef(false);
 
   useEffect(() => {
+    if (embedded) {
+      setRevealReady(true);
+      return;
+    }
     if (!revealWhenCalendarVisible) {
       setRevealReady(true);
       return;
@@ -154,25 +164,34 @@ export function HostSetupCopilot({
       cancelAnimationFrame(raf);
       io?.disconnect();
     };
-  }, [revealWhenCalendarVisible, calendarSectionSelector]);
+  }, [embedded, revealWhenCalendarVisible, calendarSectionSelector]);
 
   useLayoutEffect(() => {
     if (!revealReady) return;
     setMounted(true);
-    setBounds(initialBottomRightBounds());
-  }, [revealReady]);
+    if (!embedded) {
+      setBounds(initialBottomRightBounds());
+    }
+  }, [revealReady, embedded]);
 
   useEffect(() => {
-    if (!mounted || !bounds || entrancePlayedRef.current) return;
+    if (!mounted || entrancePlayedRef.current) return;
+    if (embedded) {
+      entrancePlayedRef.current = true;
+      setSurfaceEntered(true);
+      return;
+    }
+    if (!bounds) return;
     entrancePlayedRef.current = true;
     setSurfaceEntered(false);
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => setSurfaceEntered(true));
     });
     return () => cancelAnimationFrame(id);
-  }, [mounted, bounds]);
+  }, [mounted, bounds, embedded]);
 
   useEffect(() => {
+    if (embedded) return;
     const onResize = () => {
       const b = boundsRef.current;
       if (!b) return;
@@ -180,7 +199,7 @@ export function HostSetupCopilot({
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [embedded]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -288,46 +307,67 @@ export function HostSetupCopilot({
     window.addEventListener("mouseup", onUp);
   }, []);
 
-  if (!mounted || !bounds) {
+  if (!mounted || (!embedded && !bounds)) {
     return null;
   }
 
+  const shellClass =
+    "relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]";
+
   const panel = (
     <div
-      className="relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]"
-      style={{
-        position: "fixed",
-        left: bounds.left,
-        top: bounds.top,
-        width: bounds.width,
-        height: bounds.height,
-        zIndex: 9999,
-        opacity: surfaceEntered ? 1 : 0,
-        transform: surfaceEntered ? "translateY(0)" : "translateY(14px)",
-        transition: "opacity 280ms ease, transform 280ms ease",
-      }}
+      className={
+        embedded
+          ? `${shellClass} h-[min(26rem,52vh)] min-h-[18rem] w-full max-w-2xl`
+          : shellClass
+      }
+      style={
+        embedded
+          ? {
+              opacity: surfaceEntered ? 1 : 0,
+              transform: surfaceEntered ? "translateY(0)" : "translateY(8px)",
+              transition: "opacity 220ms ease, transform 220ms ease",
+            }
+          : {
+              position: "fixed",
+              left: bounds!.left,
+              top: bounds!.top,
+              width: bounds!.width,
+              height: bounds!.height,
+              zIndex: 9999,
+              opacity: surfaceEntered ? 1 : 0,
+              transform: surfaceEntered ? "translateY(0)" : "translateY(14px)",
+              transition: "opacity 280ms ease, transform 280ms ease",
+            }
+      }
     >
       <div
-        role="toolbar"
-        aria-label="Drag setup copilot"
-        onMouseDown={onHeaderMouseDown}
-        className="shrink-0 cursor-grab select-none border-b border-slate-200 px-3 py-2.5 active:cursor-grabbing dark:border-white/10"
+        role={embedded ? undefined : "toolbar"}
+        aria-label={embedded ? undefined : "Drag setup copilot"}
+        onMouseDown={embedded ? undefined : onHeaderMouseDown}
+        className={
+          embedded
+            ? "shrink-0 border-b border-slate-200 px-3 py-2.5 dark:border-white/10"
+            : "shrink-0 cursor-grab select-none border-b border-slate-200 px-3 py-2.5 active:cursor-grabbing dark:border-white/10"
+        }
       >
         <div className="flex items-start gap-2">
-          <span
-            className="mt-0.5 shrink-0 text-slate-400 dark:text-neutral-500"
-            aria-hidden
-            title="Drag to move"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <circle cx="9" cy="8" r="1.5" />
-              <circle cx="15" cy="8" r="1.5" />
-              <circle cx="9" cy="12" r="1.5" />
-              <circle cx="15" cy="12" r="1.5" />
-              <circle cx="9" cy="16" r="1.5" />
-              <circle cx="15" cy="16" r="1.5" />
-            </svg>
-          </span>
+          {embedded ? null : (
+            <span
+              className="mt-0.5 shrink-0 text-slate-400 dark:text-neutral-500"
+              aria-hidden
+              title="Drag to move"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <circle cx="9" cy="8" r="1.5" />
+                <circle cx="15" cy="8" r="1.5" />
+                <circle cx="9" cy="12" r="1.5" />
+                <circle cx="15" cy="12" r="1.5" />
+                <circle cx="9" cy="16" r="1.5" />
+                <circle cx="15" cy="16" r="1.5" />
+              </svg>
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
               Setup copilot
@@ -386,26 +426,32 @@ export function HostSetupCopilot({
           {loading ? "Sending…" : "Send"}
         </button>
       </div>
-      <div
-        role="separator"
-        aria-label="Resize copilot"
-        onMouseDown={onResizeMouseDown}
-        className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-slate-100 dark:hover:bg-white/10"
-        style={{ touchAction: "none" }}
-      >
-        <svg
-          className="pointer-events-none absolute bottom-0.5 right-0.5 text-slate-400 dark:text-neutral-500"
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="currentColor"
-          aria-hidden
+      {embedded ? null : (
+        <div
+          role="separator"
+          aria-label="Resize copilot"
+          onMouseDown={onResizeMouseDown}
+          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-slate-100 dark:hover:bg-white/10"
+          style={{ touchAction: "none" }}
         >
-          <path d="M12 12H9v-3h3V12zM12 7H9V4h3v3zM7 12H4V9h3v3zM7 7H4V4h3v3z" />
-        </svg>
-      </div>
+          <svg
+            className="pointer-events-none absolute bottom-0.5 right-0.5 text-slate-400 dark:text-neutral-500"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M12 12H9v-3h3V12zM12 7H9V4h3v3zM7 12H4V9h3v3zM7 7H4V4h3v3z" />
+          </svg>
+        </div>
+      )}
     </div>
   );
+
+  if (embedded) {
+    return panel;
+  }
 
   return createPortal(panel, document.body);
 }

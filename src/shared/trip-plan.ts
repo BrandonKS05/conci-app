@@ -633,6 +633,172 @@ export function seedTextMentionsDining(seedText: string | null | undefined): boo
   return DINING_PROMPT_HINT.test(s);
 }
 
+function pad2(n: number): string {
+  return `${Math.trunc(n)}`.padStart(2, "0");
+}
+
+/** Calendar month index 0–11 from leading token (“jan”, “july”, …). */
+function monthNameTokenToIndex(raw: string): number | null {
+  const map: Record<string, number> = {
+    jan: 0,
+    january: 0,
+    feb: 1,
+    february: 1,
+    mar: 2,
+    march: 2,
+    apr: 3,
+    april: 3,
+    may: 4,
+    jun: 5,
+    june: 5,
+    jul: 6,
+    july: 6,
+    aug: 7,
+    august: 7,
+    sep: 8,
+    sept: 8,
+    september: 8,
+    oct: 9,
+    october: 9,
+    nov: 10,
+    november: 10,
+    dec: 11,
+    december: 11,
+  };
+  const key = raw.toLowerCase().replace(/\./g, "").trim();
+  return map[key] ?? null;
+}
+
+function isoFromUtcParts(y: number, monthIdx0: number, day: number): string | null {
+  if (y < 1990 || y > 2120 || monthIdx0 < 0 || monthIdx0 > 11 || day < 1 || !Number.isFinite(day)) return null;
+  const dim = new Date(Date.UTC(y, monthIdx0 + 1, 0)).getUTCDate();
+  if (day > dim) return null;
+  return `${y}-${pad2(monthIdx0 + 1)}-${pad2(day)}`;
+}
+
+function sortedIsoPair(a: string, b: string): { startIso: string; endIso: string } {
+  return a <= b ? { startIso: a, endIso: b } : { startIso: b, endIso: a };
+}
+
+function tryIsoBracketRange(chunk: string): { startIso: string; endIso: string } | null {
+  const withKw =
+    /\b(\d{4}-\d{2}-\d{2})\b\s*(?:to|through|thru|until|→)\s*\b(\d{4}-\d{2}-\d{2})\b/i.exec(chunk);
+  if (withKw?.[1] && withKw[2]) return sortedIsoPair(withKw[1], withKw[2]);
+  const hyphenOnly = /\b(\d{4}-\d{2}-\d{2})\b\s*[–\-—]\s*\b(\d{4}-\d{2}-\d{2})\b/.exec(chunk);
+  if (hyphenOnly?.[1] && hyphenOnly[2]) return sortedIsoPair(hyphenOnly[1], hyphenOnly[2]);
+  return null;
+}
+
+/** Interpret as US month/day/year. */
+function trySlashBracketRange(chunk: string): { startIso: string; endIso: string } | null {
+  const withKw =
+    /\b(\d{1,2})[/](\d{1,2})[/](\d{4})\s*(?:to|through|thru|until|→)\s*(\d{1,2})[/](\d{1,2})[/](\d{4})\b/i.exec(
+      chunk
+    );
+  if (withKw?.[6]) {
+    const y1 = Number(withKw[3]);
+    const m1 = Number(withKw[1]);
+    const d1 = Number(withKw[2]);
+    const y2 = Number(withKw[6]);
+    const m2 = Number(withKw[4]);
+    const d2 = Number(withKw[5]);
+    if (
+      ![m1, d1, y1, m2, d2, y2].every((n) => Number.isFinite(n) && n >= 0) ||
+      y1 !== y2 ||
+      m1 < 1 ||
+      m1 > 12 ||
+      m2 < 1 ||
+      m2 > 12
+    ) {
+      return null;
+    }
+    const a = isoFromUtcParts(y1, m1 - 1, d1);
+    const b = isoFromUtcParts(y2, m2 - 1, d2);
+    if (!a || !b) return null;
+    return sortedIsoPair(a, b);
+  }
+  const hyphenOnly =
+    /\b(\d{1,2})[/](\d{1,2})[/](\d{4})\s*[–\-—]\s*(\d{1,2})[/](\d{1,2})[/](\d{4})\b/.exec(chunk);
+  if (hyphenOnly?.[6]) {
+    const y1 = Number(hyphenOnly[3]);
+    const m1 = Number(hyphenOnly[1]);
+    const d1 = Number(hyphenOnly[2]);
+    const y2 = Number(hyphenOnly[6]);
+    const m2 = Number(hyphenOnly[4]);
+    const d2 = Number(hyphenOnly[5]);
+    if (
+      ![m1, d1, y1, m2, d2, y2].every((n) => Number.isFinite(n) && n >= 0) ||
+      y1 !== y2 ||
+      m1 < 1 ||
+      m1 > 12 ||
+      m2 < 1 ||
+      m2 > 12
+    ) {
+      return null;
+    }
+    const a = isoFromUtcParts(y1, m1 - 1, d1);
+    const b = isoFromUtcParts(y2, m2 - 1, d2);
+    if (!a || !b) return null;
+    return sortedIsoPair(a, b);
+  }
+  return null;
+}
+
+/** e.g. "July 10–24, 2026" or "June 14 — 28, 2026" — same-month window only (common in trip chat). */
+function tryNamedMonthDayRange(chunk: string): { startIso: string; endIso: string } | null {
+  const re =
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})(?:,?|\s+)(\d{4})\b/i.exec(
+      chunk
+    );
+  if (!re?.[4]) return null;
+  const mi = monthNameTokenToIndex(re[1]);
+  if (mi == null) return null;
+  const y = Number(re[4]);
+  let d1 = Number(re[2]);
+  let d2 = Number(re[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(d1) || !Number.isFinite(d2)) return null;
+  if (d1 > d2) [d1, d2] = [d2, d1];
+  const a = isoFromUtcParts(y, mi, d1);
+  const b = isoFromUtcParts(y, mi, d2);
+  if (!a || !b) return null;
+  return sortedIsoPair(a, b);
+}
+
+/**
+ * Replace model `dates.options` when your own words clearly state one contiguous span.
+ * Prefer `• dates: …` lines from the composed finalize prompt over generic trip seed text so we avoid
+ * random ISO-like numbers elsewhere (passport years, budgets, …).
+ *
+ * Typical failure mode: rebuild JSON emits "2026-07-01 … 2026-07-31" for any "July …" trip; this snaps back
+ * to the concrete range you typed.
+ */
+export function applyUserAnchoredTripDates(plan: TripPlan, userCorpus: string): TripPlan {
+  const corpus = userCorpus.trim();
+  if (corpus.length < 10) return plan;
+
+  const lines = corpus.split(/\r?\n/).map((l) => l.trim());
+  /** Chip answers restate dates most reliably (see composeTripPrompt). */
+  const dateBullets = lines.filter((l) => /^•\s*dates\s*:/i.test(l));
+
+  const scopes = [...(dateBullets.length > 0 ? dateBullets : []), corpus];
+  const tryAll = (): { startIso: string; endIso: string } | null => {
+    for (const scope of scopes) {
+      const r =
+        tryIsoBracketRange(scope) || trySlashBracketRange(scope) || tryNamedMonthDayRange(scope);
+      if (r) return r;
+    }
+    return null;
+  };
+
+  const ranged = tryAll();
+  if (!ranged) return plan;
+
+  return {
+    ...plan,
+    dates: { confirmed: true, options: [`${ranged.startIso} to ${ranged.endIso}`] },
+  };
+}
+
 export function normalizePlan(value: unknown): TripPlan {
   const plan = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const people =
@@ -793,14 +959,17 @@ export function tripRangeBestEffortFromPlanDates(
 }
 
 /**
- * Host draft save: same as {@link tripRangeBestEffortFromPlanDates} (concrete → loose option strings
- * → joined blob → vague month phrases). Call this when persisting `hostSetup.tripRange` for new drafts.
+ * When creating a draft, persist {@link HostSetupState.tripRange} only from **concrete** date text
+ * (ISO ranges, spelled-out day spans, etc.). Loose “July 2026” / `Date` parses are excluded so we
+ * do not silently save whole-month spans that fight the planner’s narrower windows.
+ *
+ * {@link tripRangeBestEffortFromPlanDates} stays available for ancillary features that still want a fuzzy guess.
  */
 export function tripRangeForHostDraftSave(
   plan: TripPlan,
   fallbackYear: number
 ): { startIso: string; endIso: string } | null {
-  return tripRangeBestEffortFromPlanDates(plan, fallbackYear);
+  return concreteTripRangeFromPlanDates(plan, fallbackYear);
 }
 
 /** @deprecated Use concreteTripRangeFromPlanDates */

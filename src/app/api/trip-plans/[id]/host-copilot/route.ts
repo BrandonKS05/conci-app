@@ -17,6 +17,9 @@ import {
   parseLocalIsoDate,
   planRecordWithDatesSyncedToTripRange,
   safeParseJson,
+  type HostActivityExperience,
+  type HostActivityPin,
+  type HostRestaurantPin,
   type HostSetupState,
   type TripPlan,
 } from "@/shared/trip-plan";
@@ -39,9 +42,116 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
 
 const NAV_IDS = new Set(["dates", "budget"]);
 
-const SYSTEM = (year: number) => `You are the host's setup copilot for a draft trip in the Conci app. The host is on a single-page checklist (calendar, hotel, meal pins on calendar days, budget, and other sections).
+function coerceRestaurantPinsFromParsed(
+  plan: TripPlan,
+  raw: unknown,
+  restrictDateIso?: string | null
+): HostRestaurantPin[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tr = plan.hostSetup?.tripRange;
+  if (!tr?.startIso || !tr?.endIso) return undefined;
+  const allowed = new Set(enumerateLocalIsoDays(tr.startIso, tr.endIso));
+  const pins: HostRestaurantPin[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const dateIso = typeof r.dateIso === "string" ? r.dateIso.trim() : "";
+    const placeUnknown = r.place && typeof r.place === "object" ? (r.place as Record<string, unknown>) : null;
+    const name = placeUnknown?.name !== undefined ? String(placeUnknown.name).trim() : "";
+    const mapsUrl =
+      placeUnknown?.mapsUrl !== undefined && typeof placeUnknown.mapsUrl === "string"
+        ? placeUnknown.mapsUrl.trim()
+        : "";
+    const kept =
+      typeof r.kept === "boolean" ? r.kept : r.kept == null ? true : Boolean(r.kept);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso) || !allowed.has(dateIso)) continue;
+    if (restrictDateIso && dateIso !== restrictDateIso) continue;
+    if (!name || !mapsUrl.startsWith("http")) continue;
+    const photoUrl =
+      typeof placeUnknown?.photoUrl === "string" && placeUnknown.photoUrl.startsWith("http")
+        ? placeUnknown.photoUrl
+        : null;
+    const ratingRaw = placeUnknown?.rating;
+    const rating =
+      typeof ratingRaw === "number"
+        ? ratingRaw
+        : typeof ratingRaw === "string" && ratingRaw.trim() !== ""
+          ? Number(ratingRaw)
+          : undefined;
+    const address =
+      typeof placeUnknown?.address === "string" && placeUnknown.address.trim()
+        ? placeUnknown.address.trim()
+        : undefined;
+    pins.push({
+      dateIso,
+      kept,
+      place: {
+        name,
+        mapsUrl,
+        spotlightCategory: "restaurant",
+        ...(rating != null && !Number.isNaN(rating) ? { rating } : {}),
+        ...(photoUrl ? { photoUrl } : {}),
+        ...(address ? { address } : {}),
+      },
+    });
+    if (pins.length >= 12) break;
+  }
+  return pins.length ? pins : undefined;
+}
+
+function coerceActivityPinsFromParsed(
+  plan: TripPlan,
+  raw: unknown,
+  restrictDateIso?: string | null
+): HostActivityPin[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tr = plan.hostSetup?.tripRange;
+  if (!tr?.startIso || !tr?.endIso) return undefined;
+  const allowed = new Set(enumerateLocalIsoDays(tr.startIso, tr.endIso));
+  const pins: HostActivityPin[] = [];
+
+  function buildExp(ex: Record<string, unknown>): HostActivityExperience | null {
+    const name = typeof ex.name === "string" ? ex.name.trim() : "";
+    const bookingUrl = typeof ex.bookingUrl === "string" ? ex.bookingUrl.trim() : "";
+    const pricePerPerson =
+      typeof ex.pricePerPerson === "string" ? ex.pricePerPerson.trim() : ex.pricePerPerson != null ? String(ex.pricePerPerson) : "";
+    const rating =
+      typeof ex.rating === "string" ? ex.rating.trim() : ex.rating != null ? String(ex.rating) : "";
+    const duration =
+      typeof ex.duration === "string" ? ex.duration.trim() : ex.duration != null ? String(ex.duration) : "";
+    const coverPhotoUrl =
+      typeof ex.coverPhotoUrl === "string" && ex.coverPhotoUrl.startsWith("http") ? ex.coverPhotoUrl : null;
+    const urlFinal = bookingUrl.startsWith("http") ? bookingUrl : bookingUrl ? `https://${bookingUrl}` : "";
+    if (!name || !urlFinal.startsWith("http")) return null;
+    return { name, bookingUrl: urlFinal, pricePerPerson, rating, duration, coverPhotoUrl };
+  }
+
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const dateIso = typeof r.dateIso === "string" ? r.dateIso.trim() : "";
+    const exRaw = r.experience && typeof r.experience === "object" ? (r.experience as Record<string, unknown>) : null;
+    const kept =
+      typeof r.kept === "boolean" ? r.kept : r.kept == null ? true : Boolean(r.kept);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso) || !allowed.has(dateIso)) continue;
+    if (restrictDateIso && dateIso !== restrictDateIso) continue;
+    if (!exRaw) continue;
+    const experience = buildExp(exRaw);
+    if (!experience) continue;
+    pins.push({ dateIso, experience, kept });
+    if (pins.length >= 12) break;
+  }
+  return pins.length ? pins : undefined;
+}
+
+const buildCopilotSystem = (year: number, focusDateIso?: string | null) => `You are the host's setup copilot for a Conci trip. The trip may still be drafting or already shared with travelers; the host can change calendar pins, budgets, vibes, hotels, meals, or activities anytime.
 
 **Trip dates (critical):** The only source of truth for "which calendar days exist" is **Host trip range** and **Trip calendar days** in the user message. If those are set, **ignore** older months or date ranges mentioned in "Planner dates slot" — that field is from the first chat parse and is often stale after the host moves the trip on the calendar. Never assign meal pins or reservations to ISO dates outside **Trip calendar days**.
+${
+  focusDateIso
+    ? `\n**Day-focused session:** The host is editing **${focusDateIso}** ONLY unless they clearly ask about another calendar day inside the trip window. Prefer **autoPinRestaurant** with \`dateIso\`="${focusDateIso}" and **autoBookHotel** with \`stayStartIso\` / \`stayEndIso\` set to nights that cover **${focusDateIso}**. If you populate **hostSetupPatch.restaurantPins** or **activityPins**, every pin's \`dateIso\` should be ${focusDateIso} unless the host named a different trip day explicitly.\n`
+    : ""
+}
 
 Return ONLY valid JSON (no markdown) with this exact shape:
 {
@@ -68,6 +178,7 @@ Rules:
   - When you **change tripRange** to new dates, also set **restaurantPins**: [] and **activityPins**: [] so old day pins do not leak outside the new range.
   - **hotel**: only set to null to clear in JSON; for a new stay use **autoBookHotel** (or the host picks manually in the app).
   - **experiencesOutlined**: boolean when they say they skimmed / outlined experiences.
+  - You may populate **restaurantPins** /** **activityPins** as structured arrays ONLY when proposing concrete pinned restaurants/experiences; every \`dateIso\` MUST be inside **Trip calendar days** (validated server-side). Prefer **autoPinRestaurant** for a single top pick when unsure.
 - **planPatch** (optional): only top-level trip plan fields that should change. Same rules as trip card chat:
   - Allowed: title, location, departureCity, dates, people, budget, vibe, openDecisions, nextStep, confidence.
   - **budget**: { "tier", "perPerson" } — e.g. "splurge", "mid-range", "budget-friendly" and/or strings like "~$150/person".
@@ -193,10 +304,18 @@ const MONTH_NAMES_LONG = [
 ] as const;
 
 /** If the model omits JSON, infer Jul 16 / july 16th style mentions against the trip’s ISO days. */
-function tryInferAutoPinFromMessage(message: string, plan: TripPlan): AutoPinRestaurantReq | undefined {
+function tryInferAutoPinFromMessage(
+  message: string,
+  plan: TripPlan,
+  preferredDateIso?: string | null
+): AutoPinRestaurantReq | undefined {
   const tr = plan.hostSetup?.tripRange;
   if (!tr?.startIso || !tr?.endIso) return undefined;
-  if (!/\b(dinner|lunch|breakfast|brunch|reservation|restaurant|meal|pin|places)\b/i.test(message)) {
+  if (
+    !/\b(dinner|lunch|breakfast|brunch|reservation|restaurant|meal|experience|activities|museum|tour|pin|places|food)\b/i.test(
+      message
+    )
+  ) {
     return undefined;
   }
   const days = enumerateLocalIsoDays(tr.startIso, tr.endIso);
@@ -217,12 +336,32 @@ function tryInferAutoPinFromMessage(message: string, plan: TripPlan): AutoPinRes
     if (/\blunch\b/i.test(message)) searchHint = "lunch";
     else if (/\bbrunch\b/i.test(message)) searchHint = "brunch";
     else if (/\bbreakfast\b/i.test(message)) searchHint = "breakfast";
+    else if (/\b(experience|museum|tour|activity|things to do)\b/i.test(message)) searchHint = "things to do";
     return { dateIso: iso, searchHint };
   }
+
+  const pref = typeof preferredDateIso === "string" ? preferredDateIso.trim() : "";
+  if (
+    pref &&
+    /^\d{4}-\d{2}-\d{2}$/.test(pref) &&
+    days.includes(pref)
+  ) {
+    let searchHint = "dinner";
+    if (/\blunch\b/i.test(message)) searchHint = "lunch";
+    else if (/\bbrunch\b/i.test(message)) searchHint = "brunch";
+    else if (/\bbreakfast\b/i.test(message)) searchHint = "breakfast";
+    else if (/\b(experience|museum|tour|activity|things to do)\b/i.test(message)) searchHint = "things to do";
+    return { dateIso: pref, searchHint };
+  }
+
   return undefined;
 }
 
-function tryInferAutoBookHotelFromMessage(message: string, plan: TripPlan): AutoBookHotelReq | undefined {
+function tryInferAutoBookHotelFromMessage(
+  message: string,
+  plan: TripPlan,
+  focusNightIso?: string | null
+): AutoBookHotelReq | undefined {
   const tr = plan.hostSetup?.tripRange;
   if (!tr?.startIso || !tr?.endIso) return undefined;
   if (!/\b(hotel|hotels|lodging|book\s+(a\s+)?(room|stay)|place\s+to\s+stay|where\s+to\s+stay)\b/i.test(message)) {
@@ -231,6 +370,13 @@ function tryInferAutoBookHotelFromMessage(message: string, plan: TripPlan): Auto
   let searchHint = "boutique hotel";
   if (/\bluxury\b/i.test(message)) searchHint = "luxury hotel";
   else if (/\b(budget|cheap|affordable)\b/i.test(message)) searchHint = "budget hotel";
+
+  const days = enumerateLocalIsoDays(tr.startIso, tr.endIso);
+  const f = typeof focusNightIso === "string" ? focusNightIso.trim() : "";
+  if (f && /^\d{4}-\d{2}-\d{2}$/.test(f) && days.includes(f)) {
+    return { searchHint, stayStartIso: f, stayEndIso: f };
+  }
+
   return { searchHint };
 }
 
@@ -249,9 +395,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { message?: string };
+  let body: { message?: string; focusDateIso?: string | null };
   try {
-    body = (await req.json()) as { message?: string };
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -280,12 +426,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  if (row.status !== "draft") {
-    return NextResponse.json({ error: "Copilot is only available while the trip is a draft." }, { status: 409 });
-  }
-
   const planObj = typeof row.plan === "object" && row.plan !== null ? (row.plan as Record<string, unknown>) : {};
   const plan = normalizePlan(planObj);
+
+  const rawFocus =
+    typeof body.focusDateIso === "string" ? body.focusDateIso.trim() : "";
+  let focusDateIso: string | null =
+    rawFocus && /^\d{4}-\d{2}-\d{2}$/.test(rawFocus) ? rawFocus : null;
+  const tr0 = plan.hostSetup?.tripRange;
+  if (focusDateIso && tr0?.startIso && tr0?.endIso) {
+    if (!enumerateLocalIsoDays(tr0.startIso, tr0.endIso).includes(focusDateIso)) {
+      focusDateIso = null;
+    }
+  }
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   const year = new Date().getFullYear();
@@ -316,6 +469,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     `Destination: ${plan.location ?? ""}`,
     `Departure city: ${plan.departureCity ?? ""}`,
     hasTr && tr ? `Host trip range (source of truth): ${tr.startIso} → ${tr.endIso}` : `Host trip range: not set`,
+    focusDateIso ? `UI day focus: ${focusDateIso} — prefer edits that anchor to this ISO day.` : "",
     calendarDaysLine,
     `Budget tier: ${plan.budget.tier ?? ""} perPerson: ${plan.budget.perPerson ?? ""}`,
     `Vibe: ${plan.vibe.join(", ") || "none"}`,
@@ -341,7 +495,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         body: JSON.stringify({
           model: "gpt-4o-mini",
           input: [
-            { role: "system", content: SYSTEM(year) },
+            { role: "system", content: buildCopilotSystem(year, focusDateIso) },
             { role: "user", content: contextBlock },
           ],
           text: { format: { type: "json_object" } },
@@ -380,7 +534,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
                 }
               }
               if (Array.isArray(p.restaurantPins) && p.restaurantPins.length === 0) patch.restaurantPins = [];
+              else if (Array.isArray(p.restaurantPins) && p.restaurantPins.length > 0) {
+                const rp = coerceRestaurantPinsFromParsed(plan, p.restaurantPins, focusDateIso);
+                if (rp?.length) patch.restaurantPins = rp;
+              }
               if (Array.isArray(p.activityPins) && p.activityPins.length === 0) patch.activityPins = [];
+              else if (Array.isArray(p.activityPins) && p.activityPins.length > 0) {
+                const apPins = coerceActivityPinsFromParsed(plan, p.activityPins, focusDateIso);
+                if (apPins?.length) patch.activityPins = apPins;
+              }
               if (p.hotel === null) patch.hotel = null;
               if (typeof p.experiencesOutlined === "boolean") patch.experiencesOutlined = p.experiencesOutlined;
               if (Object.keys(patch).length > 0) hostSetupPatch = patch;
@@ -405,15 +567,26 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
               !Array.isArray(parsed.autoPinRestaurant)
             ) {
               const ap = parsed.autoPinRestaurant as Record<string, unknown>;
-              const dateIso = typeof ap.dateIso === "string" ? ap.dateIso.trim() : "";
+              let dateIso = typeof ap.dateIso === "string" ? ap.dateIso.trim() : "";
               if (/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
-                autoPinRequest = {
-                  dateIso,
-                  searchHint:
-                    typeof ap.searchHint === "string" && ap.searchHint.trim()
-                      ? ap.searchHint.trim().slice(0, 80)
-                      : undefined,
-                };
+                const trPin = plan.hostSetup?.tripRange;
+                const allowedDays =
+                  trPin?.startIso && trPin?.endIso
+                    ? enumerateLocalIsoDays(trPin.startIso, trPin.endIso)
+                    : null;
+                if (allowedDays && !allowedDays.includes(dateIso)) {
+                  if (focusDateIso && allowedDays.includes(focusDateIso)) dateIso = focusDateIso;
+                  else dateIso = "";
+                }
+                if (dateIso) {
+                  autoPinRequest = {
+                    dateIso,
+                    searchHint:
+                      typeof ap.searchHint === "string" && ap.searchHint.trim()
+                        ? ap.searchHint.trim().slice(0, 80)
+                        : undefined,
+                  };
+                }
               }
             }
 
@@ -463,11 +636,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   if (!autoBookHotelRequest) {
-    autoBookHotelRequest = tryInferAutoBookHotelFromMessage(message, nextPlan);
+    autoBookHotelRequest = tryInferAutoBookHotelFromMessage(message, nextPlan, focusDateIso ?? undefined);
   }
 
   if (!autoPinRequest) {
-    autoPinRequest = tryInferAutoPinFromMessage(message, nextPlan);
+    autoPinRequest = tryInferAutoPinFromMessage(message, nextPlan, focusDateIso ?? undefined);
+  }
+
+  const inferTr = nextPlan.hostSetup?.tripRange;
+  if (
+    focusDateIso &&
+    autoPinRequest?.dateIso &&
+    inferTr?.startIso &&
+    inferTr?.endIso
+  ) {
+    const allowedInfer = enumerateLocalIsoDays(inferTr.startIso, inferTr.endIso);
+    if (allowedInfer.includes(focusDateIso) && !allowedInfer.includes(autoPinRequest.dateIso)) {
+      autoPinRequest = { ...autoPinRequest, dateIso: focusDateIso };
+    }
   }
 
   let hotelApplied = false;
