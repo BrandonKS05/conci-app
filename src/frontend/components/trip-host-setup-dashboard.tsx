@@ -54,6 +54,7 @@ import type { TripPlanStatus } from "@/shared/trip-status";
 import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
+import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -66,6 +67,8 @@ type Props = {
   seedText?: string | null;
   initialTripStatus: TripPlanStatus;
   initialCollab: CollabStateV1;
+  viewerUserId: string;
+  tripOwnerUserId: string | null;
 };
 
 function daysInMonth(y: number, m0: number): number {
@@ -145,11 +148,15 @@ export function TripHostSetupDashboard({
   seedText = null,
   initialTripStatus,
   initialCollab,
+  viewerUserId,
+  tripOwnerUserId,
 }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
   const [effectiveTripStatus, setEffectiveTripStatus] = useState<TripPlanStatus>(initialTripStatus);
+  const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
   const bumpCollab = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
     void router.refresh();
   }, [router]);
 
@@ -640,9 +647,8 @@ export function TripHostSetupDashboard({
       title={plan.title?.trim() || "Trip"}
       eyebrow={effectiveTripStatus === "draft" ? "Host setup" : "Your trip"}
       tripTypography
-      contentWide
     >
-      <div className="mx-auto w-full pb-14">
+      <div className="mx-auto w-full max-w-5xl pb-14">
       <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
         <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
           {HOST_SETUP_NAV_ITEMS.map((item) => (
@@ -676,7 +682,45 @@ export function TripHostSetupDashboard({
         </div>
       </div>
 
-      <div className="space-y-10">
+      <div className="space-y-12">
+        <section id="sec-setup-copilot" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Setup copilot
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies them.
+            </p>
+            <div className="mt-6 flex justify-center sm:justify-start">
+              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
+            </div>
+          </div>
+        </section>
+
+        <section id="sec-preferences-adjustments" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Preferences &amp; adjustments
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Guests type suggestions on the shared trip page; they queue here for you to run Trip Copilot or decline.
+            </p>
+            <div className="mt-6">
+              <TripCollaborationPanel
+                tripId={tripId}
+                plan={plan}
+                tripStatus={effectiveTripStatus}
+                isHost
+                variant="preferencesOnly"
+                collabRefreshSignal={collabRefreshSignal}
+                onPlanUpdated={setPlan}
+                viewerUserId={viewerUserId}
+                tripOwnerUserId={tripOwnerUserId}
+              />
+            </div>
+          </div>
+        </section>
+
         <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -1197,7 +1241,6 @@ export function TripHostSetupDashboard({
         }}
       />
     </SiteShell>
-    <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} />
     </>
   );
 }

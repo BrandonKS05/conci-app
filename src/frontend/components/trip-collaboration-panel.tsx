@@ -144,6 +144,8 @@ export function TripCollaborationPanel({
   groupProgressStickyTarget,
   viewerUserId,
   tripOwnerUserId,
+  variant = "full",
+  omitDecisionKeys,
 }: {
   tripId: string;
   plan: TripPlan;
@@ -162,6 +164,10 @@ export function TripCollaborationPanel({
   viewerUserId?: string;
   /** `trip_plans.user_id` — trip creator. */
   tripOwnerUserId?: string | null;
+  /** `preferencesOnly` — only the trip-wide preferences / adjustments card (host workspace). */
+  variant?: "full" | "preferencesOnly";
+  /** Hide these decision keys in “Decide together” / locked lists (e.g. duplicate prefs strip elsewhere). */
+  omitDecisionKeys?: string[];
 }) {
   const router = useRouter();
   const stickyGroupProgressRail = typeof groupProgressStickyTarget !== "undefined";
@@ -186,6 +192,8 @@ export function TripCollaborationPanel({
 
   const livePlanContext = tripLiveRecommendationsContextFingerprint(plan);
 
+  const omitKeySet = useMemo(() => new Set(omitDecisionKeys ?? []), [omitDecisionKeys]);
+
   const isTripOwner = Boolean(
     viewerUserId && tripOwnerUserId && viewerUserId === tripOwnerUserId
   );
@@ -196,6 +204,10 @@ export function TripCollaborationPanel({
   );
 
   useEffect(() => {
+    if (variant === "preferencesOnly") {
+      setLiveLoading(false);
+      return;
+    }
     let cancelled = false;
     setLiveLoading(true);
     setLiveFetchErr(null);
@@ -217,7 +229,7 @@ export function TripCollaborationPanel({
     return () => {
       cancelled = true;
     };
-  }, [tripId, livePlanContext]);
+  }, [tripId, livePlanContext, variant]);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/trip-plans/${tripId}/collab`, { credentials: "include" });
@@ -290,6 +302,7 @@ export function TripCollaborationPanel({
   const activeDecisionOrder = useMemo(
     () =>
       classified
+        .filter((meta) => !omitKeySet.has(meta.key))
         .filter((meta) => {
           if (meta.kind === "dates" && plan.dates.confirmed) return true;
           return !isDecisionLocked(collab.decisions[meta.key]);
@@ -300,7 +313,7 @@ export function TripCollaborationPanel({
           if (ga !== gb) return ga ? 1 : -1;
           return a.index - b.index;
         }),
-    [classified, collab, datesLockedByGroup, plan.dates.confirmed]
+    [classified, collab, datesLockedByGroup, omitKeySet, plan.dates.confirmed]
   );
 
   const total = classified.length;
@@ -620,6 +633,30 @@ export function TripCollaborationPanel({
     );
   }
 
+  if (variant === "preferencesOnly") {
+    if (!classified.some((m) => m.key === VIBE_POLL_DECISION_KEY)) return null;
+    return (
+      <div className="space-y-3">
+        <ActivityVibePollCard
+          tripId={tripId}
+          isTripOwner={isTripOwner}
+          adjustmentSubmissions={collab.adjustmentSubmissions}
+          viewerUserId={viewerUserId ?? null}
+          reloadCollab={load}
+          onPlanUpdated={onPlanUpdated}
+        />
+        <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+          Everyone on the trip can submit from the{" "}
+          <Link href={`/trip/${tripId}`} className="font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400">
+            shared trip page
+          </Link>
+          . Their notes appear here for you to review; tap <strong className="text-slate-700 dark:text-neutral-300">Approve &amp; apply (AI)</strong>{" "}
+          to merge with Trip Copilot, or <strong className="text-slate-700 dark:text-neutral-300">Not now</strong> to skip.
+        </p>
+      </div>
+    );
+  }
+
   const mainCollaborationColumn = (
     <>
       <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -705,6 +742,7 @@ export function TripCollaborationPanel({
           </h3>
           <ul className="space-y-3">
             {classified.map((meta) => {
+              if (omitKeySet.has(meta.key)) return null;
               const blob = collab.decisions[meta.key];
               if (!isDecisionLocked(blob)) return null;
               if (meta.kind === "dates" && plan.dates.confirmed) return null;
@@ -1208,9 +1246,8 @@ function DatesLockedGate({ active, children }: { active: boolean; children: Reac
   );
 }
 
-function ActivityVibePollCard({
+export function ActivityVibePollCard({
   tripId,
-  meta,
   isTripOwner,
   adjustmentSubmissions,
   viewerUserId,
@@ -1218,7 +1255,6 @@ function ActivityVibePollCard({
   onPlanUpdated,
 }: {
   tripId: string;
-  meta: ClassifiedDecision;
   isTripOwner: boolean;
   adjustmentSubmissions?: AdjustmentSubmissionV1[];
   viewerUserId?: string | null;
@@ -1318,12 +1354,15 @@ function ActivityVibePollCard({
     [isTripOwner, onPlanUpdated, reloadCollab, tripId]
   );
 
+  const title = "Any preferences/adjustments you'd like to see";
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{title}</h3>
       <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-        Anyone on this trip can share preferences or tweaks. They appear below for everyone; the trip owner applies them via
-        AI with one tap (&ldquo;Approve & apply&rdquo;), or declines.
+        Anyone who joins this trip can share tweaks below. The trip owner reviews each note and can run Trip Copilot with{" "}
+        <strong className="text-slate-800 dark:text-neutral-200">Approve &amp; apply (AI)</strong>, or choose{" "}
+        <strong className="text-slate-800 dark:text-neutral-200">Not now</strong>.
       </p>
 
       <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
@@ -2036,7 +2075,6 @@ function DecisionCard({
       return (
         <ActivityVibePollCard
           tripId={tripId}
-          meta={meta}
           isTripOwner={isTripOwner}
           adjustmentSubmissions={adjustmentSubmissions}
           viewerUserId={viewerUserId ?? null}

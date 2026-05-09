@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
-import type { CollabStateV1 } from "@/shared/collaboration";
+import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
@@ -140,6 +140,7 @@ export function TripHostSetupSidebar({
           onPlanUpdated={onPlanUpdated}
           viewerUserId={viewerUserId}
           tripOwnerUserId={tripOwnerUserId}
+          omitDecisionKeys={[VIBE_POLL_DECISION_KEY]}
         />
       </div>
     </div>

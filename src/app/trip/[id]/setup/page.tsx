@@ -47,7 +47,7 @@ export default async function TripHostSetupPage({
 
   const { data, error } = await svc
     .from("trip_plans")
-    .select("plan, status, seed_text, collab_state")
+    .select("plan, status, seed_text, collab_state, user_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -58,6 +58,7 @@ export default async function TripHostSetupPage({
   const plan = normalizePlan(data.plan);
   const initialTripStatus = parseTripPlanStatus(data.status);
   const initialCollab = parseCollabState(data.collab_state);
+  const ownerId = typeof data.user_id === "string" ? data.user_id : null;
 
   const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
 
@@ -69,6 +70,8 @@ export default async function TripHostSetupPage({
         seedText={seedText}
         initialTripStatus={initialTripStatus}
         initialCollab={initialCollab}
+        viewerUserId={user.id}
+        tripOwnerUserId={ownerId}
       />
     </div>
   );

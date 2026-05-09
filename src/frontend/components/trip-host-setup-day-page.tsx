@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
+import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
 import {
+  enumerateLocalIsoDays,
   hotelStayForDay,
   normalizePlan,
   parseLocalIsoDate,
@@ -88,6 +90,113 @@ function DropSection({
           <div className="px-5 pb-6 pt-4 sm:px-6 sm:pb-8 sm:pt-5">{children}</div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function formatUsd(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
+}
+
+function DaySpendEstimateBar({
+  baselineGroupUsd,
+  hotelUsd,
+  mealsUsd,
+  activitiesUsd,
+  estimatedTotalUsd,
+}: {
+  baselineGroupUsd: number | null;
+  hotelUsd: number;
+  mealsUsd: number;
+  activitiesUsd: number;
+  estimatedTotalUsd: number;
+}) {
+  const baseline = baselineGroupUsd;
+  const fillPct = baseline != null && baseline > 0 ? Math.min(100, (estimatedTotalUsd / baseline) * 100) : 100;
+  const over = baseline != null && baseline > 0 && estimatedTotalUsd > baseline;
+
+  const parts = [
+    { key: "h", usd: hotelUsd, className: "bg-teal-500 dark:bg-teal-600" },
+    { key: "m", usd: mealsUsd, className: "bg-amber-400 dark:bg-amber-500" },
+    { key: "a", usd: activitiesUsd, className: "bg-pink-500 dark:bg-pink-600" },
+  ].filter((p) => p.usd > 0);
+
+  return (
+    <div className="mt-3 space-y-2">
+      {estimatedTotalUsd <= 0 ? (
+        <p className="font-sans text-xs text-neutral-500 dark:text-neutral-500">
+          Pin a hotel night, restaurants, or experiences on this day to build an estimate.
+        </p>
+      ) : (
+        <div className="h-3 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/15">
+          <div
+            className="flex h-full min-w-[2px] overflow-hidden rounded-full"
+            style={{ width: `${Math.min(100, fillPct)}%` }}
+          >
+            {parts.map((p) => (
+              <div key={p.key} className={`min-w-0 ${p.className}`} style={{ flex: p.usd }} title={formatUsd(p.usd)} />
+            ))}
+          </div>
+        </div>
+      )}
+      <ul className="space-y-1 font-sans text-[11px] text-neutral-600 dark:text-neutral-400">
+        {estimatedTotalUsd <= 0 ? null : hotelUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-teal-700 dark:text-teal-300">Hotel (night share)</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(hotelUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd <= 0 ? null : mealsUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-amber-800 dark:text-amber-200">Restaurants (est.)</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(mealsUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd <= 0 ? null : activitiesUsd > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span className="text-pink-700 dark:text-pink-300">Experiences</span>
+            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
+              {formatUsd(activitiesUsd)}
+            </span>
+          </li>
+        ) : null}
+        {estimatedTotalUsd > 0 ? (
+          <li className="flex justify-between gap-2 border-t border-neutral-200 pt-1.5 dark:border-white/10">
+            <span className="font-bold text-neutral-800 dark:text-neutral-200">Estimated day total</span>
+            <span className="tabular-nums font-bold text-neutral-950 dark:text-white">
+              {formatUsd(estimatedTotalUsd)}
+            </span>
+          </li>
+        ) : null}
+        {baseline != null && baseline > 0 ? (
+          <li className="flex justify-between gap-2">
+            <span>Your trip budget / day (group)</span>
+            <span className="tabular-nums font-semibold text-neutral-700 dark:text-neutral-300">
+              {formatUsd(baseline)}
+            </span>
+          </li>
+        ) : (
+          <li className="text-neutral-500 dark:text-neutral-500">
+            Add a dollar amount in <span className="font-semibold">Budget</span> on the workspace to compare.
+          </li>
+        )}
+      </ul>
+      {over ? (
+        <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+          About {formatUsd(estimatedTotalUsd - baseline!)} over today&apos;s share — rough estimate only.
+        </p>
+      ) : null}
+      <p className="text-[10px] leading-snug text-neutral-500 dark:text-neutral-500">
+        Based on pinned places, party size, and trip length. Not a quote.
+      </p>
     </div>
   );
 }
@@ -212,6 +321,24 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
   const prevIso = shiftIsoDay(dateIso, -1);
   const nextIso = shiftIsoDay(dateIso, 1);
 
+  const tripRange = plan.hostSetup?.tripRange;
+  const spendBreakdown = useMemo(() => {
+    if (!tripRange?.startIso || !tripRange.endIso) return null;
+    if (!enumerateLocalIsoDays(tripRange.startIso, tripRange.endIso).includes(dateIso)) return null;
+    const dayMeals = (plan.hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+    const dayActs = (plan.hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+    const dayHotel = hotelStayForDay(plan.hostSetup?.hotelStays ?? [], dateIso);
+    return estimateHostDaySpendUsd(
+      plan,
+      dateIso,
+      tripRange.startIso,
+      tripRange.endIso,
+      dayMeals.length,
+      dayActs,
+      dayHotel
+    );
+  }, [plan, dateIso, tripRange?.startIso, tripRange?.endIso]);
+
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 sm:px-6 lg:px-8">
       <nav className="mb-8 flex flex-wrap items-center gap-4 text-sm">
@@ -316,20 +443,21 @@ export function TripHostSetupDayPage({ tripId, dateIso, locale, initialPlan }: P
             )}
           </div>
           <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-neutral-800 dark:text-neutral-300">
-            Day budget
+            Day spend estimate
           </p>
-          <div className="mt-3 flex justify-between font-sans text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">
-            <span>0</span>
-            <span>50k</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            defaultValue={50}
-            className="mt-2 w-full accent-[#e91e8c]"
-            aria-label="Day budget (placeholder scale 0–50k)"
-          />
+          {spendBreakdown ? (
+            <DaySpendEstimateBar
+              baselineGroupUsd={spendBreakdown.baselineGroupUsd}
+              hotelUsd={spendBreakdown.hotelUsd}
+              mealsUsd={spendBreakdown.mealsUsd}
+              activitiesUsd={spendBreakdown.activitiesUsd}
+              estimatedTotalUsd={spendBreakdown.estimatedTotalUsd}
+            />
+          ) : (
+            <p className="mt-3 font-sans text-xs leading-relaxed text-neutral-500 dark:text-neutral-500">
+              Save trip dates on the host calendar to see how this day lines up with your per-day budget.
+            </p>
+          )}
         </div>
       </header>
 
