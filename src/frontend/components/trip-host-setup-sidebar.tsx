@@ -8,7 +8,8 @@ import type { TripPlanStatus } from "@/shared/trip-status";
 import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
-import { TripPlanCard } from "@/frontend/components/trip-plan-card";
+import { InviteCodeRow } from "@/frontend/components/invite-code-row";
+import { DynamicTripItinerary } from "@/frontend/components/dynamic-trip-itinerary";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 
 export type TripHostSetupSidebarProps = {
@@ -18,7 +19,6 @@ export type TripHostSetupSidebarProps = {
   onPlanUpdated: (next: TripPlan) => void;
   inviteCode: string | null;
   shareMessage: string;
-  tripMemberNames: string[];
   viewerUserId: string;
   tripOwnerUserId: string | null;
   initialCollab: CollabStateV1;
@@ -35,7 +35,6 @@ export function TripHostSetupSidebar({
   onPlanUpdated,
   inviteCode,
   shareMessage,
-  tripMemberNames,
   viewerUserId,
   tripOwnerUserId,
   initialCollab,
@@ -113,17 +112,13 @@ export function TripHostSetupSidebar({
         </div>
       ) : null}
 
-      <TripPlanCard
-        plan={plan}
-        badge={tripStatus === "draft" ? "Draft" : "Saved"}
-        showShare={false}
-        hideOpenDecisions
-        inviteCode={inviteCode}
-        showInviteRow={Boolean(isHost && inviteCode)}
-        inviteCodeProminent={Boolean(isHost && inviteCode)}
-        guestJoinNames={tripMemberNames}
-        hideSpotlightsSection={hasSpotlights}
-      />
+      {isHost && inviteCode ? (
+        <div className="pt-1">
+          <InviteCodeRow rawCode={inviteCode} prominent />
+        </div>
+      ) : null}
+
+      <DynamicTripItinerary plan={plan} />
 
       {hasSpotlights ? (
         <TripSpotlightsInteractive

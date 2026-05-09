@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
+import { normalizePlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import type { CollabStateV1 } from "@/shared/collaboration";
+import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
-import { TripPlanCard } from "@/frontend/components/trip-plan-card";
+import { InviteCodeRow } from "@/frontend/components/invite-code-row";
+import { DynamicTripItinerary } from "@/frontend/components/dynamic-trip-itinerary";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
@@ -13,7 +16,7 @@ import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
 
-/** Trip home: share (host); invite code lives inside `TripPlanCard`, then collaboration. */
+/** Trip home: live itinerary + collaboration; host sees share controls and invite. */
 export function TripSharedPanel({
   tripId,
   plan: planFromServer,
@@ -21,7 +24,6 @@ export function TripSharedPanel({
   tripStatus,
   isHost,
   shareMessage,
-  tripMemberNames = [],
   viewerUserId,
   tripOwnerUserId,
   initialCollab,
@@ -35,8 +37,6 @@ export function TripSharedPanel({
   tripOwnerUserId?: string | null;
   /** Pre-written invite text for “Share Trip” (host clipboard). */
   shareMessage: string;
-  /** Other signed-in travelers on this trip (from memberships). */
-  tripMemberNames?: string[];
   viewerUserId: string;
   initialCollab: CollabStateV1;
 }) {
@@ -44,6 +44,29 @@ export function TripSharedPanel({
   const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
   const [lgTwoColumn, setLgTwoColumn] = useState(false);
   const [groupProgressStickyMount, setGroupProgressStickyMount] = useState<HTMLElement | null>(null);
+  const suppressRealtimeUntilRef = useRef(0);
+
+  const bumpCollab = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
+  }, []);
+
+  useTripWorkspaceRealtime(
+    tripId,
+    useCallback(
+      (row) => {
+        if (row.plan != null) {
+          try {
+            setPlan(normalizePlan(row.plan));
+          } catch {
+            /* ignore */
+          }
+        }
+        bumpCollab();
+      },
+      [bumpCollab]
+    ),
+    { enabled: true, suppressRealtimeUntilRef }
+  );
 
   useLayoutEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -56,10 +79,6 @@ export function TripSharedPanel({
   useEffect(() => {
     setPlan(planFromServer);
   }, [planFromServer]);
-
-  const bumpCollab = useCallback(() => {
-    setCollabRefreshSignal((n) => n + 1);
-  }, []);
 
   const hasSpotlights = Boolean(plan.spotlights?.length);
   const chatSeed = initialCollab.cardChat?.messages ?? [];
@@ -84,17 +103,13 @@ export function TripSharedPanel({
             <TripContributeButton tripId={tripId} />
           </div>
 
-          <TripPlanCard
-            plan={plan}
-            badge="Saved"
-            showShare={false}
-            hideOpenDecisions
-            inviteCode={inviteCode ?? null}
-            showInviteRow={Boolean(isHost && inviteCode)}
-            inviteCodeProminent={Boolean(isHost && inviteCode)}
-            guestJoinNames={tripMemberNames}
-            hideSpotlightsSection={hasSpotlights}
-          />
+          {isHost && inviteCode ? (
+            <div className="pt-1">
+              <InviteCodeRow rawCode={inviteCode} prominent />
+            </div>
+          ) : null}
+
+          <DynamicTripItinerary plan={plan} />
 
           {hasSpotlights ? (
             <TripSpotlightsInteractive

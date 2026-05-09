@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
 import { fetchTripHostDisplayName } from "@/backend/trip-host-profile";
-import { fetchTripMemberDisplayNames } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { TripHostSetupDashboard } from "@/frontend/components/trip-host-setup-dashboard";
@@ -74,13 +73,6 @@ export default async function TripHostSetupPage({
   const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
 
-  let memberNames: string[] = [];
-  try {
-    memberNames = await fetchTripMemberDisplayNames(svc, id, user.id);
-  } catch {
-    memberNames = [];
-  }
-
   const creatorName = await fetchTripHostDisplayName(svc, ownerId);
   const siteHost = publicSiteHostFromEnv();
   const hdrs = await headers();
@@ -111,7 +103,6 @@ export default async function TripHostSetupPage({
         tripOwnerUserId={ownerId}
         inviteCode={inviteRaw || null}
         shareMessage={shareMessage}
-        tripMemberNames={memberNames}
         isHost={access.isHost}
       />
     </div>

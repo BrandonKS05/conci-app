@@ -83,17 +83,22 @@ type Props = {
   tripId: string;
   initialItinerary?: GeneratedItinerary | null;
   headcount?: number;
+  /** When false, only POST /generate-itinerary if the visitor clicks Regenerate. */
+  autoGenerateOnMount?: boolean;
 };
 
-export function GeneratedItineraryView({ tripId, initialItinerary = null, headcount = 2 }: Props) {
+export function GeneratedItineraryView({
+  tripId,
+  initialItinerary = null,
+  headcount = 2,
+  autoGenerateOnMount = true,
+}: Props) {
   const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(initialItinerary);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialItinerary) {
-      setItinerary(initialItinerary);
-    }
+    setItinerary(initialItinerary ?? null);
   }, [initialItinerary]);
 
   const generate = useCallback(async () => {
@@ -120,8 +125,10 @@ export function GeneratedItineraryView({ tripId, initialItinerary = null, headco
   }, [tripId]);
 
   useEffect(() => {
+    if (!autoGenerateOnMount) return;
+    if (initialItinerary != null) return;
     if (!itinerary && !loading) {
-      generate();
+      void generate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

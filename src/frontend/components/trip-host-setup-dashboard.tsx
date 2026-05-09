@@ -76,7 +76,6 @@ type Props = {
   tripOwnerUserId: string | null;
   inviteCode: string | null;
   shareMessage: string;
-  tripMemberNames: string[];
   /** Invited members see the same calendar and collab; only the host can edit setup. */
   isHost?: boolean;
 };
@@ -162,7 +161,6 @@ export function TripHostSetupDashboard({
   tripOwnerUserId,
   inviteCode,
   shareMessage,
-  tripMemberNames,
   isHost = true,
 }: Props) {
   const router = useRouter();
@@ -1376,10 +1374,10 @@ export function TripHostSetupDashboard({
         <section className="scroll-mt-28">
           <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
             <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Trip card, sharing &amp; group decisions
+              Sharing &amp; group decisions
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-              Invites, deposits, spotlight votes, and open decisions — on the same workspace as your calendar.
+              Live itinerary summary, spotlight votes, and collaboration — all synced when the calendar updates.
             </p>
             <div className="mt-6">
               <TripHostSetupSidebar
@@ -1389,7 +1387,6 @@ export function TripHostSetupDashboard({
                 onPlanUpdated={setPlan}
                 inviteCode={resolvedInviteCode}
                 shareMessage={shareMessage}
-                tripMemberNames={tripMemberNames}
                 viewerUserId={viewerUserId}
                 tripOwnerUserId={tripOwnerUserId}
                 initialCollab={initialCollab}
