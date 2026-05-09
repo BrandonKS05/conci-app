@@ -74,12 +74,29 @@ function rowFromFlightOption(bf: Record<string, unknown>, index: number): Flight
   const bt = typeof bf.booking_token === "string" ? bf.booking_token : "";
   const id = bt.length > 8 ? `${bt.slice(0, 36)}:${index}` : `fl-${index}`;
 
-  const book =
-    typeof bf.link === "string" && bf.link.startsWith("http")
-      ? bf.link
-      : bt.length
-        ? `https://www.google.com/travel/flights/booking?${new URLSearchParams({ tfs: bt }).toString()}`
-        : "https://www.google.com/travel/flights";
+  const rawLink = typeof bf.link === "string" && bf.link.startsWith("http") ? bf.link : "";
+  let book = "https://www.google.com/travel/flights";
+  if (rawLink) {
+    try {
+      const u = new URL(rawLink);
+      const tfsFromLink = u.searchParams.get("tfs");
+      const effectiveTfs = tfsFromLink && tfsFromLink.trim() ? tfsFromLink.trim() : bt;
+      const isGoogleFlights = /(^|\.)google\.com$/i.test(u.hostname) && u.pathname.startsWith("/travel/flights");
+      if (isGoogleFlights && effectiveTfs) {
+        // Convert generic search-style Google Flights links into booking deep links.
+        book = `https://www.google.com/travel/flights/booking?${new URLSearchParams({ tfs: effectiveTfs }).toString()}`;
+      } else if (isGoogleFlights && !effectiveTfs) {
+        // Avoid returning a blank Flights homepage if the row lacks a deep-link token.
+        book = "https://www.google.com/travel/flights";
+      } else {
+        book = rawLink;
+      }
+    } catch {
+      book = rawLink;
+    }
+  } else if (bt.length) {
+    book = `https://www.google.com/travel/flights/booking?${new URLSearchParams({ tfs: bt }).toString()}`;
+  }
 
   const logoFromFirst = typeof first?.airline_logo === "string" ? first.airline_logo : "";
   const logoFromTop = typeof bf.airline_logo === "string" ? bf.airline_logo : "";
