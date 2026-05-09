@@ -44,6 +44,7 @@ function FlightLogo({ flight }: { flight: FlightLegRowDto }) {
   const [logoFailed, setLogoFailed] = useState(false);
   if (flight.airlineLogoUrl && !logoFailed) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- remote airline logo URLs; domains are not fixed at build time
       <img
         src={flight.airlineLogoUrl}
         alt={`${flight.airline} logo`}
