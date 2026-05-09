@@ -7,8 +7,6 @@ import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
-import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
-import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
 import { TripPlanCard } from "@/frontend/components/trip-plan-card";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
@@ -92,11 +90,6 @@ export function TripHostSetupSidebar({
           Packing list
         </Link>
       </nav>
-
-      <div className="flex flex-wrap gap-2">
-        <TripDepositTracker tripId={tripId} />
-        <TripContributeButton tripId={tripId} />
-      </div>
 
       <div className="flex flex-col gap-1">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">

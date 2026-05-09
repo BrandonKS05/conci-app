@@ -56,6 +56,8 @@ import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
+import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -206,6 +208,7 @@ export function TripHostSetupDashboard({
     startIso: string;
     endIso: string;
   } | null>(null);
+  const [availabilityNote, setAvailabilityNote] = useState("");
 
   /** Inferred strictly from planner text with real calendar days — not loose full-month guesses. */
   const parserConcreteRange = useMemo(
@@ -640,6 +643,24 @@ export function TripHostSetupDashboard({
 
   const chatSeed = initialCollab.cardChat?.messages ?? [];
 
+  const primaryHotelSummary = useMemo(() => {
+    const stays = plan.hostSetup?.hotelStays ?? [];
+    if (stays.length > 0) {
+      const p = stays[0]?.place;
+      if (p?.name) {
+        return {
+          title: p.name,
+          detail: p.address?.trim() || plan.location?.trim() || "Lodging on your calendar",
+        };
+      }
+    }
+    const loc = plan.location?.trim();
+    if (loc) {
+      return { title: loc, detail: "Add stays on a calendar day or with Trip Copilot." };
+    }
+    return null;
+  }, [plan.hostSetup?.hotelStays, plan.location]);
+
   const resolveWorkspaceNavHref = useCallback(
     (navId: HostSetupNavItemId): string =>
       navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
@@ -658,8 +679,9 @@ export function TripHostSetupDashboard({
       title={plan.title?.trim() || "Trip"}
       eyebrow={effectiveTripStatus === "draft" ? "Host setup" : "Your trip"}
       tripTypography
+      contentWide
     >
-      <div className="mx-auto w-full max-w-5xl pb-14">
+      <div className="mx-auto w-full pb-14">
       <div className="mb-10 border-b border-slate-200 pb-8 dark:border-white/10">
         <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
           {HOST_SETUP_NAV_ITEMS.map((item) => (
@@ -683,48 +705,36 @@ export function TripHostSetupDashboard({
       </div>
 
       <div className="space-y-12">
-        <section id="sec-setup-copilot" className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
-            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Setup copilot
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-              Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies them.
-            </p>
-            <div className="mt-6 flex justify-center sm:justify-start">
-              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
-            </div>
-          </div>
-        </section>
-
-        <section id="sec-preferences-adjustments" className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
-            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Preferences &amp; adjustments
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-              Guests type suggestions on the shared trip page; they queue here for you to run Trip Copilot or decline.
-            </p>
-            <div className="mt-6">
-              <TripCollaborationPanel
-                tripId={tripId}
-                plan={plan}
-                tripStatus={effectiveTripStatus}
-                isHost
-                variant="preferencesOnly"
-                collabRefreshSignal={collabRefreshSignal}
-                onPlanUpdated={setPlan}
-                viewerUserId={viewerUserId}
-                tripOwnerUserId={tripOwnerUserId}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section id="sec-dates" className="scroll-mt-28">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start xl:gap-10">
+          <div className="space-y-6">
+            <div className="rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-[#141816] to-dm-card p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:p-8">
+              <div className="mb-5">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Trip fund</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TripDepositTracker tripId={tripId} />
+                  <TripContributeButton tripId={tripId} />
+                </div>
+              </div>
+              <div className="mb-6 rounded-2xl border border-teal-500/30 bg-teal-950/25 p-4 sm:p-5">
+                <h3 className="font-display text-base font-semibold text-white">Which dates work for you?</h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">
+                  Note when everyone&apos;s free or what to avoid — keep it beside the calendar while you set trip days.
+                </p>
+                <label className="mt-3 block">
+                  <span className="sr-only">Availability</span>
+                  <textarea
+                    value={availabilityNote}
+                    onChange={(e) => setAvailabilityNote(e.target.value)}
+                    rows={3}
+                    placeholder="e.g. Prefer long weekend · avoid holidays…"
+                    className="w-full resize-y rounded-xl border border-white/15 bg-black/35 px-3 py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-teal-500/45"
+                  />
+                </label>
+              </div>
+              <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
-              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              <p className="max-w-3xl text-sm leading-relaxed text-neutral-300">
                 {datePickMode === "range"
                   ? tripDisplayRange?.startIso && tripDisplayRange.endIso
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
@@ -1016,15 +1026,21 @@ export function TripHostSetupDashboard({
 
         </section>
 
-        <section id="sec-flights" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Flights</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+            </div>
+          </div>
+          <aside className="flex flex-col gap-6 xl:sticky xl:top-28">
+            <div
+              id="sec-flights"
+              className="scroll-mt-28 rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl space-y-4 text-neutral-200 [&_h3]:text-white [&_p]:text-neutral-400 [&_strong]:text-neutral-200"
+            >
+              <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-400">
             Live fare rows from Google Flights (SerpApi). Once your trip lists a departure city and destination, you can add
             options to the published itinerary the same way as after publish — tap <strong className="text-slate-800 dark:text-neutral-200">Add to trip</strong>{" "}
             for the flights you want the group to see.
           </p>
           {liveFetchErr ? (
-            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
               {liveFetchErr}
             </p>
           ) : null}
@@ -1037,10 +1053,10 @@ export function TripHostSetupDashboard({
             <HostFlightSearchPanel tripId={tripId} enabled />
           ) : null}
           {showFlightTransport ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-              <p className="text-xs text-slate-500 dark:text-neutral-500">
-                From <strong className="text-slate-800 dark:text-neutral-200">{plan.departureCity}</strong> to{" "}
-                <strong className="text-slate-800 dark:text-neutral-200">{plan.location}</strong>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-5 shadow-inner">
+              <p className="text-xs text-neutral-400">
+                From                 <strong className="text-neutral-100">{plan.departureCity}</strong> to{" "}
+                <strong className="text-neutral-100">{plan.location}</strong>
               </p>
               <div className="mt-4 space-y-4">
                 <HostLiveScheduleByDay
@@ -1088,14 +1104,67 @@ export function TripHostSetupDashboard({
               })()}
             </div>
           ) : (
-            <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
-              Add a <strong className="text-slate-900 dark:text-white">departure city</strong> and{" "}
-              <strong className="text-slate-900 dark:text-white">destination</strong> on your trip — use{" "}
-              <strong className="text-slate-900 dark:text-white">Trip Copilot</strong> (floating panel) or your parser draft — then
-              flight rows appear here. Server needs <code className="rounded bg-slate-200/80 px-1 text-xs dark:bg-white/10">SERPAPI_KEY</code>{" "}
+            <p className="mt-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm leading-relaxed text-neutral-300">
+              Add a <strong className="text-white">departure city</strong> and{" "}
+              <strong className="text-white">destination</strong> on your trip — use{" "}
+              <strong className="text-white">Trip Copilot</strong> (floating panel) or your parser draft — then
+              flight rows appear here. Server needs <code className="rounded bg-white/10 px-1 text-xs">SERPAPI_KEY</code>{" "}
               for live prices.
             </p>
           )}
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl">
+              <h3 className="font-display text-lg font-semibold text-white">Home base · hotel</h3>
+              {primaryHotelSummary ? (
+                <div className="mt-4 rounded-2xl border border-white/15 bg-black/35 p-4 text-sm leading-relaxed text-neutral-300">
+                  <p className="font-semibold text-white">{primaryHotelSummary.title}</p>
+                  <p className="mt-2 text-neutral-400">{primaryHotelSummary.detail}</p>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm leading-relaxed text-neutral-500">
+                  Add lodging on a calendar day or with Trip Copilot.
+                </p>
+              )}
+            </div>
+          </aside>
+        </div>
+
+        <section id="sec-setup-copilot" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Setup copilot
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies them.
+            </p>
+            <div className="mt-6 flex justify-center sm:justify-start">
+              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
+            </div>
+          </div>
+        </section>
+
+        <section id="sec-preferences-adjustments" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Preferences &amp; adjustments
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              Guests type suggestions on the shared trip page; they queue here for you to run Trip Copilot or decline.
+            </p>
+            <div className="mt-6">
+              <TripCollaborationPanel
+                tripId={tripId}
+                plan={plan}
+                tripStatus={effectiveTripStatus}
+                isHost
+                variant="preferencesOnly"
+                collabRefreshSignal={collabRefreshSignal}
+                onPlanUpdated={setPlan}
+                viewerUserId={viewerUserId}
+                tripOwnerUserId={tripOwnerUserId}
+              />
+            </div>
+          </div>
         </section>
 
         <section id="sec-budget" className="scroll-mt-28">
