@@ -28,9 +28,9 @@ import {
 } from "@/shared/trip-plan";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
 import {
-  TripPlanBuildProgressOverlay,
+  TripPlanBuildProgressOverlayDark,
   type TripParserBuildStep,
-} from "@/frontend/components/trip-plan-build-progress-overlay";
+} from "@/frontend/components/trip-plan-build-progress-overlay-dark";
 import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
 import { PlacePickCards } from "@/frontend/components/place-pick-cards";
 import type { PlacePreview, PlacePreviewBlock, PlaceSpotlight } from "@/shared/place-preview";
@@ -235,7 +235,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [dateSlotError, setDateSlotError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"chat" | "building">("chat");
   const [plan, setPlan] = useState<TripPlan | null>(null);
-  /** Live phases while finalizing: AI → save → navigate (no static image — see overlay). */
+  /** Live phases while finalizing: AI -> save -> itinerary -> navigate. */
   const [tripBuildStep, setTripBuildStep] = useState<TripParserBuildStep | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefetchingSlots, setPrefetchingSlots] = useState(false);
@@ -416,10 +416,12 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           return false;
         }
         if (body.id) {
-          fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
+          setTripBuildStep("generating");
+          await fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
             method: "POST",
             credentials: "include",
-          }).catch(() => {});
+          }).catch(() => undefined);
+          setTripBuildStep("launching");
           router.replace(`/trip/${body.id}/setup`);
           return true;
         }
@@ -951,9 +953,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       ]);
       setTripBuildStep("saving");
       const navigated = await persistAndRedirectToHostSetup(planOut);
-      if (navigated) {
-        setTripBuildStep("launching");
-      } else {
+      if (!navigated) {
         setPhase("chat");
         setTripBuildStep(null);
       }
@@ -1002,7 +1002,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
       {phase === "building" && tripBuildStep ? (
-        <TripPlanBuildProgressOverlay step={tripBuildStep} />
+        <TripPlanBuildProgressOverlayDark step={tripBuildStep} tripTitle={plan?.title || seedMessage} />
       ) : null}
 
       <header className="flex items-start gap-3.5">

@@ -85,6 +85,8 @@ export type CollabStateV1 = {
   decisions: Record<string, CollabDecisionBlob>;
   /** Day-level collaborative options (restaurants/hotels/flights/activities/etc). */
   dayVoting?: DayVoteStateByDate;
+  /** Per-member permission for adding brand-new day options. Missing = vote-only. */
+  daySuggestPermissions?: Record<string, "vote_only" | "can_suggest">;
   /** Upvotes per spotlight stable id (`spotlightStableIdFromMapsUrl`) → voter keys (`member:<uuid>`). */
   spotlightVotes?: Record<string, string[]>;
   /** Trip card page: persistent group chat + inline place cards. */
@@ -305,6 +307,17 @@ function parseSpotlightVotes(raw: unknown): Record<string, string[]> | undefined
   return Object.keys(out).length ? out : undefined;
 }
 
+function parseDaySuggestPermissions(raw: unknown): Record<string, "vote_only" | "can_suggest"> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: Record<string, "vote_only" | "can_suggest"> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (!k || typeof k !== "string") continue;
+    if (v === "vote_only" || v === "can_suggest") out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function parsePlacePreviewLoose(row: unknown): PlacePreview | null {
   if (!row || typeof row !== "object") return null;
   const p = row as Record<string, unknown>;
@@ -398,6 +411,7 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
   }
   const spotlightVotes = parseSpotlightVotes(o.spotlightVotes);
   const dayVoting = parseDayVoteState(o.dayVoting);
+  const daySuggestPermissions = parseDaySuggestPermissions(o.daySuggestPermissions);
   let cardChat: { messages: CardChatMessage[] } | undefined;
   if (o.cardChat && typeof o.cardChat === "object") {
     const msgs = parseCardChatMessages(o.cardChat);
@@ -408,6 +422,7 @@ export function parseCollabState(raw: unknown): CollabStateV1 {
     v: COLLAB_VERSION,
     decisions: o.decisions as Record<string, CollabDecisionBlob>,
     ...(Object.keys(dayVoting).length ? { dayVoting } : {}),
+    ...(daySuggestPermissions ? { daySuggestPermissions } : {}),
     ...(spotlightVotes ? { spotlightVotes } : {}),
     ...(cardChat ? { cardChat } : {}),
     ...(adjustmentSubmissions ? { adjustmentSubmissions } : {}),

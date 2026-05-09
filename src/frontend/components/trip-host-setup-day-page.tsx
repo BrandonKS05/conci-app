@@ -27,6 +27,9 @@ type Props = {
   isHost: boolean;
 };
 
+type SuggestPermission = "vote_only" | "can_suggest";
+type MemberSuggestPermissionRow = { userId: string; displayName: string; permission: SuggestPermission };
+
 function startOfDay(x: Date) {
   return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 0, 0, 0, 0);
 }
@@ -260,6 +263,9 @@ export function TripHostSetupDayPage({
   );
   const [dayErr, setDayErr] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [permBusyUserId, setPermBusyUserId] = useState<string | null>(null);
+  const [memberSuggestPerms, setMemberSuggestPerms] = useState<MemberSuggestPermissionRow[]>([]);
+  const [canSuggest, setCanSuggest] = useState<boolean>(isHost);
   const [suggestDraft, setSuggestDraft] = useState<
     Partial<Record<DayVoteCategory, { label: string; detail: string; href: string }>>
   >({});
@@ -269,6 +275,28 @@ export function TripHostSetupDayPage({
     setPlan(initialPlan);
     setDayVotingByDate(mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso));
   }, [initialPlan, initialCollab.dayVoting, dateIso]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/day-vote-permissions`, { credentials: "include" });
+        const j = (await res.json().catch(() => ({}))) as {
+          viewerPermission?: SuggestPermission;
+          members?: MemberSuggestPermissionRow[];
+          error?: string;
+        };
+        if (cancelled || !res.ok) return;
+        setCanSuggest((j.viewerPermission ?? (isHost ? "can_suggest" : "vote_only")) === "can_suggest");
+        if (Array.isArray(j.members)) setMemberSuggestPerms(j.members);
+      } catch {
+        if (!cancelled) setCanSuggest(isHost);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, isHost]);
 
   const [dreamText, setDreamText] = useState("");
   const [dreamBusy, setDreamBusy] = useState(false);
@@ -563,6 +591,67 @@ export function TripHostSetupDayPage({
       </header>
 
       <div className="mt-10 space-y-4">
+        {isHost ? (
+          <DropSection
+            title="Member suggestion permissions"
+            subtitle="Host controls"
+            sectionId="day-suggest-permissions"
+            defaultOpen
+          >
+            {memberSuggestPerms.length === 0 ? (
+              <EmptyHint label="No other members yet." />
+            ) : (
+              <ul className="space-y-2">
+                {memberSuggestPerms.map((m) => {
+                  const canMemberSuggest = m.permission === "can_suggest";
+                  const busy = permBusyUserId === m.userId;
+                  return (
+                    <li
+                      key={m.userId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{m.displayName}</p>
+                        <p className="text-xs text-slate-500 dark:text-neutral-500">
+                          {canMemberSuggest ? "Can suggest new options + vote" : "Vote-only"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          setPermBusyUserId(m.userId);
+                          try {
+                            const nextPermission: SuggestPermission = canMemberSuggest ? "vote_only" : "can_suggest";
+                            const res = await fetch(`/api/trip-plans/${tripId}/day-vote-permissions`, {
+                              method: "PATCH",
+                              credentials: "include",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ memberUserId: m.userId, permission: nextPermission }),
+                            });
+                            const j = (await res.json().catch(() => ({}))) as { error?: string };
+                            if (!res.ok) throw new Error(j.error || "Could not update permission");
+                            setMemberSuggestPerms((prev) =>
+                              prev.map((row) => (row.userId === m.userId ? { ...row, permission: nextPermission } : row))
+                            );
+                          } catch (e) {
+                            setDayErr(e instanceof Error ? e.message : "Could not update permission.");
+                          } finally {
+                            setPermBusyUserId(null);
+                          }
+                        }}
+                        className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] font-bold text-indigo-800 dark:text-indigo-200 disabled:opacity-50"
+                      >
+                        {busy ? "Saving..." : canMemberSuggest ? "Revoke suggest" : "Allow suggest"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </DropSection>
+        ) : null}
+
         <DropSection title="Schedule" subtitle="— Auto populated" sectionId="day-schedule" defaultOpen>
           {scheduleItems.length === 0 ? (
             <EmptyHint label="No meals or activities pinned yet — use Add places on the trip calendar, or pull from live picks after." />
@@ -616,12 +705,18 @@ export function TripHostSetupDayPage({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
                   Suggest an option
                 </p>
+                {!canSuggest ? (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    Host set you to vote-only on suggestions. You can still vote on all options.
+                  </p>
+                ) : null}
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <input
                     value={draft.label}
                     onChange={(e) =>
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
                     }
+                    disabled={!canSuggest}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder={`${dayCategoryTitle(category)} option`}
                   />
@@ -630,6 +725,7 @@ export function TripHostSetupDayPage({
                     onChange={(e) =>
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
                     }
+                    disabled={!canSuggest}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder="Optional detail"
                   />
@@ -638,12 +734,13 @@ export function TripHostSetupDayPage({
                     onChange={(e) =>
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
                     }
+                    disabled={!canSuggest}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder="Optional URL"
                   />
                   <button
                     type="button"
-                    disabled={busyKey === `suggest:${category}` || !draft.label.trim()}
+                    disabled={!canSuggest || busyKey === `suggest:${category}` || !draft.label.trim()}
                     onClick={() =>
                       void runDayAction({
                         action: "suggest",

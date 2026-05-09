@@ -88,6 +88,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const state = day[category];
 
   if (body.action === "suggest") {
+    const memberPermission = collab.daySuggestPermissions?.[user.id] ?? "vote_only";
+    if (!access.isHost && memberPermission !== "can_suggest") {
+      return NextResponse.json(
+        { error: "Host has restricted suggestions. You can vote but not add new options." },
+        { status: 403 }
+      );
+    }
     const label = cleanText(body.label, 140);
     const detail = cleanText(body.detail, 220);
     const href = cleanText(body.href, 300);
