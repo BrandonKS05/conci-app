@@ -167,17 +167,19 @@ async function waitForUserSession(
 
   return await new Promise((resolve) => {
     let done = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let subscription: { unsubscribe: () => void } | undefined;
+    const pending = {
+      timeoutId: undefined as ReturnType<typeof setTimeout> | undefined,
+      subscription: undefined as { unsubscribe: () => void } | undefined,
+    };
 
     const finish = (value: { user: User; session: Session } | null) => {
       if (done) return;
       done = true;
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId);
+      if (pending.timeoutId !== undefined) {
+        clearTimeout(pending.timeoutId);
       }
       try {
-        subscription?.unsubscribe();
+        pending.subscription?.unsubscribe();
       } catch {
         /* noop */
       }
@@ -194,8 +196,8 @@ async function waitForUserSession(
         finish({ user: session.user, session });
       }
     });
-    subscription = data.subscription;
-    timeoutId = setTimeout(() => finish(null), 10_000);
+    pending.subscription = data.subscription;
+    pending.timeoutId = setTimeout(() => finish(null), 10_000);
 
     void sb.auth.getSession().then(({ data: d }) => {
       if (cancelled() || done) return;
