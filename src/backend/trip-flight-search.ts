@@ -78,7 +78,7 @@ function rowFromFlightOption(bf: Record<string, unknown>, index: number): Flight
     typeof bf.link === "string" && bf.link.startsWith("http")
       ? bf.link
       : bt.length
-        ? `https://www.google.com/travel/flights?${new URLSearchParams({ tfs: bt }).toString()}`
+        ? `https://www.google.com/travel/flights/booking?${new URLSearchParams({ tfs: bt }).toString()}`
         : "https://www.google.com/travel/flights";
 
   const logoFromFirst = typeof first?.airline_logo === "string" ? first.airline_logo : "";

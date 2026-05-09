@@ -75,7 +75,6 @@ type Props = {
   viewerUserId: string;
   tripOwnerUserId: string | null;
   inviteCode: string | null;
-  shareMessage: string;
   /** Invited members see the same calendar and collab; only the host can edit setup. */
   isHost?: boolean;
 };
@@ -160,7 +159,6 @@ export function TripHostSetupDashboard({
   viewerUserId,
   tripOwnerUserId,
   inviteCode,
-  shareMessage,
   isHost = true,
 }: Props) {
   const router = useRouter();
@@ -713,12 +711,6 @@ export function TripHostSetupDashboard({
   }, [plan.hostSetup?.hotelStays, plan.location]);
 
   const resolveWorkspaceNavHref = useCallback(
-    (navId: HostSetupNavItemId): string =>
-      navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
-    []
-  );
-
-  const resolveSidebarNavHref = useCallback(
     (navId: HostSetupNavItemId): string =>
       navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
     []
@@ -1426,28 +1418,7 @@ export function TripHostSetupDashboard({
 
         <section className="scroll-mt-28">
           <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
-            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Sharing &amp; group decisions
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-              Live itinerary summary, spotlight votes, and collaboration — all synced when the calendar updates.
-            </p>
-            <div className="mt-6">
-              <TripHostSetupSidebar
-                tripId={tripId}
-                plan={plan}
-                tripStatus={effectiveTripStatus}
-                onPlanUpdated={setPlan}
-                shareMessage={shareMessage}
-                viewerUserId={viewerUserId}
-                tripOwnerUserId={tripOwnerUserId}
-                initialCollab={initialCollab}
-                collabRefreshSignal={collabRefreshSignal}
-                bumpCollab={bumpCollab}
-                resolveNavHref={resolveSidebarNavHref}
-                isHost={isHost}
-              />
-            </div>
+            <TripHostSetupSidebar plan={plan} tripStatus={effectiveTripStatus} />
           </div>
         </section>
 

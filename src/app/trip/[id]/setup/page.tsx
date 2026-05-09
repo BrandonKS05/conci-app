@@ -1,19 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
-import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
-import { fetchTripHostDisplayName } from "@/backend/trip-host-profile";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { TripHostSetupDashboard } from "@/frontend/components/trip-host-setup-dashboard";
-import {
-  buildJoinPageUrlWithCode,
-  buildTripShareInviteMessage,
-  publicSiteHostFromEnv,
-  publicSiteOriginFromEnv,
-  siteOriginFromRequestHeaders,
-} from "@/shared/trip-share-copy";
 import { parseCollabState } from "@/shared/collaboration";
 import { normalizePlan } from "@/shared/trip-plan";
 import { parseTripPlanStatus } from "@/shared/trip-status";
@@ -73,24 +63,6 @@ export default async function TripHostSetupPage({
   const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
 
-  const creatorName = await fetchTripHostDisplayName(svc, ownerId);
-  const siteHost = publicSiteHostFromEnv();
-  const hdrs = await headers();
-  const siteOrigin = siteOriginFromRequestHeaders(hdrs) ?? publicSiteOriginFromEnv();
-  const tripTitle = plan.title?.trim() || "Trip";
-  const normalizedInvite = inviteRaw ? normalizeInviteCode(inviteRaw) : "";
-  const hasInvite = normalizedInvite.length === 6;
-  const inviteDisplay = hasInvite ? formatInviteCodeDisplay(inviteRaw) : "";
-  const shareMessage = hasInvite
-    ? buildTripShareInviteMessage({
-        creatorName,
-        tripTitle,
-        inviteCodeDisplay: inviteDisplay,
-        siteHost,
-        joinPageUrl: buildJoinPageUrlWithCode(siteOrigin, inviteDisplay),
-      })
-    : `${creatorName} invited you to plan ${tripTitle} 🗓️ Open ${siteOrigin}/join?from=create to enter your invite code, or view this trip while signed in:\n${siteOrigin}/trip/${id}`;
-
   return (
     <div className="min-h-screen bg-slate-50 py-6 text-slate-900 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
       <TripHostSetupDashboard
@@ -102,7 +74,6 @@ export default async function TripHostSetupPage({
         viewerUserId={user.id}
         tripOwnerUserId={ownerId}
         inviteCode={inviteRaw || null}
-        shareMessage={shareMessage}
         isHost={access.isHost}
       />
     </div>
