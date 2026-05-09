@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
@@ -25,6 +25,7 @@ export type TripHostSetupSidebarProps = {
   collabRefreshSignal: number;
   bumpCollab: () => void;
   resolveNavHref: (id: HostSetupNavItemId) => string;
+  isHost: boolean;
 };
 
 export function TripHostSetupSidebar({
@@ -41,7 +42,17 @@ export function TripHostSetupSidebar({
   collabRefreshSignal,
   bumpCollab,
   resolveNavHref,
+  isHost,
 }: TripHostSetupSidebarProps) {
+  const canEditWorkspace = tripStatus !== "finalized";
+  const sidebarNavItems = useMemo(
+    () =>
+      HOST_SETUP_NAV_ITEMS.filter((item) => {
+        if (!canEditWorkspace && (item.id === "budget" || item.id === "setup-copilot")) return false;
+        return true;
+      }),
+    [canEditWorkspace]
+  );
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const hasSpotlights = Boolean(plan.spotlights?.length);
 
@@ -72,7 +83,7 @@ export function TripHostSetupSidebar({
       </div>
 
       <nav className="space-y-1 text-sm">
-        {HOST_SETUP_NAV_ITEMS.map((item) => (
+        {sidebarNavItems.map((item) => (
           <a
             key={item.id}
             href={resolveNavHref(item.id)}
@@ -82,21 +93,25 @@ export function TripHostSetupSidebar({
             {item.label}
           </a>
         ))}
-        <Link
-          href={`/trip/${tripId}/setup/packing`}
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
-        >
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
-          Packing list
-        </Link>
+        {canEditWorkspace ? (
+          <Link
+            href={`/trip/${tripId}/setup/packing`}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+            Packing list
+          </Link>
+        ) : null}
       </nav>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-          Share trip
-        </span>
-        <TripPlanShareButton shareMessage={shareMessage} />
-      </div>
+      {isHost ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            Share trip
+          </span>
+          <TripPlanShareButton shareMessage={shareMessage} />
+        </div>
+      ) : null}
 
       <TripPlanCard
         plan={plan}
@@ -104,8 +119,8 @@ export function TripHostSetupSidebar({
         showShare={false}
         hideOpenDecisions
         inviteCode={inviteCode}
-        showInviteRow={Boolean(inviteCode)}
-        inviteCodeProminent={Boolean(inviteCode)}
+        showInviteRow={Boolean(isHost && inviteCode)}
+        inviteCodeProminent={Boolean(isHost && inviteCode)}
         guestJoinNames={tripMemberNames}
         hideSpotlightsSection={hasSpotlights}
       />
@@ -119,7 +134,7 @@ export function TripHostSetupSidebar({
           onPlanUpdated={onPlanUpdated}
           onCollabBump={bumpCollab}
           collabRefreshSignal={collabRefreshSignal}
-          isHost
+          isHost={isHost}
         />
       ) : null}
 
@@ -128,7 +143,7 @@ export function TripHostSetupSidebar({
           tripId={tripId}
           plan={plan}
           tripStatus={tripStatus}
-          isHost
+          isHost={isHost}
           collabRefreshSignal={collabRefreshSignal}
           onPlanUpdated={onPlanUpdated}
           viewerUserId={viewerUserId}

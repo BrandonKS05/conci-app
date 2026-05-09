@@ -2,12 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
-import { fetchTripMemberDisplayNames } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
-import { TripSharedPanel } from "@/frontend/components/trip-shared-panel";
-import { SiteShell } from "@/frontend/components/site-shell";
-import { normalizePlan } from "@/shared/trip-plan";
-import { parseCollabState } from "@/shared/collaboration";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -58,7 +53,7 @@ export default async function SavedTripPlanPage({
 
   const { data, error } = await svc
     .from("trip_plans")
-    .select("plan, invite_code, user_id, status, collab_state")
+    .select("plan, status")
     .eq("id", id)
     .maybeSingle();
 
@@ -77,8 +72,6 @@ export default async function SavedTripPlanPage({
     notFound();
   }
 
-  const plan = normalizePlan(data.plan);
-  const initialCollab = parseCollabState(data.collab_state);
   const tripStatus = parseTripPlanStatus(data.status);
   const isHost = access.isHost;
 
@@ -87,51 +80,6 @@ export default async function SavedTripPlanPage({
     redirect(`/trip/${id}/setup`);
   }
 
-  /** Host-facing trip home is always the unified calendar/setup experience. */
-  if (isHost) {
-    redirect(`/trip/${id}/setup`);
-  }
-
-  const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
-  let memberNames: string[] = [];
-  try {
-    memberNames = await fetchTripMemberDisplayNames(svc, id, user.id);
-  } catch {
-    memberNames = [];
-  }
-
-  const ownerId = typeof data.user_id === "string" ? data.user_id : null;
-  const shareMessage = "";
-
-  return (
-    <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">
-      <SiteShell title={plan.title || "Trip plan"} eyebrow="Your trip" tripTypography>
-        <div className="mx-auto w-full max-w-6xl space-y-6">
-          <TripSharedPanel
-            tripId={id}
-            plan={plan}
-            inviteCode={inviteRaw || null}
-            tripStatus={tripStatus}
-            isHost={isHost}
-            shareMessage={shareMessage}
-            tripMemberNames={memberNames}
-            viewerUserId={user.id}
-            tripOwnerUserId={ownerId}
-            initialCollab={initialCollab}
-          />
-          <p className="text-center text-xs text-slate-500 dark:text-neutral-500">
-            Bookmark this URL to reopen this plan anytime.
-          </p>
-          <p className="text-center">
-            <Link
-              href="/trip-parser"
-              className="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
-            >
-              Create another plan
-            </Link>
-          </p>
-        </div>
-      </SiteShell>
-    </div>
-  );
+  /** Host and invited members use the same trip workspace (calendar, pins, shared collab). */
+  redirect(`/trip/${id}/setup`);
 }

@@ -43,7 +43,7 @@ export default async function TripHostPackingSetupPage({
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
+  if (!access) {
     notFound();
   }
 

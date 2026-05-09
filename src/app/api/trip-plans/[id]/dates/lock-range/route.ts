@@ -16,7 +16,7 @@ function parseIsoDay(iso: string): Date | null {
   return dt.getFullYear() === y && dt.getMonth() === mo && dt.getDate() === d ? dt : null;
 }
 
-/** Host-only: updates confirmed trip dates to a new inclusive range (still `dates.confirmed`). */
+/** Any trip member: updates confirmed trip dates to a new inclusive range (still `dates.confirmed`). */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!id || !isUuid(id)) {
@@ -57,8 +57,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
-    return NextResponse.json({ error: "Only the trip host can lock dates." }, { status: 403 });
+  if (!access) {
+    return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
 
   const { data: row, error: fetchErr } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();

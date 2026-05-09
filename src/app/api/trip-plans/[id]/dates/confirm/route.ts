@@ -7,7 +7,7 @@ import { isUuid } from "@/shared/is-uuid";
 
 export const runtime = "nodejs";
 
-/** Host-only: sets `plan.dates.confirmed = true` for the whole group. */
+/** Any trip member: sets `plan.dates.confirmed = true` for the whole group. */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!id || !isUuid(id)) {
@@ -29,8 +29,8 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
-    return NextResponse.json({ error: "Only the trip owner can confirm dates." }, { status: 403 });
+  if (!access) {
+    return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
 
   const { data: row, error: fetchErr } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();

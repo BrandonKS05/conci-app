@@ -36,7 +36,7 @@ export default async function TripHostFlightsSetupPage({
   const svc = getSupabaseServiceRoleClient();
   if (!svc) notFound();
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) notFound();
+  if (!access) notFound();
 
   const { data, error } = await svc.from("trip_plans").select("plan, status").eq("id", id).maybeSingle();
   if (error || !data?.plan) notFound();

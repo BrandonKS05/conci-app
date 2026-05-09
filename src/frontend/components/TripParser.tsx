@@ -27,6 +27,10 @@ import {
   safeParseJson,
 } from "@/shared/trip-plan";
 import { primaryFilledInteractive } from "@/frontend/ui/primary-action";
+import {
+  TripPlanBuildProgressOverlay,
+  type TripParserBuildStep,
+} from "@/frontend/components/trip-plan-build-progress-overlay";
 import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
 import { PlacePickCards } from "@/frontend/components/place-pick-cards";
 import type { PlacePreview, PlacePreviewBlock, PlaceSpotlight } from "@/shared/place-preview";
@@ -231,7 +235,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [dateSlotError, setDateSlotError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"chat" | "building">("chat");
   const [plan, setPlan] = useState<TripPlan | null>(null);
-  const [loading, setLoading] = useState(false);
+  /** Live phases while finalizing: AI → save → navigate (no static image — see overlay). */
+  const [tripBuildStep, setTripBuildStep] = useState<TripParserBuildStep | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefetchingSlots, setPrefetchingSlots] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -600,7 +605,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       const trimmed = text.trim();
       if (!trimmed && !(imageDataUrls?.length)) return null;
 
-      setLoading(true);
       setError(null);
 
       try {
@@ -614,8 +618,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "Unknown parser error.");
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     [fetchParsedPlan]
@@ -741,7 +743,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   }
 
   function pickChip(key: SlotKey) {
-    if (phase !== "chat" || loading || prefetchingSlots || !awaitingFirstChipAnswer) return;
+    if (phase !== "chat" || tripBuildStep !== null || prefetchingSlots || !awaitingFirstChipAnswer) return;
     if (key === "dates") {
       setDateSlotMode("specific");
       setDateStart("");
@@ -934,6 +936,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   async function finalizePlan(finalSlots: Partial<Record<SlotKey, string>>) {
     const prompt = composeTripPrompt(seedMessage, finalSlots);
+    setTripBuildStep("structuring");
     setPhase("building");
     setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: ACK_BEFORE_PLAN }]);
     const planOut = await runParse(prompt, undefined, finalSlots);
@@ -946,12 +949,17 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           text: "Taking you to host setup — opening your calendar next.",
         },
       ]);
+      setTripBuildStep("saving");
       const navigated = await persistAndRedirectToHostSetup(planOut);
-      if (!navigated) {
+      if (navigated) {
+        setTripBuildStep("launching");
+      } else {
         setPhase("chat");
+        setTripBuildStep(null);
       }
     } else {
       setPhase("chat");
+      setTripBuildStep(null);
     }
   }
 
@@ -968,6 +976,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setDateEnd("");
     setDateSlotError(null);
     setPhase("chat");
+    setTripBuildStep(null);
     setPlan(null);
     setError(null);
     setPrefetchingSlots(false);
@@ -983,7 +992,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     awaitingFirstChipAnswer &&
     missing.length > 0 &&
     activeSlot === null &&
-    !loading &&
+    tripBuildStep === null &&
     !prefetchingSlots;
 
   const introChipKeys = missing.slice(0, 3);
@@ -992,23 +1001,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
-      {phase === "building" && loading ? (
-        <div
-          className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-auto bg-[#C7B1FF] px-4 py-8 dark:bg-[#8f73c9]"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <p className="sr-only">Building your trip plan, please wait.</p>
-          <NextImage
-            src="/trip-plan-generating.png"
-            alt=""
-            width={1024}
-            height={673}
-            priority
-            className="h-auto max-h-[88vh] w-auto max-w-full rounded-2xl shadow-[0_24px_80px_-16px_rgba(65,43,118,0.45)] ring-1 ring-black/5 select-none"
-          />
-        </div>
+      {phase === "building" && tripBuildStep ? (
+        <TripPlanBuildProgressOverlay step={tripBuildStep} />
       ) : null}
 
       <header className="flex items-start gap-3.5">
@@ -1217,7 +1211,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             <button
               type="submit"
               disabled={
-                loading ||
+                tripBuildStep !== null ||
                 (activeSlot !== "dates" && !replyDraft.trim()) ||
                 (activeSlot === "dates" &&
                   dateSlotMode === "specific" &&

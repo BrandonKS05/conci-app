@@ -6,7 +6,7 @@ import { fetchFlightAirportSuggestions } from "@/backend/trip-flight-search";
 import { hostHasConcreteTripRange, normalizePlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
-/** Read-only host context for flight search (destination airport + trip dates). */
+/** Read-only trip context for flight search (destination airport + trip dates). */
 export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!id || !isUuid(id)) {
@@ -28,8 +28,8 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
-    return NextResponse.json({ error: "Only the trip host can view this." }, { status: 403 });
+  if (!access) {
+    return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
 
   const { data, error } = await svc.from("trip_plans").select("plan").eq("id", id).maybeSingle();

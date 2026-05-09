@@ -32,7 +32,7 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
           return;
         }
         if (typeof j.tripId === "string" && j.tripId) {
-          router.push(`/trip/${j.tripId}`);
+          router.push(`/trip/${j.tripId}/setup`);
           router.refresh();
         }
       } finally {

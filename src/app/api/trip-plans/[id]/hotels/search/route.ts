@@ -105,8 +105,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
-    return NextResponse.json({ error: "Only the trip host can run hotel search." }, { status: 403 });
+  if (!access) {
+    return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
 
   const { row, error: fetchErr } = await fetchTripPlanRowForCollab(svc, id);

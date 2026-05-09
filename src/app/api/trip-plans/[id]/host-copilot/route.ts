@@ -412,8 +412,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
-    return NextResponse.json({ error: "Only the host can use setup copilot." }, { status: 403 });
+  if (!access) {
+    return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
 
   const { data: row, error } = await svc

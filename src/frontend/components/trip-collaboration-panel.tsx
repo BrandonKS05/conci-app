@@ -633,6 +633,9 @@ export function TripCollaborationPanel({
     );
   }
 
+  /** Flights, hotels on cards, and live picks: any trip member while the trip is not finalized (API enforces membership). */
+  const canEditLiveItinerary = tripStatus !== "finalized";
+
   if (variant === "preferencesOnly") {
     if (!classified.some((m) => m.key === VIBE_POLL_DECISION_KEY)) return null;
     return (
@@ -721,7 +724,7 @@ export function TripCollaborationPanel({
                 reloadCollab={load}
                 voteFailure={voteFailure?.decisionKey === meta.key ? voteFailure.message : null}
                 blockedByDates={gated}
-                canRunHotelSearch={isHost}
+                canRunHotelSearch={canEditLiveItinerary}
                 liveVenueMerge={meta.key === VENUE_POLL_DECISION_KEY ? liveData?.restaurants ?? null : null}
                 isHost={isHost}
                 datesHostConfirmBusy={datesHostConfirmBusy}
@@ -794,7 +797,7 @@ export function TripCollaborationPanel({
         liveLoading={liveLoading}
         liveFetchErr={liveFetchErr}
         onPlanUpdated={onPlanUpdated}
-        isHost={isHost}
+        isHost={canEditLiveItinerary}
       />
     </>
   );

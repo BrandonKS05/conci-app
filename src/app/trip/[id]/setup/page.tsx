@@ -52,7 +52,7 @@ export default async function TripHostSetupPage({
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
+  if (!access) {
     notFound();
   }
 
@@ -112,6 +112,7 @@ export default async function TripHostSetupPage({
         inviteCode={inviteRaw || null}
         shareMessage={shareMessage}
         tripMemberNames={memberNames}
+        isHost={access.isHost}
       />
     </div>
   );

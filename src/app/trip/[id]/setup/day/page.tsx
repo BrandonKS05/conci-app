@@ -46,7 +46,7 @@ export default async function TripHostSetupDayDetailPage({
   }
 
   const access = await resolveTripAccess(svc, id, user.id);
-  if (!access?.isHost) {
+  if (!access) {
     notFound();
   }
 
