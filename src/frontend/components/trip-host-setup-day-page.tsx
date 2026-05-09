@@ -427,13 +427,14 @@ export function TripHostSetupDayPage({
   const dayVoting = useMemo(() => mergeDayVoteStateForDate(plan, dayVotingByDate, dateIso)[dateIso], [plan, dayVotingByDate, dateIso]);
 
   const scheduleItems = useMemo(() => {
-    const rows: { key: string; label: string; sub: string; href?: string }[] = [];
+    const rows: { key: string; label: string; sub: string; href?: string; recommendedByConci?: boolean }[] = [];
     for (const p of meals) {
       rows.push({
         key: `m-${p.place.mapsUrl}`,
         label: p.place.name,
         sub: "Restaurant",
         href: p.place.mapsUrl,
+        recommendedByConci: p.recommendedByConci === true,
       });
     }
     for (const p of activities) {
@@ -442,6 +443,7 @@ export function TripHostSetupDayPage({
         label: p.experience.name,
         sub: "Activity",
         href: p.experience.bookingUrl || undefined,
+        recommendedByConci: p.recommendedByConci === true,
       });
     }
     return rows;
@@ -667,6 +669,11 @@ export function TripHostSetupDayPage({
                       {row.sub}
                     </span>
                     <p className="mt-2 font-sans text-sm font-bold text-neutral-950 dark:text-white">{row.label}</p>
+                    {row.recommendedByConci ? (
+                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/70 dark:text-neutral-500/70">
+                        recommended by CONCI
+                      </p>
+                    ) : null}
                     {row.href ? (
                       <a
                         href={row.href}
@@ -776,6 +783,11 @@ export function TripHostSetupDayPage({
                         }`}
                       >
                         <p className="font-sans text-base font-bold text-neutral-950 dark:text-white">{opt.label}</p>
+                        {opt.suggestedBy === "conci:auto" ? (
+                          <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/70 dark:text-neutral-500/70">
+                            recommended by CONCI
+                          </p>
+                        ) : null}
                         {opt.detail ? <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{opt.detail}</p> : null}
                         {opt.href ? (
                           <a

@@ -1083,6 +1083,11 @@ export function TripHostSetupDashboard({
                               <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
                                 <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                   {hotelForDay.place.name}
+                                    {hotelForDay.recommendedByConci ? (
+                                      <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                        recommended by CONCI
+                                      </span>
+                                    ) : null}
                                 </span>
                                 <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
                                   Stay
@@ -1106,6 +1111,11 @@ export function TripHostSetupDashboard({
                                   <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
                                     <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                       {p.place.name}
+                                      {p.recommendedByConci ? (
+                                        <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                          recommended by CONCI
+                                        </span>
+                                      ) : null}
                                     </span>
                                     <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
                                       Meal
@@ -1152,6 +1162,11 @@ export function TripHostSetupDashboard({
                                   <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
                                     <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                       {p.experience.name}
+                                      {p.recommendedByConci ? (
+                                        <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                          recommended by CONCI
+                                        </span>
+                                      ) : null}
                                     </span>
                                     <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
                                       Activity

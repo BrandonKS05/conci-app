@@ -3,13 +3,21 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
+import { parseCollabState } from "@/shared/collaboration";
+import { parseDayVoteState, type DayVoteStateByDate, type DayVoteCategoryState } from "@/shared/day-collaboration";
 import {
+  enumerateLocalIsoDays,
   normalizePlan,
+  parseLocalIsoDate,
   safeParseJson,
+  tripRangeBestEffortFromPlanDates,
   type TripPlan,
   type GeneratedItinerary,
   type ItineraryDay,
   type ItineraryActivity,
+  type HostRestaurantPin,
+  type HostActivityPin,
+  type HostHotelStay,
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -52,6 +60,205 @@ Rules:
 
 Example (abbreviated) for a 2-day budget trip to Austin with "outdoors" vibe:
 {"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Arrive at Austin-Bergstrom","description":"Grab bags, take city bus downtown (~30 min).","category":"transport","estimatedCostPp":2},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to HI Austin Hostel","description":"Dorm bed in SoCo area, walking distance to food.","category":"lodging","estimatedCostPp":45},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":18}],"estimatedDayCostPp":82},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent a kayak at the rowing dock for 2 hours.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Depart Austin","description":"Bus back to airport for evening flight.","category":"transport","estimatedCostPp":2}],"estimatedDayCostPp":40}]}`;
+
+function cleanLabel(v: string, max = 140): string {
+  return v.replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function slug(v: string): string {
+  return encodeURIComponent(v.trim());
+}
+
+function mapsSearchUrl(q: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${slug(q)}`;
+}
+
+function dayVoteId(prefix: string, seed: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return `${prefix}:${(h >>> 0).toString(36)}`;
+}
+
+function inferTripDays(plan: TripPlan, itinerary: GeneratedItinerary): string[] {
+  const y0 = new Date().getFullYear();
+  const tr = plan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(plan, y0);
+  if (tr?.startIso && tr.endIso) {
+    const days = enumerateLocalIsoDays(tr.startIso, tr.endIso);
+    if (days.length) return days;
+  }
+  const isoDays = itinerary.days
+    .map((d) => d.dateIso)
+    .filter((x) => typeof x === "string" && parseLocalIsoDate(x));
+  if (isoDays.length) return isoDays;
+  return [];
+}
+
+function inferHomeBaseName(plan: TripPlan, itinerary: GeneratedItinerary): string {
+  const fromHost = plan.hostSetup?.hotel?.name?.trim();
+  if (fromHost) return fromHost;
+  for (const d of itinerary.days) {
+    const lodg = d.activities.find((a) => a.category === "lodging" && a.title.trim());
+    if (lodg?.title?.trim()) return cleanLabel(lodg.title, 120);
+  }
+  return `Recommended stay in ${plan.location?.trim() || "destination"}`;
+}
+
+function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItinerary): {
+  restaurantPins: HostRestaurantPin[];
+  activityPins: HostActivityPin[];
+  hotelStays: HostHotelStay[];
+  dayVoting: DayVoteStateByDate;
+} {
+  const days = inferTripDays(plan, itinerary);
+  const location = plan.location?.trim() || "Destination";
+  const departure = plan.departureCity?.trim() || "Origin";
+  const homeBase = inferHomeBaseName(plan, itinerary);
+
+  const restaurantPins: HostRestaurantPin[] = [];
+  const activityPins: HostActivityPin[] = [];
+  const dayVoting: DayVoteStateByDate = {};
+
+  for (let i = 0; i < days.length; i += 1) {
+    const dateIso = days[i]!;
+    const dayItin = itinerary.days[i] ?? itinerary.days[itinerary.days.length - 1];
+    const foodActs = (dayItin?.activities ?? []).filter((a) => a.category === "food" && a.title.trim());
+    const lunch = cleanLabel(foodActs[0]?.title || `Lunch spot in ${location}`, 120);
+    const dinner = cleanLabel(foodActs[1]?.title || `Dinner spot in ${location}`, 120);
+    const actRows = (dayItin?.activities ?? []).filter((a) => a.category === "activity" && a.title.trim()).slice(0, 2);
+    while (actRows.length < 2) {
+      const slot = actRows.length + 1;
+      actRows.push({
+        time: slot === 1 ? "Afternoon" : "Evening",
+        title: `Top ${slot === 1 ? "experience" : "activity"} in ${location}`,
+        description: `${dayItin?.label || "Curated for your trip vibe and budget."}`,
+        category: "activity",
+        estimatedCostPp: null,
+      });
+    }
+    const flightLabel = cleanLabel(`${departure} -> ${location} best-value flight option`, 140);
+    const flightUrl = `https://www.google.com/travel/flights?hl=en&q=Flights%20from%20${slug(departure)}%20to%20${slug(location)}`;
+
+    restaurantPins.push({
+      dateIso,
+      place: { name: lunch, mapsUrl: mapsSearchUrl(`${lunch} ${location}`), spotlightCategory: "restaurant" },
+      kept: true,
+      recommendedByConci: true,
+    });
+    restaurantPins.push({
+      dateIso,
+      place: { name: dinner, mapsUrl: mapsSearchUrl(`${dinner} ${location}`), spotlightCategory: "restaurant" },
+      kept: true,
+      recommendedByConci: true,
+    });
+
+    for (const a of actRows) {
+      const name = cleanLabel(a.title, 130);
+      activityPins.push({
+        dateIso,
+        experience: {
+          name,
+          pricePerPerson: a.estimatedCostPp != null ? `$${Math.round(a.estimatedCostPp)} pp` : "",
+          rating: "",
+          duration: a.time || "",
+          bookingUrl: mapsSearchUrl(`${name} ${location}`),
+          coverPhotoUrl: null,
+        },
+        kept: true,
+        recommendedByConci: true,
+      });
+    }
+    activityPins.push({
+      dateIso,
+      experience: {
+        name: flightLabel,
+        pricePerPerson: "",
+        rating: "",
+        duration: "Best option",
+        bookingUrl: flightUrl,
+        coverPhotoUrl: null,
+      },
+      kept: true,
+      recommendedByConci: true,
+    });
+
+    const flightsState: DayVoteCategoryState = {
+      options: [
+        {
+          id: dayVoteId("flt", `${dateIso}|${flightLabel}`),
+          label: flightLabel,
+          detail: "recommended by CONCI",
+          href: flightUrl,
+          votes: [],
+          suggestedBy: "conci:auto",
+        },
+      ],
+    };
+    dayVoting[dateIso] = {
+      restaurants: {
+        options: [
+          {
+            id: dayVoteId("rest", `${dateIso}|${lunch}`),
+            label: lunch,
+            detail: "recommended by CONCI",
+            href: mapsSearchUrl(`${lunch} ${location}`),
+            votes: [],
+            suggestedBy: "conci:auto",
+          },
+          {
+            id: dayVoteId("rest", `${dateIso}|${dinner}`),
+            label: dinner,
+            detail: "recommended by CONCI",
+            href: mapsSearchUrl(`${dinner} ${location}`),
+            votes: [],
+            suggestedBy: "conci:auto",
+          },
+        ],
+      },
+      hotels: {
+        options: [
+          {
+            id: dayVoteId("hotel", `${dateIso}|${homeBase}`),
+            label: homeBase,
+            detail: "recommended by CONCI",
+            href: mapsSearchUrl(`${homeBase} ${location}`),
+            votes: [],
+            suggestedBy: "conci:auto",
+          },
+        ],
+      },
+      flights: flightsState,
+      activities: {
+        options: actRows.map((a, idx) => ({
+          id: dayVoteId("act", `${dateIso}|${a.title}|${idx}`),
+          label: cleanLabel(a.title, 120),
+          detail: "recommended by CONCI",
+          href: mapsSearchUrl(`${a.title} ${location}`),
+          votes: [],
+          suggestedBy: "conci:auto",
+        })),
+      },
+      other: { options: [] },
+    };
+  }
+
+  const hotelStays: HostHotelStay[] =
+    days.length > 0
+      ? [
+          {
+            startIso: days[0]!,
+            endIso: days[days.length - 1]!,
+            place: {
+              name: homeBase,
+              mapsUrl: mapsSearchUrl(`${homeBase} ${location}`),
+              spotlightCategory: "hotel",
+            },
+            recommendedByConci: true,
+          },
+        ]
+      : [];
+
+  return { restaurantPins, activityPins, hotelStays, dayVoting };
+}
 
 function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): string {
   const lines: string[] = [];
@@ -196,7 +403,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const { data: row, error: fetchErr } = await svc
     .from("trip_plans")
-    .select("plan, seed_text")
+    .select("plan, seed_text, collab_state")
     .eq("id", id)
     .maybeSingle();
 
@@ -269,11 +476,25 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   itinerary.totalEstimateGroup =
     itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
 
-  const updatedPlan: TripPlan = { ...plan, generatedItinerary: itinerary };
+  const generated = buildAutofillRecommendations(plan, itinerary);
+  const updatedPlan: TripPlan = {
+    ...plan,
+    generatedItinerary: itinerary,
+    hostSetup: {
+      ...(plan.hostSetup ?? {}),
+      hotel: generated.hotelStays[0]?.place ?? plan.hostSetup?.hotel ?? null,
+      hotelStays: generated.hotelStays,
+      restaurantPins: generated.restaurantPins,
+      activityPins: generated.activityPins,
+    },
+  };
+  const collab = parseCollabState(row.collab_state);
+  const mergedDayVoting = { ...parseDayVoteState(collab.dayVoting), ...generated.dayVoting };
+  const nextCollab = { ...collab, dayVoting: mergedDayVoting };
 
   const { error: upErr } = await svc
     .from("trip_plans")
-    .update({ plan: updatedPlan, updated_at: new Date().toISOString() })
+    .update({ plan: updatedPlan, collab_state: nextCollab, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   if (upErr) {

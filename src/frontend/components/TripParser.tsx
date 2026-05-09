@@ -16,6 +16,7 @@ import type { TripPlan } from "@/shared/trip-plan";
 import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
+  applyDepartureSlotToPlan,
   applyDatesSlotToPlan,
   applyUserAnchoredTripDates,
   isDatesSlotTbdValue,
@@ -44,14 +45,15 @@ import {
 } from "@/shared/trip-input-quality";
 import { buildBudgetSoftWarning } from "@/shared/budget-trip-soft-warning";
 
-type SlotKey = "location" | "dates" | "people" | "budget" | "vibe" | "interests" | "pace";
+type SlotKey = "location" | "departure" | "dates" | "people" | "budget" | "vibe" | "interests" | "pace";
 
-const REQUIRED_SLOT_ORDER: SlotKey[] = ["location", "dates", "people", "budget", "vibe"];
+const REQUIRED_SLOT_ORDER: SlotKey[] = ["location", "departure", "dates", "people", "budget", "vibe"];
 const OPTIONAL_SLOT_ORDER: SlotKey[] = ["interests", "pace"];
 const SLOT_ORDER: SlotKey[] = [...REQUIRED_SLOT_ORDER, ...OPTIONAL_SLOT_ORDER];
 
 const SLOT_QUESTIONS: Record<SlotKey, string> = {
   location: "Where are you headed—or any region you’re eyeing?",
+  departure: "What city are you flying from?",
   dates: "Roughly when should this trip fall—even a season or month is fine?",
   people: "How many people are coming?",
   budget: "What’s your budget per person (rough range is fine)?",
@@ -84,6 +86,9 @@ function slotsFromPlan(plan: TripPlan): Partial<Record<SlotKey, string>> {
 
   if (plan.location?.trim() && !isLocationVague(plan.location)) {
     out.location = plan.location.trim();
+  }
+  if (plan.departureCity?.trim()) {
+    out.departure = plan.departureCity.trim();
   }
 
   const usableDateLines = plan.dates.options.filter(
@@ -612,6 +617,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       try {
         const parsed = await fetchParsedPlan(trimmed, imageDataUrls);
         let planOut = mergeSpotlightsFromRef(parsed, draftSpotlightsRef);
+        if (mergeSlots?.departure?.trim()) {
+          planOut = applyDepartureSlotToPlan(planOut, mergeSlots.departure.trim());
+        }
         if (mergeSlots?.dates?.trim()) {
           planOut = applyDatesSlotToPlan(planOut, mergeSlots.dates.trim());
         }

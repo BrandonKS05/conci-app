@@ -50,6 +50,8 @@ export type HostRestaurantPin = {
   place: PlaceSpotlight;
   /** When false the host removed this suggestion for that day. */
   kept: boolean;
+  /** Auto-seeded recommendation provenance (subtle badge in UI). */
+  recommendedByConci?: boolean;
 };
 
 /** Serialized experience row (matches `LiveExperienceCard` from live recommendations). */
@@ -66,6 +68,8 @@ export type HostActivityPin = {
   dateIso: string;
   experience: HostActivityExperience;
   kept: boolean;
+  /** Auto-seeded recommendation provenance (subtle badge in UI). */
+  recommendedByConci?: boolean;
 };
 
 /** Inclusive lodging segment (host may split stays across the trip). */
@@ -73,6 +77,8 @@ export type HostHotelStay = {
   startIso: string;
   endIso: string;
   place: PlaceSpotlight;
+  /** Auto-seeded recommendation provenance (subtle badge in UI). */
+  recommendedByConci?: boolean;
 };
 
 /**
@@ -247,7 +253,8 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       const place = spotlightFromUnknown(o.place);
       if (!place) continue;
       const kept = typeof o.kept === "boolean" ? o.kept : true;
-      pins.push({ dateIso, place, kept });
+      const recommendedByConci = o.recommendedByConci === true;
+      pins.push({ dateIso, place, kept, ...(recommendedByConci ? { recommendedByConci: true } : {}) });
     }
     if (pins.length) restaurantPins = pins;
   }
@@ -281,7 +288,8 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
               : undefined,
       };
       const kept = typeof o.kept === "boolean" ? o.kept : true;
-      pins.push({ dateIso, experience, kept });
+      const recommendedByConci = o.recommendedByConci === true;
+      pins.push({ dateIso, experience, kept, ...(recommendedByConci ? { recommendedByConci: true } : {}) });
     }
     if (pins.length) activityPins = pins;
   }
@@ -300,7 +308,10 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(startIso) || !/^\d{4}-\d{2}-\d{2}$/.test(endIso)) continue;
       const place = spotlightFromUnknown(o.place);
       if (!place) continue;
-      if (startIso <= endIso) list.push({ startIso, endIso, place });
+      const recommendedByConci = o.recommendedByConci === true;
+      if (startIso <= endIso) {
+        list.push({ startIso, endIso, place, ...(recommendedByConci ? { recommendedByConci: true } : {}) });
+      }
     }
     if (list.length) hotelStays = list;
   }
@@ -1337,6 +1348,14 @@ export function applyDatesSlotToPlan(plan: TripPlan, datesSlotText: string): Tri
   }
   const line = v.length > 200 ? `${v.slice(0, 197)}…` : v;
   return { ...plan, dates: { confirmed: false, options: [line] } };
+}
+
+/** Apply the chat "departure" slot answer onto the plan. */
+export function applyDepartureSlotToPlan(plan: TripPlan, departureSlotText: string): TripPlan {
+  const v = departureSlotText.trim();
+  if (!v) return plan;
+  const line = v.length > 120 ? `${v.slice(0, 117)}…` : v;
+  return { ...plan, departureCity: line };
 }
 
 /**
