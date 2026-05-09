@@ -55,8 +55,14 @@ type BasePresence = {
   avatarUrl: string | null;
 };
 
-/** Temporary: remove after presence debugging. Filter console with `[trip-cal-presence]`. */
-const DBG = "[trip-cal-presence]";
+/** Topic passed to `sb.channel()`; server uses `realtime:${topic}`. */
+function presenceChannelName(tripId: string): string {
+  return `presence:trip-cal:${tripId}`;
+}
+
+function presenceRealtimeTopic(tripId: string): string {
+  return `realtime:${presenceChannelName(tripId)}`;
+}
 
 /**
  * Google-Docs-style presence on the trip calendar: who's here + optional cell focus for indicators.
@@ -107,23 +113,13 @@ export function useTripCalendarPresence(
         });
       }
     }
-    console.log(DBG, "peers state updated", {
-      count: out.length,
-      peers: out.map((p) => ({ userId: p.userId, name: p.name, focus: p.focusCellIso })),
-    });
     setPeers(out);
   }, []);
 
   useEffect(() => {
-    if (!enabled || !tripId) {
-      console.log(DBG, "hook disabled or no tripId", { enabled, tripId });
-      return undefined;
-    }
+    if (!enabled || !tripId) return undefined;
     const sb = getSupabaseClient();
-    if (!sb) {
-      console.warn(DBG, "no Supabase browser client — presence disabled");
-      return undefined;
-    }
+    if (!sb) return undefined;
 
     let cancelled = false;
     let ch: RealtimeChannel | null = null;
@@ -133,9 +129,10 @@ export function useTripCalendarPresence(
         data: { session },
       } = await sb.auth.getSession();
       const user = session?.user;
-      if (!user || cancelled) {
-        console.warn(DBG, "no auth session — cannot join presence channel", { cancelled });
-        return;
+      if (!user || cancelled) return;
+
+      if (session.access_token) {
+        await sb.realtime.setAuth(session.access_token);
       }
 
       selfIdRef.current = user.id;
@@ -156,35 +153,34 @@ export function useTripCalendarPresence(
         avatarUrl,
       };
 
-      const channelName = `presence:trip-cal:${tripId}`;
-      console.log(DBG, "joining presence channel", { channelName, selfUserId: user.id });
+      const channelName = presenceChannelName(tripId);
+      const topicFull = presenceRealtimeTopic(tripId);
+
+      const stale = sb.getChannels().find((c) => c.topic === topicFull);
+      if (stale) {
+        await sb.removeChannel(stale);
+      }
+      if (cancelled) return;
 
       ch = sb
         .channel(channelName, {
-          config: { presence: { key: user.id } },
+          config: {
+            presence: { key: user.id, enabled: true },
+          },
         })
         .on("presence", { event: "sync" }, () => {
-          console.log(DBG, "presence event: sync");
           if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "join" }, (payload) => {
-          console.log(DBG, "presence event: join", payload);
+        .on("presence", { event: "join" }, () => {
           if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "leave" }, (payload) => {
-          console.log(DBG, "presence event: leave", payload);
+        .on("presence", { event: "leave" }, () => {
           if (ch) syncFromPresence(ch, user.id);
         })
         .subscribe(async (status, err) => {
-          console.log(DBG, "channel subscribe callback", {
-            status,
-            err: err?.message ?? err ?? null,
-            channel: channelName,
-            tripId,
-          });
           if (status !== "SUBSCRIBED" || cancelled || !ch) {
-            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-              console.warn(DBG, "presence channel not SUBSCRIBED", { status, err });
+            if (status === "CHANNEL_ERROR") {
+              console.warn("[trip-cal-presence] channel error", err?.message ?? err);
             }
             return;
           }
@@ -201,22 +197,18 @@ export function useTripCalendarPresence(
             viewMonth0: calendarMonth0,
           });
           try {
-            const trackStatus = await ch.track(track);
-            console.log(DBG, "subscribed + track() finished", {
-              channel: channelName,
-              trackStatus,
-              payloadPreview: { name: track.name, view: `${calendarYear}-${calendarMonth0}` },
-            });
+            await ch.track(track);
           } catch (e) {
-            console.error(DBG, "track() failed", e);
+            console.warn("[trip-cal-presence] track() failed", e);
           }
         });
     })();
 
     return () => {
-      console.log(DBG, "cleanup: removing presence channel", { tripId });
       cancelled = true;
-      const toRemove = activeChannelRef.current;
+      const topicFull = presenceRealtimeTopic(tripId);
+      const toRemove =
+        activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
       activeChannelRef.current = null;
       channelRef.current = null;
       if (toRemove) {
