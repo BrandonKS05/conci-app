@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
 
+const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+
 /** Only entry to `/join` from this CTA (`/join?from=create`). Not shown in global nav. */
 export function TripParserJoinCta() {
   return (
@@ -8,7 +10,7 @@ export function TripParserJoinCta() {
       <p className="text-sm text-slate-700 dark:text-neutral-300">
         Have an invite code from your host?
       </p>
-      <Link href="/join?from=create" className={`inline-flex w-full shrink-0 justify-center sm:w-auto ${primaryFormButtonClass}`}>
+      <Link href={JOIN_WITH_CODE_URL} className={`inline-flex w-full shrink-0 justify-center sm:w-auto ${primaryFormButtonClass}`}>
         Join a Trip
       </Link>
     </div>

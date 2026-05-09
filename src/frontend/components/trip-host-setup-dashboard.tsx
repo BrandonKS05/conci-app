@@ -61,6 +61,8 @@ import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 
+const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
 }
@@ -805,7 +807,7 @@ export function TripHostSetupDashboard({
                       <p>
                         Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
                         <Link
-                          href="/join?from=create"
+                          href={JOIN_WITH_CODE_URL}
                           className="font-medium text-teal-400 underline-offset-2 hover:underline"
                         >
                           Join a Trip

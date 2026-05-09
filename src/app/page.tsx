@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
 import { primaryHeroEmphasisLinkClass } from "@/frontend/ui/primary-action";
 
+const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+
 export const metadata: Metadata = {
   title: "Conci — Group trips, planned",
   description:
@@ -178,7 +180,7 @@ export default function HomePage() {
               </span>
               <span className="font-display font-semibold text-zinc-800 dark:text-white">Conci</span>
             </div>
-            <Link href="/trip-parser" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href={JOIN_WITH_CODE_URL} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
               Join a Trip
             </Link>
           </div>
