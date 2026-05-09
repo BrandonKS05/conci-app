@@ -14,6 +14,7 @@ import {
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
   hotelStayForDay,
+  normalizePlan,
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
@@ -48,7 +49,7 @@ import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import type { TripPlanStatus } from "@/shared/trip-status";
+import { parseTripPlanStatus, type TripPlanStatus } from "@/shared/trip-status";
 import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { CollabStateV1 } from "@/shared/collaboration";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
@@ -57,6 +58,8 @@ import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-side
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
+import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
+import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -166,10 +169,35 @@ export function TripHostSetupDashboard({
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
   const [effectiveTripStatus, setEffectiveTripStatus] = useState<TripPlanStatus>(initialTripStatus);
   const [collabRefreshSignal, setCollabRefreshSignal] = useState(0);
+  const suppressRealtimeUntilRef = useRef(0);
   const bumpCollab = useCallback(() => {
     setCollabRefreshSignal((n) => n + 1);
     void router.refresh();
   }, [router]);
+  const bumpCollabLive = useCallback(() => {
+    setCollabRefreshSignal((n) => n + 1);
+  }, []);
+
+  useTripWorkspaceRealtime(
+    tripId,
+    useCallback(
+      (row) => {
+        if (row.plan != null) {
+          try {
+            setPlan(normalizePlan(row.plan));
+          } catch {
+            /* ignore */
+          }
+        }
+        if (typeof row.status === "string" && row.status.length > 0) {
+          setEffectiveTripStatus(parseTripPlanStatus(row.status));
+        }
+        bumpCollabLive();
+      },
+      [bumpCollabLive]
+    ),
+    { enabled: true, suppressRealtimeUntilRef }
+  );
 
   useEffect(() => {
     setPlan(initialPlan);
@@ -308,6 +336,12 @@ export function TripHostSetupDashboard({
     return new Date().getMonth();
   });
 
+  const { peers, peersByCellIso, setFocusedCell } = useTripCalendarPresence(tripId, {
+    enabled: true,
+    calendarYear: calYear,
+    calendarMonth0: calMonth,
+  });
+
   /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
   const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
 
@@ -356,7 +390,10 @@ export function TripHostSetupDashboard({
           setErr(j.error || "Could not save setup.");
           return false;
         }
-        if (j.plan) setPlan(j.plan);
+        if (j.plan) {
+          suppressRealtimeUntilRef.current = Date.now() + 1200;
+          setPlan(j.plan);
+        }
         return true;
       } catch {
         setErr("Could not save setup.");
@@ -855,6 +892,39 @@ export function TripHostSetupDashboard({
                   </button>
                 ) : null}
               </div>
+              {peers.length > 0 ? (
+                <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 px-1 py-2.5 dark:border-white/10 sm:border-t-0 sm:py-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400">
+                    Here now
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {peers.map((p) => (
+                      <span
+                        key={p.userId}
+                        title={`${p.name} · on this calendar`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs text-slate-800 shadow-sm dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+                      >
+                        <span
+                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 text-[11px] font-semibold text-white dark:border-white/10"
+                          style={
+                            p.avatarUrl
+                              ? undefined
+                              : { backgroundColor: p.color, borderColor: "transparent" }
+                          }
+                        >
+                          {p.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs from OAuth metadata
+                            <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            p.name.slice(0, 1).toUpperCase()
+                          )}
+                        </span>
+                        <span className="max-w-[8rem] truncate font-medium">{p.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <button
                   type="button"
@@ -927,6 +997,8 @@ export function TripHostSetupDashboard({
                         tabIndex={0}
                         role="presentation"
                         onClick={() => onCalendarDayClick(dom)}
+                        onMouseEnter={() => setFocusedCell(cellIso)}
+                        onMouseLeave={() => setFocusedCell(null)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -1062,6 +1134,22 @@ export function TripHostSetupDashboard({
                               </div>
                             ))}
                         </div>
+                        {(() => {
+                          const others = peersByCellIso.get(cellIso);
+                          if (!others?.length) return null;
+                          return (
+                            <div className="pointer-events-none absolute bottom-2 right-2 flex max-w-[calc(100%-0.5rem)] flex-wrap justify-end gap-1">
+                              {others.map((p) => (
+                                <span
+                                  key={p.userId}
+                                  title={`${p.name} is viewing this day`}
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-dm-card"
+                                  style={{ backgroundColor: p.color }}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
