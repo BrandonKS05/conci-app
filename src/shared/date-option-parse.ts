@@ -306,7 +306,7 @@ function parseDateOptionToRangeStructured(
   }
 
   const cross = raw.match(
-    /^([A-Za-z]+)\s+(\d{1,2})\s*-\s*([A-Za-z]+)\s+(\d{1,2})(?:\s*,\s*(\d{4}))?$/i
+    /^([A-Za-z]+)\s+(\d{1,2})\s*(?:-|–|—|to|through|thru|until|→)\s*([A-Za-z]+)\s+(\d{1,2})(?:\s*,\s*(\d{4}))?$/i
   );
   if (cross) {
     const m1 = monthFromToken(cross[1]!);
@@ -321,7 +321,9 @@ function parseDateOptionToRangeStructured(
     }
   }
 
-  const sameMo = raw.match(/^([A-Za-z]+)\s+(\d{1,2})\s*-\s*(\d{1,2})(?:\s*,\s*(\d{4}))?$/i);
+  const sameMo = raw.match(
+    /^([A-Za-z]+)\s+(\d{1,2})\s*(?:-|–|—|to|through|thru|until|→)\s*(\d{1,2})(?:\s*,\s*(\d{4}))?$/i
+  );
   if (sameMo) {
     const mon = monthFromToken(sameMo[1]!);
     const dStart = parseInt(sameMo[2]!, 10);

@@ -1226,11 +1226,6 @@ export function TripHostSetupDashboard({
               className="scroll-mt-28 rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl space-y-4 text-neutral-200 [&_h3]:text-white [&_p]:text-neutral-400 [&_strong]:text-neutral-200"
             >
               <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-400">
-            Live fare rows from Google Flights (SerpApi). Once your trip lists a departure city and destination, you can add
-            options to the group itinerary — tap <strong className="text-slate-800 dark:text-neutral-200">Add to trip</strong>{" "}
-            for the flights you want the group to see.
-          </p>
           {liveFetchErr ? (
             <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
               {liveFetchErr}
@@ -1296,22 +1291,7 @@ export function TripHostSetupDashboard({
               })()}
             </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm leading-relaxed text-neutral-300">
-                  {canEditTripWorkspace ? (
-                    <>
-                      Add a <strong className="text-white">departure city</strong> and{" "}
-                      <strong className="text-white">destination</strong> on your trip — use{" "}
-                      <strong className="text-white">Trip Copilot</strong> (floating panel) or Trip chat — then flight rows
-                      appear here. Server needs <code className="rounded bg-white/10 px-1 text-xs">SERPAPI_KEY</code> for
-                      live prices.
-                    </>
-                  ) : (
-                    <>
-                      Flight ideas appear once this trip has a <strong className="text-white">departure city</strong> and{" "}
-                      <strong className="text-white">destination</strong>.
-                    </>
-                  )}
-                </p>
+                <></>
               )}
             </div>
             <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl">
@@ -1442,6 +1422,23 @@ export function TripHostSetupDashboard({
               </div>
             </details>
           ) : null}
+        </section>
+
+        <section id="sec-trip-overview" className="scroll-mt-28">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Trip overview app</h2>
+            <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-neutral-400">
+              Open a full-screen itinerary view of everything saved so far, then download it as a PDF.
+            </p>
+            <div className="mt-4">
+              <Link
+                href={`/trip/${tripId}/setup/overview-app`}
+                className="inline-flex items-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-500"
+              >
+                Open trip overview
+              </Link>
+            </div>
+          </div>
         </section>
       </div>
       </div>

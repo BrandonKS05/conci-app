@@ -764,6 +764,26 @@ function tryNamedMonthDayRange(chunk: string): { startIso: string; endIso: strin
   return sortedIsoPair(a, b);
 }
 
+/** e.g. "Jul 30 to Aug 3, 2026" (cross-month explicit window). */
+function tryNamedCrossMonthDayRange(chunk: string): { startIso: string; endIso: string } | null {
+  const re =
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\s*(?:-|–|—|to|through|thru|until|→)\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?|\s+)(\d{4})\b/i.exec(
+      chunk
+    );
+  if (!re?.[5]) return null;
+  const m1 = monthNameTokenToIndex(re[1]);
+  const m2 = monthNameTokenToIndex(re[3]);
+  if (m1 == null || m2 == null) return null;
+  const y = Number(re[5]);
+  const d1 = Number(re[2]);
+  const d2 = Number(re[4]);
+  if (!Number.isFinite(y) || !Number.isFinite(d1) || !Number.isFinite(d2)) return null;
+  const a = isoFromUtcParts(y, m1, d1);
+  const b = isoFromUtcParts(y, m2, d2);
+  if (!a || !b) return null;
+  return sortedIsoPair(a, b);
+}
+
 /**
  * Replace model `dates.options` when your own words clearly state one contiguous span.
  * Prefer `• dates: …` lines from the composed finalize prompt over generic trip seed text so we avoid
@@ -784,7 +804,10 @@ export function applyUserAnchoredTripDates(plan: TripPlan, userCorpus: string): 
   const tryAll = (): { startIso: string; endIso: string } | null => {
     for (const scope of scopes) {
       const r =
-        tryIsoBracketRange(scope) || trySlashBracketRange(scope) || tryNamedMonthDayRange(scope);
+        tryIsoBracketRange(scope) ||
+        trySlashBracketRange(scope) ||
+        tryNamedCrossMonthDayRange(scope) ||
+        tryNamedMonthDayRange(scope);
       if (r) return r;
     }
     return null;
