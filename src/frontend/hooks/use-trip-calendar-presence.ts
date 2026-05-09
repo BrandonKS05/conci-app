@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, Session, User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 import { firstNameFromUserMetadata } from "@/shared/user-display-name";
 
@@ -55,6 +55,79 @@ type BasePresence = {
   avatarUrl: string | null;
 };
 
+type RawPresenceRow = {
+  user_id?: string;
+  name?: string;
+  avatar_url?: string | null;
+  color?: string;
+  focus_cell_iso?: string | null;
+  view_year?: number;
+  view_month0?: number;
+};
+
+function peerFromRow(p: RawPresenceRow): TripCalendarPeer | null {
+  const uid = typeof p.user_id === "string" ? p.user_id : "";
+  if (!uid) return null;
+  return {
+    userId: uid,
+    name: typeof p.name === "string" && p.name.trim() ? p.name.trim() : "Traveler",
+    avatarUrl: typeof p.avatar_url === "string" && p.avatar_url.startsWith("http") ? p.avatar_url : null,
+    color: typeof p.color === "string" ? p.color : "#6366f1",
+    focusCellIso: typeof p.focus_cell_iso === "string" ? p.focus_cell_iso : null,
+    viewYear: typeof p.view_year === "number" ? p.view_year : null,
+    viewMonth0: typeof p.view_month0 === "number" ? p.view_month0 : null,
+  };
+}
+
+function rowScore(presenceKey: string, peer: TripCalendarPeer): number {
+  let s = 0;
+  if (presenceKey === peer.userId) s += 1000;
+  if (peer.focusCellIso) s += 10;
+  if (peer.avatarUrl) s += 1;
+  return s;
+}
+
+/**
+ * Collapse Phoenix presence to **one row per `user_id`** payload field.
+ * Multiple presence keys (reconnect ghosts) become a single UI row.
+ */
+function dedupePeersByUserId(
+  state: Record<string, RawPresenceRow[]>,
+  selfId: string
+): TripCalendarPeer[] {
+  type Cand = { presenceKey: string; peer: TripCalendarPeer; score: number };
+  const byUser = new Map<string, Cand[]>();
+
+  for (const [presenceKey, presences] of Object.entries(state)) {
+    for (const p of presences ?? []) {
+      const peer = peerFromRow(p);
+      if (!peer || peer.userId === selfId) continue;
+      const c: Cand = {
+        presenceKey,
+        peer,
+        score: rowScore(presenceKey, peer),
+      };
+      const list = byUser.get(peer.userId) ?? [];
+      list.push(c);
+      byUser.set(peer.userId, list);
+    }
+  }
+
+  const out: TripCalendarPeer[] = [];
+  for (const [, cands] of byUser) {
+    if (!cands.length) continue;
+    cands.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const ca = a.presenceKey === a.peer.userId ? 1 : 0;
+      const cb = b.presenceKey === b.peer.userId ? 1 : 0;
+      return cb - ca;
+    });
+    out.push(cands[0]!.peer);
+  }
+
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Topic passed to `sb.channel()`; server uses `realtime:${topic}`. */
 function presenceChannelName(tripId: string): string {
   return `presence:trip-cal:${tripId}`;
@@ -64,8 +137,73 @@ function presenceRealtimeTopic(tripId: string): string {
   return `realtime:${presenceChannelName(tripId)}`;
 }
 
-/** Debug: filter console with `[trip-cal-presence]` — remove when presence is stable. */
-const DBG = "[trip-cal-presence]";
+async function untrackAndRemoveChannel(sb: ReturnType<typeof getSupabaseClient>, ch: RealtimeChannel) {
+  if (!sb) return;
+  try {
+    await ch.untrack();
+  } catch {
+    /* channel may already be torn down */
+  }
+  try {
+    await sb.removeChannel(ch);
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * After a full page load, `getSession()` can briefly return null before storage hydration.
+ * Wait for `INITIAL_SESSION` / `SIGNED_IN` so we join presence as soon as auth is ready (fixes
+ * "disappears after refresh" on the other client).
+ */
+async function waitForUserSession(
+  sb: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  cancelled: () => boolean
+): Promise<{ user: User; session: Session } | null> {
+  const immediate = await sb.auth.getSession();
+  if (!cancelled() && immediate.data.session?.user) {
+    return { user: immediate.data.session.user, session: immediate.data.session };
+  }
+
+  return await new Promise((resolve) => {
+    let done = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let subscription: { unsubscribe: () => void } | undefined;
+
+    const finish = (value: { user: User; session: Session } | null) => {
+      if (done) return;
+      done = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      try {
+        subscription?.unsubscribe();
+      } catch {
+        /* noop */
+      }
+      resolve(value);
+    };
+
+    const { data } = sb.auth.onAuthStateChange((event, session) => {
+      if (cancelled() || done) return;
+      if (!session?.user) {
+        if (event === "SIGNED_OUT") finish(null);
+        return;
+      }
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        finish({ user: session.user, session });
+      }
+    });
+    subscription = data.subscription;
+
+    timeoutId = setTimeout(() => finish(null), 10_000);
+
+    void sb.auth.getSession().then(({ data: d }) => {
+      if (cancelled() || done) return;
+      if (d.session?.user) {
+        finish({ user: d.session.user, session: d.session });
+      }
+    });
+  });
+}
 
 /**
  * Google-Docs-style presence on the trip calendar: who's here + optional cell focus for indicators.
@@ -86,95 +224,49 @@ export function useTripCalendarPresence(
   const lastSentFocus = useRef(0);
   const basePayloadRef = useRef<BasePresence | null>(null);
   const activeChannelRef = useRef<RealtimeChannel | null>(null);
+  const calendarRef = useRef({ calendarYear, calendarMonth0 });
+  calendarRef.current = { calendarYear, calendarMonth0 };
 
-  const syncFromPresence = useCallback((ch: RealtimeChannel, selfId: string, source: "sync" | "join" | "leave") => {
-    const state = ch.presenceState() as Record<
-      string,
-      Array<{
-        user_id?: string;
-        name?: string;
-        avatar_url?: string | null;
-        color?: string;
-        focus_cell_iso?: string | null;
-        view_year?: number;
-        view_month0?: number;
-      }>
-    >;
-    console.log(DBG, "presenceState() raw (before filter)", source, {
-      presenceKeys: Object.keys(state),
-      entries: Object.entries(state).map(([k, v]) => [
-        k,
-        Array.isArray(v) ? v.map((p) => p?.user_id ?? "?") : v,
-      ]),
-    });
-    const out: TripCalendarPeer[] = [];
-    for (const [, presences] of Object.entries(state)) {
-      for (const p of presences ?? []) {
-        const uid = typeof p.user_id === "string" ? p.user_id : "";
-        if (!uid || uid === selfId) continue;
-        out.push({
-          userId: uid,
-          name: typeof p.name === "string" && p.name.trim() ? p.name.trim() : "Traveler",
-          avatarUrl: typeof p.avatar_url === "string" && p.avatar_url.startsWith("http") ? p.avatar_url : null,
-          color: typeof p.color === "string" ? p.color : "#6366f1",
-          focusCellIso: typeof p.focus_cell_iso === "string" ? p.focus_cell_iso : null,
-          viewYear: typeof p.view_year === "number" ? p.view_year : null,
-          viewMonth0: typeof p.view_month0 === "number" ? p.view_month0 : null,
-        });
-      }
-    }
-    console.log(DBG, "peers state updated", source, {
-      selfId,
-      count: out.length,
-      peers: out.map((p) => ({
-        userId: p.userId,
-        name: p.name,
-        focus: p.focusCellIso,
-        view: p.viewYear != null && p.viewMonth0 != null ? `${p.viewYear}-${p.viewMonth0}` : null,
-      })),
-    });
-    setPeers(out);
+  const syncFromPresence = useCallback((ch: RealtimeChannel, selfId: string) => {
+    const state = ch.presenceState() as Record<string, RawPresenceRow[]>;
+    setPeers(dedupePeersByUserId(state, selfId));
+  }, []);
+
+  const trackRef = useCallback(async () => {
+    const ch = channelRef.current;
+    const base = basePayloadRef.current;
+    if (!ch || !base) return;
+    const { calendarYear: y, calendarMonth0: m } = calendarRef.current;
+    await ch.track(
+      buildTrackPayload({
+        userId: base.userId,
+        email: base.email,
+        meta: base.meta,
+        color: base.color,
+        avatarUrl: base.avatarUrl,
+        focusCellIso: focusRef.current,
+        viewYear: y,
+        viewMonth0: m,
+      })
+    );
   }, []);
 
   useEffect(() => {
-    if (!enabled || !tripId) {
-      console.log(DBG, "effect skipped", { enabled, tripId });
-      return undefined;
-    }
+    if (!enabled || !tripId) return undefined;
     const sb = getSupabaseClient();
-    if (!sb) {
-      console.warn(DBG, "no Supabase browser client");
-      return undefined;
-    }
-
-    console.log(DBG, "effect run", { tripId, enabled });
+    if (!sb) return undefined;
 
     let cancelled = false;
     let ch: RealtimeChannel | null = null;
 
     void (async () => {
-      const {
-        data: { session },
-      } = await sb.auth.getSession();
-      const user = session?.user;
-      if (!user || cancelled) {
-        console.warn(DBG, "abort: no user or cancelled after getSession", {
-          hasUser: Boolean(user),
-          cancelled,
-        });
-        return;
-      }
+      const auth = await waitForUserSession(sb, () => cancelled);
+      if (!auth || cancelled) return;
 
-      console.log(DBG, "session ok", {
-        userId: user.id,
-        hasAccessToken: Boolean(session?.access_token),
-      });
+      const { user, session } = auth;
 
       if (session.access_token) {
         await sb.realtime.setAuth(session.access_token);
-        console.log(DBG, "realtime.setAuth(access_token) awaited");
-      } else {
-        console.warn(DBG, "no session.access_token — realtime may use anon/key fallback");
       }
 
       selfIdRef.current = user.id;
@@ -200,20 +292,9 @@ export function useTripCalendarPresence(
 
       const stale = sb.getChannels().find((c) => c.topic === topicFull);
       if (stale) {
-        console.log(DBG, "removing stale channel before create", { topic: stale.topic });
-        await sb.removeChannel(stale);
+        await untrackAndRemoveChannel(sb, stale);
       }
-      if (cancelled) {
-        console.log(DBG, "cancelled after stale removal");
-        return;
-      }
-
-      console.log(DBG, "creating channel + subscribe", {
-        channelName,
-        topicFull,
-        selfUserId: user.id,
-        existingChannels: sb.getChannels().map((c) => c.topic),
-      });
+      if (cancelled) return;
 
       ch = sb
         .channel(channelName, {
@@ -222,38 +303,24 @@ export function useTripCalendarPresence(
           },
         })
         .on("presence", { event: "sync" }, () => {
-          console.log(DBG, "presence event: sync");
-          if (ch) syncFromPresence(ch, user.id, "sync");
+          if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "join" }, (payload) => {
-          console.log(DBG, "presence event: join", payload);
-          if (ch) syncFromPresence(ch, user.id, "join");
+        .on("presence", { event: "join" }, () => {
+          if (ch) syncFromPresence(ch, user.id);
         })
-        .on("presence", { event: "leave" }, (payload) => {
-          console.log(DBG, "presence event: leave", payload);
-          if (ch) syncFromPresence(ch, user.id, "leave");
+        .on("presence", { event: "leave" }, () => {
+          if (ch) syncFromPresence(ch, user.id);
         })
         .subscribe(async (status, err) => {
-          console.log(DBG, "channel subscribe callback", {
-            status,
-            err: err?.message ?? err ?? null,
-            channelName,
-            topicFull,
-            tripId,
-            cancelled,
-          });
           if (status !== "SUBSCRIBED" || cancelled || !ch) {
-            console.warn(DBG, "subscribe not SUBSCRIBED (early return)", {
-              status,
-              err: err?.message ?? err ?? null,
-              cancelled,
-              hasChannel: Boolean(ch),
-            });
+            if (status === "CHANNEL_ERROR") {
+              console.warn("[trip-cal-presence] channel error", err?.message ?? err);
+            }
             return;
           }
-          console.log(DBG, "SUBSCRIBED — presence channel ready");
           channelRef.current = ch;
           activeChannelRef.current = ch;
+          const cal = calendarRef.current;
           const track = buildTrackPayload({
             userId: user.id,
             email,
@@ -261,62 +328,55 @@ export function useTripCalendarPresence(
             color,
             avatarUrl,
             focusCellIso: focusRef.current,
-            viewYear: calendarYear,
-            viewMonth0: calendarMonth0,
+            viewYear: cal.calendarYear,
+            viewMonth0: cal.calendarMonth0,
           });
           try {
-            const trackStatus = await ch.track(track);
-            console.log(DBG, "track() after SUBSCRIBED", {
-              trackStatus,
-              payloadPreview: {
-                name: track.name,
-                user_id: track.user_id,
-                view_year: track.view_year,
-                view_month0: track.view_month0,
-                focus_cell_iso: track.focus_cell_iso,
-              },
-            });
+            await ch.track(track);
           } catch (e) {
-            console.warn(DBG, "track() failed", e);
+            console.warn("[trip-cal-presence] track() failed", e);
           }
         });
     })();
 
+    const onOnline = () => {
+      void trackRef();
+    };
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void trackRef();
+        const topicFull = presenceRealtimeTopic(tripId);
+        const live =
+          activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
+        const sid = selfIdRef.current;
+        if (live && sid) {
+          syncFromPresence(live, sid);
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", onOnline);
+      document.addEventListener("visibilitychange", onVisible);
+    }
+
     return () => {
-      console.log(DBG, "cleanup: unmount / deps change", { tripId });
       cancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", onOnline);
+        document.removeEventListener("visibilitychange", onVisible);
+      }
       const topicFull = presenceRealtimeTopic(tripId);
       const toRemove =
         activeChannelRef.current ?? sb.getChannels().find((c) => c.topic === topicFull) ?? null;
       activeChannelRef.current = null;
       channelRef.current = null;
       if (toRemove) {
-        console.log(DBG, "cleanup: removeChannel", { topic: toRemove.topic });
-        void sb.removeChannel(toRemove);
-      } else {
-        console.log(DBG, "cleanup: nothing to remove (no ref / no matching topic)");
+        void untrackAndRemoveChannel(sb, toRemove);
       }
       setPeers([]);
     };
-  }, [tripId, enabled, syncFromPresence]);
-
-  const trackRef = useCallback(async () => {
-    const ch = channelRef.current;
-    const base = basePayloadRef.current;
-    if (!ch || !base) return;
-    await ch.track(
-      buildTrackPayload({
-        userId: base.userId,
-        email: base.email,
-        meta: base.meta,
-        color: base.color,
-        avatarUrl: base.avatarUrl,
-        focusCellIso: focusRef.current,
-        viewYear: calendarYear,
-        viewMonth0: calendarMonth0,
-      })
-    );
-  }, [calendarYear, calendarMonth0]);
+  }, [tripId, enabled, syncFromPresence, trackRef]);
 
   useEffect(() => {
     if (!enabled || !tripId) return;
@@ -335,14 +395,21 @@ export function useTripCalendarPresence(
   );
 
   const peersByCellIso = useMemo(() => {
-    const m = new Map<string, TripCalendarPeer[]>();
+    const m = new Map<string, Map<string, TripCalendarPeer>>();
     for (const p of peers) {
       if (!p.focusCellIso) continue;
-      const list = m.get(p.focusCellIso) ?? [];
-      list.push(p);
-      m.set(p.focusCellIso, list);
+      let inner = m.get(p.focusCellIso);
+      if (!inner) {
+        inner = new Map();
+        m.set(p.focusCellIso, inner);
+      }
+      inner.set(p.userId, p);
     }
-    return m;
+    const out = new Map<string, TripCalendarPeer[]>();
+    for (const [cell, umap] of m) {
+      out.set(cell, [...umap.values()]);
+    }
+    return out;
   }, [peers]);
 
   return {
