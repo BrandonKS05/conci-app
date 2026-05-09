@@ -672,31 +672,6 @@ export function TripCollaborationPanel({
         </ul>
       </section>
 
-      {isHost && isTripOwner ? (
-        <section className="mb-6 rounded-2xl border border-amber-300/50 bg-amber-50/90 px-5 py-4 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
-          <p className="mt-2 text-sm text-amber-950/90 dark:text-amber-100/90">
-            You can override group suggestions anytime — update dates, destination, budget, and which flights appear below.
-          </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-950 dark:text-amber-50/95">
-            <li>
-              Use{" "}
-              <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
-                Trip chat
-              </a>{" "}
-              (floating button — jump via link) to change dates, budget, or destination in plain language.
-            </li>
-            <li>
-              Under{" "}
-              <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
-                Flights
-              </a>
-              , keep or dismiss options so the group only sees the itineraries you want.
-            </li>
-          </ul>
-        </section>
-      ) : null}
-
       {showDecideTogetherColumn ? (
         <div className="space-y-6">
           <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>

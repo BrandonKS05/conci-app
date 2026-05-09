@@ -243,6 +243,8 @@ export function TripHostSetupDashboard({
       initialPlan.budget.tier?.trim() ||
       ""
   );
+  const [showBudgetEditor, setShowBudgetEditor] = useState(false);
+  const [savingBudgetInline, setSavingBudgetInline] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [rangeAnchor, setRangeAnchor] = useState<string | null>(null);
   const [datePickMode, setDatePickMode] = useState<"range" | "day">(() =>
@@ -266,7 +268,6 @@ export function TripHostSetupDashboard({
     startIso: string;
     endIso: string;
   } | null>(null);
-  const [availabilityNote, setAvailabilityNote] = useState("");
 
   /** Inferred strictly from planner text with real calendar days — not loose full-month guesses. */
   const parserConcreteRange = useMemo(
@@ -423,6 +424,11 @@ export function TripHostSetupDashboard({
 
   useEffect(() => {
     setBudgetLine(plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "");
+  }, [plan.budget.perPerson, plan.budget.tier]);
+
+  const budgetDisplayLine = useMemo(() => {
+    const raw = plan.budget.perPerson?.trim() || plan.budget.tier?.trim() || "";
+    return raw || "Not set";
   }, [plan.budget.perPerson, plan.budget.tier]);
 
   /** Legacy drafts: persist **concrete** parser dates once if `hostSetup.tripRange` was never saved. */
@@ -777,7 +783,31 @@ export function TripHostSetupDashboard({
                     Join code · invite people
                   </p>
                   {resolvedInviteCode ? (
-                    <InviteCodeRow rawCode={resolvedInviteCode} prominent />
+                    <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
+                      <InviteCodeRow rawCode={resolvedInviteCode} prominent />
+                      <div className="rounded-2xl border border-amber-300/50 bg-amber-50/90 px-4 py-3 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
+                        <h3 className="font-display text-sm font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
+                        <p className="mt-1.5 text-xs text-amber-950/90 dark:text-amber-100/90">
+                          You can override group suggestions anytime.
+                        </p>
+                        <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-amber-950 dark:text-amber-50/95">
+                          <li>
+                            Use{" "}
+                            <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
+                              Trip chat
+                            </a>{" "}
+                            to change dates, budget, or destination.
+                          </li>
+                          <li>
+                            Under{" "}
+                            <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
+                              Flights
+                            </a>
+                            , keep or dismiss itineraries.
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
                   ) : (
                     <div className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-neutral-300">
                       <p>
@@ -812,24 +842,47 @@ export function TripHostSetupDashboard({
                   </p>
                 </div>
               )}
-              {isHost ? (
-                <div className="mb-6 rounded-2xl border border-teal-500/30 bg-teal-950/25 p-4 sm:p-5">
-                  <h3 className="font-display text-base font-semibold text-white">Which dates work for you?</h3>
-                  <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">
-                    Note when everyone&apos;s free or what to avoid — keep it beside the calendar while you set trip days.
-                  </p>
-                  <label className="mt-3 block">
-                    <span className="sr-only">Availability</span>
-                    <textarea
-                      value={availabilityNote}
-                      onChange={(e) => setAvailabilityNote(e.target.value)}
-                      rows={3}
-                      placeholder="e.g. Prefer long weekend · avoid holidays…"
-                      className="w-full resize-y rounded-xl border border-white/15 bg-black/35 px-3 py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-teal-500/45"
-                    />
-                  </label>
+              <div className="mb-6 rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
+                  <span className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-xs font-semibold text-neutral-100">
+                    {budgetDisplayLine}
+                  </span>
+                  {canEditTripWorkspace ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowBudgetEditor((v) => !v)}
+                      className="rounded-full border border-white/20 px-2.5 py-1 text-xs font-medium text-neutral-200 transition hover:bg-white/10"
+                    >
+                      {showBudgetEditor ? "Cancel" : "Change budget"}
+                    </button>
+                  ) : null}
                 </div>
-              ) : null}
+                {canEditTripWorkspace && showBudgetEditor ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <input
+                      value={budgetLine}
+                      onChange={(e) => setBudgetLine(e.target.value)}
+                      placeholder="e.g. ~$1,200 per person"
+                      className="w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-teal-500/45"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingBudgetInline}
+                      onClick={() => {
+                        setSavingBudgetInline(true);
+                        void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null }).then((ok) => {
+                          if (ok) setShowBudgetEditor(false);
+                          setSavingBudgetInline(false);
+                        });
+                      }}
+                      className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                    >
+                      {savingBudgetInline ? "Saving..." : "Save budget"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -1385,7 +1438,6 @@ export function TripHostSetupDashboard({
                 plan={plan}
                 tripStatus={effectiveTripStatus}
                 onPlanUpdated={setPlan}
-                inviteCode={resolvedInviteCode}
                 shareMessage={shareMessage}
                 viewerUserId={viewerUserId}
                 tripOwnerUserId={tripOwnerUserId}

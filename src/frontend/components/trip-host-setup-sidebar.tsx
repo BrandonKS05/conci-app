@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { TripPlanStatus } from "@/shared/trip-status";
 import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaboration";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripPlanShareButton } from "@/frontend/components/trip-plan-share-button";
-import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { DynamicTripItinerary } from "@/frontend/components/dynamic-trip-itinerary";
 import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights-interactive";
 
@@ -17,7 +16,6 @@ export type TripHostSetupSidebarProps = {
   plan: TripPlan;
   tripStatus: TripPlanStatus;
   onPlanUpdated: (next: TripPlan) => void;
-  inviteCode: string | null;
   shareMessage: string;
   viewerUserId: string;
   tripOwnerUserId: string | null;
@@ -33,7 +31,6 @@ export function TripHostSetupSidebar({
   plan,
   tripStatus,
   onPlanUpdated,
-  inviteCode,
   shareMessage,
   viewerUserId,
   tripOwnerUserId,
@@ -52,35 +49,10 @@ export function TripHostSetupSidebar({
       }),
     [canEditWorkspace]
   );
-  const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const hasSpotlights = Boolean(plan.spotlights?.length);
-
-  useEffect(() => {
-    const loc = plan.location?.trim() || plan.title?.trim();
-    if (!loc) return;
-    let cancelled = false;
-    void (async () => {
-      const res = await fetch(`/api/places/destination-cover?q=${encodeURIComponent(loc)}`);
-      const j = (await res.json().catch(() => ({}))) as { photoUrl?: string | null };
-      if (!cancelled && j.photoUrl?.startsWith("http")) setHeroUrl(j.photoUrl);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [plan.location, plan.title]);
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <div
-          className="aspect-[16/11] bg-slate-200 bg-cover bg-center dark:bg-neutral-800"
-          style={heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined}
-        />
-        <p className="border-t border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 dark:border-white/10 dark:text-neutral-400">
-          {plan.location?.trim() || plan.title?.trim() || "Destination"}
-        </p>
-      </div>
-
       <nav className="space-y-1 text-sm">
         {sidebarNavItems.map((item) => (
           <a
@@ -109,12 +81,6 @@ export function TripHostSetupSidebar({
             Share trip
           </span>
           <TripPlanShareButton shareMessage={shareMessage} />
-        </div>
-      ) : null}
-
-      {isHost && inviteCode ? (
-        <div className="pt-1">
-          <InviteCodeRow rawCode={inviteCode} prominent />
         </div>
       ) : null}
 
