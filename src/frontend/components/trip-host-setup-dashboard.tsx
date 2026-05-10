@@ -13,6 +13,7 @@ import {
   concreteTripRangeFromPlanDates,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
+  hostCalendarHotelDisplayTitle,
   hotelStayRowsForCalendarDay,
   type HostHotelCalendarEdge,
   normalizePlan,
@@ -1062,7 +1063,7 @@ export function TripHostSetupDashboard({
                         >
                           <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
                             <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                              {hotelForDay.place.name}
+                              {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
                               {hotelForDay.recommendedByConci ? (
                                 <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
                                   recommended by CONCI

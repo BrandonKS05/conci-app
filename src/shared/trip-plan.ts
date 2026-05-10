@@ -1178,6 +1178,23 @@ export function hotelStayRowsForCalendarDay(
   return rows;
 }
 
+/**
+ * Primary line for a lodging row on the host month calendar. On check-out days, rewrites
+ * generic “check in …” titles so they match the CHECK-OUT badge (place.name is often the same for both edges).
+ */
+export function hostCalendarHotelDisplayTitle(placeName: string, edge: HostHotelCalendarEdge): string {
+  const n = placeName.trim();
+  if (!n) return "";
+  if (edge !== "check-out") return n;
+
+  const checkInIntro = /^check\s*-?\s*in\s*(?:to\s+)?(.*)$/i.exec(n);
+  if (checkInIntro) {
+    const rest = checkInIntro[1]?.trim() ?? "";
+    return rest ? `Check out from ${rest}` : "Check out";
+  }
+  return `Check out · ${n}`;
+}
+
 /** Inclusive list of yyyy-mm-dd between start and end (invalid / wrong order → []). */
 export function enumerateLocalIsoDays(startIso: string, endIso: string): string[] {
   const a = parseLocalIsoDate(startIso);
