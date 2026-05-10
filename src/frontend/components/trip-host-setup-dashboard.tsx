@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -86,6 +86,9 @@ function daysInMonth(y: number, m0: number): number {
 }
 
 const WEEKDAY_MON_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+/** Stay + pins shown per day cell; extra rows summarized so week rows stay a uniform height. */
+const CALENDAR_CELL_MAX_VISIBLE_ITEMS = 2;
 
 /** Monday-first month grid padding (classic wall calendar layout). */
 function calendarCellsMondayFirst(viewYear: number, viewMonth: number): (number | null)[] {
@@ -1036,6 +1039,133 @@ export function TripHostSetupDashboard({
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
                     const dayLabel = formatPinDayLabel(cellIso);
+                    const mealPinsForCell = (hostSetup.restaurantPins ?? []).filter(
+                      (p) => p.dateIso === cellIso && p.kept
+                    );
+                    const activityPinsForCell = (hostSetup.activityPins ?? []).filter(
+                      (p) => p.dateIso === cellIso && p.kept
+                    );
+
+                    const calendarCellEntries: ReactNode[] = [];
+                    if (hotelForDay) {
+                      calendarCellEntries.push(
+                        <div key={`stay-${cellIso}`} className="min-w-0 w-full">
+                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
+                            <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                              {hotelForDay.place.name}
+                              {hotelForDay.recommendedByConci ? (
+                                <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                  recommended by CONCI
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                              Stay
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    for (const p of mealPinsForCell) {
+                      calendarCellEntries.push(
+                        <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
+                          <button
+                            type="button"
+                            className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
+                            }}
+                          >
+                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                {p.place.name}
+                                {p.recommendedByConci ? (
+                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                    recommended by CONCI
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                Meal
+                              </span>
+                            </div>
+                          </button>
+                          {canEditTripWorkspace ? (
+                            <button
+                              type="button"
+                              aria-label={`Remove ${p.place.name}`}
+                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setRemovePinConfirm({
+                                  kind: "meal",
+                                  dateIso: p.dateIso,
+                                  mapsUrl: p.place.mapsUrl,
+                                  title: `“${p.place.name}” on ${dayLabel}`,
+                                });
+                              }}
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    }
+                    for (const p of activityPinsForCell) {
+                      calendarCellEntries.push(
+                        <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
+                          <button
+                            type="button"
+                            className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setPinDetail({
+                                kind: "activity",
+                                experience: p.experience,
+                                dateLabel: dayLabel,
+                              });
+                            }}
+                          >
+                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                {p.experience.name}
+                                {p.recommendedByConci ? (
+                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                    recommended by CONCI
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                                Activity
+                              </span>
+                            </div>
+                          </button>
+                          {canEditTripWorkspace ? (
+                            <button
+                              type="button"
+                              aria-label={`Remove ${p.experience.name}`}
+                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setRemovePinConfirm({
+                                  kind: "activity",
+                                  dateIso: p.dateIso,
+                                  bookingUrl: p.experience.bookingUrl,
+                                  title: `“${p.experience.name}” on ${dayLabel}`,
+                                });
+                              }}
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    }
+
+                    const visibleCalendarEntries = calendarCellEntries.slice(0, CALENDAR_CELL_MAX_VISIBLE_ITEMS);
+                    const calendarMoreCount = Math.max(0, calendarCellEntries.length - CALENDAR_CELL_MAX_VISIBLE_ITEMS);
+
                     return (
                       <div
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
@@ -1077,122 +1207,13 @@ export function TripHostSetupDashboard({
                           )}
                         </div>
 
-                        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-                          {hotelForDay ? (
-                            <div className="min-w-0 w-full">
-                              <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
-                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                  {hotelForDay.place.name}
-                                    {hotelForDay.recommendedByConci ? (
-                                      <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
-                                        recommended by CONCI
-                                      </span>
-                                    ) : null}
-                                </span>
-                                <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                  Stay
-                                </span>
-                              </div>
-                            </div>
+                        <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+                          {visibleCalendarEntries}
+                          {calendarMoreCount > 0 ? (
+                            <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-slate-500 dark:text-neutral-500">
+                              +{calendarMoreCount} more
+                            </p>
                           ) : null}
-
-                          {(hostSetup.restaurantPins ?? [])
-                            .filter((p) => p.dateIso === cellIso && p.kept)
-                            .map((p) => (
-                              <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
-                                <button
-                                  type="button"
-                                  className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
-                                  }}
-                                >
-                                  <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
-                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                      {p.place.name}
-                                      {p.recommendedByConci ? (
-                                        <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
-                                          recommended by CONCI
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                      Meal
-                                    </span>
-                                  </div>
-                                </button>
-                                {canEditTripWorkspace ? (
-                                  <button
-                                    type="button"
-                                    aria-label={`Remove ${p.place.name}`}
-                                    className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      setRemovePinConfirm({
-                                        kind: "meal",
-                                        dateIso: p.dateIso,
-                                        mapsUrl: p.place.mapsUrl,
-                                        title: `“${p.place.name}” on ${dayLabel}`,
-                                      });
-                                    }}
-                                  >
-                                    ×
-                                  </button>
-                                ) : null}
-                              </div>
-                            ))}
-
-                          {(hostSetup.activityPins ?? [])
-                            .filter((p) => p.dateIso === cellIso && p.kept)
-                            .map((p) => (
-                              <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
-                                <button
-                                  type="button"
-                                  className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setPinDetail({
-                                      kind: "activity",
-                                      experience: p.experience,
-                                      dateLabel: dayLabel,
-                                    });
-                                  }}
-                                >
-                                  <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
-                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                      {p.experience.name}
-                                      {p.recommendedByConci ? (
-                                        <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
-                                          recommended by CONCI
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                                      Activity
-                                    </span>
-                                  </div>
-                                </button>
-                                {canEditTripWorkspace ? (
-                                  <button
-                                    type="button"
-                                    aria-label={`Remove ${p.experience.name}`}
-                                    className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      setRemovePinConfirm({
-                                        kind: "activity",
-                                        dateIso: p.dateIso,
-                                        bookingUrl: p.experience.bookingUrl,
-                                        title: `“${p.experience.name}” on ${dayLabel}`,
-                                      });
-                                    }}
-                                  >
-                                    ×
-                                  </button>
-                                ) : null}
-                              </div>
-                            ))}
                         </div>
                         {(() => {
                           const others = peersByCellIso.get(cellIso);
