@@ -1153,6 +1153,31 @@ export function hotelStayForDay(stays: HostHotelStay[] | undefined, dayIso: stri
   return null;
 }
 
+/** Which edge(s) of a stay appear on the host month calendar for `cellIso` (middle nights omitted). */
+export type HostHotelCalendarEdge = "check-in" | "check-out" | "check-in-out";
+
+export function hotelStayRowsForCalendarDay(
+  stays: HostHotelStay[] | undefined,
+  cellIso: string
+): { stay: HostHotelStay; edge: HostHotelCalendarEdge }[] {
+  if (!stays?.length || !ISO_DAY.test(cellIso)) return [];
+  const rows: { stay: HostHotelStay; edge: HostHotelCalendarEdge }[] = [];
+  for (const s of stays) {
+    if (!ISO_DAY.test(s.startIso) || !ISO_DAY.test(s.endIso)) continue;
+    if (cellIso < s.startIso || cellIso > s.endIso) continue;
+    if (cellIso === s.startIso && cellIso === s.endIso) {
+      rows.push({ stay: s, edge: "check-in-out" });
+    } else if (cellIso === s.startIso) {
+      rows.push({ stay: s, edge: "check-in" });
+    } else if (cellIso === s.endIso) {
+      rows.push({ stay: s, edge: "check-out" });
+    }
+  }
+  const rank = (e: HostHotelCalendarEdge) => (e === "check-out" ? 0 : e === "check-in-out" ? 1 : 2);
+  rows.sort((a, b) => rank(a.edge) - rank(b.edge));
+  return rows;
+}
+
 /** Inclusive list of yyyy-mm-dd between start and end (invalid / wrong order → []). */
 export function enumerateLocalIsoDays(startIso: string, endIso: string): string[] {
   const a = parseLocalIsoDate(startIso);

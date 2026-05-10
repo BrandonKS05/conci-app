@@ -13,7 +13,8 @@ import {
   concreteTripRangeFromPlanDates,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
-  hotelStayForDay,
+  hotelStayRowsForCalendarDay,
+  type HostHotelCalendarEdge,
   normalizePlan,
   parseLocalIsoDate,
   seedTextMentionsDining,
@@ -89,6 +90,12 @@ const WEEKDAY_MON_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as c
 
 /** Stay + pins shown per day cell; extra rows summarized so week rows stay a uniform height. */
 const CALENDAR_CELL_MAX_VISIBLE_ITEMS = 2;
+
+const HOST_CALENDAR_HOTEL_EDGE_LABEL: Record<HostHotelCalendarEdge, string> = {
+  "check-in": "Check-in",
+  "check-out": "Check-out",
+  "check-in-out": "Check-in · Check-out",
+};
 
 /** Monday-first month grid padding (classic wall calendar layout). */
 function calendarCellsMondayFirst(viewYear: number, viewMonth: number): (number | null)[] {
@@ -1037,7 +1044,7 @@ export function TripHostSetupDashboard({
                       );
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
-                    const hotelForDay = hotelStayForDay(hostSetup.hotelStays, cellIso);
+                    const hotelCalendarRows = hotelStayRowsForCalendarDay(hostSetup.hotelStays, cellIso);
                     const dayLabel = formatPinDayLabel(cellIso);
                     const mealPinsForCell = (hostSetup.restaurantPins ?? []).filter(
                       (p) => p.dateIso === cellIso && p.kept
@@ -1047,9 +1054,12 @@ export function TripHostSetupDashboard({
                     );
 
                     const calendarCellEntries: ReactNode[] = [];
-                    if (hotelForDay) {
+                    for (const { stay: hotelForDay, edge } of hotelCalendarRows) {
                       calendarCellEntries.push(
-                        <div key={`stay-${cellIso}`} className="min-w-0 w-full">
+                        <div
+                          key={`stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`}
+                          className="min-w-0 w-full"
+                        >
                           <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
                             <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                               {hotelForDay.place.name}
@@ -1060,7 +1070,7 @@ export function TripHostSetupDashboard({
                               ) : null}
                             </span>
                             <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
-                              Stay
+                              {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
                             </span>
                           </div>
                         </div>
