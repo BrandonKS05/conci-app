@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { PRIMARY_APP_NAV } from "@/shared/app-nav";
 
@@ -45,7 +44,6 @@ export function SiteShell({
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              <ThemeToggleButton />
               <UserMenu />
               <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-500 md:inline">
                 Consumer-first flow

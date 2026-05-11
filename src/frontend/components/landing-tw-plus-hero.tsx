@@ -2,7 +2,6 @@
 
 import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
-import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { primaryHeroLinkPillClass, primaryNavPillClass } from "@/frontend/ui/primary-action";
 
@@ -23,7 +22,6 @@ export function LandingTwPlusHero() {
             </Link>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <ThemeToggleButton variant="landing" className="inline-flex" />
             <Link href="/trip-parser" className={primaryNavPillClass}>
               <span className="sm:hidden">Join trip</span>
               <span className="hidden sm:inline">Join a trip</span>
@@ -87,9 +85,6 @@ export function LandingTwPlusHero() {
                 <div className="mt-6 flow-root">
                   <div className="-my-6 divide-y divide-gray-500/10 dark:divide-white/10">
                     <div className="py-6">
-                      <div className="mb-4 px-1">
-                        <ThemeToggleButton variant="landing" className="w-full justify-center" />
-                      </div>
                       <a
                         href="/trip-parser"
                         className="-mx-3 block w-full rounded-lg px-3 py-2.5 text-left text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-dm-elevated"

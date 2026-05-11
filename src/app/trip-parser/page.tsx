@@ -1,7 +1,6 @@
 import Link from "next/link";
 import TripParser from "@/frontend/components/TripParser";
 import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
-import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { PRIMARY_APP_NAV } from "@/shared/app-nav";
 
@@ -25,7 +24,6 @@ export default function TripParserPage() {
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggleButton />
             <UserMenu />
           </div>
         </div>

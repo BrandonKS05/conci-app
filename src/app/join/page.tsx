@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { JoinTripByCodeForm } from "@/frontend/components/join-trip-by-code-form";
-import { ThemeToggleButton } from "@/frontend/components/theme-provider";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { PRIMARY_APP_NAV } from "@/shared/app-nav";
 
@@ -40,7 +39,6 @@ export default async function JoinTripPage({
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggleButton />
             <UserMenu />
           </div>
         </div>

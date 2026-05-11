@@ -6,10 +6,6 @@
   color-scheme: light;
 }
 
-html.dark {
-  color-scheme: dark;
-}
-
 html {
   scroll-behavior: smooth;
 }
@@ -29,11 +25,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-html.dark body {
-  background: #0f0f0f;
-  color: #e5e5e5;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -51,8 +42,4 @@ textarea {
 
 ::selection {
   background: rgba(79, 70, 229, 0.18);
-}
-
-html.dark ::selection {
-  background: rgba(255, 255, 255, 0.12);
 }
