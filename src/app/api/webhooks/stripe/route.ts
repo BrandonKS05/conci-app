@@ -4,10 +4,6 @@ import { getStripeClient } from "@/backend/stripe";
 import { tierFromStripePriceId } from "@/backend/stripe-subscription-prices";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import type { SubscriptionTier } from "@/shared/subscription";
-import {
-  StripeDepositCheckoutMetadataSchema,
-  StripeSubscriptionCheckoutMetadataSchema,
-} from "@/shared/schemas/stripe-webhook-metadata";
 
 export const runtime = "nodejs";
 
@@ -50,19 +46,9 @@ export async function POST(req: Request) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.metadata?.kind === "subscription") {
-      const metadataResult = StripeSubscriptionCheckoutMetadataSchema.safeParse(session.metadata);
-      if (!metadataResult.success) {
-        console.warn("[stripe-webhook] invalid subscription metadata", metadataResult.error.flatten());
-        return new NextResponse(null, { status: 200 });
-      }
-      await handleSubscriptionCheckoutCompleted(stripe, session, metadataResult.data);
+      await handleSubscriptionCheckoutCompleted(stripe, session);
     } else if (session.metadata?.deposit_id) {
-      const metadataResult = StripeDepositCheckoutMetadataSchema.safeParse(session.metadata);
-      if (!metadataResult.success) {
-        console.warn("[stripe-webhook] invalid deposit metadata", metadataResult.error.flatten());
-        return new NextResponse(null, { status: 200 });
-      }
-      await handleDepositCheckoutCompleted(session, metadataResult.data);
+      await handleDepositCheckoutCompleted(session);
     }
   }
 
@@ -79,13 +65,13 @@ export async function POST(req: Request) {
   return NextResponse.json({ received: true });
 }
 
-async function handleSubscriptionCheckoutCompleted(
-  stripe: Stripe,
-  session: Stripe.Checkout.Session,
-  metadata: { user_id: string; tier: "host" | "host_pro" }
-) {
-  const userId = metadata.user_id;
-  const tierMeta = metadata.tier;
+async function handleSubscriptionCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.user_id;
+  const tierMeta = session.metadata?.tier;
+  if (!userId || (tierMeta !== "host" && tierMeta !== "host_pro")) {
+    console.error("[stripe-webhook] subscription checkout missing user_id/tier metadata");
+    return;
+  }
 
   const svc = getSupabaseServiceRoleClient();
   if (!svc) {
@@ -140,17 +126,18 @@ async function handleSubscriptionCheckoutCompleted(
   }
 }
 
-async function handleDepositCheckoutCompleted(
-  session: Stripe.Checkout.Session,
-  metadata: { deposit_id: string }
-) {
+async function handleDepositCheckoutCompleted(session: Stripe.Checkout.Session) {
   const svc = getSupabaseServiceRoleClient();
   if (!svc) {
     console.error("[stripe-webhook] No Supabase service client");
     return;
   }
 
-  const depositId = metadata.deposit_id;
+  const depositId = session.metadata?.deposit_id;
+  if (!depositId) {
+    console.error("[stripe-webhook] No deposit_id in session metadata");
+    return;
+  }
 
   const paymentIntentId =
     typeof session.payment_intent === "string"

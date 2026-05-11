@@ -7,9 +7,3 @@ dist
 .env
 .env.local
 coverage
-
-# TypeScript incremental build cache
-*.tsbuildinfo
-
-# Local archives (e.g. snapshots, exports)
-*.zip

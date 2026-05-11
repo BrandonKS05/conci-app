@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef, useState, useEffect } from "react";
-import { track } from "@/frontend/lib/analytics";
 
 const PRESET_AMOUNTS = [25, 50, 100, 250];
 
@@ -26,7 +25,6 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
     async (amountDollars: number) => {
       setLoading(true);
       setError(null);
-      track("deposit_checkout_started", { trip_id: tripId, amount_usd: amountDollars });
       try {
         const r = await fetch(
           `/api/trip-plans/${tripId}/deposits/checkout`,

@@ -68,7 +68,6 @@ import {
   LiveCurationErrorBanner,
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
-import { track } from "@/frontend/lib/analytics";
 
 type CollabPayload = {
   collab: CollabStateV1;
@@ -438,10 +437,6 @@ export function TripCollaborationPanel({
         setVoteFailure({ decisionKey: dk, message: msg });
         return;
       }
-      track("vote_submitted", {
-        trip_id: tripId,
-        vote_kind: typeof payload.kind === "string" ? payload.kind : "unknown",
-      });
       await load();
       setError(null);
       setVoteFailure(null);
@@ -1677,7 +1672,6 @@ function DecisionCard({
 
   async function runHotelSearch() {
     if (blockedByDates) return;
-    track("hotel_search_started", { trip_id: tripId });
     setHotelSearchErr(null);
     setHotelSearchBusy(true);
     try {

@@ -1,18 +1,8 @@
-import * as Sentry from "@sentry/nextjs";
-
 /**
  * Runs once per server process (Node.js) when Next.js starts.
  * @see https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("../sentry.server.config");
-  }
-
-  if (process.env.NEXT_RUNTIME === "edge") {
-    await import("../sentry.edge.config");
-  }
-
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   const raw = process.env.STRIPE_SECRET_KEY;
@@ -38,5 +28,3 @@ export async function register() {
     }
   }
 }
-
-export const onRequestError = Sentry.captureRequestError;

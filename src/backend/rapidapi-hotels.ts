@@ -5,10 +5,6 @@ import {
   getRapidApiKeyDiagnostics,
   isRapidApiHotelsConfigured,
 } from "@/backend/rapidapi-key";
-import {
-  HotelDestinationSearchResponseSchema,
-  HotelSearchResponseSchema,
-} from "@/shared/schemas/hotel-search";
 
 /** RapidAPI Booking.com scraper hub: https://rapidapi.com/DataCrawler/api/booking-com15 */
 const RAPID_HOST = "booking-com15.p.rapidapi.com";
@@ -283,15 +279,8 @@ function mapBookingHotelRow(
 }
 
 async function bookingSearchDestination(query: string): Promise<string | null> {
-  const raw = await rapidGet("/api/v1/hotels/searchDestination", { query });
-  const parsed = HotelDestinationSearchResponseSchema.safeParse(raw);
-  if (!parsed.success) {
-    console.warn(`${LOG_PREFIX} invalid searchDestination response`, {
-      issues: parsed.error.flatten(),
-    });
-    return null;
-  }
-  return extractDestIdFromDestinationSearch(parsed.data, query.trim());
+  const body = await rapidGet("/api/v1/hotels/searchDestination", { query });
+  return extractDestIdFromDestinationSearch(body, query.trim());
 }
 
 async function bookingSearchHotels(
@@ -300,7 +289,7 @@ async function bookingSearchHotels(
   checkOut: string,
   adults: number
 ): Promise<Record<string, unknown>[]> {
-  const raw = await rapidGet("/api/v1/hotels/searchHotels", {
+  const body = await rapidGet("/api/v1/hotels/searchHotels", {
     dest_id: destId,
     search_type: "CITY",
     arrival_date: checkIn,
@@ -310,14 +299,7 @@ async function bookingSearchHotels(
     room_qty: 1,
     languagecode: "en-us",
   });
-  const parsed = HotelSearchResponseSchema.safeParse(raw);
-  if (!parsed.success) {
-    console.warn(`${LOG_PREFIX} invalid searchHotels response`, {
-      issues: parsed.error.flatten(),
-    });
-    return [];
-  }
-  return extractHotelsArray(parsed.data);
+  return extractHotelsArray(body);
 }
 
 /**

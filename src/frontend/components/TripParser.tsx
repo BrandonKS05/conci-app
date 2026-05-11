@@ -44,7 +44,6 @@ import {
   looksLikeStandalonePeopleCount,
 } from "@/shared/trip-input-quality";
 import { buildBudgetSoftWarning } from "@/shared/budget-trip-soft-warning";
-import { track } from "@/frontend/lib/analytics";
 
 type SlotKey = "location" | "departure" | "dates" | "people" | "budget" | "vibe" | "interests" | "pace";
 
@@ -422,7 +421,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           return false;
         }
         if (body.id) {
-          track("trip_created", { trip_id: body.id });
           setTripBuildStep("generating");
           await fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
             method: "POST",
@@ -656,7 +654,6 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
     const seed = text || "(Trip details from attached images)";
     const msgId = newId();
-    track("trip_prompt_submitted");
     setSeedMessage(seed);
     setComposerText("");
     setImageSlots([]);

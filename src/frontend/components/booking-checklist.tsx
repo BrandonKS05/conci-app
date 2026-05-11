@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import type { BookingTaskKey, BookingTasksState } from "@/shared/booking-tasks";
-import { track } from "@/frontend/lib/analytics";
 
 function cityQuery(plan: TripPlan): string {
   const loc = plan.location?.trim();
@@ -144,7 +143,6 @@ export function BookingChecklist({
                     href={row.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => track("booking_task_clicked", { trip_id: tripId, task_key: row.key })}
                     className="inline-flex justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-center text-sm font-semibold text-indigo-900 transition hover:bg-indigo-100 dark:border-white/10 dark:bg-dm-elevated dark:text-indigo-200 dark:hover:bg-dm-page"
                   >
                     {row.actionLabel}

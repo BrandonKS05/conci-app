@@ -2,78 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/**
- * shadcn/ui design tokens. HSL channels only (no `hsl()` wrapper) so Tailwind
- * utilities like `bg-primary/80` can apply alpha. Values are tuned to match
- * the existing Conci palette: slate-900 / #ebe9e4 primary CTA, white & dm.card
- * surfaces, slate-200 / white-10 borders, slate-400 / #d4d2cd focus rings.
- */
-@layer base {
-  :root {
-    color-scheme: light;
-
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    --primary: 222 47% 11%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 215 20% 65%;
-
-    --radius: 0.75rem;
-  }
-
-  html.dark {
-    color-scheme: dark;
-
-    --background: 0 0% 6%;
-    --foreground: 0 0% 90%;
-
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 43 15% 91%;
-    --primary-foreground: 0 0% 8%;
-
-    --secondary: 0 0% 7%;
-    --secondary-foreground: 0 0% 90%;
-
-    --muted: 0 0% 7%;
-    --muted-foreground: 0 0% 45%;
-
-    --accent: 0 0% 7%;
-    --accent-foreground: 0 0% 90%;
-
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 43 8% 82%;
-  }
+:root {
+  color-scheme: light;
 }
 
 html {

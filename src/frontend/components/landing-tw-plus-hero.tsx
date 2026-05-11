@@ -2,17 +2,10 @@
 
 import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
-import { useEffect } from "react";
-
-import { track } from "@/frontend/lib/analytics";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { primaryHeroLinkPillClass, primaryNavPillClass } from "@/frontend/ui/primary-action";
 
 export function LandingTwPlusHero() {
-  useEffect(() => {
-    track("landing_start");
-  }, []);
-
   return (
     <>
       <header className="absolute inset-x-0 top-0 z-50">

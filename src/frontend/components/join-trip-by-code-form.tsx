@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { primaryFormButtonClass } from "@/frontend/ui/primary-action";
-import { track } from "@/frontend/lib/analytics";
 
 export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string }) {
   const router = useRouter();
@@ -33,7 +32,6 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
           return;
         }
         if (typeof j.tripId === "string" && j.tripId) {
-          track("member_joined", { trip_id: j.tripId });
           router.push(`/trip/${j.tripId}/setup`);
           router.refresh();
         }

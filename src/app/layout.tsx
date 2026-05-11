@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
-import { PostHogProvider } from "@/frontend/components/posthog-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,12 +29,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable} ${instrumentSerif.variable}`}
+      className={`${inter.variable} ${instrumentSerif.variable}`}
       suppressHydrationWarning
     >
-      <body>
-        <PostHogProvider>{children}</PostHogProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
