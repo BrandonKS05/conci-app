@@ -1347,45 +1347,43 @@ export function ActivityVibePollCard({
               return (
                 <li
                   key={row.id}
-                  className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated/40"
+                  className="rounded-2xl border border-[#D9C9A8] bg-gradient-to-br from-[#FDF8F0] to-[#F5EDD8] p-5 shadow-sm"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-xs font-medium text-slate-500 dark:text-neutral-500">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E8603C]">
+                      Conci suggestion
+                    </p>
+                    <p className="text-xs text-[#7A7060]">
                       {row.authorDisplayName}
                       {isMine ? " · you" : null}
-                      <span className="text-slate-400 dark:text-neutral-600">
+                      <span>
                         {" "}
                         · {new Date(row.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
                       </span>
                     </p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-900 dark:bg-amber-950/45 dark:text-amber-100">
-                      Pending review
-                    </span>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-800 dark:text-neutral-200">{row.text}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{row.text}</p>
                   {isTripOwner ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-3">
                       <button
                         type="button"
                         disabled={busyHere}
                         onClick={() => void applyWithCopilot(row)}
-                        className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
+                        className="rounded-full bg-[#0B1929] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#162235] disabled:opacity-40"
                       >
-                        {busyHere ? "Working…" : "Approve & apply (AI)"}
+                        {busyHere ? "Working…" : "Accept change"}
                       </button>
                       <button
                         type="button"
                         disabled={busyHere}
                         onClick={() => void dismissSubmission(row.id)}
-                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                        className="rounded-full bg-[#EFE3CC] px-5 py-2 text-sm font-semibold text-[#4A3F30] transition hover:bg-[#D9C9A8] disabled:opacity-40"
                       >
-                        Not now
+                        Keep original
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
-                      Waiting for the trip owner to review.
-                    </p>
+                    <p className="mt-3 text-xs text-[#7A7060]">Waiting for the trip owner to review.</p>
                   )}
                 </li>
               );
