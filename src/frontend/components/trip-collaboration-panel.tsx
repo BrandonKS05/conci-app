@@ -1303,17 +1303,8 @@ export function ActivityVibePollCard({
     [isTripOwner, onPlanUpdated, reloadCollab, tripId]
   );
 
-  const title = "Any preferences/adjustments you'd like to see";
-
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{title}</h3>
-      <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
-        Anyone who joins this trip can share tweaks below. The trip owner reviews each note and can run Trip Copilot with{" "}
-        <strong className="text-slate-800 dark:text-neutral-200">Approve &amp; apply (AI)</strong>, or choose{" "}
-        <strong className="text-slate-800 dark:text-neutral-200">Not now</strong>.
-      </p>
-
       <textarea
         rows={4}
         value={draft}
@@ -1321,7 +1312,7 @@ export function ActivityVibePollCard({
         placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
         maxLength={2000}
         disabled={submitBusy}
-        className="mt-5 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+        className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
       />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-slate-500 dark:text-neutral-500">{draft.trim().length} / 2000</span>

@@ -1382,28 +1382,26 @@ export function TripHostSetupDashboard({
         ) : null}
 
         <section id="sec-preferences-adjustments" className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-dm-card dark:shadow-none sm:p-8">
-            <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Preferences &amp; adjustments
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
-              {isHost
-                ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
-                : "Share preferences and tweaks here — the group shares one calendar and polls; anyone can edit the trip workspace, and the host can still merge notes with Trip Copilot."}
-            </p>
-            <div className="mt-6">
-              <TripCollaborationPanel
-                tripId={tripId}
-                plan={plan}
-                tripStatus={effectiveTripStatus}
-                isHost={isHost}
-                variant="preferencesOnly"
-                collabRefreshSignal={collabRefreshSignal}
-                onPlanUpdated={setPlan}
-                viewerUserId={viewerUserId}
-                tripOwnerUserId={tripOwnerUserId}
-              />
-            </div>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            Preferences &amp; adjustments
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
+            {isHost
+              ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
+              : "Share preferences and tweaks here — the group shares one calendar and polls; anyone can edit the trip workspace, and the host can still merge notes with Trip Copilot."}
+          </p>
+          <div className="mt-5">
+            <TripCollaborationPanel
+              tripId={tripId}
+              plan={plan}
+              tripStatus={effectiveTripStatus}
+              isHost={isHost}
+              variant="preferencesOnly"
+              collabRefreshSignal={collabRefreshSignal}
+              onPlanUpdated={setPlan}
+              viewerUserId={viewerUserId}
+              tripOwnerUserId={tripOwnerUserId}
+            />
           </div>
         </section>
 
