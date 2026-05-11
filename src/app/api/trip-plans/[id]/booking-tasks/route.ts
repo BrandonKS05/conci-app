@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 import type { BookingTaskKey } from "@/shared/booking-tasks";
 import { parseBookingTasks } from "@/shared/booking-tasks";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
 const TASKS: BookingTaskKey[] = ["hotel", "flights", "restaurant"];
-
-function displayNameFromUser(user: { email?: string | null; user_metadata?: Record<string, unknown> }): string {
-  const meta = user.user_metadata;
-  const full =
-    meta && typeof meta === "object" && typeof meta.full_name === "string"
-      ? meta.full_name.trim()
-      : "";
-  if (full) return full;
-  const em = user.email?.trim();
-  if (em) return em.split("@")[0] ?? "Organizer";
-  return "Organizer";
-}
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -67,7 +56,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const prev = parseBookingTasks(row.booking_tasks);
-  const label = displayNameFromUser(user);
+  const profileLabel = await fetchAuthUserDisplayLabel(svc, user.id);
+  const label = profileLabel === "Traveler" ? "Organizer" : profileLabel;
   const now = new Date().toISOString();
 
   const nextEntry =

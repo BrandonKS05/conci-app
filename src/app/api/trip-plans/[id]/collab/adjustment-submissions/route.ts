@@ -1,12 +1,14 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+import { generateConciSuggestionProposal } from "@/backend/conci-suggestion-proposal";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 import { fetchTripPlanRowForCollab } from "@/backend/trip-plan-collab-fetch";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
-import { parseCollabState } from "@/shared/collaboration";
+import { parseCollabState, type AdjustmentSubmissionV1 } from "@/shared/collaboration";
 import { isUuid } from "@/shared/is-uuid";
+import { normalizePlan } from "@/shared/trip-plan";
 
 const MAX_ADJUSTMENTS = 40;
 
@@ -55,13 +57,27 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     );
   }
 
-  const nextSubmission = {
+  let conciProposal = undefined as AdjustmentSubmissionV1["conciProposal"];
+  try {
+    const plan = normalizePlan(row.plan);
+    const generated = await generateConciSuggestionProposal({
+      submissionText: text,
+      authorDisplayName: displayName,
+      plan,
+    });
+    if (generated) conciProposal = generated;
+  } catch (err) {
+    console.warn("[adjustment-submissions POST] proposal generation failed:", err);
+  }
+
+  const nextSubmission: AdjustmentSubmissionV1 = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     authorUserId: user.id,
     authorDisplayName: displayName,
     text,
-    status: "pending" as const,
+    status: "pending",
+    ...(conciProposal ? { conciProposal } : {}),
   };
   list.push(nextSubmission);
 

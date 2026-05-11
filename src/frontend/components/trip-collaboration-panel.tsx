@@ -1322,7 +1322,7 @@ export function ActivityVibePollCard({
           onClick={() => void submitSuggestion()}
           className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
         >
-          {submitBusy ? "Sending…" : "Submit suggestion"}
+          {submitBusy ? "Conci is preparing…" : "Submit suggestion"}
         </button>
       </div>
 
@@ -1344,6 +1344,7 @@ export function ActivityVibePollCard({
             {pending.map((row) => {
               const isMine = viewerUserId && row.authorUserId === viewerUserId;
               const busyHere = actionBusyId === row.id;
+              const conciSummary = row.conciProposal?.summary?.trim();
               return (
                 <li
                   key={row.id}
@@ -1362,7 +1363,16 @@ export function ActivityVibePollCard({
                       </span>
                     </p>
                   </div>
-                  <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{row.text}</p>
+                  {conciSummary ? (
+                    <>
+                      <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{conciSummary}</p>
+                      <p className="mt-2 text-xs italic leading-relaxed text-[#7A7060]">
+                        {row.authorDisplayName} said: &ldquo;{row.text}&rdquo;
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{row.text}</p>
+                  )}
                   {isTripOwner ? (
                     <div className="mt-4 flex flex-wrap gap-3">
                       <button

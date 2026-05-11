@@ -1,14 +1,14 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 
-/** Best-effort display name for trip share copy (Supabase Auth user metadata). */
+/**
+ * Best-effort display name for trip share copy.
+ * Prefers `profiles.display_name` (what the user set in Settings), then auth user_metadata,
+ * then email local-part. Falls back to "Someone".
+ */
 export async function fetchTripHostDisplayName(svc: SupabaseClient, ownerUserId: string | null): Promise<string> {
   if (!ownerUserId) return "Someone";
-  const { data, error } = await svc.auth.admin.getUserById(ownerUserId);
-  if (error || !data?.user) return "Someone";
-  const meta = data.user.user_metadata as Record<string, unknown> | undefined;
-  const full = typeof meta?.full_name === "string" ? meta.full_name.trim() : "";
-  const name = typeof meta?.name === "string" ? meta.name.trim() : "";
-  const emailLocal = data.user.email?.split("@")[0]?.trim() ?? "";
-  return full || name || emailLocal || "Someone";
+  const label = await fetchAuthUserDisplayLabel(svc, ownerUserId);
+  return label === "Traveler" ? "Someone" : label;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 import { getStripeClient } from "@/backend/stripe";
 import { appBaseUrl } from "@/backend/app-base-url";
 import { resolveTripAccess } from "@/backend/trip-memberships";
@@ -85,11 +86,8 @@ export async function POST(
   const plan = tripRow?.plan ? normalizePlan(tripRow.plan) : null;
   const tripTitle = plan?.title?.trim() || "Trip";
 
-  const displayName =
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email?.split("@")[0] ||
-    "Member";
+  const profileLabel = await fetchAuthUserDisplayLabel(svc, user.id);
+  const displayName = profileLabel === "Traveler" ? "Member" : profileLabel;
 
   const { data: deposit, error: insertErr } = await svc
     .from("trip_deposits")

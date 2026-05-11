@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { aliasesForParticipant, voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import type { ClassifiedDecision, CollabStateV1 } from "@/shared/collaboration";
 import type { TripRosterPerson } from "@/shared/trip-roster";
+import { fetchDisplayNameMap } from "@/backend/trip-member-names";
 
 function blobVoteKeysAcrossPlan(classified: ClassifiedDecision[], collab: CollabStateV1): Map<string, string[]> {
   const byDecision = new Map<string, string[]>();
@@ -57,20 +58,7 @@ export async function fetchTripPlanRoster(
       : [...(rows ?? [])];
 
   const userIds = [...new Set(effectiveRows.map((r) => r.user_id as string).filter(Boolean))];
-  const displayByUser = new Map<string, string>();
-
-  for (const uid of userIds) {
-    const { data: u, error: uErr } = await svc.auth.admin.getUserById(uid);
-    if (uErr || !u?.user) {
-      displayByUser.set(uid, "Traveler");
-      continue;
-    }
-    const meta = u.user.user_metadata as Record<string, unknown> | undefined;
-    const full = typeof meta?.full_name === "string" ? meta.full_name.trim() : "";
-    const name = typeof meta?.name === "string" ? meta.name.trim() : "";
-    const emailLocal = u.user.email?.split("@")[0]?.trim() ?? "";
-    displayByUser.set(uid, full || name || emailLocal || "Traveler");
-  }
+  const displayByUser = await fetchDisplayNameMap(svc, userIds);
 
   const roster: TripRosterPerson[] = [];
   for (const row of effectiveRows) {

@@ -69,6 +69,18 @@ export type CardChatMessage = {
 
 export const MAX_CARD_CHAT_MESSAGES = 60;
 
+/**
+ * Conci's auto-generated narrative for a guest's adjustment submission.
+ * Surfaced to the host as the body of the "Conci suggestion" card so they can act
+ * (e.g. "Marcus is vegan — Day 3's dinner pin is steakhouse. Find vegan-friendly options?").
+ */
+export type ConciSuggestionProposalV1 = {
+  /** 1–2 sentence Conci-voiced narrative shown in the card body. */
+  summary: string;
+  /** ISO timestamp the proposal was generated. */
+  createdAt: string;
+};
+
 /** Trip-wide free-text adjustments from travelers; host reviews in collab UI. */
 export type AdjustmentSubmissionV1 = {
   id: string;
@@ -78,6 +90,8 @@ export type AdjustmentSubmissionV1 = {
   text: string;
   status: "pending" | "applied" | "dismissed";
   resolvedAt?: string;
+  /** Optional Conci-generated proposal narrative; rendered as the card body when present. */
+  conciProposal?: ConciSuggestionProposalV1;
 };
 
 export type CollabStateV1 = {
@@ -364,6 +378,15 @@ export function trimCardChatMessages(messages: CardChatMessage[]): CardChatMessa
   return messages.slice(messages.length - MAX_CARD_CHAT_MESSAGES);
 }
 
+function parseConciProposalLoose(raw: unknown): ConciSuggestionProposalV1 | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const summary = typeof r.summary === "string" ? r.summary.trim() : "";
+  const createdAt = typeof r.createdAt === "string" ? r.createdAt.trim() : "";
+  if (!summary || summary.length > 600 || !createdAt) return undefined;
+  return { summary, createdAt };
+}
+
 function parseAdjustmentSubmissions(raw: unknown): AdjustmentSubmissionV1[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out: AdjustmentSubmissionV1[] = [];
@@ -378,6 +401,7 @@ function parseAdjustmentSubmissions(raw: unknown): AdjustmentSubmissionV1[] | un
     const text = typeof r.text === "string" ? r.text.trim() : "";
     const status = r.status === "pending" || r.status === "applied" || r.status === "dismissed" ? r.status : "";
     const resolvedAt = typeof r.resolvedAt === "string" ? r.resolvedAt.trim() : undefined;
+    const conciProposal = parseConciProposalLoose(r.conciProposal);
     if (
       !id ||
       !createdAt ||
@@ -396,6 +420,7 @@ function parseAdjustmentSubmissions(raw: unknown): AdjustmentSubmissionV1[] | un
       text,
       status,
       ...(resolvedAt ? { resolvedAt } : {}),
+      ...(conciProposal ? { conciProposal } : {}),
     });
   }
   return out.length > 0 ? out : undefined;
