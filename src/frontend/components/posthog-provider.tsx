@@ -1,22 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import { getSupabaseClient } from "@/frontend/supabase/client";
 
 export function PostHogProvider({ children }: { children: ReactNode }) {
-  return (
-    <>
-      {children}
-      <Suspense fallback={null}>
-        <PostHogTracker />
-      </Suspense>
-    </>
-  );
-}
-
-function PostHogTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -71,5 +60,5 @@ function PostHogTracker() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return null;
+  return <>{children}</>;
 }
