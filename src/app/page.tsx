@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
 import { primaryHeroEmphasisLinkClass } from "@/frontend/ui/primary-action";
 
-const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+const JOIN_WITH_CODE_URL = "/join?from=create";
 
 export const metadata: Metadata = {
   title: "Conci — Group trips, planned",

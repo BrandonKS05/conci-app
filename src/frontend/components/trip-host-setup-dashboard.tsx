@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,21 +71,23 @@ import { TripContributeButton } from "@/frontend/components/trip-contribute-butt
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
-import { useActiveTripWorkspaceTab, type TripWorkspaceTabId } from "@/frontend/hooks/use-active-trip-tab";
+import {
+  TRIP_WORKSPACE_SECTION_TO_TAB,
+  type TripWorkspaceTabId,
+} from "@/frontend/hooks/use-active-trip-tab";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 
-const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+const JOIN_WITH_CODE_URL = "/join?from=create";
 
 const LEFT_RAIL_TABS: readonly {
   id: TripWorkspaceTabId;
-  href: string;
   label: string;
   navIconId: string;
 }[] = [
-  { id: "overview", href: "#sec-dates", label: "Overview", navIconId: "overview" },
-  { id: "budget", href: "#sec-budget", label: "Budget", navIconId: "budget" },
-  { id: "fund", href: "#sec-fund", label: "Fund", navIconId: "fund" },
-  { id: "collaborate", href: "#sec-preferences-adjustments", label: "Collaborate", navIconId: "collaborate" },
+  { id: "overview", label: "Overview", navIconId: "overview" },
+  { id: "budget", label: "Budget", navIconId: "budget" },
+  { id: "fund", label: "Fund", navIconId: "fund" },
+  { id: "collaborate", label: "Collaborate", navIconId: "collaborate" },
 ];
 
 function firstHotelStayHeroPhotoUrl(place: PlaceSpotlight | undefined | null): string | null {
@@ -106,10 +116,16 @@ function formatShortStayRange(startIso: string, endIso: string): string {
   return `${left} — ${right}`;
 }
 
-function homeBaseHeroImageSources(plan: TripPlan): { src: string; unoptimized: boolean } | null {
+function homeBaseHeroImageSources(
+  plan: TripPlan,
+  destinationCoverUrl?: string | null
+): { src: string; unoptimized: boolean } | null {
   const stay0 = plan.hostSetup?.hotelStays?.[0];
   const fromPlace = firstHotelStayHeroPhotoUrl(stay0?.place);
   if (fromPlace) return { src: fromPlace, unoptimized: !fromPlace.startsWith("/") };
+  const trimmedServer = typeof destinationCoverUrl === "string" ? destinationCoverUrl.trim() : "";
+  if (trimmedServer)
+    return { src: trimmedServer, unoptimized: !trimmedServer.startsWith("/") };
   const cover = tripDestinationCoverFromPlan(plan);
   if (cover) return { src: cover, unoptimized: !cover.startsWith("/") };
   return null;
@@ -131,6 +147,8 @@ type Props = {
   inviteCode: string | null;
   /** Invited members see the same calendar and collab; only the host can edit setup. */
   isHost?: boolean;
+  /** Server-fetched Wikipedia/Unsplash-style cover when plan has no hotel photo. */
+  destinationCoverUrl?: string | null;
 };
 
 function daysInMonth(y: number, m0: number): number {
@@ -343,6 +361,7 @@ export function TripHostSetupDashboard({
   tripOwnerUserId,
   inviteCode,
   isHost = true,
+  destinationCoverUrl = null,
 }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<TripPlan>(initialPlan);
@@ -522,11 +541,43 @@ export function TripHostSetupDashboard({
     calendarMonth0: calMonth,
   });
 
-  const activeTab = useActiveTripWorkspaceTab(canEditTripWorkspace);
+  const [workspaceTab, setWorkspaceTab] = useState<TripWorkspaceTabId>("overview");
+  const mainColumnRef = useRef<HTMLElement | null>(null);
+
+  const scrollToWorkspaceSection = useCallback((rawId: string) => {
+    const id = rawId.startsWith("#") ? rawId.slice(1) : rawId;
+    const tab = TRIP_WORKSPACE_SECTION_TO_TAB[id];
+    if (tab) setWorkspaceTab(tab);
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    const h = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    if (h && TRIP_WORKSPACE_SECTION_TO_TAB[h]) {
+      setWorkspaceTab(TRIP_WORKSPACE_SECTION_TO_TAB[h]!);
+    }
+  }, []);
+
+  const onMainHashLinkClick = useCallback(
+    (e: MouseEvent<HTMLElement>) => {
+      const t = e.target as HTMLElement | null;
+      const a = t?.closest?.("a[href^='#']") as HTMLAnchorElement | null;
+      if (!a || !mainColumnRef.current?.contains(a)) return;
+      const href = a.getAttribute("href");
+      if (!href || href.length < 2) return;
+      const id = href.slice(1);
+      if (!TRIP_WORKSPACE_SECTION_TO_TAB[id]) return;
+      e.preventDefault();
+      scrollToWorkspaceSection(id);
+    },
+    [scrollToWorkspaceSection]
+  );
 
   const scrollToInviteSection = useCallback(() => {
-    document.getElementById("sec-invite")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+    scrollToWorkspaceSection("sec-invite");
+  }, [scrollToWorkspaceSection]);
 
   /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
   const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
@@ -837,11 +888,9 @@ export function TripHostSetupDashboard({
       }
     }
     if (ui.scrollTo) {
-      requestAnimationFrame(() => {
-        document.getElementById(`sec-${ui.scrollTo}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      scrollToWorkspaceSection(`sec-${ui.scrollTo}`);
     }
-  }, []);
+  }, [scrollToWorkspaceSection]);
 
   const cells = useMemo(() => calendarCellsSundayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
@@ -866,6 +915,20 @@ export function TripHostSetupDashboard({
     [effectiveHighlightRange, calYear, calMonth]
   );
 
+  const displayWeeks = useMemo(() => {
+    const start = tripDisplayRange?.startIso;
+    const end = tripDisplayRange?.endIso;
+    if (!start || !end) return weeks;
+    const tripDays = enumerateLocalIsoDays(start, end);
+    const filtered = weeks.filter((weekRow) =>
+      weekRow.some((dom) => {
+        if (dom == null) return false;
+        return tripDays.includes(isoFromCell(calYear, calMonth, dom));
+      })
+    );
+    return filtered.length > 0 ? filtered : weeks;
+  }, [weeks, tripDisplayRange?.startIso, tripDisplayRange?.endIso, calYear, calMonth]);
+
   const selectedDayLabel = useMemo(() => {
     if (!selectedDayIso) return "";
     const d = parseLocalIsoDate(selectedDayIso);
@@ -886,7 +949,10 @@ export function TripHostSetupDashboard({
     return stays[0] ?? null;
   }, [plan.hostSetup?.hotelStays]);
 
-  const homeBaseHero = useMemo(() => homeBaseHeroImageSources(plan), [plan]);
+  const homeBaseHero = useMemo(
+    () => homeBaseHeroImageSources(plan, destinationCoverUrl),
+    [plan, destinationCoverUrl]
+  );
 
   const primaryHotelSummary = useMemo(() => {
     const stays = plan.hostSetup?.hotelStays ?? [];
@@ -946,13 +1012,14 @@ export function TripHostSetupDashboard({
               className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
             >
               {LEFT_RAIL_TABS.filter((tab) => tab.id !== "budget" || canEditTripWorkspace).map((tab) => (
-                <a
+                <button
                   key={tab.id}
-                  href={tab.href}
-                  aria-current={activeTab === tab.id ? "page" : undefined}
+                  type="button"
+                  aria-current={workspaceTab === tab.id ? "page" : undefined}
+                  onClick={() => setWorkspaceTab(tab.id)}
                   className={[
-                    "group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full",
-                    activeTab === tab.id
+                    "group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full",
+                    workspaceTab === tab.id
                       ? "bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] dark:bg-white/10 dark:text-[#ebe9e4]"
                       : "text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)]/80 hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]",
                   ].join(" ")}
@@ -961,38 +1028,49 @@ export function TripHostSetupDashboard({
                     <NavIcon id={tab.navIconId} />
                   </span>
                   {tab.label}
-                </a>
+                </button>
               ))}
             </nav>
 
-            <a
-              href="#sec-invite"
+            <button
+              type="button"
+              onClick={scrollToInviteSection}
               className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:mt-auto lg:inline-flex"
             >
               <NavIcon id="invite" />
               Invite friends
-            </a>
+            </button>
           </div>
         </aside>
 
         {/* CENTER COLUMN */}
-        <main className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-1">
-          {/* Trip fund + join + roster — #sec-fund wraps fund actions for left-rail anchor */}
+        <main
+          ref={mainColumnRef}
+          onClick={onMainHashLinkClick}
+          className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-1"
+        >
+          <section
+            className="scroll-mt-28 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10"
+            aria-label="Join this trip"
+          >
+            <div id="sec-invite" className="min-w-0 scroll-mt-28">
+              <span className="label-caps mb-2 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                Join code
+              </span>
+              {resolvedInviteCode ? (
+                <InviteCodeRow rawCode={resolvedInviteCode} prominent />
+              ) : (
+                <p className="font-display text-[1.5rem] font-semibold tracking-[0.18em] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
+                  ······
+                </p>
+              )}
+            </div>
+          </section>
+
+          {workspaceTab === "fund" ? (
           <div id="sec-fund" className="scroll-mt-28 space-y-5">
             <section className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
               <TripDepositTracker tripId={tripId} variant="flat" />
-              <div id="sec-invite" className="min-w-0 scroll-mt-28">
-                <span className="label-caps mb-2 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                  Join code
-                </span>
-                {resolvedInviteCode ? (
-                  <InviteCodeRow rawCode={resolvedInviteCode} prominent />
-                ) : (
-                  <p className="font-display text-[1.5rem] font-semibold tracking-[0.18em] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
-                    ······
-                  </p>
-                )}
-              </div>
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center -space-x-2" aria-label="People on this calendar now">
@@ -1083,7 +1161,7 @@ export function TripHostSetupDashboard({
                         </li>
                         <li>
                           Under{" "}
-                          <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
+                          <a href="#sec-flights" className="font-semibold underline underline-offset-2">
                             Flights
                           </a>
                           , keep or dismiss itineraries.
@@ -1166,7 +1244,10 @@ export function TripHostSetupDashboard({
             </details>
           </div>
           </div>
+          ) : null}
 
+          {workspaceTab === "overview" ? (
+          <>
           <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -1313,7 +1394,7 @@ export function TripHostSetupDashboard({
             </div>
 
             <div>
-              {weeks.map((weekRow, wi) => (
+              {displayWeeks.map((weekRow, wi) => (
                 <div key={`wk-${wi}`} className="grid grid-cols-7">
                   {weekRow.map((dom, ci) => {
                     if (dom == null) {
@@ -1542,17 +1623,25 @@ export function TripHostSetupDashboard({
                         </div>
                         {(() => {
                           const others = peersByCellIso.get(cellIso);
-                          if (!others?.length) return null;
+                          const p0 = others?.[0];
+                          if (!p0) return null;
+                          const extra = (others?.length ?? 0) - 1;
                           return (
-                            <div className="pointer-events-none absolute bottom-2 right-2 flex max-w-[calc(100%-0.5rem)] flex-wrap justify-end gap-1">
-                              {others.map((p) => (
-                                <span
-                                  key={p.userId}
-                                  title={`${p.name} is viewing this day`}
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-dm-card"
-                                  style={{ backgroundColor: p.color }}
-                                />
-                              ))}
+                            <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex max-w-[calc(100%-0.5rem)] items-center justify-end gap-0.5">
+                              <span
+                                title={
+                                  extra > 0
+                                    ? `${p0.name} and ${extra} other${extra === 1 ? "" : "s"} viewing this day`
+                                    : `${p0.name} is viewing this day`
+                                }
+                                className="h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-white/70 dark:ring-dm-card/80"
+                                style={{ backgroundColor: p0.color }}
+                              />
+                              {extra > 0 ? (
+                                <span className="text-[9px] font-semibold tabular-nums text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                                  +{extra}
+                                </span>
+                              ) : null}
                             </div>
                           );
                         })()}
@@ -1608,6 +1697,81 @@ export function TripHostSetupDashboard({
           </section>
         ) : null}
 
+        <section id="sec-trip-chat" className="scroll-mt-28">
+          <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Trip chat</h2>
+          <p className="mt-1 max-w-3xl text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+            Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
+          </p>
+          <div className="mt-4">
+            <TripCardChatWidget
+              tripId={tripId}
+              spotlights={plan.spotlights ?? []}
+              initialMessages={chatSeed}
+              onPlanReplaced={setPlan}
+              onCollabBump={bumpCollab}
+            />
+          </div>
+        </section>
+
+          </>
+          ) : null}
+
+          {workspaceTab === "budget" && canEditTripWorkspace ? (
+          <>
+            {isHost ? (
+          <section id="sec-budget" className="scroll-mt-28">
+            <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Budget</h2>
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+              Set or update your trip budget. This is saved on your draft and guides suggestions.
+            </p>
+            <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+              <textarea
+                rows={3}
+                value={budgetLine}
+                onChange={(e) => setBudgetLine(e.target.value)}
+                placeholder="e.g. ~$1,200 per person, splurge on one dinner…"
+                className="w-full resize-y rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null })
+                }
+                className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+              >
+                Save budget
+              </button>
+            </div>
+          </section>
+            ) : (
+              <section id="sec-budget" className="scroll-mt-28">
+                <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Group budget</h2>
+                <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                  The host sets the working budget on the plan. Cast your vote and notes under{" "}
+                  <strong className="text-[color:var(--on-surface)]">Collaborate</strong> → Decide together.
+                </p>
+                <p className="mt-3 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm font-medium text-[color:var(--on-surface)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100">
+                  {budgetDisplayLine}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceTab("collaborate");
+                    requestAnimationFrame(() =>
+                      document.getElementById("sec-collab-sidebar")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    );
+                  }}
+                  className="mt-4 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
+                >
+                  Open group budget poll
+                </button>
+              </section>
+            )}
+          </>
+          ) : null}
+
+          {workspaceTab === "collaborate" ? (
+          <>
         <section id="sec-preferences-adjustments" className="scroll-mt-28">
           <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
             Preferences &amp; adjustments
@@ -1647,49 +1811,6 @@ export function TripHostSetupDashboard({
           />
         </section>
 
-        {canEditTripWorkspace ? (
-          <section id="sec-budget" className="scroll-mt-28">
-            <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Budget</h2>
-            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-              Set or update your trip budget. This is saved on your draft and guides suggestions.
-            </p>
-            <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
-              <textarea
-                rows={3}
-                value={budgetLine}
-                onChange={(e) => setBudgetLine(e.target.value)}
-                placeholder="e.g. ~$1,200 per person, splurge on one dinner…"
-                className="w-full resize-y rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null })
-                }
-                className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
-              >
-                Save budget
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        <section id="sec-trip-chat" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Trip chat</h2>
-          <p className="mt-1 max-w-3xl text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-            Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
-          </p>
-          <div className="mt-4">
-            <TripCardChatWidget
-              tripId={tripId}
-              spotlights={plan.spotlights ?? []}
-              initialMessages={chatSeed}
-              onPlanReplaced={setPlan}
-              onCollabBump={bumpCollab}
-            />
-          </div>
-        </section>
-
         <section className="scroll-mt-28 border-t border-[color:var(--hairline)] pt-8 dark:border-white/10">
           <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
         </section>
@@ -1713,6 +1834,9 @@ export function TripHostSetupDashboard({
             </details>
           ) : null}
         </section>
+
+          </>
+          ) : null}
 
         </main>
 
@@ -1752,7 +1876,7 @@ export function TripHostSetupDashboard({
                   flightsError={liveData?.flightsError ?? null}
                   mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
                   busyKey={flightCurationBusy}
-                  isHost={canEditTripWorkspace}
+                  isHost={isHost}
                   tripDays={flightTripDayOptions}
                 />
                 {(() => {

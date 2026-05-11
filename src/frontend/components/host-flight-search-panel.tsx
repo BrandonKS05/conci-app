@@ -595,6 +595,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
                     try {
                       const res = await fetch(`/api/trip-plans/${tripId}/flights/save-selection`, {
                         method: "POST",
+                        credentials: "include",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           outbound: pickOut,

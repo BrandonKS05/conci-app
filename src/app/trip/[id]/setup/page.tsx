@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { fetchWikipediaThumbnailForQuery } from "@/backend/wikipedia-place-image";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { TripHostSetupDashboard } from "@/frontend/components/trip-host-setup-dashboard";
 import { parseCollabState } from "@/shared/collaboration";
 import { normalizePlan } from "@/shared/trip-plan";
+import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -63,6 +65,14 @@ export default async function TripHostSetupPage({
   const seedText = typeof data.seed_text === "string" ? data.seed_text : null;
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
 
+  let destinationCoverUrl: string | null = tripDestinationCoverFromPlan(plan);
+  if (!destinationCoverUrl && plan.location?.trim()) {
+    const token = plan.location.split(",")[0]?.trim() ?? plan.location.trim();
+    if (token.length >= 2 && !/^tbd$/i.test(token)) {
+      destinationCoverUrl = await fetchWikipediaThumbnailForQuery(token);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 py-6 text-[color:var(--on-surface)] dark:bg-dm-page dark:text-neutral-100 sm:py-8">
       <TripHostSetupDashboard
@@ -75,6 +85,7 @@ export default async function TripHostSetupPage({
         tripOwnerUserId={ownerId}
         inviteCode={inviteRaw || null}
         isHost={access.isHost}
+        destinationCoverUrl={destinationCoverUrl}
       />
     </div>
   );

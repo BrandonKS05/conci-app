@@ -20,6 +20,15 @@ export type LiveCurationMutate = (
   dateIso?: string
 ) => void;
 
+function googleFlightsHrefForCard(f: LiveFlightCard, plan: TripPlan): string {
+  const raw = f.bookOnGoogleFlightsUrl?.trim() ?? "";
+  if (raw && /^https?:\/\//i.test(raw)) return raw;
+  const origin = plan.departureCity?.trim() ?? "";
+  const dest = plan.location?.trim() ?? "";
+  const q = ["Flights", origin && `from ${origin}`, dest && `to ${dest}`].filter(Boolean).join(" ");
+  return `https://www.google.com/travel/flights?q=${encodeURIComponent(q)}`;
+}
+
 function formatShortTripDay(iso: string): string {
   const d = parseLocalIsoDate(iso);
   return d
@@ -291,6 +300,7 @@ export function useLiveCurationMutation(tripId: string, onPlanUpdated?: (plan: T
         }
         const res = await fetch(`/api/trip-plans/${tripId}/itinerary-live-curation`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
@@ -454,7 +464,7 @@ export function CuratedFlightsRows({
               />
             </div>
             <a
-              href={f.bookOnGoogleFlightsUrl}
+              href={googleFlightsHrefForCard(f, plan)}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-flex rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-50 dark:border-sky-500/30 dark:bg-dm-page dark:text-sky-200 dark:hover:bg-sky-950/40"

@@ -242,6 +242,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [plan, setPlan] = useState<TripPlan | null>(null);
   /** Live phases while finalizing: AI -> save -> itinerary -> navigate. */
   const [tripBuildStep, setTripBuildStep] = useState<TripParserBuildStep | null>(null);
+  /** Fires if navigation does not complete within the safety window. */
+  const [tripBuildWatchdogMessage, setTripBuildWatchdogMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefetchingSlots, setPrefetchingSlots] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -422,14 +424,24 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         }
         if (body.id) {
           setTripBuildStep("generating");
-          await fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
-            method: "POST",
-            credentials: "include",
-          }).catch(() => undefined);
+          const genController = new AbortController();
+          const genTimer = window.setTimeout(() => genController.abort(), 28_000);
+          try {
+            await fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
+              method: "POST",
+              credentials: "include",
+              signal: genController.signal,
+            }).catch(() => undefined);
+          } finally {
+            window.clearTimeout(genTimer);
+          }
           setTripBuildStep("launching");
           router.replace(`/trip/${body.id}/setup`);
           return true;
         }
+        setSaveError(
+          "Trip saved but the server response was incomplete. Refresh My Trips or try saving again."
+        );
         return false;
       } catch (e) {
         console.error("[Conci Supabase] Save plan request threw:", e);
@@ -441,6 +453,26 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     },
     [seedMessage, router, pathname]
   );
+
+  useEffect(() => {
+    if (phase !== "building") return undefined;
+    const t = window.setTimeout(() => {
+      setTripBuildWatchdogMessage(
+        "Couldn’t open your trip in time — your plan may still be saved. You can try again or open it from My Trips."
+      );
+      setTripBuildStep(null);
+      setPhase("chat");
+      setSaveBusy(false);
+    }, 60_000);
+    return () => window.clearTimeout(t);
+  }, [phase]);
+
+  const dismissTripBuildOverlay = useCallback(() => {
+    setTripBuildWatchdogMessage(null);
+    setTripBuildStep(null);
+    setPhase("chat");
+    setSaveBusy(false);
+  }, []);
 
   const confirmPlan = useCallback(async () => {
     if (!plan) return;
@@ -946,6 +978,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   async function finalizePlan(finalSlots: Partial<Record<SlotKey, string>>) {
     const prompt = composeTripPrompt(seedMessage, finalSlots);
+    setTripBuildWatchdogMessage(null);
     setTripBuildStep("structuring");
     setPhase("building");
     setMessages((prev) => [...prev, { id: newId(), role: "assistant", text: ACK_BEFORE_PLAN }]);
@@ -985,6 +1018,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
     setDateSlotError(null);
     setPhase("chat");
     setTripBuildStep(null);
+    setTripBuildWatchdogMessage(null);
     setPlan(null);
     setError(null);
     setPrefetchingSlots(false);
@@ -1010,7 +1044,36 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
       {phase === "building" && tripBuildStep ? (
-        <TripPlanBuildProgressOverlayDark step={tripBuildStep} tripTitle={plan?.title || seedMessage} />
+        <TripPlanBuildProgressOverlayDark
+          step={tripBuildStep}
+          tripTitle={plan?.title || seedMessage}
+          onBack={dismissTripBuildOverlay}
+        />
+      ) : null}
+      {phase === "chat" && tripBuildWatchdogMessage ? (
+        <div className="rounded-xl border border-amber-300/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <p>{tripBuildWatchdogMessage}</p>
+          {plan && seedMessage ? (
+            <button
+              type="button"
+              disabled={saveBusy}
+              onClick={() => {
+                setTripBuildWatchdogMessage(null);
+                void confirmPlan();
+              }}
+              className="mt-2 rounded-full border border-amber-400/70 bg-white px-4 py-1.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700/50 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-950/80"
+            >
+              {saveBusy ? "Opening…" : "Try opening trip again"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setTripBuildWatchdogMessage(null)}
+            className="mt-2 ml-2 text-xs font-medium text-amber-900 underline-offset-2 hover:underline dark:text-amber-200"
+          >
+            Dismiss
+          </button>
+        </div>
       ) : null}
 
       <header className="flex flex-col gap-3 pt-2 sm:pt-4">

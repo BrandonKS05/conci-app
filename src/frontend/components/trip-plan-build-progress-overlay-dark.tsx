@@ -49,9 +49,12 @@ function DoneCheck() {
 export function TripPlanBuildProgressOverlayDark({
   step,
   tripTitle,
+  onBack,
 }: {
   step: TripParserBuildStep;
   tripTitle?: string | null;
+  /** Dismiss overlay (e.g. return to chat) without resetting the whole parser. */
+  onBack?: () => void;
 }) {
   const targetDone = STEP_TARGET_DONE_COUNT[step];
   const [doneCount, setDoneCount] = useState(0);
@@ -82,7 +85,16 @@ export function TripPlanBuildProgressOverlayDark({
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#141414] px-6 py-7 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.8)] sm:px-8">
+      <div className="relative w-full max-w-4xl rounded-3xl border border-white/10 bg-[#141414] px-6 py-7 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.8)] sm:px-8">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="absolute right-4 top-4 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-300 transition hover:bg-white/10 hover:text-white"
+          >
+            Back
+          </button>
+        ) : null}
         <h2 className="text-center font-display text-2xl font-semibold text-white sm:text-3xl">{title}</h2>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {TRAVEL_CARD_BACKDROPS.map((src, i) => (
