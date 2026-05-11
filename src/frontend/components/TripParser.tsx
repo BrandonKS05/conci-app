@@ -1013,15 +1013,13 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         <TripPlanBuildProgressOverlayDark step={tripBuildStep} tripTitle={plan?.title || seedMessage} />
       ) : null}
 
-      <header className="flex flex-col gap-5 pt-2 sm:pt-6">
-        <span className="editorial-eyebrow dark:text-[color:var(--sage-soft)]">Plan your journey</span>
-        <h1 className="font-display text-[2.75rem] font-semibold leading-[0.98] tracking-[-0.035em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[4.25rem]">
+      <header className="flex flex-col gap-3 pt-2 sm:pt-4">
+        <h1 className="font-display text-[2.75rem] font-semibold leading-[0.98] tracking-[-0.035em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[4rem]">
           Hello, <span className="italic">{firstName}</span>
         </h1>
-        <p className="max-w-xl text-base leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[#9c9a96] sm:text-[17px]">
-          Where will your next journey take you? Paste a text, link, or screenshot and Conci will turn it into a shareable plan.
+        <p className="max-w-xl text-[15px] leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[#9c9a96] sm:text-base">
+          Where will your next journey take you? Paste a text, link, or screenshot — Conci will turn messy group chats into a real shareable plan.
         </p>
-        <div className="hairline-rule mt-2 max-w-md dark:bg-white/10" />
       </header>
 
       {saveError ? (
@@ -1243,7 +1241,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             <textarea
               value={composerText}
               onChange={(e) => setComposerText(e.target.value)}
-              placeholder="How can I help you plan today?"
+              placeholder="Plan a long weekend with friends in Tokyo…"
               rows={6}
               className="min-h-[8.5rem] w-full resize-y border-0 bg-transparent text-[15px] leading-relaxed text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:ring-0 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
             />
@@ -1304,9 +1302,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               <button
                 type="submit"
                 disabled={!composerText.trim() && imageSlots.length === 0}
-                className={`rounded-full px-6 py-2 text-sm disabled:cursor-not-allowed ${primaryFilledInteractive}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm disabled:cursor-not-allowed ${primaryFilledInteractive}`}
               >
-                Send
+                Generate
+                <SparkleIcon className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -1334,6 +1333,21 @@ function VoiceWaveIcon() {
       <rect x="2" y="6" width="2.5" height="6" rx="1" />
       <rect x="7.25" y="3" width="2.5" height="12" rx="1" />
       <rect x="12.5" y="5" width="2.5" height="8" rx="1" />
+    </svg>
+  );
+}
+
+function SparkleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+    >
+      <path d="M8 1.5 9.05 5.2a1.5 1.5 0 0 0 1.05 1.05L13.8 7.3l-3.7 1.05A1.5 1.5 0 0 0 9.05 9.4L8 13.1 6.95 9.4A1.5 1.5 0 0 0 5.9 8.35L2.2 7.3l3.7-1.05A1.5 1.5 0 0 0 6.95 5.2L8 1.5Z" />
+      <path d="M13.5 1.5l.35 1.15a.5.5 0 0 0 .35.35L15.35 3.35l-1.15.35a.5.5 0 0 0-.35.35L13.5 5.2l-.35-1.15a.5.5 0 0 0-.35-.35L11.65 3.35l1.15-.35a.5.5 0 0 0 .35-.35L13.5 1.5Z" />
     </svg>
   );
 }

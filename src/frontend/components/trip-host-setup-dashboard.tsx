@@ -738,159 +738,233 @@ export function TripHostSetupDashboard({
     [canEditTripWorkspace]
   );
 
+  const tripDisplayName = (plan.title?.trim() || plan.location?.trim() || "Trip");
+  const tripIdentityInitial = (tripDisplayName.match(/\p{L}/u)?.[0] ?? "T").toUpperCase();
+  const tripIdentityDateLabel = useMemo(() => {
+    if (tripDisplayRange?.startIso && tripDisplayRange.endIso) {
+      return formatTripRangeLabel(tripDisplayRange.startIso, tripDisplayRange.endIso);
+    }
+    const first = plan.dates.options.find((o) => o && o.trim());
+    return first ?? "Dates TBD";
+  }, [tripDisplayRange?.startIso, tripDisplayRange?.endIso, plan.dates.options]);
+
   return (
     <>
-    <SiteShell
-      title={plan.title?.trim() || "Trip"}
-      eyebrow={effectiveTripStatus === "finalized" ? "Your trip" : isHost ? "Host setup" : "Group trip"}
-      tripTypography
-      contentWide
-    >
-      <div className="mx-auto w-full pb-14">
-      <div className="mb-10 border-b border-[color:var(--hairline)] pb-8 dark:border-white/10">
-        <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
-          {workspaceNavItems.map((item) => (
-            <a
-              key={item.id}
-              href={resolveWorkspaceNavHref(item.id)}
-              className="label-caps flex items-center gap-2 rounded-lg px-2 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
+    <SiteShell tripTypography contentWide>
+      <div className="mx-auto w-full pb-24 lg:pb-12">
+      <div className="grid grid-cols-1 gap-7 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_360px] xl:gap-9">
+        {/* LEFT RAIL — trip identity + vertical workspace nav + invite-friends CTA */}
+        <aside className="space-y-5 lg:row-start-1 lg:self-start lg:sticky lg:top-28">
+          <div className="flex items-center gap-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-5 py-5 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:flex-col lg:items-start lg:gap-3">
+            <div
+              aria-hidden
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--sage-soft)] to-[color:var(--surface-container-high)] text-lg font-display font-semibold text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:from-[#3a3a3a] dark:to-[#222] dark:text-[#ebe9e4] lg:h-14 lg:w-14 lg:text-xl"
             >
-              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
-              {item.label}
-            </a>
-          ))}
-          {canEditTripWorkspace ? (
-            <Link
-              href={`/trip/${tripId}/setup/packing`}
-              className="label-caps flex items-center gap-2 rounded-lg px-2 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
+              {tripIdentityInitial}
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate font-display text-xl font-semibold leading-[1.05] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] lg:whitespace-normal lg:text-2xl">
+                {tripDisplayName}
+              </h1>
+              <p className="mt-0.5 text-xs text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
+                {tripIdentityDateLabel}
+              </p>
+            </div>
+          </div>
+
+          <nav
+            aria-label="Trip workspace sections"
+            className="flex flex-row gap-1 overflow-x-auto rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-1.5 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:flex-col lg:overflow-visible"
+          >
+            {workspaceNavItems.map((item) => (
+              <a
+                key={item.id}
+                href={resolveWorkspaceNavHref(item.id)}
+                className="label-caps flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
+              >
+                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
+                {item.label}
+              </a>
+            ))}
+            {canEditTripWorkspace ? (
+              <Link
+                href={`/trip/${tripId}/setup/packing`}
+                className="label-caps flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
+              >
+                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
+                Packing list
+              </Link>
+            ) : null}
+          </nav>
+
+          <a
+            href="#sec-invite"
+            className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:inline-flex"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+              aria-hidden
             >
-              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
-              Packing list
-            </Link>
-          ) : null}
-        </nav>
-      </div>
+              <circle cx="8" cy="7.5" r="2.4" />
+              <path d="M3 16.5c.5-2.3 2.4-3.8 4.7-3.8s4.2 1.5 4.7 3.8" />
+              <path d="M13.5 4.5h3.7M15.4 2.6v3.8" />
+            </svg>
+            Invite friends
+          </a>
+        </aside>
 
-      <div className="space-y-12">
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start xl:gap-10">
-          <div className="space-y-6">
-            <div className="rounded-[1.75rem] border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient)] sm:p-8 dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-              <div className="mb-6">
-                <span className="editorial-eyebrow mb-3 dark:text-[color:var(--sage-soft)]">Trip fund</span>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <TripDepositTracker tripId={tripId} />
-                  <TripContributeButton tripId={tripId} />
-                </div>
-              </div>
-              {isHost ? (
-                <div className="mb-6">
-                  <span className="editorial-eyebrow mb-3 dark:text-[color:var(--sage-soft)]">
-                    Join code · invite people
-                  </span>
-                  <div className="mt-3" />
-
-                  {resolvedInviteCode ? (
-                    <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
-                      <InviteCodeRow rawCode={resolvedInviteCode} prominent />
-                      <div className="rounded-2xl border border-amber-300/50 bg-amber-50/90 px-4 py-3 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
-                        <h3 className="font-display text-sm font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
-                        <p className="mt-1.5 text-xs text-amber-950/90 dark:text-amber-100/90">
-                          You can override group suggestions anytime.
-                        </p>
-                        <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-amber-950 dark:text-amber-50/95">
-                          <li>
-                            Use{" "}
-                            <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
-                              Trip chat
-                            </a>{" "}
-                            to change dates, budget, or destination.
-                          </li>
-                          <li>
-                            Under{" "}
-                            <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
-                              Flights
-                            </a>
-                            , keep or dismiss itineraries.
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                      <p>
-                        Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
-                        <Link
-                          href={JOIN_WITH_CODE_URL}
-                          className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
-                        >
-                          Join a Trip
-                        </Link>
-                        . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
-                        below.
-                      </p>
-                    </div>
-                  )}
-                  {resolvedInviteCode ? (
-                    <p className="mt-2 text-xs text-neutral-500">Guests sign in and enter this code on Join a Trip.</p>
-                  ) : null}
-                </div>
+        {/* CENTER COLUMN */}
+        <main className="min-w-0 space-y-10 lg:col-start-2 lg:row-start-1">
+          {/* Top stats strip — Trip fund · Join code · Trip owner */}
+          <section
+            id="sec-invite"
+            className="flex flex-col gap-5 border-b border-[color:var(--hairline)] pb-7 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6 lg:gap-7"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <TripDepositTracker tripId={tripId} />
+              <TripContributeButton tripId={tripId} />
+            </div>
+            <span className="hidden h-10 w-px bg-[color:var(--hairline)] dark:bg-white/10 sm:inline-block" />
+            <div className="min-w-0">
+              {resolvedInviteCode ? (
+                <InviteCodeRow rawCode={resolvedInviteCode} prominent />
               ) : (
-                <div className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                  <p>
-                    You&apos;re on this trip as a guest.{" "}
-                    {canEditTripWorkspace ? (
-                      <>
-                        Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
-                        <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
-                      </>
-                    ) : (
-                      <>This trip is finalized — viewing shared plans and checklist.</>
-                    )}
-                  </p>
-                </div>
+                <p className="text-sm text-[color:var(--on-surface-variant)]">Loading invite code…</p>
               )}
-              <div className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
-                  <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
-                    {budgetDisplayLine}
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <div
+                aria-hidden
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--surface-container-high)] text-base font-display font-semibold text-[color:var(--on-surface)] dark:bg-[#2a2a2a] dark:text-[#ebe9e4]"
+              >
+                {tripIdentityInitial}
+                {isHost ? (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[color:var(--surface)] bg-[#1c1c17] text-[10px] font-bold leading-none text-[color:var(--surface)] dark:border-dm-card dark:bg-[#ebe9e4] dark:text-[#141414]">
+                    +
                   </span>
-                  {canEditTripWorkspace ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowBudgetEditor((v) => !v)}
-                      className="rounded-full border border-[color:var(--hairline-strong)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container)]"
-                    >
-                      {showBudgetEditor ? "Cancel" : "Change budget"}
-                    </button>
-                  ) : null}
-                </div>
-                {canEditTripWorkspace && showBudgetEditor ? (
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <input
-                      value={budgetLine}
-                      onChange={(e) => setBudgetLine(e.target.value)}
-                      placeholder="e.g. ~$1,200 per person"
-                      className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-neutral-500 focus:border-[color:var(--sage)]/55"
-                    />
-                    <button
-                      type="button"
-                      disabled={savingBudgetInline}
-                      onClick={() => {
-                        setSavingBudgetInline(true);
-                        void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null }).then((ok) => {
-                          if (ok) setShowBudgetEditor(false);
-                          setSavingBudgetInline(false);
-                        });
-                      }}
-                      className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
-                    >
-                      {savingBudgetInline ? "Saving..." : "Save budget"}
-                    </button>
-                  </div>
                 ) : null}
               </div>
-              <section id="sec-dates" className="scroll-mt-28">
+              <div className="flex flex-col gap-0.5">
+                <span className="label-caps text-[color:var(--on-surface-muted)]">
+                  {isHost ? "Trip owner" : "Trip member"}
+                </span>
+                <Link
+                  href="/settings"
+                  className="text-sm font-medium text-[color:var(--on-surface)] underline-offset-2 hover:underline dark:text-[#ebe9e4]"
+                >
+                  Manage Settings
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* Owner controls helper / member helper */}
+          {isHost ? (
+            resolvedInviteCode ? (
+              <div className="rounded-2xl border border-amber-300/50 bg-amber-50/90 px-4 py-3 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
+                <h3 className="font-display text-sm font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
+                <p className="mt-1.5 text-xs text-amber-950/90 dark:text-amber-100/90">
+                  You can override group suggestions anytime.
+                </p>
+                <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-amber-950 dark:text-amber-50/95">
+                  <li>
+                    Use{" "}
+                    <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
+                      Trip chat
+                    </a>{" "}
+                    to change dates, budget, or destination.
+                  </li>
+                  <li>
+                    Under{" "}
+                    <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
+                      Flights
+                    </a>
+                    , keep or dismiss itineraries.
+                  </li>
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                <p>
+                  Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
+                  <Link
+                    href={JOIN_WITH_CODE_URL}
+                    className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
+                  >
+                    Join a Trip
+                  </Link>
+                  . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
+                  below.
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+              <p>
+                You&apos;re on this trip as a guest.{" "}
+                {canEditTripWorkspace ? (
+                  <>
+                    Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
+                    <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
+                  </>
+                ) : (
+                  <>This trip is finalized — viewing shared plans and checklist.</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Budget chip + editor */}
+          <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
+              <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
+                {budgetDisplayLine}
+              </span>
+              {canEditTripWorkspace ? (
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetEditor((v) => !v)}
+                  className="rounded-full border border-[color:var(--hairline-strong)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container)]"
+                >
+                  {showBudgetEditor ? "Cancel" : "Change budget"}
+                </button>
+              ) : null}
+            </div>
+            {canEditTripWorkspace && showBudgetEditor ? (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                <input
+                  value={budgetLine}
+                  onChange={(e) => setBudgetLine(e.target.value)}
+                  placeholder="e.g. ~$1,200 per person"
+                  className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-neutral-500 focus:border-[color:var(--sage)]/55"
+                />
+                <button
+                  type="button"
+                  disabled={savingBudgetInline}
+                  onClick={() => {
+                    setSavingBudgetInline(true);
+                    void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null }).then((ok) => {
+                      if (ok) setShowBudgetEditor(false);
+                      setSavingBudgetInline(false);
+                    });
+                  }}
+                  className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                >
+                  {savingBudgetInline ? "Saving..." : "Save budget"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
               <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
@@ -1270,105 +1344,6 @@ export function TripHostSetupDashboard({
 
         </section>
 
-            </div>
-          </div>
-          <aside className="flex flex-col gap-6 xl:sticky xl:top-28">
-            <div
-              id="sec-flights"
-              className="scroll-mt-28 rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card p-6 shadow-sm space-y-4 text-[color:var(--on-surface-variant)] [&_h3]:text-[color:var(--on-surface)] [&_p]:text-[color:var(--on-surface-variant)] [&_strong]:text-[color:var(--on-surface)]"
-            >
-              <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-muted)]">
-            Search flight options and add the ones you want into the trip itinerary.
-          </p>
-          {liveFetchErr ? (
-            <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-2 text-sm text-amber-200">
-              {liveFetchErr}
-            </p>
-          ) : null}
-          {flightCurationErr ? (
-            <div className="mt-3">
-              <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
-            </div>
-          ) : null}
-          {canEditTripWorkspace && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
-            <HostFlightSearchPanel tripId={tripId} enabled />
-          ) : null}
-          {showFlightTransport ? (
-            <div className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-5 shadow-inner">
-              <p className="text-xs text-[color:var(--on-surface-muted)]">
-                From                 <strong className="text-[color:var(--on-surface)]">{plan.departureCity}</strong> to{" "}
-                <strong className="text-[color:var(--on-surface)]">{plan.location}</strong>
-              </p>
-              <div className="mt-4 space-y-4">
-                <HostLiveScheduleByDay
-                  plan={plan}
-                  flights={liveData?.flights ?? []}
-                  restaurants={liveData?.restaurants ?? []}
-                  experiences={liveData?.experiences ?? []}
-                />
-                <CuratedFlightsRows
-                  plan={plan}
-                  flights={liveData?.flights ?? []}
-                  liveLoading={liveLoading}
-                  flightsError={liveData?.flightsError ?? null}
-                  mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
-                  busyKey={flightCurationBusy}
-                  isHost={canEditTripWorkspace}
-                  tripDays={flightTripDayOptions}
-                />
-              </div>
-              {(() => {
-                const dc = plan.departureCity?.trim();
-                const loc = plan.location?.trim();
-                const href =
-                  liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
-                return href ? (
-                  <p className="mt-4 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                    Driving instead?{" "}
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-emerald-300"
-                    >
-                      Open directions in Google Maps
-                    </a>
-                    {liveData?.drive?.durationEstimate ? (
-                      <>
-                        {" "}
-                        (~{liveData.drive.durationEstimate}
-                        {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
-                      </>
-                    ) : null}
-                  </p>
-                ) : null;
-              })()}
-            </div>
-              ) : (
-                <p className="mt-3 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                  Flight search appears here once departure city and destination are set on the trip.
-                </p>
-              )}
-            </div>
-            <div className="rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card p-6 shadow-sm">
-              <h3 className="font-display text-lg font-semibold text-white">Home base · hotel</h3>
-              {primaryHotelSummary ? (
-                <div className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-4 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                  <p className="font-semibold text-white">{primaryHotelSummary.title}</p>
-                  <p className="mt-2 text-[color:var(--on-surface-muted)]">{primaryHotelSummary.detail}</p>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm leading-relaxed text-neutral-500">
-                  {canEditTripWorkspace
-                    ? "Add lodging on a calendar day, with Trip Copilot, or in the day editor."
-                    : "No home base saved on the plan yet."}
-                </p>
-              )}
-            </div>
-          </aside>
-        </div>
-
         {canEditTripWorkspace ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
             <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-[color:var(--hairline)] dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
@@ -1479,6 +1454,109 @@ export function TripHostSetupDashboard({
           ) : null}
         </section>
 
+        </main>
+
+        {/* RIGHT RAIL — flights + home base, sticky on xl */}
+        <aside className="space-y-6 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:self-start xl:sticky xl:top-28">
+          <div
+            id="sec-flights"
+            className="scroll-mt-28 space-y-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+          >
+            <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">Flights</h3>
+            <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+              Search flight options and add the ones you want into the trip itinerary.
+            </p>
+            {liveFetchErr ? (
+              <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/30 dark:text-amber-200">
+                {liveFetchErr}
+              </p>
+            ) : null}
+            {flightCurationErr ? (
+              <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
+            ) : null}
+            {canEditTripWorkspace && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
+              <HostFlightSearchPanel tripId={tripId} enabled />
+            ) : null}
+            {showFlightTransport ? (
+              <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-5 shadow-inner">
+                <p className="text-xs text-[color:var(--on-surface-muted)]">
+                  From <strong className="text-[color:var(--on-surface)]">{plan.departureCity}</strong> to{" "}
+                  <strong className="text-[color:var(--on-surface)]">{plan.location}</strong>
+                </p>
+                <div className="mt-4 space-y-4">
+                  <HostLiveScheduleByDay
+                    plan={plan}
+                    flights={liveData?.flights ?? []}
+                    restaurants={liveData?.restaurants ?? []}
+                    experiences={liveData?.experiences ?? []}
+                  />
+                  <CuratedFlightsRows
+                    plan={plan}
+                    flights={liveData?.flights ?? []}
+                    liveLoading={liveLoading}
+                    flightsError={liveData?.flightsError ?? null}
+                    mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
+                    busyKey={flightCurationBusy}
+                    isHost={canEditTripWorkspace}
+                    tripDays={flightTripDayOptions}
+                  />
+                </div>
+                {(() => {
+                  const dc = plan.departureCity?.trim();
+                  const loc = plan.location?.trim();
+                  const href =
+                    liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
+                  return href ? (
+                    <p className="mt-4 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      Driving instead?{" "}
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-emerald-300"
+                      >
+                        Open directions in Google Maps
+                      </a>
+                      {liveData?.drive?.durationEstimate ? (
+                        <>
+                          {" "}
+                          (~{liveData.drive.durationEstimate}
+                          {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
+                        </>
+                      ) : null}
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                Flight search appears here once departure city and destination are set on the trip.
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+            <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">Home base</h3>
+            {primaryHotelSummary ? (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:border-white/10 dark:from-[#2a2a2a] dark:to-[#1f1f1f]">
+                <div className="px-4 pb-4 pt-12">
+                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Hotel</span>
+                  <p className="mt-1 font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+                    {primaryHotelSummary.title}
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                    {primaryHotelSummary.detail}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed text-[color:var(--on-surface-muted)]">
+                {canEditTripWorkspace
+                  ? "Add lodging on a calendar day, with Trip Copilot, or in the day editor."
+                  : "No home base saved on the plan yet."}
+              </p>
+            )}
+          </div>
+        </aside>
       </div>
       </div>
 

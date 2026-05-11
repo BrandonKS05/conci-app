@@ -16,13 +16,14 @@ export function SiteShell({
   /** Wider main column for dense layouts (e.g. host setup month calendar). */
   contentWide = false,
 }: {
-  title: string;
+  title?: string;
   eyebrow?: string;
   children: ReactNode;
   tripTypography?: boolean;
   titleRight?: ReactNode;
   contentWide?: boolean;
 }) {
+  const hasHero = Boolean((title && title.trim()) || eyebrow || titleRight);
   return (
     <main className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#0f0f0f] dark:text-neutral-200">
       <div
@@ -61,21 +62,25 @@ export function SiteShell({
           </nav>
         </header>
 
-        <section className="mb-7 lg:mb-9">
-          {eyebrow ? (
-            <p className="label-caps mb-3 text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">{eyebrow}</p>
-          ) : null}
-          <div
-            className={`flex flex-col gap-6${titleRight ? " lg:flex-row lg:items-start lg:justify-between lg:gap-8 xl:gap-12" : ""}`}
-          >
-            <h1 className="min-w-0 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-5xl lg:text-6xl">
-              {title}
-            </h1>
-            {titleRight ? (
-              <div className="w-full shrink-0 lg:max-w-3xl">{titleRight}</div>
+        {hasHero ? (
+          <section className="mb-7 lg:mb-9">
+            {eyebrow ? (
+              <p className="label-caps mb-3 text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">{eyebrow}</p>
             ) : null}
-          </div>
-        </section>
+            <div
+              className={`flex flex-col gap-6${titleRight ? " lg:flex-row lg:items-start lg:justify-between lg:gap-8 xl:gap-12" : ""}`}
+            >
+              {title && title.trim() ? (
+                <h1 className="min-w-0 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-5xl lg:text-6xl">
+                  {title}
+                </h1>
+              ) : null}
+              {titleRight ? (
+                <div className="w-full shrink-0 lg:max-w-3xl">{titleRight}</div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <div className={`flex-1 pb-24 sm:pb-10${tripTypography ? " font-display" : ""}`}>{children}</div>
 
