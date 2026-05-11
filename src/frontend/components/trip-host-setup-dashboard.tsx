@@ -747,13 +747,13 @@ export function TripHostSetupDashboard({
       contentWide
     >
       <div className="mx-auto w-full pb-14">
-      <div className="mb-10 border-b border-slate-200 pb-8 dark:border-white/10">
+      <div className="mb-10 border-b border-slate-200 pb-8 dark:border-slate-200">
         <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
           {workspaceNavItems.map((item) => (
             <a
               key={item.id}
               href={resolveWorkspaceNavHref(item.id)}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-900"
             >
               <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
               {item.label}
@@ -762,7 +762,7 @@ export function TripHostSetupDashboard({
           {canEditTripWorkspace ? (
             <Link
               href={`/trip/${tripId}/setup/packing`}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-100"
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-900"
             >
               <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
               Packing list
@@ -774,7 +774,7 @@ export function TripHostSetupDashboard({
       <div className="space-y-12">
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start xl:gap-10">
           <div className="space-y-6">
-            <div className="rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-[#141816] to-dm-card p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:p-8">
+            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
               <div className="mb-5">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Trip fund</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -814,7 +814,7 @@ export function TripHostSetupDashboard({
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm leading-relaxed text-neutral-300">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
                       <p>
                         Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
                         <Link
@@ -823,7 +823,7 @@ export function TripHostSetupDashboard({
                         >
                           Join a Trip
                         </Link>
-                        . Full share text is under <span className="text-neutral-200">Share trip</span> in the trip card
+                        . Full share text is under <span className="text-slate-800">Share trip</span> in the trip card
                         below.
                       </p>
                     </div>
@@ -833,13 +833,13 @@ export function TripHostSetupDashboard({
                   ) : null}
                 </div>
               ) : (
-                <div className="mb-6 rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-neutral-300">
+                <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
                   <p>
                     You&apos;re on this trip as a guest.{" "}
                     {canEditTripWorkspace ? (
                       <>
                         Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
-                        <span className="text-neutral-100">Group progress</span> for polls and availability.
+                        <span className="text-slate-900">Group progress</span> for polls and availability.
                       </>
                     ) : (
                       <>This trip is finalized — viewing shared plans and checklist.</>
@@ -847,17 +847,17 @@ export function TripHostSetupDashboard({
                   </p>
                 </div>
               )}
-              <div className="mb-6 rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-3">
+              <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
-                  <span className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-xs font-semibold text-neutral-100">
+                  <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-900">
                     {budgetDisplayLine}
                   </span>
                   {canEditTripWorkspace ? (
                     <button
                       type="button"
                       onClick={() => setShowBudgetEditor((v) => !v)}
-                      className="rounded-full border border-white/20 px-2.5 py-1 text-xs font-medium text-neutral-200 transition hover:bg-white/10"
+                      className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-800 transition hover:bg-slate-100"
                     >
                       {showBudgetEditor ? "Cancel" : "Change budget"}
                     </button>
@@ -869,7 +869,7 @@ export function TripHostSetupDashboard({
                       value={budgetLine}
                       onChange={(e) => setBudgetLine(e.target.value)}
                       placeholder="e.g. ~$1,200 per person"
-                      className="w-full rounded-xl border border-white/20 bg-black/25 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-teal-500/45"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-neutral-500 focus:border-teal-500/45"
                     />
                     <button
                       type="button"
@@ -891,7 +891,7 @@ export function TripHostSetupDashboard({
               <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
-              <p className="max-w-3xl text-sm leading-relaxed text-neutral-300">
+              <p className="max-w-3xl text-sm leading-relaxed text-slate-700">
                 {!canEditTripWorkspace
                   ? "This trip is finalized here — the calendar is for reference. Open the booking checklist for next steps."
                   : datePickMode === "range"
@@ -913,11 +913,11 @@ export function TripHostSetupDashboard({
             </div>
           </div>
 
-          <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-none">
+          <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-slate-200 dark:bg-dm-card dark:text-slate-900 dark:shadow-none">
             {/* Header — toolbar like reference */}
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:py-4">
+            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 dark:border-slate-200 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:py-4">
               <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-xl">
+                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-900 sm:text-xl">
                   {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
                 </h3>
                 {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
@@ -942,14 +942,14 @@ export function TripHostSetupDashboard({
                       setAddPlacesOpen(false);
                       setPendingRangeConfirm(null);
                     }}
-                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-1.5 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-800 dark:hover:bg-dm-page"
                   >
                     Change dates
                   </button>
                 ) : null}
               </div>
               {peers.length > 0 ? (
-                <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 px-1 py-2.5 dark:border-white/10 sm:border-t-0 sm:py-1.5">
+                <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 px-1 py-2.5 dark:border-slate-200 sm:border-t-0 sm:py-1.5">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400">
                     Here now
                   </span>
@@ -958,10 +958,10 @@ export function TripHostSetupDashboard({
                       <span
                         key={p.userId}
                         title={`${p.name} · on this calendar`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs text-slate-800 shadow-sm dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs text-slate-800 shadow-sm dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-900"
                       >
                         <span
-                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 text-[11px] font-semibold text-white dark:border-white/10"
+                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 text-[11px] font-semibold text-white dark:border-slate-200"
                           style={
                             p.avatarUrl
                               ? undefined
@@ -994,7 +994,7 @@ export function TripHostSetupDashboard({
                       return m - 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-300 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-200 dark:text-slate-700 dark:hover:border-slate-200 dark:hover:bg-dm-elevated"
                 >
                   <ChevLeft className="h-4 w-4" />
                 </button>
@@ -1010,7 +1010,7 @@ export function TripHostSetupDashboard({
                       return m + 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-300 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-200 dark:text-slate-700 dark:hover:border-slate-200 dark:hover:bg-dm-elevated"
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
@@ -1018,18 +1018,18 @@ export function TripHostSetupDashboard({
             </div>
 
             {/* Weekday stripe */}
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-dm-elevated/80">
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90 dark:border-slate-200 dark:bg-dm-elevated/80">
               {WEEKDAY_MON_FIRST.map((w) => (
                 <div
                   key={w}
-                  className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 dark:text-neutral-400 sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
+                  className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 dark:text-slate-500 sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
                 >
                   {w}
                 </div>
               ))}
             </div>
 
-            <div className="border-x border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card">
+            <div className="border-x border-slate-200 bg-white dark:border-slate-200 dark:bg-dm-card">
               {weeks.map((weekRow, wi) => (
                 <div key={`wk-${wi}`} className="grid grid-cols-7">
                   {weekRow.map((dom, ci) => {
@@ -1038,8 +1038,8 @@ export function TripHostSetupDashboard({
                         <div
                           key={`e-${wi}-${ci}`}
                           className={[
-                            "min-h-[7.5rem] border-b border-slate-200 bg-slate-50/40 dark:border-white/10 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
-                            ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
+                            "min-h-[7.5rem] border-b border-slate-200 bg-slate-50/40 dark:border-slate-200 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
+                            ci < 6 ? "border-r border-slate-200 dark:border-slate-200" : "",
                           ].join(" ")}
                         />
                       );
@@ -1061,7 +1061,7 @@ export function TripHostSetupDashboard({
                           key={`stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`}
                           className="min-w-0 w-full"
                         >
-                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-neutral-100">
+                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-slate-900">
                             <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                               {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
                               {hotelForDay.recommendedByConci ? (
@@ -1088,7 +1088,7 @@ export function TripHostSetupDashboard({
                               setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-slate-900">
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.place.name}
                                 {p.recommendedByConci ? (
@@ -1138,7 +1138,7 @@ export function TripHostSetupDashboard({
                               });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-neutral-100">
+                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-slate-900">
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.experience.name}
                                 {p.recommendedByConci ? (
@@ -1192,9 +1192,9 @@ export function TripHostSetupDashboard({
                           }
                         }}
                         className={[
-                          "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
+                          "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-slate-200",
                           canEditTripWorkspace ? "cursor-pointer" : "cursor-default",
-                          ci < 6 ? "border-r border-slate-200 dark:border-white/10" : "",
+                          ci < 6 ? "border-r border-slate-200 dark:border-slate-200" : "",
                           inTripRangeCell(dom)
                             ? "bg-amber-100/85 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-950/60"
                             : "bg-white hover:bg-slate-50/80 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
@@ -1212,7 +1212,7 @@ export function TripHostSetupDashboard({
                               {dom}
                             </span>
                           ) : (
-                            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-neutral-400 sm:text-base">
+                            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-500 sm:text-base">
                               {dom}
                             </span>
                           )}
@@ -1250,14 +1250,14 @@ export function TripHostSetupDashboard({
             </div>
 
             {!hostHasConcreteTripRange(plan) ? (
-              <p className="border-t border-slate-100 bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-white/10 dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="border-t border-slate-100 bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-slate-200 dark:bg-amber-950/40 dark:text-amber-100">
                 {canEditTripWorkspace
                   ? "Choose a trip range — two taps on the calendar — to anchor your plan and invites."
                   : "Trip dates aren't on the calendar yet. When the trip isn't finalized, anyone on the trip can set or adjust the range here."}
               </p>
             ) : null}
             {err ? (
-              <p className="border-t border-slate-100 bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-white/10 dark:bg-rose-950/40 dark:text-rose-200">
+              <p className="border-t border-slate-100 bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-slate-200 dark:bg-rose-950/40 dark:text-rose-200">
                 {err}
               </p>
             ) : null}
@@ -1270,10 +1270,10 @@ export function TripHostSetupDashboard({
           <aside className="flex flex-col gap-6 xl:sticky xl:top-28">
             <div
               id="sec-flights"
-              className="scroll-mt-28 rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl space-y-4 text-neutral-200 [&_h3]:text-white [&_p]:text-neutral-400 [&_strong]:text-neutral-200"
+              className="scroll-mt-28 rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm space-y-4 text-slate-700 [&_h3]:text-slate-900 [&_p]:text-slate-600 [&_strong]:text-slate-900"
             >
               <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-400">
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">
             Search flight options and add the ones you want into the trip itinerary.
           </p>
           {liveFetchErr ? (
@@ -1290,10 +1290,10 @@ export function TripHostSetupDashboard({
             <HostFlightSearchPanel tripId={tripId} enabled />
           ) : null}
           {showFlightTransport ? (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-5 shadow-inner">
-              <p className="text-xs text-neutral-400">
-                From                 <strong className="text-neutral-100">{plan.departureCity}</strong> to{" "}
-                <strong className="text-neutral-100">{plan.location}</strong>
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-100 p-5 shadow-inner">
+              <p className="text-xs text-slate-500">
+                From                 <strong className="text-slate-900">{plan.departureCity}</strong> to{" "}
+                <strong className="text-slate-900">{plan.location}</strong>
               </p>
               <div className="mt-4 space-y-4">
                 <HostLiveScheduleByDay
@@ -1341,17 +1341,17 @@ export function TripHostSetupDashboard({
               })()}
             </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm leading-relaxed text-neutral-300">
+                <p className="mt-3 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm leading-relaxed text-slate-700">
                   Flight search appears here once departure city and destination are set on the trip.
                 </p>
               )}
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-[#141816] to-[#101412] p-6 shadow-xl">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="font-display text-lg font-semibold text-white">Home base · hotel</h3>
               {primaryHotelSummary ? (
-                <div className="mt-4 rounded-2xl border border-white/15 bg-black/35 p-4 text-sm leading-relaxed text-neutral-300">
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-100 p-4 text-sm leading-relaxed text-slate-700">
                   <p className="font-semibold text-white">{primaryHotelSummary.title}</p>
-                  <p className="mt-2 text-neutral-400">{primaryHotelSummary.detail}</p>
+                  <p className="mt-2 text-slate-500">{primaryHotelSummary.detail}</p>
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-relaxed text-neutral-500">
@@ -1366,11 +1366,11 @@ export function TripHostSetupDashboard({
 
         {canEditTripWorkspace ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
-            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
+            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-slate-200 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
               <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
                 Setup copilot
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
                 Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies
                 them.
               </p>
@@ -1382,11 +1382,11 @@ export function TripHostSetupDashboard({
         ) : null}
 
         <section id="sec-preferences-adjustments" className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-dm-card dark:shadow-none sm:p-8">
             <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
               Preferences &amp; adjustments
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
               {isHost
                 ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
                 : "Share preferences and tweaks here — the group shares one calendar and polls; anyone can edit the trip workspace, and the host can still merge notes with Trip Copilot."}
@@ -1410,7 +1410,7 @@ export function TripHostSetupDashboard({
         {canEditTripWorkspace ? (
           <section id="sec-budget" className="scroll-mt-28">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Budget</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-500">
               Set or update your trip budget. This is saved on your draft and guides suggestions.
             </p>
             <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
@@ -1419,7 +1419,7 @@ export function TripHostSetupDashboard({
                 value={budgetLine}
                 onChange={(e) => setBudgetLine(e.target.value)}
                 placeholder="e.g. ~$1,200 per person, splurge on one dinner…"
-                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-teal-500 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-900"
               />
               <button
                 type="button"
@@ -1436,7 +1436,7 @@ export function TripHostSetupDashboard({
 
         <section id="sec-trip-chat" className="scroll-mt-28">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Trip chat</h2>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-neutral-400">
+          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-500">
             Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
           </p>
           <div className="mt-4">
@@ -1451,21 +1451,21 @@ export function TripHostSetupDashboard({
         </section>
 
         <section className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none sm:p-8">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-dm-card dark:shadow-none sm:p-8">
             <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
           </div>
         </section>
 
         <section id="sec-itinerary" className="scroll-mt-28">
           {plan.generatedItinerary ? (
-            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card">
+            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-200 dark:bg-dm-card">
               <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
                 <span className="text-base font-semibold text-slate-900 dark:text-white">Full text itinerary</span>
-                <span className="mt-1 block text-sm font-normal leading-relaxed text-slate-600 dark:text-neutral-400">
+                <span className="mt-1 block text-sm font-normal leading-relaxed text-slate-600 dark:text-slate-500">
                   Optional long-form planner text. Pins and votes on the calendar are what guests see day by day.
                 </span>
               </summary>
-              <div className="border-t border-slate-200 dark:border-white/10">
+              <div className="border-t border-slate-200 dark:border-slate-200">
                 <GeneratedItineraryView
                   tripId={tripId}
                   initialItinerary={plan.generatedItinerary ?? null}
@@ -1492,12 +1492,12 @@ export function TripHostSetupDashboard({
             aria-label="Cancel"
             onClick={cancelPendingTripRange}
           />
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
-            <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-200 dark:bg-dm-card">
+            <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-200">
               <h2 id="confirm-trip-range-title" className="text-lg font-semibold text-slate-900 dark:text-white">
                 Confirm trip dates
               </h2>
-              <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-500">
                 Use these dates for your trip?
               </p>
               <p className="mt-3 rounded-lg bg-teal-50 px-3 py-2 text-sm font-medium text-teal-900 dark:bg-teal-950/50 dark:text-teal-100">
@@ -1508,7 +1508,7 @@ export function TripHostSetupDashboard({
               <button
                 type="button"
                 onClick={cancelPendingTripRange}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-800 dark:hover:bg-dm-page"
               >
                 No
               </button>

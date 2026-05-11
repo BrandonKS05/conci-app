@@ -22,11 +22,11 @@ const config: Config = {
         ],
       },
       colors: {
-        /** Dark mode surfaces (with `class` strategy + `html.dark`) */
+        /** Light-mode surfaces (previously dark; remapped after dark mode removal). */
         dm: {
-          page: "#0f0f0f",
-          elevated: "#111111",
-          card: "#1a1a1a",
+          page: "#ffffff",
+          elevated: "#f8fafc",
+          card: "#ffffff",
         },
         ink: "#101828",
         paper: "#F8FAFC",

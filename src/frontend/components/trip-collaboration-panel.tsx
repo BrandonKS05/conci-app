@@ -1314,27 +1314,25 @@ export function ActivityVibePollCard({
         <strong className="text-slate-800 dark:text-neutral-200">Not now</strong>.
       </p>
 
-      <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
-        <textarea
-          rows={4}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
-          maxLength={2000}
-          disabled={submitBusy}
-          className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
-        />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-slate-500 dark:text-neutral-500">{draft.trim().length} / 2000</span>
-          <button
-            type="button"
-            disabled={submitBusy || draft.trim().length < 1}
-            onClick={() => void submitSuggestion()}
-            className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
-          >
-            {submitBusy ? "Sending…" : "Submit suggestion"}
-          </button>
-        </div>
+      <textarea
+        rows={4}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
+        maxLength={2000}
+        disabled={submitBusy}
+        className="mt-5 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-slate-500 dark:text-neutral-500">{draft.trim().length} / 2000</span>
+        <button
+          type="button"
+          disabled={submitBusy || draft.trim().length < 1}
+          onClick={() => void submitSuggestion()}
+          className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
+        >
+          {submitBusy ? "Sending…" : "Submit suggestion"}
+        </button>
       </div>
 
       {uiErr ? (
@@ -1343,8 +1341,8 @@ export function ActivityVibePollCard({
         </p>
       ) : null}
 
-      <div className="mt-6">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+      <div className="mt-6 border-t border-slate-200 pt-4 dark:border-white/10">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
           Suggestions
         </p>
         {!pending.length && !archives.length ? (
