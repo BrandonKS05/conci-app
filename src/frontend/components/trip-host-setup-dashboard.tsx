@@ -30,6 +30,7 @@ import {
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
   type HostActivityExperience,
+  type HostActivityPin,
   type HostHotelStay,
   type HostRestaurantPin,
   type HostSetupState,
@@ -85,6 +86,7 @@ const LEFT_RAIL_TABS: readonly {
   navIconId: string;
 }[] = [
   { id: "overview", label: "Overview", navIconId: "overview" },
+  { id: "transportation", label: "Transportation", navIconId: "flights" },
   { id: "budget", label: "Budget", navIconId: "budget" },
   { id: "fund", label: "Fund", navIconId: "fund" },
   { id: "collaborate", label: "Collaborate", navIconId: "collaborate" },
@@ -463,6 +465,9 @@ export function TripHostSetupDashboard({
   const [liveData, setLiveData] = useState<TripLiveRecommendationsPayload | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveFetchErr, setLiveFetchErr] = useState<string | null>(null);
+  /** Refit (regenerate itinerary after the host picks new trip dates). */
+  const [refittingItinerary, setRefittingItinerary] = useState(false);
+  const [refitError, setRefitError] = useState<string | null>(null);
   /** Set after the second tap in range mode; saved only when the host confirms. */
   const [pendingRangeConfirm, setPendingRangeConfirm] = useState<{
     startIso: string;
@@ -772,27 +777,122 @@ export function TripHostSetupDashboard({
     [hostSetup.activityPins, persistHostSetup]
   );
 
+  const refitItineraryForRange = useCallback(
+    async (nextRange: { startIso: string; endIso: string }) => {
+      setRefittingItinerary(true);
+      setRefitError(null);
+      const newDays = new Set(enumerateLocalIsoDays(nextRange.startIso, nextRange.endIso));
+      const preservedRestaurantKeys = new Set(
+        (hostSetup.restaurantPins ?? [])
+          .filter((p) => newDays.has(p.dateIso))
+          .map((p) => `${p.dateIso}::${p.place.mapsUrl}`)
+      );
+      const preservedActivityKeys = new Set(
+        (hostSetup.activityPins ?? [])
+          .filter((p) => newDays.has(p.dateIso))
+          .map((p) => `${p.dateIso}::${p.experience.bookingUrl}`)
+      );
+      const preservedRestaurantPins = (hostSetup.restaurantPins ?? []).filter((p) =>
+        newDays.has(p.dateIso)
+      );
+      const preservedActivityPins = (hostSetup.activityPins ?? []).filter((p) =>
+        newDays.has(p.dateIso)
+      );
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/generate-itinerary`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        const j = (await res.json().catch(() => ({}))) as {
+          plan?: TripPlan;
+          error?: string;
+        };
+        if (!res.ok || !j.plan) {
+          setRefitError(j.error || "Couldn't refit the itinerary. Your new dates are saved.");
+          return;
+        }
+        const serverPlan = j.plan;
+        const serverHost = serverPlan.hostSetup ?? {};
+        const serverRestaurants: HostRestaurantPin[] = serverHost.restaurantPins ?? [];
+        const serverActivities: HostActivityPin[] = serverHost.activityPins ?? [];
+        const mergedRestaurants: HostRestaurantPin[] = [
+          ...preservedRestaurantPins,
+          ...serverRestaurants.filter(
+            (p) => !preservedRestaurantKeys.has(`${p.dateIso}::${p.place.mapsUrl}`)
+          ),
+        ];
+        const mergedActivities: HostActivityPin[] = [
+          ...preservedActivityPins,
+          ...serverActivities.filter(
+            (p) => !preservedActivityKeys.has(`${p.dateIso}::${p.experience.bookingUrl}`)
+          ),
+        ];
+        setPlan(serverPlan);
+        const hadPreserved =
+          preservedRestaurantPins.length > 0 || preservedActivityPins.length > 0;
+        if (hadPreserved) {
+          await persistHostSetup({
+            restaurantPins: mergedRestaurants,
+            activityPins: mergedActivities,
+          });
+        }
+      } catch {
+        setRefitError("Couldn't refit the itinerary. Your new dates are saved.");
+      } finally {
+        setRefittingItinerary(false);
+      }
+    },
+    [tripId, hostSetup.restaurantPins, hostSetup.activityPins, persistHostSetup]
+  );
+
   const confirmPendingTripRange = useCallback(async () => {
     if (!pendingRangeConfirm) return;
     setErr(null);
+    setRefitError(null);
     suggestedSeededRef.current = false;
     setSelectedDayIso(null);
+
+    /** Preserve pins / stays whose dates still fall inside the new range; drop the rest. */
+    const newDays = new Set(enumerateLocalIsoDays(pendingRangeConfirm.startIso, pendingRangeConfirm.endIso));
+    const preservedRestaurantPins = (hostSetup.restaurantPins ?? []).filter((p) =>
+      newDays.has(p.dateIso)
+    );
+    const preservedActivityPins = (hostSetup.activityPins ?? []).filter((p) =>
+      newDays.has(p.dateIso)
+    );
+    const preservedHotelStays: HostHotelStay[] = (hostSetup.hotelStays ?? [])
+      .map((stay) => {
+        const stayDays = enumerateLocalIsoDays(stay.startIso, stay.endIso).filter((d) =>
+          newDays.has(d)
+        );
+        if (stayDays.length === 0) return null;
+        return { ...stay, startIso: stayDays[0]!, endIso: stayDays[stayDays.length - 1]! };
+      })
+      .filter((s): s is HostHotelStay => s !== null);
+    const preservedHotelPlace = preservedHotelStays[0]?.place ?? null;
+
     const ok = await persistHostSetup({
-      hotel: null,
-      hotelStays: [],
+      hotel: preservedHotelPlace,
+      hotelStays: preservedHotelStays,
       experiencesOutlined: hostSetup.experiencesOutlined,
       tripRange: pendingRangeConfirm,
-      restaurantPins: [],
-      activityPins: [],
+      restaurantPins: preservedRestaurantPins,
+      activityPins: preservedActivityPins,
     });
-    if (ok) {
-      setPendingRangeConfirm(null);
-      setDatePickMode("day");
-    }
+    if (!ok) return;
+
+    setPendingRangeConfirm(null);
+    setDatePickMode("day");
+    void refitItineraryForRange(pendingRangeConfirm);
   }, [
     pendingRangeConfirm,
     hostSetup.experiencesOutlined,
+    hostSetup.restaurantPins,
+    hostSetup.activityPins,
+    hostSetup.hotelStays,
     persistHostSetup,
+    refitItineraryForRange,
   ]);
 
   const cancelPendingTripRange = useCallback(() => {
@@ -915,19 +1015,37 @@ export function TripHostSetupDashboard({
     [effectiveHighlightRange, calYear, calMonth]
   );
 
+  /**
+   * Calendar view modes:
+   *  - "expanded": full Sunday-first month grid (the owner is in range-pick mode,
+   *    or the trip has no concrete dates yet) — so days outside the saved range can be tapped.
+   *  - "compact": only the weeks that overlap the saved trip range, AND within those weeks
+   *    only the trip days render content — surrounding cells collapse to empty placeholders.
+   */
+  const calendarMode: "expanded" | "compact" =
+    datePickMode === "range" || !hostHasConcreteTripRange(plan) ? "expanded" : "compact";
+
   const displayWeeks = useMemo(() => {
+    if (calendarMode === "expanded") return weeks;
     const start = tripDisplayRange?.startIso;
     const end = tripDisplayRange?.endIso;
     if (!start || !end) return weeks;
-    const tripDays = enumerateLocalIsoDays(start, end);
-    const filtered = weeks.filter((weekRow) =>
-      weekRow.some((dom) => {
-        if (dom == null) return false;
-        return tripDays.includes(isoFromCell(calYear, calMonth, dom));
-      })
-    );
+    const tripDays = new Set(enumerateLocalIsoDays(start, end));
+    const filtered = weeks
+      .filter((weekRow) =>
+        weekRow.some((dom) => {
+          if (dom == null) return false;
+          return tripDays.has(isoFromCell(calYear, calMonth, dom));
+        })
+      )
+      .map((weekRow) =>
+        weekRow.map((dom) => {
+          if (dom == null) return null;
+          return tripDays.has(isoFromCell(calYear, calMonth, dom)) ? dom : null;
+        })
+      );
     return filtered.length > 0 ? filtered : weeks;
-  }, [weeks, tripDisplayRange?.startIso, tripDisplayRange?.endIso, calYear, calMonth]);
+  }, [calendarMode, weeks, tripDisplayRange?.startIso, tripDisplayRange?.endIso, calYear, calMonth]);
 
   const selectedDayLabel = useMemo(() => {
     if (!selectedDayIso) return "";
@@ -1270,6 +1388,41 @@ export function TripHostSetupDashboard({
                   Confirm your trip dates in the dialog below.
                 </p>
               ) : null}
+              {refittingItinerary ? (
+                <p className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]" role="status">
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[color:var(--sage)]" aria-hidden />
+                  Refitting itinerary for your new dates…
+                </p>
+              ) : null}
+              {!refittingItinerary && refitError ? (
+                <p
+                  className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-300"
+                  role="alert"
+                >
+                  <span>{refitError}</span>
+                  {tripDisplayRange?.startIso && tripDisplayRange.endIso ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void refitItineraryForRange({
+                          startIso: tripDisplayRange.startIso!,
+                          endIso: tripDisplayRange.endIso!,
+                        })
+                      }
+                      className="rounded-full border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100/60 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                    >
+                      Retry refit
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setRefitError(null)}
+                    className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-[color:var(--on-surface-muted)] transition hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/10"
+                  >
+                    Dismiss
+                  </button>
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -1330,7 +1483,7 @@ export function TripHostSetupDashboard({
                     Add places
                   </button>
                 ) : null}
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) ? (
+                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1343,6 +1496,19 @@ export function TripHostSetupDashboard({
                     className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
                   >
                     Change dates
+                  </button>
+                ) : null}
+                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "range" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDatePickMode("day");
+                      setRangeAnchor(null);
+                      setPendingRangeConfirm(null);
+                    }}
+                    className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
+                  >
+                    Cancel
                   </button>
                 ) : null}
                 {peers.length > 0 ? (
@@ -1838,14 +2004,20 @@ export function TripHostSetupDashboard({
           </>
           ) : null}
 
-        </main>
+          {workspaceTab === "transportation" ? (
+          <section id="sec-flights" className="scroll-mt-28 space-y-5">
+            <div>
+              <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                Transportation
+              </p>
+              <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
+                Flights &amp; getting there
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                Search routes, save the ones you like, and review driving alternates.
+              </p>
+            </div>
 
-        {/* RIGHT RAIL — flights + home base, sticky + independently scrollable on xl */}
-        <aside className="space-y-10 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:overscroll-y-contain xl:self-start xl:sticky xl:top-28 xl:pr-1">
-          <div id="sec-flights" className="scroll-mt-28 space-y-4 border-b border-[color:var(--hairline)] pb-10 dark:border-white/10">
-            <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-              Flights
-            </h3>
             {liveFetchErr ? (
               <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/30 dark:text-amber-200">
                 {liveFetchErr}
@@ -1911,20 +2083,17 @@ export function TripHostSetupDashboard({
                 Add a departure city on the trip card to see route picks and driving estimates here.
               </p>
             ) : (
-              <div className="space-y-4">
-                <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-                  No flights booked yet. Set departure city and destination on the trip to search.
-                </p>
-                <a
-                  href="#sec-flights"
-                  className="inline-flex items-center justify-center bg-[#1c1c17] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--surface)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
-                >
-                  Search
-                </a>
-              </div>
+              <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                No flights booked yet. Set departure city and destination on the trip to search.
+              </p>
             )}
-          </div>
+          </section>
+          ) : null}
 
+        </main>
+
+        {/* RIGHT RAIL — home base only; flights live on the Transportation tab */}
+        <aside className="space-y-10 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:self-start xl:sticky xl:top-28 xl:pr-1">
           <div className="scroll-mt-28 space-y-4">
             <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
               Home base
