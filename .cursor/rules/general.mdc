@@ -1,0 +1,13 @@
+---
+description: Core project conventions for making changes
+alwaysApply: true
+---
+
+# General Guidelines
+
+- Do not rewrite large sections unnecessarily
+- Reuse existing components whenever possible
+- Keep UI consistent with current design
+- Do not touch auth unless explicitly asked
+- Use TypeScript types for new code
+- Keep changes minimal and focused

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { formatInviteCodeDisplay } from "@/backend/invite-code";
+import { track } from "@/frontend/lib/analytics";
 
 export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string; prominent?: boolean }) {
   const display = formatInviteCodeDisplay(rawCode);
@@ -10,6 +11,7 @@ export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string;
   const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(display);
+      track("invite_shared");
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -22,6 +24,7 @@ export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string;
         ta.select();
         document.execCommand("copy");
         document.body.removeChild(ta);
+        track("invite_shared");
         setCopied(true);
         window.setTimeout(() => setCopied(false), 2000);
       } catch {

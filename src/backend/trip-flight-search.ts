@@ -1,6 +1,7 @@
 import { getSerpApiKey } from "@/backend/env-api-keys";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { FlightLegRowDto, AirportSuggestionDto } from "@/shared/flight-search";
+import { GoogleFlightsSearchResponseSchema } from "@/shared/schemas/flight-search";
 
 const SERP = "https://serpapi.com/search.json";
 
@@ -204,11 +205,17 @@ export async function searchFlightsOneWayLeg(args: {
       params.travel_class = travelClass;
     }
 
-    const j = (await serpSearchJson("google_flights", params)) as {
-      best_flights?: unknown[];
-      other_flights?: unknown[];
-      error?: string;
-    };
+    const raw = await serpSearchJson("google_flights", params);
+    const parsed = GoogleFlightsSearchResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      console.warn("[flight-search] invalid google_flights response", {
+        route: `${departureAirportId}->${arrivalAirportId}`,
+        dateIso: iso,
+        issues: parsed.error.flatten(),
+      });
+      return { flights: [], error: "Invalid flight provider response." };
+    }
+    const j = parsed.data;
 
     if (typeof j.error === "string" && j.error) {
       return { flights: [], error: j.error };

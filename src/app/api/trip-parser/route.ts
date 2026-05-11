@@ -8,6 +8,7 @@ import {
   retainPeopleNamesOnlyIfMentionedInInput,
   safeParseJson,
 } from "@/shared/trip-plan";
+import { TripParserOutputSchema } from "@/shared/schemas/trip-parser-output";
 
 function buildUserContent(
   text: string,
@@ -82,17 +83,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "OpenAI returned no text output." }, { status: 502 });
   }
 
+  let parsedOutput: unknown;
+  try {
+    parsedOutput = safeParseJson(outputText);
+  } catch {
+    return NextResponse.json({ error: "Parser produced invalid output", issues: ["Invalid JSON"] }, { status: 502 });
+  }
+
+  const parsedResult = TripParserOutputSchema.safeParse(parsedOutput);
+  if (!parsedResult.success) {
+    return NextResponse.json(
+      {
+        error: "Parser produced invalid output",
+        issues: parsedResult.error.flatten(),
+      },
+      { status: 422 }
+    );
+  }
+
   let finalText = outputText;
   try {
     const inputForRetain = [input, ...images.map(() => "[image]")].filter(Boolean).join("\n");
     let plan = groundPlanInUserInput(
-      retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(safeParseJson(outputText)), inputForRetain),
+      retainPeopleNamesOnlyIfMentionedInInput(normalizePlan(parsedResult.data), inputForRetain),
       input.trim()
     );
     plan = applyUserAnchoredTripDates(plan, inputForRetain);
     finalText = JSON.stringify(plan);
   } catch {
-    /* return raw model output if JSON pipeline fails */
+    finalText = JSON.stringify(parsedResult.data);
   }
 
   return NextResponse.json({ outputText: finalText });

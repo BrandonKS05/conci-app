@@ -1,5 +1,12 @@
 import Link from "next/link";
 
+import { Card } from "@/frontend/components/ui/card";
+
+/**
+ * Conci surface primitive — translucent white over the page gradient in light,
+ * solid `dm.card` in dark. Backed by the shadcn `Card` so future shared
+ * surfaces inherit the same tokens automatically.
+ */
 export function GlassCard({
   children,
   className = "",
@@ -7,13 +14,7 @@ export function GlassCard({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <div
-      className={`rounded-[1.75rem] border border-white/80 bg-white/[0.85] p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-dm-card dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)] ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <Card className={className}>{children}</Card>;
 }
 
 export function SectionTitle({
@@ -41,6 +42,11 @@ export function Pill({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Hero CTA — preserves the bespoke landing gradient and lift-on-hover that
+ * Conci uses on marketing pages (distinct from the standard slate-900 CTA
+ * pill exposed by the shadcn `Button` `default` variant).
+ */
 export function PrimaryButton({
   href,
   children,

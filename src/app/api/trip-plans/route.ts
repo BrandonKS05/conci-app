@@ -11,6 +11,7 @@ import {
   planRecordWithDatesSyncedToTripRange,
   tripRangeForHostDraftSave,
 } from "@/shared/trip-plan";
+import { TripPlanCreateBodySchema } from "@/shared/schemas/trip-plan-create";
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
@@ -30,17 +31,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json().catch(() => ({}))) as {
-    id?: string;
-    plan?: unknown;
-    seedText?: string | null;
-    /** When true: first save from parser → host setup hydrate (still mints invite + voting status). */
-    hostSetupDraft?: boolean;
-  };
-
-  if (!body.plan || typeof body.plan !== "object") {
-    return NextResponse.json({ error: "Field `plan` is required." }, { status: 400 });
+  const rawBody = (await request.json().catch(() => ({}))) as unknown;
+  const bodyResult = TripPlanCreateBodySchema.safeParse(rawBody);
+  if (!bodyResult.success) {
+    return NextResponse.json(
+      { error: "Invalid request", issues: bodyResult.error.flatten() },
+      { status: 400 }
+    );
   }
+  const body = bodyResult.data;
 
   const normalizedPlan = normalizePlan(body.plan);
   if (!planHasUsableTripTiming(normalizedPlan)) {
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const id = body.id && typeof body.id === "string" && isUuid(body.id) ? body.id : randomUUID();
+  const id = body.id && isUuid(body.id) ? body.id : randomUUID();
   const seedText = typeof body.seedText === "string" ? body.seedText : null;
 
   const svc = getSupabaseServiceRoleClient();

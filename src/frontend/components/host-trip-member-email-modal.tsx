@@ -1,6 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { Button } from "@/frontend/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/frontend/components/ui/dialog";
+import { Input } from "@/frontend/components/ui/input";
+import { Label } from "@/frontend/components/ui/label";
+import { Textarea } from "@/frontend/components/ui/textarea";
 
 export function HostTripMemberEmailModal({
   open,
@@ -16,19 +29,10 @@ export function HostTripMemberEmailModal({
   /** Called after every recipient accepted delivery (closes modal clears form). */
   onSendSuccess?: () => void;
 }) {
-  const backdropRef = useRef<HTMLDivElement>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    if (open) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   useEffect(() => {
     if (open) {
@@ -86,64 +90,41 @@ export function HostTripMemberEmailModal({
     }
   }, [message, onSendSuccess, recipientMemberIds, subject, tripId]);
 
-  if (!open) return null;
-
   return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 backdrop-blur-sm"
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
-    >
-      <div className="mx-4 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-50">Email selected travelers</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
-              {recipientMemberIds.length === 1
-                ? "1 recipient · via Resend"
-                : `${recipientMemberIds.length} recipients · via Resend`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-neutral-500 dark:hover:bg-dm-elevated dark:hover:text-neutral-300"
-            aria-label="Close"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" />
-            </svg>
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Email selected travelers</DialogTitle>
+          <DialogDescription>
+            {recipientMemberIds.length === 1
+              ? "1 recipient · via Resend"
+              : `${recipientMemberIds.length} recipients · via Resend`}
+          </DialogDescription>
+        </DialogHeader>
 
         <label className="mb-3 block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-            Subject
-          </span>
-          <input
+          <Label asChild>
+            <span>Subject</span>
+          </Label>
+          <Input
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={busy}
             placeholder='e.g. "Vote by Friday"'
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-emerald-500/40 dark:focus:ring-emerald-500/10"
           />
         </label>
 
         <label className="mb-4 block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
-            Message
-          </span>
-          <textarea
+          <Label asChild>
+            <span>Message</span>
+          </Label>
+          <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             disabled={busy}
             rows={6}
             placeholder="Write something your travelers should know..."
-            className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-emerald-500/40 dark:focus:ring-emerald-500/10"
           />
         </label>
 
@@ -159,27 +140,28 @@ export function HostTripMemberEmailModal({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
+        <DialogFooter>
+          <Button
             type="button"
             disabled={busy || recipientMemberIds.length === 0}
             onClick={() => void send()}
-            className="inline-flex rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+            className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
           >
             {busy ? "Sending…" : "Send"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             disabled={busy}
             onClick={onClose}
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-dm-elevated"
+            className="rounded-xl"
           >
             Cancel
-          </button>
-        </div>
+          </Button>
+        </DialogFooter>
 
         <p className="mt-3 text-center text-[11px] text-slate-400 dark:text-neutral-600">Uses your Resend outbound address (same as reminders).</p>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
