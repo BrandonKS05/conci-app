@@ -84,7 +84,7 @@ export function TripOverviewApp({ tripId, plan }: { tripId: string; plan: TripPl
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
             href={`/trip/${tripId}/setup`}
-            className="text-sm font-medium text-slate-600 underline-offset-2 hover:underline dark:text-neutral-400"
+            className="text-sm font-medium text-[color:var(--on-surface-variant)] underline-offset-2 hover:underline dark:text-neutral-400"
           >
             Back to setup
           </Link>
@@ -106,16 +106,16 @@ export function TripOverviewApp({ tripId, plan }: { tripId: string; plan: TripPl
 
         <div
           ref={printRootRef}
-          className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+          className="space-y-5 rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
         >
-          <section className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-dm-page/70">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{title}</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">{location}</p>
+          <section className="rounded-2xl border border-slate-100 bg-[color:var(--surface-container-low)]/70 p-4 dark:border-white/10 dark:bg-dm-page/70">
+            <h2 className="text-xl font-semibold text-[color:var(--on-surface)] dark:text-white">{title}</h2>
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{location}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 dark:border-white/10 dark:bg-dm-elevated">
+              <span className="rounded-full border border-[color:var(--hairline)] bg-white px-3 py-1 dark:border-white/10 dark:bg-dm-elevated">
                 Dates: {datesLine}
               </span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 dark:border-white/10 dark:bg-dm-elevated">
+              <span className="rounded-full border border-[color:var(--hairline)] bg-white px-3 py-1 dark:border-white/10 dark:bg-dm-elevated">
                 Budget: {budgetLine}
               </span>
             </div>

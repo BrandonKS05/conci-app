@@ -211,7 +211,7 @@ function DaySpendEstimateBar({
 
 function EmptyHint({ label }: { label: string }) {
   return (
-    <div className="flex h-full min-h-[6rem] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-dm-page/80 dark:text-neutral-500">
+    <div className="flex h-full min-h-[6rem] items-center justify-center rounded-xl border border-dashed border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 text-center text-sm text-[color:var(--on-surface-muted)] dark:border-white/10 dark:bg-dm-page/80 dark:text-neutral-500">
       {label}
     </div>
   );
@@ -480,7 +480,7 @@ export function TripHostSetupDayPage({
           ← Trip calendar
         </Link>
         <span className="text-slate-300 dark:text-white/25">/</span>
-        <span className="text-slate-600 dark:text-neutral-400">Host day view</span>
+        <span className="text-[color:var(--on-surface-variant)] dark:text-neutral-400">Host day view</span>
       </nav>
 
       <header className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,220px)_1fr_minmax(0,280px)] lg:items-start">
@@ -610,11 +610,11 @@ export function TripHostSetupDayPage({
                   return (
                     <li
                       key={m.userId}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
                     >
                       <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{m.displayName}</p>
-                        <p className="text-xs text-slate-500 dark:text-neutral-500">
+                        <p className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">{m.displayName}</p>
+                        <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                           {canMemberSuggest ? "Can suggest new options + vote" : "Vote-only"}
                         </p>
                       </div>
@@ -708,8 +708,8 @@ export function TripHostSetupDayPage({
               subtitle={subtitle}
               sectionId={`day-${category}`}
             >
-              <div className="mb-4 rounded-xl border border-slate-200/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+              <div className="mb-4 rounded-xl border border-[color:var(--hairline)]/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                   Suggest an option
                 </p>
                 {!canSuggest ? (
@@ -724,7 +724,7 @@ export function TripHostSetupDayPage({
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
                     }
                     disabled={!canSuggest}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder={`${dayCategoryTitle(category)} option`}
                   />
                   <input
@@ -733,7 +733,7 @@ export function TripHostSetupDayPage({
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
                     }
                     disabled={!canSuggest}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder="Optional detail"
                   />
                   <input
@@ -742,7 +742,7 @@ export function TripHostSetupDayPage({
                       setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
                     }
                     disabled={!canSuggest}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
                     placeholder="Optional URL"
                   />
                   <button
@@ -778,7 +778,7 @@ export function TripHostSetupDayPage({
                         key={opt.id}
                         className={`rounded-xl border p-3 transition ${
                           dimmed
-                            ? "border-slate-200/60 bg-slate-50/60 opacity-45 dark:border-white/10 dark:bg-white/5"
+                            ? "border-[color:var(--hairline)]/60 bg-[color:var(--surface-container-low)]/60 opacity-45 dark:border-white/10 dark:bg-white/5"
                             : "border-neutral-900/10 bg-white dark:border-white/10 dark:bg-dm-elevated"
                         }`}
                       >

@@ -473,26 +473,26 @@ export function TripCollaborationPanel({
   }, [isHost, plan.dates.confirmed, plan.dates.options.length, tripId, onPlanUpdated, load]);
 
   const renderGroupProgressCard = () => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+    <div className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Group progress</p>
-        <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">Group progress</p>
+        <span className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-indigo-300">
           {lockedCount}/{total} decisions locked
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--surface-container)] dark:bg-white/10">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+          className="h-full rounded-full bg-[#1c1c17] transition-all duration-500 dark:bg-neutral-200"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+      <p className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         Quorum: at least <strong>{quorum}</strong> people need to vote to lock a decision (when options exist).
       </p>
       {data?.roster && data.roster.length > 0 ? (
-        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/80">
+        <div className="mt-4 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/80">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               Who&apos;s weighing in
             </p>
             {canSendNudges && data.roster.some((p) => !p.hasParticipated) ? (
@@ -500,7 +500,7 @@ export function TripCollaborationPanel({
                 type="button"
                 disabled={nudgeBusyKey !== null}
                 onClick={() => void sendNudgeAllPending()}
-                className="shrink-0 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+                className="shrink-0 rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-indigo-500/30 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
               >
                 {nudgeBusyKey === "__all__" ? "Sending…" : "Nudge all pending"}
               </button>
@@ -514,7 +514,7 @@ export function TripCollaborationPanel({
             </p>
           ) : null}
           {nudgeNotice ? (
-            <p className="mt-2 text-[11px] text-slate-600 dark:text-neutral-400">{nudgeNotice}</p>
+            <p className="mt-2 text-[11px] text-[color:var(--on-surface-variant)] dark:text-neutral-400">{nudgeNotice}</p>
           ) : null}
           {removeMemberErr ? (
             <p className="mt-2 text-[11px] text-rose-600 dark:text-rose-400" role="alert">
@@ -522,19 +522,19 @@ export function TripCollaborationPanel({
             </p>
           ) : null}
           {showHostNotifyUi && notifyEligibleMemberIds.size > 0 ? (
-            <div className="mt-3 space-y-2 border-t border-slate-200/80 pt-3 dark:border-white/10">
+            <div className="mt-3 space-y-2 border-t border-[color:var(--hairline)]/80 pt-3 dark:border-white/10">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <button
                   type="button"
                   onClick={() => notifyCheckAllEligible()}
-                  className="text-[11px] font-medium text-slate-500 underline decoration-slate-400/60 underline-offset-2 transition hover:text-slate-700 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+                  className="text-[11px] font-medium text-[color:var(--on-surface-muted)] underline decoration-[color:var(--on-surface-muted)]/60 underline-offset-2 transition hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
                 >
                   Check all
                 </button>
                 <button
                   type="button"
                   onClick={() => notifyUncheckAll()}
-                  className="text-[11px] font-medium text-slate-500 underline decoration-slate-400/60 underline-offset-2 transition hover:text-slate-700 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+                  className="text-[11px] font-medium text-[color:var(--on-surface-muted)] underline decoration-[color:var(--on-surface-muted)]/60 underline-offset-2 transition hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
                 >
                   Uncheck all
                 </button>
@@ -547,13 +547,13 @@ export function TripCollaborationPanel({
                   setNotifyEmailModalRecipients([...notifySelectedMemberIds]);
                   setNotifyEmailModalOpen(true);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                className="rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--on-surface)] shadow-sm transition hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
               >
                 Notify selected
               </button>
             </div>
           ) : null}
-          <ul className="mt-2 space-y-2 text-xs text-slate-700 dark:text-neutral-300">
+          <ul className="mt-2 space-y-2 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-300">
             {data.roster.map((p, i) => {
               const nk = rosterNudgeKey(p);
               const showNudge = canSendNudges && !p.hasParticipated && nk.length > 0;
@@ -571,7 +571,7 @@ export function TripCollaborationPanel({
               return (
                 <li
                   key={`${p.kind}-${p.memberId ?? ""}-${p.displayName}-${i}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-transparent px-1 py-0.5 hover:border-slate-200/80 dark:hover:border-white/10"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-transparent px-1 py-0.5 hover:border-[color:var(--hairline)]/80 dark:hover:border-white/10"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
                     {showEmailCheckbox && recipientId ? (
@@ -580,16 +580,16 @@ export function TripCollaborationPanel({
                           type="checkbox"
                           checked={notifySelectedMemberIds.has(recipientId)}
                           onChange={() => toggleNotifyMember(recipientId)}
-                          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20 dark:bg-dm-card"
+                          className="h-3.5 w-3.5 rounded border-[color:var(--hairline-strong)] accent-[#1c1c17] focus:ring-[color:var(--sage)] dark:border-white/20 dark:bg-dm-card"
                         />
                       </label>
                     ) : null}
                     <span className="font-medium">{p.displayName}</span>
                     <span className="text-emerald-600 dark:text-emerald-400">
-                      {p.hasParticipated ? "✓" : <span className="text-slate-400 dark:text-neutral-500">pending</span>}
+                      {p.hasParticipated ? "✓" : <span className="text-[color:var(--on-surface-muted)] dark:text-neutral-500">pending</span>}
                     </span>
                     {p.maskedContact ? (
-                      <span className="text-[11px] text-slate-500 dark:text-neutral-500">{p.maskedContact}</span>
+                      <span className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{p.maskedContact}</span>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
@@ -598,7 +598,7 @@ export function TripCollaborationPanel({
                         type="button"
                         disabled={nudgeBusyKey !== null}
                         onClick={() => void sendOneNudge(p)}
-                        className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
+                        className="rounded-md border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--on-surface)] hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/15 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-dm-elevated"
                       >
                         {nudgeBusyKey === nk ? "…" : "Nudge"}
                       </button>
@@ -646,13 +646,13 @@ export function TripCollaborationPanel({
           reloadCollab={load}
           onPlanUpdated={onPlanUpdated}
         />
-        <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+        <p className="text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           Everyone on the trip can submit from the{" "}
-          <Link href={`/trip/${tripId}`} className="font-semibold text-teal-700 underline-offset-2 hover:underline dark:text-teal-400">
+          <Link href={`/trip/${tripId}`} className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-teal-400">
             shared trip page
           </Link>
-          . Their notes appear here for you to review; tap <strong className="text-slate-700 dark:text-neutral-300">Approve &amp; apply (AI)</strong>{" "}
-          to merge with Trip Copilot, or <strong className="text-slate-700 dark:text-neutral-300">Not now</strong> to skip.
+          . Their notes appear here for you to review; tap <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Approve &amp; apply (AI)</strong>{" "}
+          to merge with Trip Copilot, or <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Not now</strong> to skip.
         </p>
       </div>
     );
@@ -660,12 +660,12 @@ export function TripCollaborationPanel({
 
   const mainCollaborationColumn = (
     <>
-      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">
+      <section className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">
           Estimated trip cost
         </h3>
-        <p className="mt-2 text-sm font-medium text-slate-800 dark:text-neutral-200">{costEstimate.headline}</p>
-        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-xs text-slate-600 dark:text-neutral-400">
+        <p className="mt-2 text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-200">{costEstimate.headline}</p>
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           {costEstimate.lines.map((line) => (
             <li key={line}>{line}</li>
           ))}
@@ -674,7 +674,7 @@ export function TripCollaborationPanel({
 
       {showDecideTogetherColumn ? (
         <div className="space-y-6">
-          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">Decide together</h2>
+          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Decide together</h2>
           {activeDecisionOrder.map((meta) => {
             const blob = collab.decisions[meta.key];
             const gated = decisionDependsOnDatesLocked(meta) && !datesLockedByGroup;
@@ -713,7 +713,7 @@ export function TripCollaborationPanel({
 
       {lockedCount > 0 ? (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Locked in
           </h3>
           <ul className="space-y-3">
@@ -725,7 +725,7 @@ export function TripCollaborationPanel({
               return (
                 <li
                   key={meta.key}
-                  className="overflow-hidden rounded-2xl border-2 border-emerald-400/60 bg-gradient-to-br from-emerald-50 via-white to-violet-50/40 shadow-sm dark:border-emerald-600/35 dark:from-emerald-950/50 dark:via-dm-card dark:to-violet-950/20 dark:shadow-none"
+                  className="overflow-hidden rounded-2xl border border-[color:var(--sage)]/45 bg-[color:var(--sage-soft)]/15 shadow-[var(--shadow-ambient-sm)] dark:border-emerald-600/35 dark:from-emerald-950/50 dark:via-dm-card dark:to-violet-950/20 dark:shadow-none"
                 >
                   <div className="flex items-start gap-3 px-4 py-4 sm:gap-4 sm:px-5 sm:py-4">
                     <span className="text-2xl leading-none text-emerald-600 dark:text-emerald-400" aria-hidden>
@@ -811,9 +811,9 @@ export function TripCollaborationPanel({
       ) : null}
 
       {showReady && tripStatus !== "finalized" && isHost ? (
-        <div className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-8 text-center shadow-lg dark:border-indigo-500/30 dark:from-indigo-950/40 dark:to-dm-card dark:shadow-black/30">
-          <p className="font-display text-2xl font-semibold text-slate-900 dark:text-neutral-100">All decisions resolved</p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+        <div className="rounded-3xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 text-center shadow-[var(--shadow-ambient)] dark:border-indigo-500/30 dark:from-indigo-950/40 dark:to-dm-card dark:shadow-black/30">
+          <p className="font-display text-2xl font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">All decisions resolved</p>
+          <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Finalize the trip to unlock the booking checklist for everyone.
           </p>
           {finalizeErr ? (
@@ -855,7 +855,7 @@ export function TripCollaborationPanel({
       ) : null}
 
       {showReady && tripStatus !== "finalized" && !isHost ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-sm text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
+        <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-5 py-4 text-center text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300">
           Every decision is resolved. The trip host can <strong>finalize</strong> the trip to open the booking checklist.
         </div>
       ) : null}
@@ -942,10 +942,10 @@ function TripPlanLiveBlocks({
       {showTransport ? (
         <section
           id="trip-live-flights"
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+          className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
         >
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Flights</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+          <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Flights</h3>
+          <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             From <strong>{plan.departureCity}</strong> to <strong>{plan.location}</strong>
           </p>
           <div className="mt-4">
@@ -966,7 +966,7 @@ function TripPlanLiveBlocks({
             const href =
               liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
             return href ? (
-              <p className="mt-4 text-xs text-slate-500 dark:text-neutral-500">
+              <p className="mt-4 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Driving instead?{" "}
                 <a
                   href={href}
@@ -1096,7 +1096,7 @@ function HostDatesConfirmFooter({
           }}
         >
           <div
-            className="max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-dm-card"
+            className="max-w-md rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-xl dark:border-white/10 dark:bg-dm-card"
             role="dialog"
             aria-labelledby="confirm-date-anyway-title"
             aria-modal="true"
@@ -1104,7 +1104,7 @@ function HostDatesConfirmFooter({
           >
             <p
               id="confirm-date-anyway-title"
-              className="text-sm leading-relaxed text-slate-900 dark:text-neutral-100"
+              className="text-sm leading-relaxed text-[color:var(--on-surface)] dark:text-neutral-100"
             >
               Not everyone has voted yet. Are you sure you want to lock in the date?
             </p>
@@ -1112,7 +1112,7 @@ function HostDatesConfirmFooter({
               <button
                 type="button"
                 onClick={() => setAnywayOpen(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:text-neutral-200 dark:hover:bg-white/10"
+                className="rounded-lg border border-[color:var(--hairline)] px-4 py-2 text-sm font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:text-neutral-200 dark:hover:bg-white/10"
               >
                 Cancel
               </button>
@@ -1136,7 +1136,7 @@ function HostDatesConfirmFooter({
         className={`flex flex-col items-stretch gap-2 ${
           embedded
             ? "mt-3 pt-0"
-            : "mt-4 border-t border-slate-100 pt-4 dark:border-white/10"
+            : "mt-4 border-t border-[color:var(--hairline)] pt-4 dark:border-white/10"
         }`}
       >
         <button
@@ -1144,7 +1144,7 @@ function HostDatesConfirmFooter({
           disabled={!enoughVotes || busy}
           onClick={() => void onHostConfirmDates()}
           className={`rounded-xl px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-            enoughVotes && !busy ? primaryFilledInteractive : "font-semibold bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-neutral-500"
+            enoughVotes && !busy ? primaryFilledInteractive : "font-medium bg-[color:var(--surface-container-high)] text-[color:var(--on-surface-muted)] dark:bg-white/10 dark:text-neutral-500"
           }`}
         >
           {confirmBusy ? "Saving…" : "Confirm Date"}
@@ -1153,7 +1153,7 @@ function HostDatesConfirmFooter({
           type="button"
           disabled={busy}
           onClick={() => setAnywayOpen(true)}
-          className="text-center text-xs font-medium text-slate-500 underline decoration-slate-400/70 underline-offset-2 transition hover:text-slate-700 disabled:opacity-50 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
+          className="text-center text-xs font-medium text-[color:var(--on-surface-muted)] underline decoration-[color:var(--on-surface-muted)]/70 underline-offset-2 transition hover:text-[color:var(--on-surface-variant)] disabled:opacity-50 dark:text-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-300"
         >
           confirm anyway
         </button>
@@ -1304,7 +1304,7 @@ export function ActivityVibePollCard({
   );
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+    <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <textarea
         rows={4}
         value={draft}
@@ -1312,10 +1312,10 @@ export function ActivityVibePollCard({
         placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
         maxLength={2000}
         disabled={submitBusy}
-        className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+        className="w-full resize-y rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
       />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-slate-500 dark:text-neutral-500">{draft.trim().length} / 2000</span>
+        <span className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{draft.trim().length} / 2000</span>
         <button
           type="button"
           disabled={submitBusy || draft.trim().length < 1}
@@ -1332,12 +1332,12 @@ export function ActivityVibePollCard({
         </p>
       ) : null}
 
-      <div className="mt-6 border-t border-slate-200 pt-4 dark:border-white/10">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+      <div className="mt-6 border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           Suggestions
         </p>
         {!pending.length && !archives.length ? (
-          <p className="mt-2 text-sm text-slate-500 dark:text-neutral-500">Nothing here yet.</p>
+          <p className="mt-2 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">Nothing here yet.</p>
         ) : null}
         {pending.length ? (
           <ul className="mt-3 space-y-3">
@@ -1403,16 +1403,16 @@ export function ActivityVibePollCard({
 
       {archives.length ? (
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-300">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] hover:text-[color:var(--on-surface-variant)] dark:text-neutral-400 dark:hover:text-neutral-300">
             History ({archives.length})
           </summary>
-          <ul className="mt-2 space-y-2 text-sm text-slate-600 dark:text-neutral-400">
+          <ul className="mt-2 space-y-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             {archives.map((row) => (
-              <li key={row.id} className="border-t border-slate-100 pt-2 dark:border-white/10">
-                <span className="font-medium text-slate-800 dark:text-neutral-300">{row.authorDisplayName}</span>
+              <li key={row.id} className="border-t border-[color:var(--hairline)] pt-2 dark:border-white/10">
+                <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-300">{row.authorDisplayName}</span>
                 {" · "}
                 <span>{row.status === "applied" ? "Applied by host" : "Declined"}</span>
-                <p className="mt-1 text-slate-700 dark:text-neutral-300">{row.text}</p>
+                <p className="mt-1 text-[color:var(--on-surface-variant)] dark:text-neutral-300">{row.text}</p>
               </li>
             ))}
           </ul>
@@ -1499,25 +1499,25 @@ function HostBestDatesFinder({
   const ratioLabel = y > 0 ? `${x}/${y}` : `${x}`;
 
   return (
-    <div className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
+    <div className="mt-5 border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
       <button
         type="button"
         onClick={() => run()}
-        className="text-sm font-medium text-slate-600 underline decoration-slate-400/70 underline-offset-4 transition hover:text-slate-900 dark:text-neutral-400 dark:decoration-neutral-600 dark:hover:text-neutral-100"
+        className="text-sm font-medium text-[color:var(--on-surface-variant)] underline decoration-[color:var(--on-surface-muted)]/70 underline-offset-4 transition hover:text-[color:var(--on-surface)] dark:text-neutral-400 dark:decoration-neutral-600 dark:hover:text-neutral-100"
       >
         Find best dates for everyone
       </button>
 
       {ran && insight ? (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-dm-card">
+        <div className="mt-4 rounded-xl border border-[color:var(--hairline)] bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-dm-card">
           {insight.error ? (
-            <p className="text-slate-700 dark:text-neutral-300">{insight.error}</p>
+            <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">{insight.error}</p>
           ) : insight.hostIsOptimal ? (
             <>
               <p className="font-semibold text-emerald-800 dark:text-emerald-200/95">
                 Your confirmed dates work best for the group
               </p>
-              <p className="mt-1 text-slate-600 dark:text-neutral-400">
+              <p className="mt-1 text-[color:var(--on-surface-variant)] dark:text-neutral-400">
                 Overlap on your current window: {ratioLabel} travelers
                 {insight.respondedTravelerCount > 0
                   ? ` · ${insight.respondedTravelerCount} shared availability`
@@ -1527,10 +1527,10 @@ function HostBestDatesFinder({
             </>
           ) : insight.suggestAlternative ? (
             <>
-              <p className="font-semibold text-slate-900 dark:text-neutral-100">
+              <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">
                 Consider {insight.bestRangeLabel} instead (works for {ratioLabel} members)
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+              <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 More travelers overlap this range than your confirmed dates.
               </p>
               <button
@@ -1544,7 +1544,7 @@ function HostBestDatesFinder({
             </>
           ) : (
             <>
-              <p className="font-semibold text-slate-900 dark:text-neutral-100">
+              <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">
                 Best dates: {insight.bestRangeLabel} (works for {ratioLabel} members)
               </p>
               {!bestRangeMatchesHost(insight.bestRange, insight.hostRange) ? (
@@ -1726,8 +1726,8 @@ function DecisionCard({
       const showSingleProposal = opts.length > 0 && singleLineConcrete;
 
       return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+        <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
           <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-300/90">
             The host has confirmed these trip dates for the group. Everyone should still use the calendar to share when
             they&apos;re available — including ranges outside the host window if needed.
@@ -1781,13 +1781,13 @@ function DecisionCard({
                       type="button"
                       disabled={busy || blockedByDates}
                       onClick={() => setConfirmedAlternateModalOpen(true)}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-white/5"
+                      className="rounded-xl border border-[color:var(--hairline)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--on-surface)] shadow-sm transition hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-white/5"
                     >
                       Suggest other dates
                     </button>
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-neutral-400">
-                    Tap <span className="font-semibold text-slate-800 dark:text-neutral-200">Works for me</span> if these
+                  <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+                    Tap <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Works for me</span> if these
                     dates work, or use <span className="font-semibold">Suggest other dates</span> / the calendar below to
                     propose a different range.
                   </p>
@@ -1815,36 +1815,36 @@ function DecisionCard({
               )}
             </div>
           ) : (
-            <p className="mt-5 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-5 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Travelers tap <span className="font-semibold">Works for me</span> and use the calendar to record availability.
             </p>
           )}
 
           {isHost ? (
-            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm dark:border-white/10 dark:bg-dm-elevated/60">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            <div className="mt-6 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 px-4 py-4 text-sm dark:border-white/10 dark:bg-dm-elevated/60">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Member responses
               </p>
-              <p className="mt-2 text-slate-800 dark:text-neutral-200">
-                <span className="font-semibold text-slate-900 dark:text-neutral-100">Works for me: </span>
+              <p className="mt-2 text-[color:var(--on-surface)] dark:text-neutral-200">
+                <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Works for me: </span>
                 {worksNames.length > 0 ? worksNames.join(", ") : "—"}
               </p>
               <div className="mt-2">
-                <p className="font-semibold text-slate-900 dark:text-neutral-100">Suggested other dates</p>
+                <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Suggested other dates</p>
                 {alternateRows.length > 0 ? (
-                  <ul className="mt-2 space-y-1.5 text-sm text-slate-800 dark:text-neutral-200">
+                  <ul className="mt-2 space-y-1.5 text-sm text-[color:var(--on-surface)] dark:text-neutral-200">
                     {alternateRows.map((row) => (
                       <li key={row.voterKey}>
                         <span className="font-semibold">{row.voterName}</span>
-                        <span className="text-slate-600 dark:text-neutral-400"> — {row.rangeLabel}</span>
+                        <span className="text-[color:var(--on-surface-variant)] dark:text-neutral-400"> — {row.rangeLabel}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-500">—</p>
+                  <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-500">—</p>
                 )}
               </div>
-              <p className="mt-3 text-xs text-slate-500 dark:text-neutral-500">
+              <p className="mt-3 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Names appear when travelers (not the host) submit “Works for me” or a different date range from their
                 account.
               </p>
@@ -1872,9 +1872,9 @@ function DecisionCard({
     const singleVagueBallotOnly = opts.length === 1 && !singleLineConcrete;
     const showSingleProposal = opts.length > 0 && singleLineConcrete;
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+      <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
+        <p className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           {opts.length === 0 ? (
             <>
               The trip doesn&apos;t list host dates yet — add your availability below. Group needs {voterN}/{quorum}+
@@ -1954,10 +1954,10 @@ function DecisionCard({
       const venueList = mergeLiveRestaurantsOntoHints(spots, liveVenueMerge ?? undefined);
       return (
         <DatesLockedGate active={blockedByDates}>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-            <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+          <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+            <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
             {blockedByDates ? null : (
-              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+              <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Live listings when available — book ahead to secure a table.
               </p>
             )}
@@ -1969,20 +1969,20 @@ function DecisionCard({
                     key={r.id}
                     className={`overflow-hidden rounded-xl border ${
                       picked
-                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
-                        : "border-slate-200 bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
+                        ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                        : "border-[color:var(--hairline)] bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
                     }`}
                   >
                     <LivePlaceCoverImage src={r.coverPhotoUrl} />
                     <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
+                        <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{r.name}</p>
                         {r.cuisineType ? (
-                          <p className="text-sm text-slate-600 dark:text-neutral-400">{r.cuisineType}</p>
+                          <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{r.cuisineType}</p>
                         ) : null}
-                        <p className="text-sm text-slate-600 dark:text-neutral-400">{r.neighborhood}</p>
+                        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{r.neighborhood}</p>
                         <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
-                        <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
+                        <p className="mt-1 text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-50">{r.priceRange}</p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                         <a
@@ -2000,7 +2000,7 @@ function DecisionCard({
                           className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${
                             picked
                               ? primaryFilledInteractive
-                              : "border border-slate-200 bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                              : "border border-[color:var(--hairline)] bg-white font-semibold text-[color:var(--on-surface)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                           }`}
                         >
                           Vote for this dinner
@@ -2011,7 +2011,7 @@ function DecisionCard({
                 );
               })}
             </ul>
-            <div className="mt-3 text-xs text-slate-500 dark:text-neutral-500">{voterN} vote(s) · needs quorum</div>
+            <div className="mt-3 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{voterN} vote(s) · needs quorum</div>
           </section>
         </DatesLockedGate>
       );
@@ -2044,9 +2044,9 @@ function DecisionCard({
       isAllowedPollWriteIn(viewerPrimaryPick, opts);
 
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+      <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
+        <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           {isBudgetPoll
             ? `Pick one (max 3 options). · ${voterN} vote(s)`
             : transportSimplePick
@@ -2076,12 +2076,12 @@ function DecisionCard({
                   key={opt}
                   className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
                     forSelected
-                      ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
-                      : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
+                      ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                      : "border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-dm-card"
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                    <p className="text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{opt}</p>
                     {!transportSimplePick && thumbsDownGroup > 0 ? (
                       <p className="text-xs text-rose-700 dark:text-rose-300">
                         {thumbsDownGroup} traveler
@@ -2106,7 +2106,7 @@ function DecisionCard({
                       className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
                         forSelected
                           ? primaryFilledInteractive
-                          : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                          : "border border-[color:var(--hairline)] bg-white font-semibold hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
                       {transportSimplePick ? "Vote" : "Vote for"}
@@ -2131,7 +2131,7 @@ function DecisionCard({
                         className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
                           myDown
                             ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
-                            : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                            : "border-[color:var(--hairline)] bg-white hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                         }`}
                       >
                         Not for me
@@ -2152,8 +2152,8 @@ function DecisionCard({
                 onClick={() => onVote({ decisionKey: meta.key, kind: "pick", option: opt })}
                 className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
                   viewerPrimaryPick === opt
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                    : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
+                    ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 text-[color:var(--on-surface)] ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
+                    : "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] hover:border-[color:var(--hairline-strong)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15"
                 }`}
               >
                 {formatBudgetPollChipLabel(opt)}
@@ -2162,8 +2162,8 @@ function DecisionCard({
           </div>
         )}
         {!isBudgetPoll && !transportSimplePick ? (
-          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <div className="mt-5 rounded-xl border border-dashed border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)]/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               Your idea (optional)
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2175,7 +2175,7 @@ function DecisionCard({
                 onChange={(e) => setPollWriteIn(e.target.value)}
                 placeholder="Different priority, activity, vibe…"
                 disabled={busy}
-                className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                className="min-w-[12rem] flex-1 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
               />
               <button
                 type="button"
@@ -2203,7 +2203,7 @@ function DecisionCard({
               </button>
             </div>
             {structuredWriteInMine ? (
-              <p className="mt-2 text-xs text-indigo-900 dark:text-indigo-100">
+              <p className="mt-2 text-xs text-[color:var(--on-surface-variant)] dark:text-indigo-100">
                 Your vote:{" "}
                 <span className="font-semibold">{viewerPrimaryPick}</span>. Change it anytime.
               </p>
@@ -2214,11 +2214,11 @@ function DecisionCard({
           <div
             className={`mt-4 rounded-xl border p-3 dark:border-white/10 ${
               customMine
-                ? "border-indigo-500 bg-indigo-50/80 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/30 dark:ring-indigo-500/30"
-                : "border-slate-200 bg-slate-50/80 dark:bg-dm-elevated/50"
+                ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/30 dark:ring-indigo-500/30"
+                : "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 dark:bg-dm-elevated/50"
             }`}
           >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               Custom amount
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2230,7 +2230,7 @@ function DecisionCard({
                 value={budgetCustom}
                 onChange={(e) => setBudgetCustom(e.target.value)}
                 disabled={busy}
-                className="w-28 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                className="w-28 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-2.5 py-1.5 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
               />
               <button
                 type="button"
@@ -2247,7 +2247,7 @@ function DecisionCard({
               </button>
             </div>
             {customMine ? (
-              <p className="mt-2 text-xs text-indigo-800 dark:text-indigo-200">
+              <p className="mt-2 text-xs text-[color:var(--on-surface-variant)] dark:text-indigo-200">
                 Your vote: {formatBudgetPollChipLabel(viewerPrimaryPick)}
               </p>
             ) : null}
@@ -2275,9 +2275,9 @@ function DecisionCard({
     }
 
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+      <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
+        <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           {transportSimpleBinary
             ? `Pick the option that works for you · ${voterN} vote(s)`
             : `Group vote · ${voterN} vote(s) — pick what fits, flag lines you dislike, or add another idea.`}
@@ -2294,12 +2294,12 @@ function DecisionCard({
                 key={opt}
                 className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
                   forSel
-                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
-                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-dm-card"
+                    ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                    : "border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-dm-card"
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{opt}</p>
+                  <p className="text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{opt}</p>
                   {!transportSimpleBinary && groupNo > 0 ? (
                     <p className="text-xs text-rose-700 dark:text-rose-300">
                       {groupNo} traveler{groupNo === 1 ? " " : "s "}
@@ -2323,7 +2323,7 @@ function DecisionCard({
                     className={`rounded-lg px-3 py-2 text-sm transition disabled:opacity-50 ${
                       forSel
                         ? primaryFilledInteractive
-                        : "border border-slate-200 bg-white font-semibold hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                        : "border border-[color:var(--hairline)] bg-white font-semibold hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                     }`}
                   >
                     {transportSimpleBinary ? "Vote" : "Vote for"}
@@ -2347,7 +2347,7 @@ function DecisionCard({
                       className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-40 ${
                         myNo
                           ? "border-rose-600 bg-rose-50 text-rose-950 dark:border-rose-400 dark:bg-rose-950/40 dark:text-rose-100"
-                          : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                          : "border-[color:var(--hairline)] bg-white hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
                       Not for me
@@ -2358,8 +2358,8 @@ function DecisionCard({
             );
           })}
         </ul>
-        <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+        <div className="mt-5 rounded-xl border border-dashed border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)]/70 p-3 dark:border-white/15 dark:bg-dm-elevated/60">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Prefer something else?
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2371,7 +2371,7 @@ function DecisionCard({
               onChange={(e) => setPollWriteIn(e.target.value)}
               placeholder='e.g. "Train split" · "Defer to host"'
               disabled={busy}
-              className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+              className="min-w-[12rem] flex-1 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
             />
             <button
               type="button"
@@ -2399,7 +2399,7 @@ function DecisionCard({
             </button>
           </div>
           {genericWriteInSelected ? (
-            <p className="mt-2 text-xs text-indigo-900 dark:text-indigo-100">
+            <p className="mt-2 text-xs text-[color:var(--on-surface-variant)] dark:text-indigo-100">
               Your vote: <span className="font-semibold">{viewerPrimaryPick}</span>.
             </p>
           ) : null}
@@ -2411,10 +2411,10 @@ function DecisionCard({
   if (meta.kind === "hotel" && !hotels?.length) {
     return (
       <DatesLockedGate active={blockedByDates}>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+        <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
           {blockedByDates ? null : (
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Search Booking.com via RapidAPI for this city, dates, and guest count.
             </p>
           )}
@@ -2433,7 +2433,7 @@ function DecisionCard({
               {hotelSearchBusy ? "Searching hotels…" : "Search hotels"}
             </button>
           ) : (
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Only the trip host can run hotel search. Ask them to search from their account.
             </p>
           )}
@@ -2445,10 +2445,10 @@ function DecisionCard({
   if (meta.kind === "hotel" && hotels?.length) {
     return (
       <DatesLockedGate active={blockedByDates}>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+        <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
           {blockedByDates ? null : (
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+            <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               Top picks — prices shown inline so nobody has to bounce for a dollar amount first.
             </p>
           )}
@@ -2458,15 +2458,15 @@ function DecisionCard({
                 key={h.id}
                 className={`rounded-xl border px-4 py-3 ${
                   viewerPrimaryPick === h.id
-                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
-                    : "border-slate-200 bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
+                    ? "border-[#1c1c17] bg-[color:var(--sage-soft)]/20 ring-2 ring-[color:var(--sage)]/35 dark:border-indigo-400 dark:bg-indigo-950/40 dark:ring-indigo-500/30"
+                    : "border-[color:var(--hairline)] bg-transparent dark:border-white/10 dark:bg-dm-elevated/50"
                 }`}
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-neutral-100">{h.name}</p>
-                    <p className="text-sm text-slate-600 dark:text-neutral-400">{h.area}</p>
-                    <p className="mt-1 text-base font-semibold tabular-nums text-slate-900 dark:text-neutral-50">
+                    <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{h.name}</p>
+                    <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{h.area}</p>
+                    <p className="mt-1 text-base font-semibold tabular-nums text-[color:var(--on-surface)] dark:text-neutral-50">
                       {h.priceHint}
                     </p>
                     {h.rating ? (
@@ -2479,7 +2479,7 @@ function DecisionCard({
                         href={h.bookingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
+                        className="inline-flex justify-center rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-2 text-center text-xs font-medium text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
                       >
                         Open on Booking.com
                       </a>
@@ -2491,7 +2491,7 @@ function DecisionCard({
                       className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${
                         viewerPrimaryPick === h.id
                           ? primaryFilledInteractive
-                          : "border border-slate-200 bg-white font-semibold text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+                          : "border border-[color:var(--hairline)] bg-white font-semibold text-[color:var(--on-surface)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
                       }`}
                     >
                       Vote for this stay
@@ -2502,13 +2502,13 @@ function DecisionCard({
             ))}
           </ul>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <p className="text-xs text-slate-500 dark:text-neutral-500">{voterN} vote(s) · quorum to lock</p>
+            <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{voterN} vote(s) · quorum to lock</p>
             {canRunHotelSearch ? (
               <button
                 type="button"
                 disabled={hotelSearchBusy || busy || blockedByDates}
                 onClick={() => void runHotelSearch()}
-                className="text-xs font-medium text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-400"
+                className="text-xs font-medium text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline disabled:opacity-40 dark:text-indigo-400"
               >
                 {hotelSearchBusy ? "Refreshing…" : "Refresh search"}
               </button>
@@ -2523,8 +2523,8 @@ function DecisionCard({
     const names = plan.people.names;
     if (names.length === 0) {
       return (
-        <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
-          <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
+        <section className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-5 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
+          <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
           <p className="mt-2">
             The plan card shows how many people are expected. Use the name list above for per-person RSVP once names are
             set on the plan.
@@ -2534,18 +2534,18 @@ function DecisionCard({
     }
     const row = readPeopleVoteRow(votes, visitorKey, canonicalVoterKey);
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">{meta.label}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+      <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{meta.label}</h3>
+        <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           I&apos;m in / I&apos;ll try / can&apos;t make it — group vote per name. When quorum is met, we lock RSVP.
         </p>
         <ul className="mt-4 space-y-3">
           {names.map((name) => (
             <li
               key={name}
-              className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 px-4 py-3 dark:border-white/10 dark:bg-dm-elevated sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="font-medium text-slate-900 dark:text-neutral-100">{name}</span>
+              <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{name}</span>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -2556,7 +2556,7 @@ function DecisionCard({
                   className={`rounded-lg px-4 py-2 text-sm font-semibold ${
                     row[name] === "in"
                       ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
+                      : "border border-[color:var(--hairline)] bg-white text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
                   }`}
                 >
                   I&apos;m in
@@ -2570,7 +2570,7 @@ function DecisionCard({
                   className={`rounded-lg px-4 py-2 text-sm font-semibold ${
                     row[name] === "maybe"
                       ? "bg-amber-500 text-white dark:bg-amber-600"
-                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
+                      : "border border-[color:var(--hairline)] bg-white text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
                   }`}
                 >
                   I&apos;ll try
@@ -2584,7 +2584,7 @@ function DecisionCard({
                   className={`rounded-lg px-4 py-2 text-sm font-semibold ${
                     row[name] === "out"
                       ? "bg-rose-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
+                      : "border border-[color:var(--hairline)] bg-white text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-300 dark:hover:bg-dm-elevated"
                   }`}
                 >
                   Can&apos;t make it
@@ -2593,7 +2593,7 @@ function DecisionCard({
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-slate-500 dark:text-neutral-500">{voterN} participant(s) · quorum {quorum}</p>
+        <p className="mt-3 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{voterN} participant(s) · quorum {quorum}</p>
       </section>
     );
   }

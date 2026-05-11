@@ -34,19 +34,19 @@ export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string;
     <div
       className={
         prominent
-          ? "inline-flex rounded-2xl border border-indigo-200 bg-indigo-50/80 px-3 py-2.5 dark:border-indigo-500/25 dark:bg-indigo-950/30"
-          : "rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
+          ? "inline-flex rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2.5 shadow-[var(--shadow-ambient-sm)] dark:border-indigo-500/25 dark:bg-indigo-950/30"
+          : "rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2 dark:border-white/10 dark:bg-dm-elevated"
       }
     >
       <div className="flex items-center gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 dark:text-neutral-500">Invite code</p>
-          <p className="text-lg font-bold tracking-wider text-slate-900 dark:text-white sm:text-xl">{display}</p>
+          <p className="label-caps text-[color:var(--sage)] dark:text-neutral-500">Invite code</p>
+          <p className="font-display text-lg font-semibold tracking-[0.18em] text-[color:var(--on-surface)] dark:text-white sm:text-xl">{display}</p>
         </div>
         <button
           type="button"
           onClick={() => void copy()}
-          className="shrink-0 rounded-lg border border-indigo-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50 dark:border-indigo-500/40 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+          className="shrink-0 rounded-lg bg-[#1c1c17] px-3 py-1.5 text-xs font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] dark:border dark:border-indigo-500/40 dark:bg-dm-page dark:text-indigo-200 dark:hover:bg-indigo-950/40"
         >
           {copied ? "Copied" : "Copy code"}
         </button>

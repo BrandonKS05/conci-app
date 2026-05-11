@@ -63,13 +63,13 @@ export function TripPlanCard({
     count != null && count > 0 ? Math.max(0, count - verifiedNames.length) : 0;
 
   return (
-    <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+    <div className="space-y-4 rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{plan.title || "Untitled trip plan"}</h2>
-          <p className="text-sm text-slate-600 dark:text-neutral-400">{plan.location || "Location TBD"}</p>
+          <h2 className="text-2xl font-semibold text-[color:var(--on-surface)] dark:text-white">{plan.title || "Untitled trip plan"}</h2>
+          <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{plan.location || "Location TBD"}</p>
           {plan.departureCity ? (
-            <p className="text-sm text-slate-500 dark:text-neutral-500">Departing from {plan.departureCity}</p>
+            <p className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">Departing from {plan.departureCity}</p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -88,7 +88,7 @@ export function TripPlanCard({
 
       <section>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Dates</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">Dates</p>
           {plan.dates.confirmed ? (
             <span
               className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-200"
@@ -113,12 +113,12 @@ export function TripPlanCard({
                   className={`rounded-full border px-3 py-1.5 text-sm ${
                     isViewerPick
                       ? "border-indigo-400 bg-indigo-50 font-medium text-indigo-900 ring-2 ring-indigo-200 dark:border-indigo-500/50 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                      : "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300"
+                      : "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-300"
                   }`}
                 >
                   {date}
                   {tally > 0 ? (
-                    <span className="text-slate-500 dark:text-neutral-500">
+                    <span className="text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                       {" "}
                       · {tally} vote{tally === 1 ? "" : "s"}
                     </span>
@@ -128,40 +128,40 @@ export function TripPlanCard({
             })}
           </div>
         ) : (
-          <span className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-sm text-slate-500 dark:border-white/20 dark:text-neutral-500">
+          <span className="rounded-full border border-dashed border-[color:var(--hairline-strong)] px-3 py-1 text-sm text-[color:var(--on-surface-muted)] dark:border-white/20 dark:text-neutral-500">
             TBD
           </span>
         )}
       </section>
 
       <section>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           People
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {count != null && count > 0 ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-800 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200">
+            <span className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-1 text-sm font-medium text-[color:var(--on-surface)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200">
               {travelersCountLabel(count)}
             </span>
           ) : null}
           {verifiedNames.map((name, idx) => (
             <div
               key={`${name}-${idx}`}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-white/10 dark:bg-dm-elevated"
+              className="inline-flex items-center gap-2 rounded-full border border-[color:var(--hairline)] bg-white px-2 py-1 dark:border-white/10 dark:bg-dm-elevated"
             >
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-neutral-200 dark:text-dm-page">
                 {initials(name)}
               </span>
-              <span className="text-sm text-slate-700 dark:text-neutral-300">{name}</span>
+              <span className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">{name}</span>
             </div>
           ))}
           {othersCount > 0 && verifiedNames.length > 0 ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-600 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
+            <span className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-1 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
               +{othersCount} not joined yet
             </span>
           ) : null}
           {(count == null || count <= 0) && verifiedNames.length === 0 ? (
-            <span className="text-sm text-slate-500 dark:text-neutral-500">People TBD</span>
+            <span className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">People TBD</span>
           ) : null}
         </div>
       </section>
@@ -170,14 +170,14 @@ export function TripPlanCard({
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300">
           {plan.budget.tier || "budget TBD"}
         </span>
-        <span className="text-sm text-slate-600 dark:text-neutral-400">
+        <span className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           {plan.budget.perPerson || "Per-person estimate TBD"}
         </span>
       </section>
 
       {!hideSpotlightsSection && plan.spotlights && plan.spotlights.length > 0 ? (
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Picked places
           </p>
           <ul className="space-y-3">
@@ -189,7 +189,7 @@ export function TripPlanCard({
                   href={s.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 text-left ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:ring-indigo-200/40 dark:border-white/10 dark:bg-dm-elevated dark:ring-white/[0.04] dark:hover:border-indigo-500/40"
+                  className="flex overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 text-left ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:ring-indigo-200/40 dark:border-white/10 dark:bg-dm-elevated dark:ring-white/[0.04] dark:hover:border-indigo-500/40"
                 >
                   {s.photoUrl ? (
                     <Image
@@ -201,7 +201,7 @@ export function TripPlanCard({
                       className="h-24 w-24 shrink-0 object-cover sm:h-28 sm:w-28"
                     />
                   ) : (
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-slate-200 text-xs text-slate-500 dark:bg-white/10 dark:text-neutral-500 sm:h-28 sm:w-28">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-slate-200 text-xs text-[color:var(--on-surface-muted)] dark:bg-white/10 dark:text-neutral-500 sm:h-28 sm:w-28">
                       Map
                     </div>
                   )}
@@ -213,21 +213,21 @@ export function TripPlanCard({
                         {spotlightCategoryLabel(venueKind)}
                       </span>
                     </div>
-                    <p className="font-semibold text-slate-900 dark:text-white">{s.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-600 dark:text-neutral-400">
+                    <p className="font-semibold text-[color:var(--on-surface)] dark:text-white">{s.name}</p>
+                    <p className="mt-0.5 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-400">
                       {s.rating != null ? (
                         <>
                           <span className="font-medium text-amber-700 dark:text-amber-400">{s.rating.toFixed(1)}</span> ★
                         </>
                       ) : null}
                       {s.reviewCount != null ? (
-                        <span className="text-slate-500 dark:text-neutral-500"> · {s.reviewCount.toLocaleString()} reviews</span>
+                        <span className="text-[color:var(--on-surface-muted)] dark:text-neutral-500"> · {s.reviewCount.toLocaleString()} reviews</span>
                       ) : null}
                       {s.priceRange ? (
-                        <span className="text-slate-600 dark:text-neutral-400"> · {s.priceRange}</span>
+                        <span className="text-[color:var(--on-surface-variant)] dark:text-neutral-400"> · {s.priceRange}</span>
                       ) : null}
                     </p>
-                    {s.address ? <p className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-neutral-400">{s.address}</p> : null}
+                    {s.address ? <p className="mt-1 line-clamp-2 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-400">{s.address}</p> : null}
                   </div>
                 </a>
               </li>
@@ -238,7 +238,7 @@ export function TripPlanCard({
       ) : null}
 
       <section>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           Vibe
         </p>
         <div className="flex flex-wrap gap-2">
@@ -258,7 +258,7 @@ export function TripPlanCard({
               </span>
             ))
           ) : (
-            <span className="text-sm text-slate-500 dark:text-neutral-500">No vibe tags yet</span>
+            <span className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">No vibe tags yet</span>
           )}
         </div>
       </section>
@@ -274,14 +274,14 @@ export function TripPlanCard({
         ] as const;
         return plan.polls && pollRows.some(([, xs]) => xs && xs.length > 0) ? (
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Group votes (≤ 3 options each)
           </p>
-          <ul className="space-y-3 text-sm text-slate-700 dark:text-neutral-300">
+          <ul className="space-y-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
             {pollRows.map(([label, xs]) =>
               xs && xs.length ? (
                 <li key={label}>
-                  <span className="font-medium text-slate-900 dark:text-neutral-100">{label}</span>
+                  <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{label}</span>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {xs.map((chip) => (
                       <span
@@ -302,7 +302,7 @@ export function TripPlanCard({
 
       {!hideOpenDecisions ? (
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Open decisions
           </p>
           {plan.openDecisions.length ? (
@@ -310,14 +310,14 @@ export function TripPlanCard({
               {plan.openDecisions.map((decision) => (
                 <li
                   key={decision}
-                  className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200"
+                  className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 px-3 py-2.5 text-sm text-[color:var(--on-surface)] dark:border-white/10 dark:bg-white/5 dark:text-neutral-200"
                 >
                   {decision}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-neutral-500">No open decisions detected.</p>
+            <p className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">No open decisions detected.</p>
           )}
         </section>
       ) : null}

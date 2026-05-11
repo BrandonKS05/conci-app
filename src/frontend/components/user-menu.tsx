@@ -75,7 +75,7 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
   const signInClass =
     tone === "dark"
       ? "rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
-      : "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-dm-elevated";
+      : "rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1.5 text-xs font-semibold text-[color:var(--on-surface-variant)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-dm-elevated";
 
   if (!initial && !avatarUrl) {
     return (

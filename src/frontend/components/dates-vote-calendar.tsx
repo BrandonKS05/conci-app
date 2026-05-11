@@ -30,7 +30,7 @@ const InlineRangeDatePicker = dynamic(() => import("@/frontend/components/dates-
   ssr: false,
   loading: () => (
     <div
-      className="flex min-h-[min(380px,50vh)] w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 text-sm text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-neutral-400"
+      className="flex min-h-[min(380px,50vh)] w-full items-center justify-center rounded-xl border border-dashed border-[color:var(--hairline)] bg-white/60 text-sm text-[color:var(--on-surface-muted)] dark:border-white/10 dark:bg-white/5 dark:text-neutral-400"
       role="status"
       aria-live="polite"
     >
@@ -136,27 +136,27 @@ export function AlternateDatesRangeModal({
       aria-labelledby="alternate-dates-title"
     >
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onClose} />
-      <div className="relative max-h-[min(90vh,560px)] w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+      <div className="relative max-h-[min(90vh,560px)] w-full max-w-md overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
+        <div className="flex items-start justify-between gap-3 border-b border-[color:var(--hairline)] px-5 py-4 dark:border-white/10">
           <div className="min-w-0">
-            <h2 id="alternate-dates-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 id="alternate-dates-title" className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
               Suggest other dates
             </h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Tap the first day, then the last day of the range that works for you. Your suggestion is saved when both ends
               are set.
             </p>
           </div>
           <button
             type="button"
-            className="shrink-0 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-[color:var(--on-surface-muted)] hover:bg-[color:var(--surface-container)] dark:text-neutral-400 dark:hover:bg-dm-elevated"
             onClick={onClose}
           >
             Close
           </button>
         </div>
         <div className="max-h-[min(70vh,480px)] overflow-y-auto px-5 py-4">
-          <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/50">
+          <div className="conci-datepicker-shell rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/90 px-3 py-3 dark:border-white/10 dark:bg-dm-elevated/50">
             <div className="conci-datepicker-centered [&_.react-datepicker]:min-h-[14rem]">
               <InlineRangeDatePicker
                 key={calendarMountKey}
@@ -359,7 +359,7 @@ export function DatesVoteCalendar({
           range.
         </p>
       ) : null}
-      <p className="text-sm text-slate-600 dark:text-neutral-400">
+      <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         {embeddedUnderHostProposal ? (
           <>
             Click your first date, then click the second (inclusive range). Tap the same day twice for a one-day trip. Your
@@ -378,7 +378,7 @@ export function DatesVoteCalendar({
         )}
       </p>
 
-      <div className="conci-datepicker-shell rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
+      <div className="conci-datepicker-shell rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/90 px-4 py-4 dark:border-white/10 dark:bg-dm-elevated/50">
         <div className="conci-datepicker-centered [&_.react-datepicker]:min-h-[17rem]">
           <InlineRangeDatePicker
             key={calendarMountKey}
@@ -414,11 +414,11 @@ export function DatesVoteCalendar({
         </div>
 
         {rangeSummariesWithVotes.length > 0 ? (
-          <ul className="conci-datepicker-range-totals mt-4 max-w-[20rem] space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10 sm:mx-auto">
+          <ul className="conci-datepicker-range-totals mt-4 max-w-[20rem] space-y-1.5 border-t border-[color:var(--hairline)] pt-3 dark:border-white/10 sm:mx-auto">
             {rangeSummariesWithVotes.map(({ key, label, votes: v }) => (
               <li key={key} className="flex items-baseline justify-between gap-3 text-xs">
-                <span className="min-w-0 text-slate-600 dark:text-neutral-400">{label}</span>
-                <span className="shrink-0 tabular-nums text-slate-800 dark:text-neutral-200">
+                <span className="min-w-0 text-[color:var(--on-surface-variant)] dark:text-neutral-400">{label}</span>
+                <span className="shrink-0 tabular-nums text-[color:var(--on-surface)] dark:text-neutral-200">
                   {v} {v === 1 ? "vote" : "votes"}
                 </span>
               </li>
@@ -445,7 +445,7 @@ export function DatesVoteCalendar({
                 className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
                   mine === opt
                     ? "border-indigo-500 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-200 dark:border-indigo-400 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-500/30"
-                    : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15"
+                    : "border-[color:var(--hairline)] bg-white text-[color:var(--on-surface)] hover:border-[color:var(--hairline-strong)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15"
                 }`}
               >
                 {opt}
@@ -456,7 +456,7 @@ export function DatesVoteCalendar({
       ) : null}
 
       {parsed.length === 0 && unmapped.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-neutral-400">
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           No date suggestions on the ballot — pick any range on the calendar above.
         </p>
       ) : null}
@@ -550,22 +550,22 @@ export function DatesSingleProposalMemberVote({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">
             Host proposed trip dates
           </p>
-          <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100 sm:text-3xl">
+          <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-neutral-100 sm:text-3xl">
             {heading}
           </p>
         </div>
       ) : null}
 
-      <p className="text-sm text-slate-700 dark:text-neutral-300">
+      <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
         {worksForMeMode === "confirmedAck" ? (
           <>
-            Tap <strong className="font-semibold text-slate-900 dark:text-neutral-100">Works for me</strong> if these
+            Tap <strong className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Works for me</strong> if these
             dates work for you, or pick any availability window on the calendar below — including dates outside this range
             if you need to flag a conflict.
           </>
         ) : (
           <>
-            Tap <strong className="font-semibold text-slate-900 dark:text-neutral-100">Works for me</strong> to vote yes on
+            Tap <strong className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Works for me</strong> to vote yes on
             the host&apos;s dates, or choose a different start and end below. Your vote is required — you can&apos;t skip
             availability.
           </>
@@ -580,7 +580,7 @@ export function DatesSingleProposalMemberVote({
           className={`rounded-full px-6 py-2.5 text-sm transition disabled:opacity-50 ${
             votedForProposal
               ? `${primaryFilledInteractive} ring-2 ring-slate-400 dark:ring-[#d4d2cd]`
-              : "border border-slate-200 bg-white font-semibold text-slate-900 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/25 dark:hover:bg-white/5"
+              : "border border-[color:var(--hairline)] bg-white font-semibold text-[color:var(--on-surface)] hover:border-[color:var(--hairline-strong)] hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/25 dark:hover:bg-white/5"
           }`}
         >
           {worksForMeMode === "confirmedAck" && viewerAcknowledgedConfirmed ? "Thanks — noted" : "Works for me"}
@@ -590,7 +590,7 @@ export function DatesSingleProposalMemberVote({
           type="button"
           disabled={busy}
           onClick={() => setAlternateModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-800 transition hover:border-slate-300 disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-[color:var(--hairline)] bg-white px-6 py-2.5 text-sm font-semibold text-[color:var(--on-surface)] transition hover:border-[color:var(--hairline-strong)] disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/20"
           aria-haspopup="dialog"
         >
           <CalendarGlyph className="shrink-0 opacity-70" />
@@ -598,7 +598,7 @@ export function DatesSingleProposalMemberVote({
         </button>
       </div>
 
-      <p className="text-sm text-slate-600 dark:text-neutral-400">
+      <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         The calendar is below — click two dates for your range (or the same date twice). That replaces your vote with that
         availability window.
       </p>
@@ -627,7 +627,7 @@ export function DatesSingleProposalMemberVote({
         onVote={onVote}
       />
 
-      <p className="text-xs text-slate-500 dark:text-neutral-500">
+      <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {worksForMeMode === "confirmedAck" ? (
           mineTrim || viewerAcknowledgedConfirmed ? (
             <>

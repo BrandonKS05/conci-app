@@ -15,7 +15,7 @@ export default async function ItineraryPage() {
     return (
       <SiteShell title="Your itinerary will appear here." eyebrow="Itinerary page">
         <GlassCard className="p-6">
-          <p className="text-sm leading-6 text-slate-600">
+          <p className="text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Go back to the prompt screen and submit a request to create the current plan.
           </p>
         </GlassCard>
@@ -29,7 +29,7 @@ export default async function ItineraryPage() {
     <SiteShell title="Itinerary editor" eyebrow="Itinerary page">
       <div className="grid gap-6">
         <GlassCard className="overflow-hidden p-0">
-          <div className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
+          <div className="border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-5 py-5 dark:border-white/10 dark:bg-dm-card sm:px-8">
             <div className="flex flex-wrap items-center gap-3">
               <Pill>{itinerary.category}</Pill>
               <Pill>{itinerary.guest_count} guests</Pill>

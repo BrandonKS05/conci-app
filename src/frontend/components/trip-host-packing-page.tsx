@@ -91,8 +91,8 @@ export function TripHostPackingPage({ tripId, initialPlan }: Props) {
       >
         ← Back to trip setup
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">Packing list</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+      <h1 className="mt-4 text-2xl font-semibold text-[color:var(--on-surface)] dark:text-white">Packing list</h1>
+      <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         {title} — list what the group should pack. You can edit this anytime before publishing.
       </p>
 
@@ -122,7 +122,7 @@ export function TripHostPackingPage({ tripId, initialPlan }: Props) {
         onChange={(e) => setText(e.target.value)}
         rows={14}
         placeholder="Rain jacket, chargers, sunscreen, comfortable shoes…"
-        className="mt-4 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:placeholder:text-zinc-500"
+        className="mt-4 w-full resize-y rounded-2xl border border-[color:var(--hairline)] bg-white px-4 py-3 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:placeholder:text-zinc-500"
       />
       {err ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{err}</p> : null}
       <button

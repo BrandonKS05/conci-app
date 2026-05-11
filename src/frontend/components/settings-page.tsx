@@ -250,7 +250,7 @@ export function SettingsPageClient() {
   if (loading || !payload) {
     return (
       <SiteShell title="Settings" eyebrow="Account">
-        <p className="text-sm text-slate-600 dark:text-neutral-400">{error ?? "Loading…"}</p>
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{error ?? "Loading…"}</p>
       </SiteShell>
     );
   }
@@ -261,16 +261,16 @@ export function SettingsPageClient() {
     <SiteShell title="Settings" eyebrow="Account">
       <div className="mx-auto max-w-2xl space-y-10 pb-16">
         {error ? (
-          <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
+          <p className="rounded-xl border border-[#a8443c]/35 bg-[#a8443c]/8 px-4 py-3 text-sm text-[#a8443c] dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
             {error}
           </p>
         ) : null}
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Account</h2>
+        <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Account</h2>
           <form onSubmit={(e) => void saveAccount(e)} className="mt-6 space-y-5">
             <div>
-              <label htmlFor="display-name" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
+              <label htmlFor="display-name" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                 Display name
               </label>
               <input
@@ -279,19 +279,19 @@ export function SettingsPageClient() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 maxLength={120}
-                className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-dm-page dark:text-neutral-100"
+                className="mt-1.5 block w-full rounded-xl border border-[color:var(--hairline)] bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-dm-page dark:text-neutral-100"
                 autoComplete="name"
               />
             </div>
             <div>
-              <span className="text-sm font-medium text-slate-700 dark:text-neutral-300">Email</span>
-              <p className="mt-1.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:border-white/5 dark:bg-dm-page dark:text-neutral-400">
+              <span className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">Email</span>
+              <p className="mt-1.5 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2.5 text-sm text-[color:var(--on-surface-variant)] dark:border-white/5 dark:bg-dm-page dark:text-neutral-400">
                 {payload.email || "—"}
               </p>
             </div>
             <div>
-              <span className="text-sm font-medium text-slate-700 dark:text-neutral-300">Profile photo</span>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-500">
+              <span className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">Profile photo</span>
+              <p className="mt-0.5 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Tap or hover your photo, then click to change it.
               </p>
               <div className="mt-2">
@@ -309,12 +309,12 @@ export function SettingsPageClient() {
                   disabled={avatarBusy}
                   onClick={() => avatarFileRef.current?.click()}
                   aria-label={avatarBusy ? "Uploading photo" : "Change profile photo"}
-                  className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 outline-none ring-offset-2 ring-offset-white transition hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-dm-elevated dark:ring-offset-dm-card dark:hover:border-white/20"
+                  className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container)] outline-none ring-offset-2 ring-offset-[color:var(--surface)] transition hover:border-[color:var(--hairline-strong)] focus-visible:ring-2 focus-visible:ring-[color:var(--sage)] disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-dm-elevated dark:ring-offset-dm-card dark:hover:border-white/20"
                 >
                   {avatarUrl ? (
                     <Image src={avatarUrl} alt="" fill className="object-cover" unoptimized />
                   ) : (
-                    <span className="flex h-full w-full items-center justify-center text-lg font-semibold text-slate-500 dark:text-neutral-500">
+                    <span className="flex h-full w-full items-center justify-center text-lg font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                       {(displayName || payload.email || "?").slice(0, 1).toUpperCase()}
                     </span>
                   )}
@@ -332,7 +332,7 @@ export function SettingsPageClient() {
               </div>
             </div>
             {accountMsg ? (
-              <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
+              <p className="text-sm text-[color:var(--sage)] dark:text-emerald-300" role="status">
                 {accountMsg}
               </p>
             ) : null}
@@ -342,11 +342,11 @@ export function SettingsPageClient() {
           </form>
 
           <div className="mt-8 border-t border-slate-100 pt-8 dark:border-white/10">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Change password</h3>
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+            <h3 className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">Change password</h3>
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               We&apos;ll email you a link to set a new password at the address below.
             </p>
-            <label htmlFor="reset-email" className="mt-4 block text-sm font-medium text-slate-700 dark:text-neutral-300">
+            <label htmlFor="reset-email" className="mt-4 block text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               Email for reset link
             </label>
             <input
@@ -355,39 +355,39 @@ export function SettingsPageClient() {
               readOnly
               value={payload.email || ""}
               autoComplete="email"
-              className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:border-white/10 dark:bg-dm-page dark:text-neutral-400"
+              className="mt-1.5 block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2.5 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-page dark:text-neutral-400"
             />
             <button
               type="button"
               disabled={pwBusy || !payload.email}
               onClick={() => void sendPasswordReset()}
-              className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
+              className="mt-3 rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-sm font-medium text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-200 dark:hover:bg-dm-elevated"
             >
               {pwBusy ? "Sending…" : "Send password reset email"}
             </button>
-            {pwMsg ? <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">{pwMsg}</p> : null}
+            {pwMsg ? <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{pwMsg}</p> : null}
           </div>
 
           <div className="mt-8 border-t border-slate-100 pt-8 dark:border-white/10">
-            <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300">Delete account</h3>
-            <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+            <h3 className="text-sm font-semibold text-[#a8443c] dark:text-rose-300">Delete account</h3>
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Permanently remove your account and access. This cannot be undone.
             </p>
             <button
               type="button"
               onClick={() => setDeleteOpen(true)}
-              className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-900 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/60"
+              className="mt-3 rounded-lg border border-[#a8443c]/35 bg-[#a8443c]/8 px-4 py-2.5 text-sm font-medium text-[#a8443c] transition hover:bg-[#a8443c]/15 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/60"
             >
               Delete account…
             </button>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Subscription</h2>
-          <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+        <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Subscription</h2>
+          <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Current plan:{" "}
-            <span className="font-semibold text-slate-900 dark:text-white">{tierLabel(tier)}</span>
+            <span className="font-semibold text-[color:var(--on-surface)] dark:text-white">{tierLabel(tier)}</span>
           </p>
           <div className="mt-6">
             {tier === "free" ? (
@@ -407,9 +407,9 @@ export function SettingsPageClient() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Notifications</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">
+        <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Notifications</h2>
+          <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Email preferences for trip activity (where configured in Conci).
           </p>
           <form onSubmit={(e) => void saveNotifications(e)} className="mt-6 space-y-4">
@@ -418,30 +418,30 @@ export function SettingsPageClient() {
                 type="checkbox"
                 checked={notifyVote}
                 onChange={(e) => setNotifyVote(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20"
+                className="mt-1 h-4 w-4 rounded border-[color:var(--hairline-strong)] accent-[#1c1c17] focus:ring-[color:var(--sage)] dark:border-white/20"
               />
-              <span className="text-sm text-slate-800 dark:text-neutral-200">Email me when someone votes</span>
+              <span className="text-sm text-[color:var(--on-surface)] dark:text-neutral-200">Email me when someone votes</span>
             </label>
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
                 checked={notifyDateLocked}
                 onChange={(e) => setNotifyDateLocked(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20"
+                className="mt-1 h-4 w-4 rounded border-[color:var(--hairline-strong)] accent-[#1c1c17] focus:ring-[color:var(--sage)] dark:border-white/20"
               />
-              <span className="text-sm text-slate-800 dark:text-neutral-200">Email me when a date is locked</span>
+              <span className="text-sm text-[color:var(--on-surface)] dark:text-neutral-200">Email me when a date is locked</span>
             </label>
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
                 checked={notifyNudge}
                 onChange={(e) => setNotifyNudge(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20"
+                className="mt-1 h-4 w-4 rounded border-[color:var(--hairline-strong)] accent-[#1c1c17] focus:ring-[color:var(--sage)] dark:border-white/20"
               />
-              <span className="text-sm text-slate-800 dark:text-neutral-200">Nudge reminders on/off</span>
+              <span className="text-sm text-[color:var(--on-surface)] dark:text-neutral-200">Nudge reminders on/off</span>
             </label>
             {notifyMsg ? (
-              <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
+              <p className="text-sm text-[color:var(--sage)] dark:text-emerald-300" role="status">
                 {notifyMsg}
               </p>
             ) : null}
@@ -454,22 +454,22 @@ export function SettingsPageClient() {
 
       {deleteOpen ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1c1c17]/45 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-account-title"
           onClick={() => !deleteBusy && setDeleteOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-dm-card"
+            className="w-full max-w-md rounded-2xl border border-[color:var(--hairline)] bg-white p-6 shadow-xl dark:border-white/10 dark:bg-dm-card"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <h3 id="delete-account-title" className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+            <h3 id="delete-account-title" className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
               Delete your account?
             </h3>
-            <p className="mt-3 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               You will lose access to hosted trips and memberships. This cannot be undone.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -477,7 +477,7 @@ export function SettingsPageClient() {
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => setDeleteOpen(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
+                className="rounded-lg border border-[color:var(--hairline-strong)] px-4 py-2 text-sm font-medium text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
               >
                 Cancel
               </button>
@@ -485,7 +485,7 @@ export function SettingsPageClient() {
                 type="button"
                 disabled={deleteBusy}
                 onClick={() => void confirmDelete()}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                className="rounded-lg bg-[#a8443c] px-4 py-2 text-sm font-medium tracking-wide text-white hover:bg-[#933a33] disabled:opacity-50"
               >
                 {deleteBusy ? "Deleting…" : "Delete account"}
               </button>

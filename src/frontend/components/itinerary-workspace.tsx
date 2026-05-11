@@ -121,16 +121,16 @@ export function ItineraryWorkspace({ screenData }: { screenData: ItineraryScreen
           />
         </div>
 
-        <div className="mt-5 flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-dm-elevated sm:flex-row sm:items-end">
+        <div className="mt-5 flex flex-col gap-3 rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 dark:border-white/10 dark:bg-dm-elevated sm:flex-row sm:items-end">
           <label className="grid gap-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               Guest count
             </span>
             <input
               value={guestCountDraft}
               onChange={(event) => setGuestCountDraft(event.target.value)}
               inputMode="numeric"
-              className="w-32 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100"
+              className="w-32 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none focus:border-[color:var(--sage)] focus:ring-1 focus:ring-[color:var(--sage)]/30 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100"
             />
           </label>
           <button
@@ -143,11 +143,11 @@ export function ItineraryWorkspace({ screenData }: { screenData: ItineraryScreen
               }
               void runAction({ type: "change_guest_count", guest_count: parsed });
             }}
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
+            className="inline-flex items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-3 text-sm font-medium tracking-wide text-[color:var(--on-surface)] transition hover:border-[color:var(--hairline-strong)] hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
           >
             Update guests
           </button>
-          <p className="text-sm leading-6 text-slate-600 dark:text-neutral-400">
+          <p className="text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Regeneration uses the current edited itinerary, not the original prompt defaults.
           </p>
         </div>
@@ -191,7 +191,7 @@ export function ItineraryWorkspace({ screenData }: { screenData: ItineraryScreen
 
       {activeSections.length === 0 ? (
         <GlassCard className="p-6">
-          <p className="text-sm leading-6 text-slate-600 dark:text-neutral-400">
+          <p className="text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             The itinerary is currently empty. Use “Regenerate all” to restore the plan.
           </p>
         </GlassCard>
@@ -216,14 +216,14 @@ export function ItineraryWorkspace({ screenData }: { screenData: ItineraryScreen
             data.itinerary.selections.slice(-4).map((selection) => (
               <div
                 key={selection.id}
-                className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400"
+                className="rounded-[1.35rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400"
               >
-                <p className="font-semibold text-ink dark:text-white">{selection.status.replaceAll("_", " ")}</p>
+                <p className="font-semibold text-[color:var(--on-surface)] dark:text-white">{selection.status.replaceAll("_", " ")}</p>
                 <p className="mt-1">{selection.created_at}</p>
               </div>
             ))
           ) : (
-            <p className="text-sm leading-6 text-slate-600 dark:text-neutral-500">No changes yet.</p>
+            <p className="text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-500">No changes yet.</p>
           )}
         </div>
       </GlassCard>
@@ -267,13 +267,13 @@ function ItinerarySectionCard({
     <GlassCard className="p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-neutral-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Step {index + 1}
           </p>
-          <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-0.04em] text-ink dark:text-white">
+          <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-0.04em] text-[color:var(--on-surface)] dark:text-white">
             {section.title}
           </h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-neutral-400">{section.description}</p>
+          <p className="mt-2 text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">{section.description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <StepButton label="Move up" disabled={index === 0 || busy} onClick={() => onMove(-1)} />
@@ -285,19 +285,19 @@ function ItinerarySectionCard({
         </div>
       </div>
 
-      <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-dm-elevated dark:shadow-none">
+      <div className="mt-4 rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-4 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-elevated dark:shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Pill>Selected</Pill>
-          <span className="text-xs font-medium uppercase tracking-[0.24em] text-slate-500 dark:text-neutral-500">
+          <span className="text-xs font-medium uppercase tracking-[0.24em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             {item.kind}
           </span>
         </div>
-        <h4 className="mt-4 font-display text-xl font-semibold tracking-[-0.03em] text-ink dark:text-white">
+        <h4 className="mt-4 font-display text-xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white">
           {item.title}
         </h4>
-        <p className="mt-2 text-sm text-slate-500 dark:text-neutral-500">{item.details}</p>
-        <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-neutral-400">{item.meta}</p>
-        <p className="mt-4 text-sm font-semibold text-ink dark:text-neutral-100">{item.price}</p>
+        <p className="mt-2 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">{item.details}</p>
+        <p className="mt-4 text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">{item.meta}</p>
+        <p className="mt-4 text-sm font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{item.price}</p>
 
         <div className="mt-5 flex flex-wrap gap-2">
           <StepButton label="Replace" disabled={busy} onClick={onReplace} />
@@ -306,7 +306,7 @@ function ItinerarySectionCard({
         </div>
 
         {isEditing ? (
-          <div className="mt-5 grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-dm-page">
+          <div className="mt-5 grid gap-3 rounded-[1.25rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 dark:border-white/10 dark:bg-dm-page">
             <div className="grid gap-2">
               <Field
                 label="Title"
@@ -344,22 +344,22 @@ function ItinerarySectionCard({
 
       {section.alternatives.length > 0 ? (
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-neutral-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Alternatives
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {section.alternatives.map((alt) => (
               <div
                 key={alt.id}
-                className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-dm-elevated"
+                className="rounded-[1.4rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 dark:border-white/10 dark:bg-dm-elevated"
               >
-                <p className="font-display text-lg font-semibold tracking-[-0.03em] text-ink dark:text-white">{alt.title}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-neutral-500">{alt.details}</p>
+                <p className="font-display text-lg font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white">{alt.title}</p>
+                <p className="mt-1 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">{alt.details}</p>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => onSelectAlternative(alt)}
-                  className="mt-4 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-ink transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-dm-page"
+                  className="mt-4 inline-flex items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-xs font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:bg-dm-page"
                 >
                   Swap in this option
                 </button>
@@ -386,7 +386,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
+      className="inline-flex items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-3 text-sm font-medium tracking-wide text-[color:var(--on-surface)] transition hover:border-[color:var(--hairline-strong)] hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
     >
       {label}
     </button>
@@ -407,7 +407,7 @@ function StepButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-ink transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
+      className="inline-flex items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-xs font-medium tracking-wide text-[color:var(--on-surface)] transition hover:border-[color:var(--hairline-strong)] hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-dm-card dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-elevated"
     >
       {label}
     </button>
@@ -425,11 +425,11 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-neutral-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100"
+        className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none focus:border-[color:var(--sage)] focus:ring-1 focus:ring-[color:var(--sage)]/30 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100"
       />
     </label>
   );

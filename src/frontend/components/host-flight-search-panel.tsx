@@ -123,12 +123,12 @@ function Paginator({
 }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-neutral-400">
+    <div className="mt-3 flex items-center justify-between gap-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
       <button
         type="button"
         disabled={page <= 1}
         onClick={onPrev}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/5"
+        className="rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-1.5 font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] disabled:opacity-40 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/5"
       >
         Previous
       </button>
@@ -139,7 +139,7 @@ function Paginator({
         type="button"
         disabled={page >= totalPages}
         onClick={onNext}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/5"
+        className="rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-1.5 font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] disabled:opacity-40 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:bg-white/5"
       >
         Next
       </button>
@@ -327,31 +327,31 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
         className={`w-full overflow-hidden rounded-2xl border text-left transition ${
           selected
             ? "border-teal-500 bg-teal-50 dark:border-teal-500 dark:bg-teal-950/30"
-            : "border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated"
+            : "border-[color:var(--hairline)] bg-white hover:border-[color:var(--hairline-strong)] dark:border-white/10 dark:bg-dm-elevated"
         }`}
       >
         <div className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_auto] md:items-start">
           <div className="min-w-0">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[11px] font-semibold tracking-wide text-slate-700 dark:border-white/15 dark:bg-white/5 dark:text-neutral-200">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[11px] font-semibold tracking-wide text-[color:var(--on-surface-variant)] dark:border-white/15 dark:bg-white/5 dark:text-neutral-200">
                 {airlineMonogram(f.airline)}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[22px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+                <div className="flex items-center gap-2 text-[22px] font-bold leading-none tracking-tight text-[color:var(--on-surface)] dark:text-white">
                   <span>{f.departureTime}</span>
-                  <span className="text-slate-400 dark:text-neutral-600">→</span>
+                  <span className="text-[color:var(--on-surface-muted)] dark:text-neutral-600">→</span>
                   <span>{f.arrivalTime}</span>
                 </div>
-                <p className="mt-1 truncate text-sm text-slate-700 dark:text-neutral-300">
+                <p className="mt-1 truncate text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                   {f.departureAirport} - {f.arrivalAirport}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-neutral-500">{f.airline}</p>
+                <p className="mt-0.5 truncate text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{f.airline}</p>
               </div>
             </div>
           </div>
 
           <div className="min-w-0 md:px-1">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-neutral-300">
+            <div className="flex items-center gap-2 text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               <span className="whitespace-nowrap">{f.duration}</span>
               <span className="h-px flex-1 bg-emerald-500/70 dark:bg-emerald-400/60" />
               <span className="whitespace-nowrap text-emerald-700 dark:text-emerald-300">{stopsLabel(f.stops)}</span>
@@ -359,12 +359,12 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
           </div>
 
           <div className="text-right md:min-w-[132px]">
-            <p className="text-[34px] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{f.price}</p>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-neutral-500">Roundtrip per traveler</p>
+            <p className="text-[34px] font-bold leading-none tracking-tight text-[color:var(--on-surface)] dark:text-white">{f.price}</p>
+            <p className="mt-1 text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">Roundtrip per traveler</p>
           </div>
         </div>
-        <div className="border-t border-slate-200/80 px-4 py-2 text-right dark:border-white/10">
-          <span className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline dark:text-neutral-400">
+        <div className="border-t border-[color:var(--hairline)]/80 px-4 py-2 text-right dark:border-white/10">
+          <span className="text-xs font-medium text-[color:var(--on-surface-muted)] underline-offset-2 hover:underline dark:text-neutral-400">
             Flight details
           </span>
         </div>
@@ -376,21 +376,21 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
   if (!enabled) return null;
 
   return (
-    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="text-base font-semibold text-slate-900 dark:text-white">Search round-trip flights</h3>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-neutral-400">
+    <div className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+      <h3 className="text-base font-semibold text-[color:var(--on-surface)] dark:text-white">Search round-trip flights</h3>
+      <p className="mt-1 text-xs leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         Destination and travel dates come from your trip. Choose where you are leaving from, then pick outbound and return options.
       </p>
 
       {ctxLoading ? (
-        <p className="mt-3 text-sm text-slate-500 dark:text-neutral-500">Loading trip flight context…</p>
+        <p className="mt-3 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">Loading trip flight context…</p>
       ) : ctx && !ctx.ready ? (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           {ctx.reason ?? "Flight search is not ready for this trip yet."}
         </p>
       ) : ctx?.ready ? (
-        <p className="mt-2 text-xs text-slate-600 dark:text-neutral-400">
-          To <span className="font-medium text-slate-800 dark:text-neutral-200">{ctx.destinationLabel}</span>
+        <p className="mt-2 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+          To <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">{ctx.destinationLabel}</span>
           {ctx.destinationAirport ? (
             <>
               {" "}
@@ -401,8 +401,8 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
           {ctx.startIso && ctx.endIso ? (
             <>
               {" "}
-              · Outbound <span className="font-medium text-slate-800 dark:text-neutral-200">{ctx.startIso}</span>, return{" "}
-              <span className="font-medium text-slate-800 dark:text-neutral-200">{ctx.endIso}</span>
+              · Outbound <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">{ctx.startIso}</span>, return{" "}
+              <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">{ctx.endIso}</span>
             </>
           ) : null}
         </p>
@@ -411,7 +411,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
       {ctx?.ready && wizard === "form" ? (
         <div ref={rootRef} className="mt-4 space-y-3">
           <div className="relative">
-            <label className="block text-xs font-medium text-slate-700 dark:text-neutral-300">Leaving from</label>
+            <label className="block text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">Leaving from</label>
             <input
               type="text"
               autoComplete="off"
@@ -419,15 +419,15 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
               onChange={(e) => onLeaveChange(e.target.value)}
               onFocus={() => leaveInput.trim().length >= 2 && setSuggestOpen(true)}
               placeholder="City or airport"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+              className="mt-1 w-full rounded-xl border border-[color:var(--hairline)] bg-white px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
             />
             {suggestOpen && (suggestions.length > 0 || suggestBusy) ? (
               <ul
                 role="listbox"
-                className="absolute z-40 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-white/10 dark:bg-dm-elevated"
+                className="absolute z-40 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-[color:var(--hairline)] bg-white py-1 text-sm shadow-lg dark:border-white/10 dark:bg-dm-elevated"
               >
                 {suggestBusy && !suggestions.length ? (
-                  <li className="px-3 py-2 text-slate-500 dark:text-neutral-500">Searching…</li>
+                  <li className="px-3 py-2 text-[color:var(--on-surface-muted)] dark:text-neutral-500">Searching…</li>
                 ) : (
                   suggestions.map((s) => (
                     <li key={s.id}>
@@ -435,12 +435,12 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
                         type="button"
                         role="option"
                         aria-selected={pickedOrigin?.id === s.id}
-                        className="flex w-full flex-col px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-white/5"
+                        className="flex w-full flex-col px-3 py-2 text-left hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/5"
                         onClick={() => onPickSuggestion(s)}
                       >
-                        <span className="font-medium text-slate-900 dark:text-neutral-100">{s.label}</span>
-                        {s.subtitle ? <span className="text-xs text-slate-500 dark:text-neutral-500">{s.subtitle}</span> : null}
-                        <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-neutral-600">{s.id}</span>
+                        <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{s.label}</span>
+                        {s.subtitle ? <span className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{s.subtitle}</span> : null}
+                        <span className="text-[10px] uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-600">{s.id}</span>
                       </button>
                     </li>
                   ))
@@ -450,11 +450,11 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-neutral-300">Cabin class</label>
+            <label className="block text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">Cabin class</label>
             <select
               value={cabin}
               onChange={(e) => setCabin(e.target.value as CabinClass)}
-              className="mt-1 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
+              className="mt-1 w-full max-w-xs rounded-xl border border-[color:var(--hairline)] bg-white px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none focus:border-teal-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
             >
               {CABIN_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -477,7 +477,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
               });
               router.push(`/trip/${tripId}/setup/flights?${q.toString()}`);
             }}
-            className="rounded-xl border border-teal-600/80 bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-neutral-500"
+            className="rounded-xl border border-teal-600/80 bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:border-[color:var(--hairline)] disabled:bg-slate-200 disabled:text-[color:var(--on-surface-muted)] dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-neutral-500"
           >
             Search flights
           </button>
@@ -493,18 +493,18 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
       {wizard === "outbound" ? (
         <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Step 1 — Outbound</h4>
+            <h4 className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">Step 1 — Outbound</h4>
             <button
               type="button"
               onClick={resetWizard}
-              className="text-xs font-medium text-slate-600 underline-offset-2 hover:underline dark:text-neutral-400"
+              className="text-xs font-medium text-[color:var(--on-surface-variant)] underline-offset-2 hover:underline dark:text-neutral-400"
             >
               Start over
             </button>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">Select a flight, then continue to return options.</p>
+          <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">Select a flight, then continue to return options.</p>
           {!outboundFlights.length && !legLoading ? (
-            <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">No outbound results.</p>
+            <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No outbound results.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {outSlice.map((f) => {
@@ -527,7 +527,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
             type="button"
             disabled={!pickOut || legLoading}
             onClick={() => void runLeg("return")}
-            className="mt-4 rounded-xl border border-teal-600/80 bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-neutral-500"
+            className="mt-4 rounded-xl border border-teal-600/80 bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:border-[color:var(--hairline)] disabled:bg-slate-200 disabled:text-[color:var(--on-surface-muted)] dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-neutral-500"
           >
             {legLoading ? "Loading return…" : "Next: return flights"}
           </button>
@@ -537,7 +537,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
       {wizard === "return" ? (
         <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Step 2 — Return</h4>
+            <h4 className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">Step 2 — Return</h4>
             <button
               type="button"
               onClick={() => {
@@ -545,18 +545,18 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
                 setPickRet(null);
                 setLegError(null);
               }}
-              className="text-xs font-medium text-slate-600 underline-offset-2 hover:underline dark:text-neutral-400"
+              className="text-xs font-medium text-[color:var(--on-surface-variant)] underline-offset-2 hover:underline dark:text-neutral-400"
             >
               Back to outbound
             </button>
           </div>
           {pickOut ? (
-            <p className="mt-1 text-xs text-slate-600 dark:text-neutral-400">
+            <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Outbound: {pickOut.airline} · {pickOut.departureTime}–{pickOut.arrivalTime} ({pickOut.duration})
             </p>
           ) : null}
           {!returnFlights.length && !legLoading ? (
-            <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">No return results.</p>
+            <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No return results.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {retSlice.map((f) => {
@@ -622,7 +622,7 @@ export function HostFlightSearchPanel({ tripId, enabled }: { tripId: string; ena
               {saveMessage ? <p className="mt-2">{saveMessage}</p> : null}
             </div>
           ) : (
-            <p className="mt-3 text-xs text-slate-500 dark:text-neutral-500">Select a return flight to finish.</p>
+            <p className="mt-3 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">Select a return flight to finish.</p>
           )}
         </div>
       ) : null}

@@ -70,7 +70,7 @@ export default async function RecommendationDetailPage({
 
           <GlassCard className="p-6 sm:p-7">
             <SectionTitle title="Assistant note" />
-            <p className="text-sm leading-6 text-slate-600">
+            <p className="text-sm leading-6 text-[color:var(--on-surface-variant)]">
               This page is intentionally a detail-first view so the user can inspect one recommendation
               before committing to a booking step.
             </p>
@@ -83,8 +83,8 @@ export default async function RecommendationDetailPage({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
+    <div className="rounded-[1.4rem] border border-[color:var(--hairline)] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)]">{label}</p>
       <p className="mt-2 text-sm font-medium leading-6 text-ink">{value}</p>
     </div>
   );

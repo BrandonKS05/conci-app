@@ -113,7 +113,7 @@ export function BookingChecklist({
   return (
     <div className="space-y-4">
       {!canEdit ? (
-        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
+        <p className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400">
           You&apos;re viewing this checklist as a guest. Sign in as the trip owner to mark items booked.
         </p>
       ) : null}
@@ -125,14 +125,14 @@ export function BookingChecklist({
           return (
             <li
               key={row.key}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+              className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-5 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none"
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="font-display text-lg font-semibold text-slate-900 dark:text-neutral-100">{row.title}</p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">{row.description}</p>
+                  <p className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{row.title}</p>
+                  <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{row.description}</p>
                   {booked && (t?.bookedBy || t?.bookedAt) ? (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+                    <p className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                       Marked booked{t?.bookedBy ? ` by ${t.bookedBy}` : ""}
                       {t?.bookedAt ? ` · ${formatWhen(t.bookedAt)}` : ""}
                     </p>
@@ -143,17 +143,17 @@ export function BookingChecklist({
                     href={row.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-center text-sm font-semibold text-indigo-900 transition hover:bg-indigo-100 dark:border-white/10 dark:bg-dm-elevated dark:text-indigo-200 dark:hover:bg-dm-page"
+                    className="inline-flex justify-center rounded-lg bg-[#1c1c17] px-4 py-2.5 text-center text-sm font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] dark:border dark:border-white/10 dark:bg-dm-elevated dark:text-indigo-200 dark:hover:bg-dm-page"
                   >
                     {row.actionLabel}
                   </a>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-neutral-300">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                     <input
                       type="checkbox"
                       checked={booked}
                       disabled={!canEdit || busy === row.key}
                       onChange={(e) => void toggle(row.key, e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 dark:border-white/20"
+                      className="h-4 w-4 rounded border-[color:var(--hairline-strong)] accent-[#1c1c17] dark:border-white/20"
                     />
                     <span>{busy === row.key ? "Saving…" : "Mark as booked"}</span>
                   </label>

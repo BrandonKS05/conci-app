@@ -8,23 +8,15 @@ export async function register() {
   const raw = process.env.STRIPE_SECRET_KEY;
   const trimmed = typeof raw === "string" ? raw.trim() : "";
 
-  // Next.js loads `.env.local` (and `.env`) into `process.env` for the server — no extra file read needed.
-  if (process.env.NODE_ENV === "production") {
-    console.log(
-      "[Conci Stripe startup] STRIPE_SECRET_KEY:",
-      trimmed ? `set (length=${trimmed.length})` : "missing or empty"
-    );
-  } else {
-    console.log(
-      "[Conci Stripe startup] STRIPE_SECRET_KEY raw:",
-      raw === undefined ? "undefined" : raw === "" ? '""' : JSON.stringify(raw)
-    );
-    console.log(
-      "[Conci Stripe startup] STRIPE_SECRET_KEY after trim():",
-      trimmed ? JSON.stringify(trimmed) : "(empty — checkout will return Stripe is not configured)"
-    );
-    if (typeof raw === "string" && raw !== trimmed) {
-      console.log("[Conci Stripe startup] Note: key had leading/trailing whitespace; app uses trim().");
-    }
+  // Never print the raw secret — log only presence + length so terminal output
+  // and any CI logs cannot leak the key.
+  console.log(
+    "[Conci Stripe startup] STRIPE_SECRET_KEY:",
+    trimmed
+      ? `set (length=${trimmed.length}, prefix=${trimmed.slice(0, 7)}…)`
+      : "missing or empty — /api/checkout will return 'Stripe is not configured'"
+  );
+  if (typeof raw === "string" && raw !== trimmed) {
+    console.log("[Conci Stripe startup] Note: key had surrounding whitespace; app uses trim().");
   }
 }

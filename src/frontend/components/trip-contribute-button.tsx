@@ -67,7 +67,7 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
           setError(null);
           setCustomAmount("");
         }}
-        className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] dark:bg-emerald-500 dark:hover:bg-emerald-600"
+        className="inline-flex items-center gap-2 rounded-2xl bg-[#1c1c17] px-5 py-2.5 text-sm font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] active:scale-[0.98] dark:bg-emerald-500 dark:hover:bg-emerald-600"
       >
         <svg
           width="16"
@@ -93,14 +93,14 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
             if (e.target === backdropRef.current) setOpen(false);
           }}
         >
-          <div className="mx-4 w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-dm-card">
+          <div className="mx-4 w-full max-w-sm rounded-3xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-lg)] dark:border-white/10 dark:bg-dm-card">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+              <h3 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
                 Add a deposit
               </h3>
               <button
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-neutral-500 dark:hover:bg-dm-elevated dark:hover:text-neutral-300"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-[color:var(--on-surface-muted)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:hover:bg-dm-elevated dark:hover:text-neutral-300"
                 aria-label="Close"
               >
                 <svg
@@ -117,7 +117,7 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
               </button>
             </div>
 
-            <p className="mb-4 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mb-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Pick a preset or enter a custom amount. You&apos;ll be taken to
               Stripe to complete payment.
             </p>
@@ -128,7 +128,7 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
                   key={amt}
                   disabled={loading}
                   onClick={() => contribute(amt)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:border-emerald-500/30 dark:hover:text-emerald-400"
+                  className="rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm font-medium text-[color:var(--on-surface)] transition hover:border-[color:var(--sage)]/40 hover:bg-[color:var(--sage-soft)]/15 hover:text-[color:var(--on-surface)] disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:hover:border-emerald-500/30 dark:hover:text-emerald-400"
                 >
                   ${amt}
                 </button>
@@ -136,12 +136,12 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
             </div>
 
             <div className="mb-4">
-              <label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-neutral-500">
+              <label className="label-caps mb-1.5 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Custom amount
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-neutral-500">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                     $
                   </span>
                   <input
@@ -158,13 +158,13 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
                     }}
                     placeholder="0.00"
                     disabled={loading}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-7 pr-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:focus:border-emerald-500/50 dark:focus:ring-emerald-500/10"
+                    className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] py-2.5 pl-7 pr-3 text-sm text-[color:var(--on-surface)] outline-none transition focus:border-[color:var(--sage)] focus:ring-2 focus:ring-[color:var(--sage)]/25 disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:focus:border-emerald-500/50 dark:focus:ring-emerald-500/10"
                   />
                 </div>
                 <button
                   disabled={loading || !customAmount}
                   onClick={handleCustomSubmit}
-                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+                  className="rounded-xl bg-[#1c1c17] px-4 py-2.5 text-sm font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
                 >
                   {loading ? "…" : "Pay"}
                 </button>
@@ -172,12 +172,12 @@ export function TripContributeButton({ tripId }: { tripId: string }) {
             </div>
 
             {error && (
-              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+              <p className="rounded-xl bg-[#a8443c]/8 px-3 py-2 text-sm text-[#a8443c] dark:bg-red-500/10 dark:text-red-400">
                 {error}
               </p>
             )}
 
-            <p className="mt-4 text-center text-xs text-slate-400 dark:text-neutral-600">
+            <p className="mt-4 text-center text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-600">
               Secured by Stripe. Funds go toward the group trip.
             </p>
           </div>

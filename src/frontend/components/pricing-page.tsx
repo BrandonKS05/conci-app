@@ -82,7 +82,7 @@ function PricingContent() {
       <div className="mx-auto w-full max-w-5xl px-4 pb-20 pt-6">
         {subscribed ? (
           <div
-            className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100"
+            className="mb-8 rounded-2xl border border-[color:var(--sage)]/35 bg-[color:var(--sage-soft)]/25 px-4 py-3 text-center text-sm text-[color:var(--on-surface)] dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100"
             role="status"
           >
             You&apos;re subscribed — you can create trips from{" "}
@@ -93,43 +93,43 @@ function PricingContent() {
           </div>
         ) : null}
         {canceled ? (
-          <p className="mb-6 text-center text-sm text-slate-600 dark:text-neutral-400">Checkout canceled.</p>
+          <p className="mb-6 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Checkout canceled.</p>
         ) : null}
         {checkoutError ? (
-          <p className="mb-6 text-center text-sm text-rose-600 dark:text-rose-400" role="alert">
+          <p className="mb-6 text-center text-sm text-[#a8443c] dark:text-rose-400" role="alert">
             {checkoutError}
           </p>
         ) : null}
 
         <div className="text-center">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
             Simple pricing
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-slate-600 dark:text-neutral-400">
-            Testing mode: every tier is <span className="font-semibold text-slate-800 dark:text-neutral-200">$0/mo</span>{" "}
+          <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+            Testing mode: every tier is <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">$0/mo</span>{" "}
             in the UI. Trip creation is open to all signed-in users — subscription billing is bypassed until we turn the
             gate back on.
           </p>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          <article className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-dm-card">
-            <p className="text-sm font-semibold text-slate-500 dark:text-neutral-500">Free</p>
-            <p className="mt-2 font-display text-4xl font-semibold text-slate-900 dark:text-white">
+          <article className="flex flex-col rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card">
+            <p className="text-sm font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">Free</p>
+            <p className="mt-2 font-display text-4xl font-semibold text-[color:var(--on-surface)] dark:text-white">
               $0
-              <span className="text-lg font-normal text-slate-500 dark:text-neutral-500">/mo</span>
+              <span className="text-lg font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">/mo</span>
             </p>
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               For travelers joining someone else&apos;s trip.
             </p>
-            <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-700 dark:text-neutral-300">
+            <ul className="mt-6 flex-1 space-y-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               {[
                 "Join trips with an invite code",
                 "Vote on group decisions",
                 "View shared itineraries",
               ].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--sage)] dark:text-emerald-400" />
                   <span>{f}</span>
                 </li>
               ))}
@@ -142,19 +142,19 @@ function PricingContent() {
             </Link>
           </article>
 
-          <article className="relative flex flex-col rounded-2xl border-2 border-indigo-500 bg-white p-8 shadow-lg dark:border-indigo-500/60 dark:bg-dm-card">
-            <span className="absolute right-4 top-4 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-200">
+          <article className="relative flex flex-col rounded-2xl border border-[#1c1c17] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient)] dark:border-indigo-500/60 dark:bg-dm-card">
+            <span className="absolute right-4 top-4 label-caps rounded-full bg-[#1c1c17] px-3 py-1 text-[color:var(--surface)] dark:bg-indigo-950/80 dark:text-indigo-200">
               Popular
             </span>
-            <p className="text-sm font-semibold text-slate-500 dark:text-neutral-500">Host</p>
-            <p className="mt-2 font-display text-4xl font-semibold text-slate-900 dark:text-white">
+            <p className="text-sm font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">Host</p>
+            <p className="mt-2 font-display text-4xl font-semibold text-[color:var(--on-surface)] dark:text-white">
               $0
-              <span className="text-lg font-normal text-slate-500 dark:text-neutral-500">/mo</span>
+              <span className="text-lg font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">/mo</span>
             </p>
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Create trips and coordinate small groups.
             </p>
-            <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-700 dark:text-neutral-300">
+            <ul className="mt-6 flex-1 space-y-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               {[
                 "Create & share trips",
                 "AI trip parser",
@@ -162,7 +162,7 @@ function PricingContent() {
                 "Hotel & restaurant suggestions",
               ].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--sage)] dark:text-emerald-400" />
                   <span>{f}</span>
                 </li>
               ))}
@@ -177,16 +177,16 @@ function PricingContent() {
             </button>
           </article>
 
-          <article className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-dm-card">
-            <p className="text-sm font-semibold text-slate-500 dark:text-neutral-500">Host Pro</p>
-            <p className="mt-2 font-display text-4xl font-semibold text-slate-900 dark:text-white">
+          <article className="flex flex-col rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card">
+            <p className="text-sm font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">Host Pro</p>
+            <p className="mt-2 font-display text-4xl font-semibold text-[color:var(--on-surface)] dark:text-white">
               $0
-              <span className="text-lg font-normal text-slate-500 dark:text-neutral-500">/mo</span>
+              <span className="text-lg font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">/mo</span>
             </p>
-            <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+            <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Full-featured hosting for larger trips.
             </p>
-            <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-700 dark:text-neutral-300">
+            <ul className="mt-6 flex-1 space-y-3 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               {[
                 "Everything in Host",
                 "Unlimited group members",
@@ -195,7 +195,7 @@ function PricingContent() {
                 "Priority support",
               ].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--sage)] dark:text-emerald-400" />
                   <span>{f}</span>
                 </li>
               ))}
@@ -220,7 +220,7 @@ export function PricingPageWithSuspense() {
     <Suspense
       fallback={
         <SiteShell title="Pricing" eyebrow="Conci">
-          <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
+          <div className="flex min-h-[40vh] items-center justify-center text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Loading…
           </div>
         </SiteShell>

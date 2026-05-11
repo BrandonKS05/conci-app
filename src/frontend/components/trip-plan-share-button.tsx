@@ -58,7 +58,7 @@ export function TripPlanShareButton({ shareMessage }: { shareMessage?: string })
       <button
         type="button"
         onClick={() => void handleShare()}
-        className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-card"
+        className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-white px-3 py-1 text-xs font-semibold text-[color:var(--on-surface-variant)] shadow-sm transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-card"
       >
         {label}
       </button>
@@ -66,7 +66,7 @@ export function TripPlanShareButton({ shareMessage }: { shareMessage?: string })
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-lg shadow-slate-900/10 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-black/40"
+          className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-full border border-[color:var(--hairline)] bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-lg shadow-slate-900/10 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:shadow-black/40"
         >
           {toastMessage}
         </div>

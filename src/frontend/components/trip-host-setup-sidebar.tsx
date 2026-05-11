@@ -21,13 +21,13 @@ export function TripHostSetupSidebar({
   return (
     <div className="space-y-4">
       <DynamicTripItinerary plan={plan} />
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-        <p className="text-sm text-slate-600 dark:text-neutral-400">
+      <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-4 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Want a cleaner full itinerary page with print-ready export?
         </p>
         <Link
           href={`/trip/${tripId}/setup/overview-app`}
-          className="mt-3 inline-flex items-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-500"
+          className="mt-3 inline-flex items-center rounded-lg bg-[#1c1c17] px-4 py-2 text-sm font-medium tracking-wide text-[color:var(--surface)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
         >
           Open trip overview
         </Link>

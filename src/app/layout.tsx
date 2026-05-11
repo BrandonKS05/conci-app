@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Inter } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,10 +7,10 @@ const inter = Inter({
   variable: "--font-body",
 });
 
-/** Editorial display / headings — matches Create a Trip greeting (Instrument Serif). */
-const instrumentSerif = Instrument_Serif({
+/** Editorial display / headings — Cool Luxury Travel design system (Playfair Display). */
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  weight: "400",
+  weight: ["600", "700"],
   variable: "--font-display",
   display: "swap",
 });
@@ -29,10 +29,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${instrumentSerif.variable}`}
+      className={`${inter.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] antialiased dark:bg-[#0f0f0f] dark:text-neutral-200">
+        {children}
+      </body>
     </html>
   );
 }

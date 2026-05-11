@@ -113,11 +113,11 @@ export function TripPlanBuildProgressOverlay({ step }: { step: TripParserBuildSt
           aria-hidden
         />
         <div className="relative overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/90 shadow-[0_24px_80px_-20px_rgba(15,23,42,0.35)] backdrop-blur-md dark:border-white/10 dark:bg-[#151821]/92">
-          <div className="border-b border-slate-200/80 bg-gradient-to-r from-violet-50/90 to-sky-50/80 px-6 pb-4 pt-5 dark:border-white/10 dark:from-violet-950/40 dark:to-sky-950/30">
+          <div className="border-b border-[color:var(--hairline)]/80 bg-gradient-to-r from-violet-50/90 to-sky-50/80 px-6 pb-4 pt-5 dark:border-white/10 dark:from-violet-950/40 dark:to-sky-950/30">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700/90 dark:text-violet-300/90">
               Creating your trip
             </p>
-            <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
               Hang tight — this usually takes a few seconds
             </h2>
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
@@ -148,7 +148,7 @@ export function TripPlanBuildProgressOverlay({ step }: { step: TripParserBuildSt
                         ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/40"
                         : current
                           ? "border-sky-200 bg-white ring-2 ring-sky-400/40 dark:border-sky-800/60 dark:bg-[#1a2230] dark:ring-sky-500/35"
-                          : "border-slate-200/80 bg-slate-50/80 opacity-60 dark:border-white/10 dark:bg-[#1a1d26]",
+                          : "border-[color:var(--hairline)]/80 bg-[color:var(--surface-container-low)]/80 opacity-60 dark:border-white/10 dark:bg-[#1a1d26]",
                     ].join(" ")}
                   >
                     {done ? (
@@ -171,8 +171,8 @@ export function TripPlanBuildProgressOverlay({ step }: { step: TripParserBuildSt
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="font-semibold text-slate-900 dark:text-neutral-100">{row.title}</p>
-                    <p className="mt-1 text-sm leading-snug text-slate-600 dark:text-neutral-400">{row.subtitle}</p>
+                    <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{row.title}</p>
+                    <p className="mt-1 text-sm leading-snug text-[color:var(--on-surface-variant)] dark:text-neutral-400">{row.subtitle}</p>
                   </div>
                 </li>
               );

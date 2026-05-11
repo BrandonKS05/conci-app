@@ -127,11 +127,11 @@ export function DynamicTripItinerary({ plan }: { plan: TripPlan }) {
   const emptyTimeline = days.length === 0 || !hasTimelineContent;
 
   return (
-    <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+    <div className="space-y-4 rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
       <header className="border-b border-slate-100 pb-4 dark:border-white/10">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{title}</h2>
-        {loc ? <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">{loc}</p> : null}
-        <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+        <h2 className="text-xl font-semibold text-[color:var(--on-surface)] dark:text-white">{title}</h2>
+        {loc ? <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{loc}</p> : null}
+        <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           Updates live when someone adds restaurants on the calendar, keeps live picks, or edits trip spotlights.
         </p>
       </header>
@@ -142,11 +142,11 @@ export function DynamicTripItinerary({ plan }: { plan: TripPlan }) {
         </p>
       ) : (
         <div className="space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Timeline
           </p>
           {emptyTimeline ? (
-            <p className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
+            <p className="rounded-xl border border-slate-100 bg-[color:var(--surface-container-low)] px-4 py-3 text-sm text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
               No dining or lodging on the calendar yet for these dates — pin restaurants on the month grid or add live picks from
               flights. This section fills in automatically as you go.
             </p>
@@ -159,10 +159,10 @@ export function DynamicTripItinerary({ plan }: { plan: TripPlan }) {
               return (
                 <li
                   key={iso}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 dark:border-white/10 dark:bg-dm-page/80"
+                  className="overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/50 dark:border-white/10 dark:bg-dm-page/80"
                 >
                   <div className="border-b border-slate-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-dm-card/90">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-neutral-100">
+                    <h3 className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">
                       {formatDayHeading(iso, index)}
                     </h3>
                   </div>
@@ -173,9 +173,9 @@ export function DynamicTripItinerary({ plan }: { plan: TripPlan }) {
                           {r.icon}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{r.label}</p>
+                          <p className="text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{r.label}</p>
                           {r.sub ? (
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                               {r.sub}
                             </p>
                           ) : null}
@@ -192,16 +192,16 @@ export function DynamicTripItinerary({ plan }: { plan: TripPlan }) {
 
       {unscheduledSpotlights.length > 0 ? (
         <div className="border-t border-slate-100 pt-4 dark:border-white/10">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Spotlight restaurants (not pinned to a day yet)
           </p>
           <ul className="mt-3 space-y-2">
             {unscheduledSpotlights.map((r, i) => (
-              <li key={`spot-${i}-${r.label}`} className="flex gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+              <li key={`spot-${i}-${r.label}`} className="flex gap-3 rounded-lg bg-[color:var(--surface-container-low)] px-3 py-2 dark:bg-white/5">
                 <span aria-hidden>{r.icon}</span>
                 <div>
                   <p className="text-sm font-medium text-slate-800 dark:text-neutral-200">{r.label}</p>
-                  <p className="text-[11px] text-slate-500 dark:text-neutral-500">{r.sub}</p>
+                  <p className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{r.sub}</p>
                 </div>
               </li>
             ))}

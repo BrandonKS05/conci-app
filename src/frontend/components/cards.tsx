@@ -9,7 +9,7 @@ export function GlassCard({
 }) {
   return (
     <div
-      className={`rounded-[1.75rem] border border-white/80 bg-white/[0.85] p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-dm-card dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)] ${className}`}
+      className={`rounded-[1.75rem] border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-5 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)] ${className}`}
     >
       {children}
     </div>
@@ -25,17 +25,17 @@ export function SectionTitle({
 }) {
   return (
     <div className="mb-5">
-      <h2 className="font-display text-xl font-semibold tracking-[-0.03em] text-ink dark:text-white sm:text-2xl">
+      <h2 className="font-display text-xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-2xl">
         {title}
       </h2>
-      {description ? <p className="mt-1 text-sm text-slate-500 dark:text-neutral-500">{description}</p> : null}
+      {description ? <p className="mt-1 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">{description}</p> : null}
     </div>
   );
 }
 
 export function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-brand-100 bg-brand-50/80 px-3 py-1 text-xs font-semibold text-brand-700 dark:border-white/10 dark:bg-white/5 dark:text-neutral-300">
+    <span className="label-caps inline-flex items-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-1 text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-white/5 dark:text-neutral-300">
       {children}
     </span>
   );
@@ -51,7 +51,7 @@ export function PrimaryButton({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-slate-950 via-slate-900 to-brand-700 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_30px_rgba(15,23,42,0.22)]"
+      className="inline-flex items-center justify-center rounded-full bg-[#1c1c17] px-6 py-3.5 text-sm font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26]"
     >
       {children}
     </Link>
@@ -68,7 +68,7 @@ export function SecondaryButton({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-ink transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-card"
+      className="inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-3.5 text-sm font-medium tracking-wide text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-card"
     >
       {children}
     </Link>

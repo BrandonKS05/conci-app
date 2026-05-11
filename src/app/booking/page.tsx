@@ -30,7 +30,7 @@ export default async function BookingIndexPage() {
     console.error("[booking page] hosted query failed:", ownedErr.message);
     return (
       <SiteShell title="Checklists" eyebrow="Checklists">
-        <div className="mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="mx-auto max-w-xl rounded-xl border border-amber-300/45 bg-amber-50/70 px-4 py-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           Could not load finalized trips.
         </div>
       </SiteShell>
@@ -91,9 +91,9 @@ export default async function BookingIndexPage() {
     <SiteShell title="Checklists" eyebrow="Finalized trips">
       <div className="mx-auto w-full max-w-xl space-y-8">
         {trips.length === 0 ? (
-          <p className="text-sm leading-6 text-slate-600 dark:text-neutral-400">
+          <p className="text-sm leading-6 text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             When you <strong>finalize</strong> a trip after all decisions are locked, it appears here. Open a plan from{" "}
-            <Link href="/my-trips" className="font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400">
+            <Link href="/my-trips" className="font-medium text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400">
               My Trips
             </Link>
             .
@@ -104,13 +104,13 @@ export default async function BookingIndexPage() {
               <li key={t.id}>
                 <Link
                   href={`/booking/${t.id}`}
-                  className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 dark:border-white/10 dark:bg-dm-card dark:hover:border-indigo-500/40"
+                  className="block rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-5 shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--hairline-strong)] hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:hover:border-indigo-500/40"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+                  <p className="label-caps text-[color:var(--sage)] dark:text-neutral-500">
                     {t.section === "hosted" ? "My trip" : "Joined trip"}
                   </p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-neutral-100">{t.title}</p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">{t.location || "Location TBD"}</p>
+                  <p className="mt-2 font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-neutral-100">{t.title}</p>
+                  <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{t.location || "Location TBD"}</p>
                 </Link>
               </li>
             ))}

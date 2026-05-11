@@ -36,8 +36,8 @@ export default async function BookingTripPage({
   const svc = getSupabaseServiceRoleClient();
   if (!svc) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-slate-600 dark:bg-dm-page dark:text-neutral-400">
-        Add <code className="rounded bg-slate-100 px-1 dark:bg-dm-card">SUPABASE_SERVICE_ROLE_KEY</code> for this page.
+      <div className="min-h-screen bg-[color:var(--surface)] px-4 py-16 text-center text-sm text-[color:var(--on-surface-variant)] dark:bg-dm-page dark:text-neutral-400">
+        Add <code className="rounded bg-[color:var(--surface-container)] px-1 dark:bg-dm-card">SUPABASE_SERVICE_ROLE_KEY</code> for this page.
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default async function BookingTripPage({
   const canEdit = access.isHost;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 dark:bg-dm-page sm:py-12">
+    <div className="min-h-screen bg-[color:var(--surface)] py-8 dark:bg-dm-page sm:py-12">
       <SiteShell title="Checklists" eyebrow="Booking checklist">
         <div className="mx-auto w-full max-w-xl space-y-8">
           <div className="flex items-center justify-between gap-3">
@@ -79,22 +79,22 @@ export default async function BookingTripPage({
             <TripContributeButton tripId={id} />
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">Trip</p>
-            <h2 className="mt-1 font-display text-2xl font-semibold text-slate-900 dark:text-neutral-100">
+          <div className="rounded-3xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+            <p className="label-caps text-[color:var(--sage)] dark:text-neutral-500">Trip</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-neutral-100">
               {plan.title || "Untitled trip"}
             </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">{plan.location || "Location TBD"}</p>
-            <dl className="mt-4 grid gap-2 text-sm text-slate-700 dark:text-neutral-300">
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-500 dark:text-neutral-500">Dates</dt>
-                <dd className="text-right font-medium">
+            <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{plan.location || "Location TBD"}</p>
+            <dl className="mt-4 grid gap-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+              <div className="flex justify-between gap-4 border-t border-[color:var(--hairline)] pt-3 dark:border-white/10">
+                <dt className="text-[color:var(--on-surface-muted)] dark:text-neutral-500">Dates</dt>
+                <dd className="text-right font-medium text-[color:var(--on-surface)] dark:text-neutral-100">
                   {plan.dates.options.length ? plan.dates.options.join(" · ") : "TBD"}
                 </dd>
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-500 dark:text-neutral-500">People</dt>
-                <dd className="text-right font-medium">
+              <div className="flex justify-between gap-4 border-t border-[color:var(--hairline)] pt-3 dark:border-white/10">
+                <dt className="text-[color:var(--on-surface-muted)] dark:text-neutral-500">People</dt>
+                <dd className="text-right font-medium text-[color:var(--on-surface)] dark:text-neutral-100">
                   {plan.people.count != null
                     ? `${plan.people.count}`
                     : plan.people.names.length
@@ -102,9 +102,9 @@ export default async function BookingTripPage({
                       : "TBD"}
                 </dd>
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-500 dark:text-neutral-500">Budget</dt>
-                <dd className="text-right font-medium">
+              <div className="flex justify-between gap-4 border-t border-[color:var(--hairline)] pt-3 dark:border-white/10">
+                <dt className="text-[color:var(--on-surface-muted)] dark:text-neutral-500">Budget</dt>
+                <dd className="text-right font-medium text-[color:var(--on-surface)] dark:text-neutral-100">
                   {[plan.budget.tier, plan.budget.perPerson].filter(Boolean).join(" · ") || "TBD"}
                 </dd>
               </div>
@@ -116,7 +116,7 @@ export default async function BookingTripPage({
           <p className="text-center">
             <Link
               href={`/trip/${id}`}
-              className="text-sm font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+              className="text-sm font-medium text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400"
             >
               Back to trip plan
             </Link>

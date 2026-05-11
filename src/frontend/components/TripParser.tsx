@@ -1013,16 +1013,15 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         <TripPlanBuildProgressOverlayDark step={tripBuildStep} tripTitle={plan?.title || seedMessage} />
       ) : null}
 
-      <header className="flex items-start gap-3.5">
-        <span
-          className="mt-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-semibold text-slate-900 ring-1 ring-slate-200 dark:bg-[#1f1f1f] dark:text-[#ebe9e4] dark:ring-white/10"
-          aria-hidden
-        >
-          C
-        </span>
-        <h1 className="font-display text-[1.85rem] font-medium leading-[1.12] tracking-[-0.02em] text-slate-900 dark:text-[#ebe9e4] sm:text-[2.35rem]">
-          Hello, {firstName}
+      <header className="flex flex-col gap-5 pt-2 sm:pt-6">
+        <span className="editorial-eyebrow dark:text-[color:var(--sage-soft)]">Plan your journey</span>
+        <h1 className="font-display text-[2.75rem] font-semibold leading-[0.98] tracking-[-0.035em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[4.25rem]">
+          Hello, <span className="italic">{firstName}</span>
         </h1>
+        <p className="max-w-xl text-base leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[#9c9a96] sm:text-[17px]">
+          Where will your next journey take you? Paste a text, link, or screenshot and Conci will turn it into a shareable plan.
+        </p>
+        <div className="hairline-rule mt-2 max-w-md dark:bg-white/10" />
       </header>
 
       {saveError ? (
@@ -1073,7 +1072,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         {error ? (
           <div className="flex flex-col gap-2">
             <div className="flex gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 ring-1 ring-slate-300 dark:bg-[#2a2a2a] dark:text-[#a8a6a2] dark:ring-white/10">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--surface-container-high)] text-xs font-semibold text-[color:var(--on-surface-muted)] ring-1 ring-[color:var(--hairline)] dark:bg-[#2a2a2a] dark:text-[#a8a6a2] dark:ring-white/10">
                 C
               </div>
               <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/50 dark:text-rose-100">
@@ -1088,7 +1087,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                     setError(null);
                     void finalizePlan(slots);
                   }}
-                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-white/15 dark:bg-[#252525] dark:text-[#ebe9e4] dark:hover:bg-[#2e2e2e]"
+                  className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-sm font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-[#252525] dark:text-[#ebe9e4] dark:hover:bg-[#2e2e2e]"
                 >
                   Try building the plan again
                 </button>
@@ -1104,7 +1103,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                 key={key}
                 type="button"
                 onClick={() => pickChip(key)}
-                className="max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm text-slate-800 shadow-sm transition hover:border-orange-400/50 hover:bg-slate-50 dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#e4e2de] dark:hover:border-[#ea580c]/50 dark:hover:bg-[#252525]"
+                className="max-w-full rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-left text-sm text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--sage)]/40 hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#e4e2de] dark:hover:border-[#ea580c]/50 dark:hover:bg-[#252525]"
               >
                 {SLOT_QUESTIONS[key]}
               </button>
@@ -1118,9 +1117,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           onSubmit={(e) => {
             void submitSlotAnswer(e);
           }}
-          className="mb-2 shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+          className="mb-2 shrink-0 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-4 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
         >
-          <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8d89]">
+          <label className="label-caps mb-1.5 block text-[color:var(--on-surface-muted)] dark:text-[#8f8d89]">
             Your answer
           </label>
           {activeSlot === "dates" ? (
@@ -1135,8 +1134,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                   }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                     dateSlotMode === "specific"
-                      ? "bg-slate-900 text-white dark:bg-[#ebe9e4] dark:text-[#141414]"
-                      : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
+                      ? "bg-[#1c1c17] text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] dark:bg-[#ebe9e4] dark:text-[#141414]"
+                      : "border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
                   }`}
                 >
                   Specific dates
@@ -1151,8 +1150,8 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                   }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                     dateSlotMode === "rough"
-                      ? "bg-slate-900 text-white dark:bg-[#ebe9e4] dark:text-[#141414]"
-                      : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
+                      ? "bg-[#1c1c17] text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] dark:bg-[#ebe9e4] dark:text-[#141414]"
+                      : "border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-[#252525] dark:text-[#c4c2be]"
                   }`}
                 >
                   Rough window
@@ -1161,34 +1160,34 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               {dateSlotMode === "specific" ? (
                 <div className="space-y-2">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
+                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-400">
                       Start
                       <input
                         type="date"
                         value={dateStart}
                         onChange={(e) => setDateStart(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-500/50 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
+                        className="rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none focus:border-[color:var(--sage)]/55 focus:ring-1 focus:ring-[color:var(--sage)]/25 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
                       />
                     </label>
-                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-neutral-400">
-                      End <span className="font-normal text-slate-400">(optional)</span>
+                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+                      End <span className="font-normal text-[color:var(--on-surface-muted)]">(optional)</span>
                       <input
                         type="date"
                         value={dateEnd}
                         min={dateStart || undefined}
                         onChange={(e) => setDateEnd(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-orange-500/50 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
+                        className="rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none focus:border-[color:var(--sage)]/55 focus:ring-1 focus:ring-[color:var(--sage)]/25 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4]"
                       />
                     </label>
                   </div>
-                  <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+                  <p className="text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                     Group calendar sync isn&apos;t wired up yet — for now this just captures dates for your plan.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="block text-xs font-medium text-slate-600 dark:text-neutral-400">
-                    Timing window <span className="font-normal text-slate-400">(free text)</span>
+                  <label className="block text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+                    Timing window <span className="font-normal text-[color:var(--on-surface-muted)]">(free text)</span>
                   </label>
                   <textarea
                     ref={replyInputRef}
@@ -1196,9 +1195,9 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                     onChange={(e) => setReplyDraft(e.target.value)}
                     placeholder="e.g. Late July 2026 · Summer · Any weekend in September"
                     rows={2}
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
+                    className="w-full resize-none rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)] px-3 py-2.5 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)]/55 focus:ring-1 focus:ring-[color:var(--sage)]/25 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
                   />
-                  <p className="text-xs leading-relaxed text-slate-500 dark:text-neutral-500">
+                  <p className="text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                     Doesn&apos;t have to be exact—we need something to steer flights, stays, and the group calendar.
                   </p>
                 </div>
@@ -1212,7 +1211,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
               onChange={(e) => setReplyDraft(e.target.value)}
               placeholder="Type here…"
               rows={2}
-              className="mb-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
+              className="mb-3 w-full resize-none rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-low)] px-3 py-2.5 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)]/55 focus:ring-1 focus:ring-[color:var(--sage)]/25 dark:border-white/10 dark:bg-[#161616] dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965] dark:focus:border-[#ea580c]/50 dark:focus:ring-[#ea580c]/30"
             />
           )}
           <div className="flex justify-end">
@@ -1237,23 +1236,23 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       {showMainComposer ? (
         <form
           onSubmit={startChat}
-          className="shrink-0 rounded-[1.35rem] border border-slate-200/90 bg-white p-1 shadow-xl ring-1 ring-slate-200/80 dark:border-white/[0.08] dark:bg-[#1e1e1e] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] dark:ring-white/[0.04]"
+          className="shrink-0 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-1 shadow-[var(--shadow-ambient)] dark:border-white/[0.08] dark:bg-[#1e1e1e] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)]"
         >
-          <div className="rounded-[1.2rem] bg-white p-4 sm:p-5 dark:bg-[#1e1e1e]">
+          <div className="rounded-[14px] bg-[color:var(--surface-container-lowest)] p-4 sm:p-5 dark:bg-[#1e1e1e]">
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={(e) => void onPickImages(e.target.files)} />
             <textarea
               value={composerText}
               onChange={(e) => setComposerText(e.target.value)}
               placeholder="How can I help you plan today?"
               rows={6}
-              className="min-h-[8.5rem] w-full resize-y border-0 bg-transparent text-[15px] leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
+              className="min-h-[8.5rem] w-full resize-y border-0 bg-transparent text-[15px] leading-relaxed text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:ring-0 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
             />
             {imageSlots.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
                 {imageSlots.map((img) => (
                   <div
                     key={img.id}
-                    className="group relative h-14 w-14 overflow-hidden rounded-lg ring-1 ring-slate-200 dark:ring-white/10"
+                    className="group relative h-14 w-14 overflow-hidden rounded-lg ring-1 ring-[color:var(--hairline)] dark:ring-white/10"
                   >
                     <NextImage
                       src={img.dataUrl}
@@ -1278,12 +1277,12 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
             {voiceNote ? (
               <p className="mb-2 text-xs text-amber-800 dark:text-amber-200/90">{voiceNote}</p>
             ) : null}
-            <div className="mt-1 flex items-center justify-between gap-3 border-t border-slate-200/90 pt-3 dark:border-white/[0.06]">
+            <div className="mt-1 flex items-center justify-between gap-3 border-t border-[color:var(--hairline)] pt-3 dark:border-white/[0.06]">
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-[#c4c2be] dark:hover:bg-white/5 dark:hover:text-[#ebe9e4]"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--on-surface-muted)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[#c4c2be] dark:hover:bg-white/5 dark:hover:text-[#ebe9e4]"
                   aria-label="Add images"
                 >
                   <span className="text-lg font-light leading-none">+</span>
@@ -1291,10 +1290,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
                 <button
                   type="button"
                   onClick={() => (voiceListening ? stopVoice() : void toggleVoice())}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition hover:bg-slate-100 dark:hover:bg-white/5 ${
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/5 ${
                     voiceListening
                       ? "bg-orange-100 text-orange-700 dark:bg-[#ea580c]/20 dark:text-[#fb923c]"
-                      : "text-slate-500 hover:text-slate-900 dark:text-[#c4c2be] dark:hover:text-[#ebe9e4]"
+                      : "text-[color:var(--on-surface-muted)] hover:text-[color:var(--on-surface)] dark:text-[#c4c2be] dark:hover:text-[#ebe9e4]"
                   }`}
                   aria-label={voiceListening ? "Stop voice" : "Voice mode"}
                   title="Voice mode"
@@ -1319,7 +1318,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           <button
             type="button"
             onClick={resetTrip}
-            className="text-sm font-medium text-slate-500 underline-offset-4 hover:text-slate-700 hover:underline dark:text-[#9c9a96] dark:hover:text-[#ebe9e4]"
+            className="text-sm font-medium text-[color:var(--on-surface-muted)] underline-offset-4 hover:text-[color:var(--on-surface)] hover:underline dark:text-[#9c9a96] dark:hover:text-[#ebe9e4]"
           >
             Start over
           </button>
@@ -1350,14 +1349,14 @@ function AssistantBubble({
 }) {
   return (
     <div className="flex gap-2">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 ring-1 ring-slate-300 dark:bg-[#2a2a2a] dark:text-[#a8a6a2] dark:ring-white/10">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--surface-container-high)] text-xs font-semibold text-[color:var(--on-surface-muted)] ring-1 ring-[color:var(--hairline)] dark:bg-[#2a2a2a] dark:text-[#a8a6a2] dark:ring-white/10">
         C
       </div>
       <div
-        className={`max-w-[85%] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 dark:text-[#e4e2de] ${
+        className={`max-w-[85%] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-[color:var(--on-surface)] dark:text-[#e4e2de] ${
           typing
-            ? "border border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#7a7874]"
-            : "bg-slate-100 ring-1 ring-slate-200/80 dark:bg-[#252525] dark:ring-white/[0.04]"
+            ? "border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface-muted)] dark:border-white/10 dark:bg-[#1e1e1e] dark:text-[#7a7874]"
+            : "bg-[color:var(--surface-container-low)] ring-1 ring-[color:var(--hairline)] dark:bg-[#252525] dark:ring-white/[0.04]"
         }`}
       >
         {typing ? <span className="inline-block animate-pulse">Building…</span> : text}
@@ -1370,7 +1369,7 @@ function AssistantBubble({
 function UserBubble({ text, placeBlocks }: { text: string; placeBlocks?: PlacePreviewBlock[] }) {
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-slate-200 px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 ring-1 ring-slate-300 dark:bg-[#2c2c2c] dark:text-[#ebe9e4] dark:ring-white/10">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[color:var(--surface-container-high)] px-3.5 py-2.5 text-sm leading-relaxed text-[color:var(--on-surface)] ring-1 ring-[color:var(--hairline-strong)] dark:bg-[#2c2c2c] dark:text-[#ebe9e4] dark:ring-white/10">
         {text}
       </div>
       {placeBlocks?.length ? <InlinePlacePreviewCards blocks={placeBlocks} /> : null}

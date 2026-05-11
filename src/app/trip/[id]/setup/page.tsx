@@ -28,7 +28,7 @@ export default async function TripHostSetupPage({
   const svc = getSupabaseServiceRoleClient();
   if (!svc) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-slate-600 dark:bg-dm-page dark:text-neutral-400">
+      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-[color:var(--on-surface-variant)] dark:bg-dm-page dark:text-neutral-400">
         <p className="mb-4">
           Trip setup needs{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-dm-card dark:text-neutral-200">SUPABASE_SERVICE_ROLE_KEY</code> on the server.
@@ -64,7 +64,7 @@ export default async function TripHostSetupPage({
   const inviteRaw = typeof data.invite_code === "string" ? data.invite_code : "";
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 text-slate-900 dark:bg-dm-page dark:text-neutral-100 sm:py-8">
+    <div className="min-h-screen bg-slate-50 py-6 text-[color:var(--on-surface)] dark:bg-dm-page dark:text-neutral-100 sm:py-8">
       <TripHostSetupDashboard
         tripId={id}
         initialPlan={plan}

@@ -28,7 +28,7 @@ export default async function SavedTripPlanPage({
 
   if (!svc) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-slate-600 dark:bg-dm-page dark:text-neutral-400">
+      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-[color:var(--on-surface-variant)] dark:bg-dm-page dark:text-neutral-400">
         <p className="mb-4">
           Trip pages need{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-dm-card dark:text-neutral-200">SUPABASE_SERVICE_ROLE_KEY</code> on the

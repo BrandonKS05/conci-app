@@ -1,12 +1,12 @@
 /**
- * TripParser chat Send–aligned filled primary actions: slate pill in light mode,
+ * Filled primary actions — Cool Luxury: charcoal ink on cream in light mode,
  * warm off-white pill in dark mode (`#ebe9e4`).
  */
 export const primaryFilledInteractive =
-  "bg-slate-900 font-semibold text-white transition hover:bg-slate-800 disabled:pointer-events-none disabled:opacity-40 dark:bg-[#ebe9e4] dark:text-[#141414] dark:hover:bg-white";
+  "bg-[#1c1c17] font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] disabled:pointer-events-none disabled:opacity-40 dark:bg-[#ebe9e4] dark:text-[#141414] dark:shadow-none dark:hover:bg-white";
 
 export const primaryFocusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-[#d4d2cd] dark:focus-visible:ring-offset-dm-page";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] dark:focus-visible:ring-[color:var(--sage-soft)]/40 dark:focus-visible:ring-offset-dm-page";
 
 /** Navbar / landing: full pill (matches TripParser Send shape). */
 export const primaryNavPillClass = `inline-flex items-center justify-center rounded-full px-4 py-2 text-xs shadow-sm sm:px-5 sm:text-sm ${primaryFocusRing} ${primaryFilledInteractive}`;

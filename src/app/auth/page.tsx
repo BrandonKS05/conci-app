@@ -196,18 +196,18 @@ function AuthInner() {
   }
 
   const inputClass =
-    "mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100";
+    "mt-1.5 block w-full rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2.5 text-sm text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] outline-none transition placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:ring-1 focus:ring-[color:var(--sage)]/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100";
 
   return (
-    <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center px-4 py-16">
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-black/40">
-        <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-neutral-500">
+    <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center px-5 py-16">
+      <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:shadow-black/40">
+        <p className="label-caps mb-2 text-center text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
           Conci
         </p>
-        <h1 className="mb-2 text-center font-display text-2xl font-semibold tracking-[-0.04em] text-slate-900 dark:text-white">
+        <h1 className="mb-2 text-center font-display text-2xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white">
           {mode === "signin" ? "Sign in" : "Create account"}
         </h1>
-        <p className="mb-8 text-center text-sm text-slate-600 dark:text-neutral-400">
+        <p className="mb-8 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Continue to create and save trip plans.
         </p>
 
@@ -215,7 +215,7 @@ function AuthInner() {
           type="button"
           onClick={() => void continueWithGoogle()}
           disabled={oauthWorking || working}
-          className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-page"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-3.5 text-sm font-medium tracking-wide text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--on-surface)]/25 hover:bg-[color:var(--surface-container-low)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:border-white/15 dark:hover:bg-dm-page"
         >
           <GoogleGlyph />
           {oauthWorking ? "Redirecting…" : "Continue with Google"}
@@ -223,16 +223,16 @@ function AuthInner() {
 
         <div className="relative my-7">
           <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-slate-200 dark:border-white/10" />
+            <div className="w-full border-t border-[color:var(--hairline)] dark:border-white/10" />
           </div>
           <div className="relative flex justify-center text-xs font-medium uppercase tracking-wide">
-            <span className="bg-white px-3 text-slate-500 dark:bg-dm-card dark:text-neutral-500">or</span>
+            <span className="bg-[color:var(--surface-container-lowest)] px-3 text-[color:var(--on-surface-muted)] dark:bg-dm-card dark:text-neutral-500">or</span>
           </div>
         </div>
 
         {signupNotice ? (
           <div
-            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200"
+            className="rounded-2xl border border-[color:var(--sage)]/35 bg-[color:var(--sage-soft)]/25 px-4 py-3 text-center text-sm text-[color:var(--on-surface)] dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200"
             role="status"
           >
             Check your email to confirm your account before signing in.
@@ -240,7 +240,7 @@ function AuthInner() {
         ) : (
           <form onSubmit={(e) => void handleEmailAuth(e)} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="auth-email" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
+              <label htmlFor="auth-email" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                 Email
               </label>
               <input
@@ -254,13 +254,13 @@ function AuthInner() {
                 className={inputClass}
               />
               {emailError ? (
-                <p className="mt-1.5 text-sm text-rose-600 dark:text-rose-400" role="alert">
+                <p className="mt-1.5 text-sm text-[#a8443c] dark:text-rose-400" role="alert">
                   {emailError}
                 </p>
               ) : null}
             </div>
             <div>
-              <label htmlFor="auth-password" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
+              <label htmlFor="auth-password" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                 Password
               </label>
               <input
@@ -275,14 +275,14 @@ function AuthInner() {
                 className={inputClass}
               />
               {passwordError ? (
-                <p className="mt-1.5 text-sm text-rose-600 dark:text-rose-400" role="alert">
+                <p className="mt-1.5 text-sm text-[#a8443c] dark:text-rose-400" role="alert">
                   {passwordError}
                 </p>
               ) : null}
             </div>
             {mode === "signup" ? (
               <div>
-                <label htmlFor="auth-confirm" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
+                <label htmlFor="auth-confirm" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
                   Confirm password
                 </label>
                 <input
@@ -296,7 +296,7 @@ function AuthInner() {
                   className={inputClass}
                 />
                 {confirmError ? (
-                  <p className="mt-1.5 text-sm text-rose-600 dark:text-rose-400" role="alert">
+                  <p className="mt-1.5 text-sm text-[#a8443c] dark:text-rose-400" role="alert">
                     {confirmError}
                   </p>
                 ) : null}
@@ -304,7 +304,7 @@ function AuthInner() {
             ) : null}
 
             {error ? (
-              <p className="text-center text-sm text-rose-600 dark:text-rose-400" role="alert">
+              <p className="text-center text-sm text-[#a8443c] dark:text-rose-400" role="alert">
                 {error}
               </p>
             ) : null}
@@ -320,14 +320,14 @@ function AuthInner() {
         )}
 
         {!signupNotice ? (
-          <p className="mt-6 text-center text-sm text-slate-600 dark:text-neutral-400">
+          <p className="mt-6 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             {mode === "signin" ? (
               <>
                 Don&apos;t have an account?{" "}
                 <button
                   type="button"
                   onClick={() => switchMode("signup")}
-                  className="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+                  className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400"
                 >
                   Sign up
                 </button>
@@ -338,7 +338,7 @@ function AuthInner() {
                 <button
                   type="button"
                   onClick={() => switchMode("signin")}
-                  className="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+                  className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400"
                 >
                   Sign in
                 </button>
@@ -346,7 +346,7 @@ function AuthInner() {
             )}
           </p>
         ) : (
-          <p className="mt-6 text-center text-sm text-slate-600 dark:text-neutral-400">
+          <p className="mt-6 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Wrong email?{" "}
             <button
               type="button"
@@ -354,15 +354,15 @@ function AuthInner() {
                 setSignupNotice(false);
                 switchMode("signup");
               }}
-              className="font-semibold text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+              className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400"
             >
               Try again
             </button>
           </p>
         )}
       </div>
-      <p className="mt-6 text-center text-xs text-slate-500 dark:text-neutral-500">
-        <Link href="/" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+      <p className="mt-6 text-center text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+        <Link href="/" className="font-medium text-[color:var(--on-surface)] hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400">
           Back to home
         </Link>
       </p>
@@ -397,7 +397,7 @@ export default function AuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
+        <div className="flex min-h-[40vh] items-center justify-center text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
           Loading…
         </div>
       }

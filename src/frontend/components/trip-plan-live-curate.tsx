@@ -67,9 +67,9 @@ function LivePickTripDayModal({
   return (
     <div className="fixed inset-0 z-[300] flex items-end justify-center p-4 sm:items-center sm:p-6" role="dialog" aria-modal="true">
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onCancel} />
-      <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
-        <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Pick a trip day</h3>
-        <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+      <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
+        <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Pick a trip day</h3>
+        <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Choose which day this reservation belongs on (within your trip date range).
         </p>
         {tripDays.length === 0 ? (
@@ -84,7 +84,7 @@ function LivePickTripDayModal({
                 type="button"
                 disabled={busy}
                 onClick={() => onPick(iso)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-3 py-2 text-xs font-medium text-[color:var(--on-surface)] shadow-sm transition hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
               >
                 {formatShortTripDay(iso)}
               </button>
@@ -95,7 +95,7 @@ function LivePickTripDayModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
+            className="rounded-lg border border-[color:var(--hairline)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--on-surface-variant)] shadow-sm hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200 dark:hover:bg-dm-page"
           >
             Cancel
           </button>
@@ -121,7 +121,7 @@ function LiveHostCurateRowActions({
   const [open, setOpen] = useState(false);
   if (!isHost) {
     return (
-      <p className="text-[11px] text-slate-500 dark:text-neutral-500">Only the trip host can add or dismiss suggestions.</p>
+      <p className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">Only the trip host can add or dismiss suggestions.</p>
     );
   }
   return (
@@ -131,7 +131,7 @@ function LiveHostCurateRowActions({
           type="button"
           disabled={busyAll}
           onClick={() => mutate("dismiss", itemKey)}
-          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
+          className="rounded-full border border-[color:var(--hairline)] px-3 py-1.5 text-xs font-semibold text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)] disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/5"
         >
           Not interested
         </button>
@@ -192,8 +192,8 @@ export function HostLiveScheduleByDay({
       <ul className="mt-3 space-y-4">
         {days.map((day) => (
           <li key={day}>
-            <p className="text-sm font-semibold text-slate-900 dark:text-neutral-100">{formatShortTripDay(day)}</p>
-            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-neutral-300">
+            <p className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{formatShortTripDay(day)}</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
               {(byDay.get(day) ?? []).map((label, i) => (
                 <li key={`${day}-${i}-${label}`}>{label}</li>
               ))}
@@ -238,7 +238,7 @@ function SwipeableLiveCard({
       <div
         role="group"
         aria-label={swipeLabel}
-        className="relative touch-pan-y overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
+        className="relative touch-pan-y overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-dm-elevated/50"
         style={{
           transform: `translateX(${offset}px)`,
           transition: dragging ? "none" : "transform 0.22s ease-out",
@@ -407,23 +407,23 @@ export function CuratedFlightsRows({
     .filter(({ key }) => !kept.has(key) && !dismissed.has(key));
 
   if (liveLoading) {
-    return <p className="text-sm text-slate-600 dark:text-neutral-400">Loading flights…</p>;
+    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Loading flights…</p>;
   }
   if (flightsError) {
     return <p className="text-sm text-amber-800 dark:text-amber-200/90">{flightsError}</p>;
   }
   if (!flights.length) {
-    return <p className="text-sm text-slate-600 dark:text-neutral-400">No flight rows yet (check SERPAPI_KEY).</p>;
+    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No flight rows yet (check SERPAPI_KEY).</p>;
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500 dark:text-neutral-500">
+      <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {isHost ? (
           <>
-            Tap <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, pick a day in the trip range,
-            then see it under <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Swipe
-            left or use <strong className="text-slate-700 dark:text-neutral-300">Not interested</strong> to clear the rest.
+            Tap <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Add to trip</strong>, pick a day in the trip range,
+            then see it under <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Reservations by day</strong>. Swipe
+            left or use <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Not interested</strong> to clear the rest.
           </>
         ) : (
           "Flight suggestions for your group (only the host can add them to the trip)."
@@ -440,10 +440,10 @@ export function CuratedFlightsRows({
           <div className="px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-slate-900 dark:text-neutral-100">{f.airline}</p>
-                <p className="text-sm text-slate-600 dark:text-neutral-400">Departs {f.departureTime}</p>
-                <p className="text-sm text-slate-600 dark:text-neutral-400">Duration {f.duration}</p>
-                <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{f.pricePerPerson}</p>
+                <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{f.airline}</p>
+                <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Departs {f.departureTime}</p>
+                <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Duration {f.duration}</p>
+                <p className="mt-1 text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-50">{f.pricePerPerson}</p>
               </div>
               <LiveHostCurateRowActions
                 itemKey={key}
@@ -466,10 +466,10 @@ export function CuratedFlightsRows({
         </SwipeableLiveCard>
       ))}
       {!flightPool.length && flightKeptMeta.length > 0 ? (
-        <p className="text-sm text-slate-600 dark:text-neutral-400">No more flight suggestions in the deck.</p>
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No more flight suggestions in the deck.</p>
       ) : null}
       {flights.length > 0 && !flightPool.length && !flightKeptMeta.length ? (
-        <p className="text-sm text-slate-600 dark:text-neutral-400">
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Every flight row here was dismissed. Refresh after new results load to curate again.
         </p>
       ) : null}
@@ -513,13 +513,13 @@ export function CuratedRestaurantsSection({
   const restaurantPool = restaurants.filter((r) => !kept.has(restaurantLiveKey(r)) && !dismissed.has(restaurantLiveKey(r)));
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Restaurants (live)</h3>
-      <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+    <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+      <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Restaurants (live)</h3>
+      <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {isHost ? (
           <>
-            Use <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong>, choose a trip day, then find it
-            under <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Suggestions come from
+            Use <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Add to trip</strong>, choose a trip day, then find it
+            under <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Reservations by day</strong>. Suggestions come from
             Google Places (group food hints).
           </>
         ) : (
@@ -527,7 +527,7 @@ export function CuratedRestaurantsSection({
         )}
       </p>
       {liveLoading ? (
-        <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading restaurants…</p>
+        <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Loading restaurants…</p>
       ) : restaurantsError ? (
         <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{restaurantsError}</p>
       ) : restaurants.length ? (
@@ -538,17 +538,17 @@ export function CuratedRestaurantsSection({
             return (
               <div
                 key={key}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
+                className="overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-dm-elevated/50"
               >
                 <LivePlaceCoverImage src={r.coverPhotoUrl} />
                 <div className="px-4 py-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-neutral-100">{r.name}</p>
-                      {r.cuisineType ? <p className="text-sm text-slate-600 dark:text-neutral-400">{r.cuisineType}</p> : null}
-                      <p className="text-sm text-slate-600 dark:text-neutral-400">{r.neighborhood}</p>
+                      <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{r.name}</p>
+                      {r.cuisineType ? <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{r.cuisineType}</p> : null}
+                      <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{r.neighborhood}</p>
                       <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{r.ratingDisplay}</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{r.priceRange}</p>
+                      <p className="mt-1 text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-50">{r.priceRange}</p>
                     </div>
                     <LiveHostCurateRowActions
                       itemKey={key}
@@ -571,16 +571,16 @@ export function CuratedRestaurantsSection({
             );
           })}
           {!restaurantPool.length && restaurantKeptMeta.length > 0 ? (
-            <p className="text-sm text-slate-600 dark:text-neutral-400">No more restaurant suggestions in the deck.</p>
+            <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No more restaurant suggestions in the deck.</p>
           ) : null}
           {restaurants.length > 0 && !restaurantPool.length && !restaurantKeptMeta.length ? (
-            <p className="text-sm text-slate-600 dark:text-neutral-400">
+            <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Every live suggestion here was dismissed. Refresh the page after new results load if you want to curate again.
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">No live restaurant rows yet.</p>
+        <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No live restaurant rows yet.</p>
       )}
     </section>
   );
@@ -623,20 +623,20 @@ export function CuratedExperiencesSection({
     .filter(({ key }) => !kept.has(key) && !dismissed.has(key));
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <h3 className="font-display text-base font-semibold text-slate-900 dark:text-neutral-100">Top experiences</h3>
-      <p className="mt-1 text-xs text-slate-500 dark:text-neutral-500">
+    <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+      <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">Top experiences</h3>
+      <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {isHost ? (
           <>
-            <strong className="text-slate-700 dark:text-neutral-300">Add to trip</strong> and pick a day — it will show under{" "}
-            <strong className="text-slate-700 dark:text-neutral-300">Reservations by day</strong>. Suggestions from Google Places.
+            <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Add to trip</strong> and pick a day — it will show under{" "}
+            <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Reservations by day</strong>. Suggestions from Google Places.
           </>
         ) : (
           "Experience ideas — only the host can add them to the trip."
         )}
       </p>
       {liveLoading ? (
-        <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">Loading experiences…</p>
+        <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Loading experiences…</p>
       ) : experiencesError ? (
         <p className="mt-4 text-sm text-amber-800 dark:text-amber-200/90">{experiencesError}</p>
       ) : experiences.length ? (
@@ -645,16 +645,16 @@ export function CuratedExperiencesSection({
           {experiencePool.map(({ ex, key }) => (
             <div
               key={key}
-              className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-dm-elevated/50"
+              className="overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-dm-elevated/50"
             >
               <LivePlaceCoverImage src={ex.coverPhotoUrl} />
               <div className="px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-neutral-100">{ex.name}</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900 dark:text-neutral-50">{ex.pricePerPerson}</p>
+                    <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{ex.name}</p>
+                    <p className="mt-1 text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-50">{ex.pricePerPerson}</p>
                     <p className="mt-1 text-sm font-medium text-amber-900/90 dark:text-amber-300">{ex.rating}</p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-neutral-400">Duration: {ex.duration}</p>
+                    <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Duration: {ex.duration}</p>
                   </div>
                   <LiveHostCurateRowActions
                     itemKey={key}
@@ -676,16 +676,16 @@ export function CuratedExperiencesSection({
             </div>
           ))}
           {!experiencePool.length && experienceKeptMeta.length > 0 ? (
-            <p className="text-sm text-slate-600 dark:text-neutral-400">No more experience suggestions in the deck.</p>
+            <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No more experience suggestions in the deck.</p>
           ) : null}
           {experiences.length > 0 && !experiencePool.length && !experienceKeptMeta.length ? (
-            <p className="text-sm text-slate-600 dark:text-neutral-400">
+            <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Every suggestion here was dismissed. Refresh after new results load to curate again.
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-slate-600 dark:text-neutral-400">
+        <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           No experiences found for this destination yet. Try a more specific city, or check back later.
         </p>
       )}

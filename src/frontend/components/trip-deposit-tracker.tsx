@@ -59,19 +59,19 @@ function DepositBreakdownModal({
         if (e.target === backdropRef.current) onClose();
       }}
     >
-      <div className="mx-4 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-dm-card">
+      <div className="mx-4 w-full max-w-md rounded-3xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-lg)] dark:border-white/10 dark:bg-dm-card">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500">
+            <p className="label-caps text-[color:var(--sage)] dark:text-neutral-500">
               Trip fund
             </p>
-            <p className="font-display text-2xl font-semibold text-slate-900 dark:text-white">
+            <p className="font-display text-2xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
               {formatCurrency(totalCents)}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-neutral-500 dark:hover:bg-dm-elevated dark:hover:text-neutral-300"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[color:var(--on-surface-muted)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:hover:bg-dm-elevated dark:hover:text-neutral-300"
             aria-label="Close"
           >
             <svg
@@ -89,7 +89,7 @@ function DepositBreakdownModal({
         </div>
 
         {deposits.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500 dark:text-neutral-500">
+          <p className="py-6 text-center text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             No contributions yet. Be the first!
           </p>
         ) : (
@@ -97,17 +97,17 @@ function DepositBreakdownModal({
             {deposits.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-dm-elevated"
+                className="flex items-center justify-between rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 dark:border-transparent dark:bg-dm-elevated"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-neutral-100">
+                  <p className="truncate text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-100">
                     {d.contributor_name || "Anonymous"}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-neutral-500">
+                  <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                     {formatDate(d.created_at)}
                   </p>
                 </div>
-                <p className="ml-4 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                <p className="ml-4 text-sm font-semibold text-[color:var(--sage)] dark:text-emerald-400">
                   {formatCurrency(d.amount_cents)}
                 </p>
               </li>
@@ -159,8 +159,8 @@ export function TripDepositTracker({ tripId }: { tripId: string }) {
 
   if (loading) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-400 shadow-sm dark:border-white/10 dark:bg-dm-card dark:text-neutral-500">
-        <span className="h-3 w-3 animate-pulse rounded-full bg-slate-300 dark:bg-neutral-600" />
+      <div className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-sm text-[color:var(--on-surface-muted)] shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-500">
+        <span className="h-3 w-3 animate-pulse rounded-full bg-[color:var(--surface-container-high)] dark:bg-neutral-600" />
         Loading…
       </div>
     );
@@ -170,9 +170,9 @@ export function TripDepositTracker({ tripId }: { tripId: string }) {
     <>
       <button
         onClick={() => setShowBreakdown(true)}
-        className="group inline-flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-white/10 dark:bg-dm-card dark:hover:border-emerald-500/30"
+        className="group inline-flex items-center gap-2.5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-sm shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:hover:border-emerald-500/30"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[color:var(--sage-soft)]/25 text-[color:var(--sage)] dark:bg-emerald-500/10 dark:text-emerald-400">
           <svg
             width="16"
             height="16"
@@ -189,14 +189,14 @@ export function TripDepositTracker({ tripId }: { tripId: string }) {
           </svg>
         </span>
         <span className="flex flex-col items-start leading-tight">
-          <span className="text-xs text-slate-500 dark:text-neutral-500">
+          <span className="label-caps text-[color:var(--sage)] dark:text-neutral-500">
             Trip fund
           </span>
-          <span className="font-semibold text-slate-900 dark:text-white">
+          <span className="font-display font-semibold text-[color:var(--on-surface)] dark:text-white">
             {formatCurrency(totalCents)}
           </span>
         </span>
-        <span className="ml-1 text-xs text-slate-400 transition group-hover:text-slate-600 dark:text-neutral-600 dark:group-hover:text-neutral-300">
+        <span className="ml-1 text-xs text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface-variant)] dark:text-neutral-600 dark:group-hover:text-neutral-300">
           {deposits.length} {deposits.length === 1 ? "deposit" : "deposits"}
         </span>
       </button>

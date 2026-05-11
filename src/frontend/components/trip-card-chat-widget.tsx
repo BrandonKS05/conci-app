@@ -113,20 +113,20 @@ export function TripCardChatWidget({
       className="pointer-events-none fixed bottom-4 right-4 z-40 flex max-w-full flex-col items-end gap-2 sm:bottom-6 sm:right-6"
     >
       {open ? (
-        <div className="pointer-events-auto flex h-[min(420px,70vh)] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]">
-          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-white/10">
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">Trip chat</span>
+        <div className="pointer-events-auto flex h-[min(420px,70vh)] w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-2xl dark:border-white/10 dark:bg-[#1a1a1a]">
+          <div className="flex items-center justify-between border-b border-[color:var(--hairline)] px-3 py-2 dark:border-white/10">
+            <span className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">Trip chat</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-white/5"
+              className="rounded-lg px-2 py-1 text-xs text-[color:var(--on-surface-muted)] hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-white/5"
             >
               Close
             </button>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto px-3 py-2">
             {messages.length === 0 ? (
-              <p className="text-xs text-slate-500 dark:text-neutral-500">
+              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 Ask for tweaks like “more upscale dinner” or “cheaper hotel near downtown”.
               </p>
             ) : null}
@@ -138,7 +138,7 @@ export function TripCardChatWidget({
                 <div
                   className={`max-w-[95%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
                     m.role === "user"
-                      ? "bg-slate-200 text-slate-900 dark:bg-[#2c2c2c] dark:text-[#ebe9e4]"
+                      ? "bg-slate-200 text-[color:var(--on-surface)] dark:bg-[#2c2c2c] dark:text-[#ebe9e4]"
                       : "bg-slate-100 text-slate-800 dark:bg-[#252525] dark:text-[#e4e2de]"
                   }`}
                 >
@@ -149,7 +149,7 @@ export function TripCardChatWidget({
                     {m.places.map((p, idx) => (
                       <div
                         key={`${m.id}-${p.mapsUrl}-${idx}`}
-                        className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#161616]"
+                        className="overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-[#161616]"
                       >
                         {p.photoUrl ? (
                           <div className="relative h-20 w-full">
@@ -168,16 +168,16 @@ export function TripCardChatWidget({
                           </div>
                         )}
                         <div className="space-y-1.5 p-2">
-                          <p className="text-xs font-semibold text-slate-900 dark:text-white">{p.name}</p>
-                          <p className="text-[10px] text-slate-600 dark:text-neutral-400">
+                          <p className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-white">{p.name}</p>
+                          <p className="text-[10px] text-[color:var(--on-surface-variant)] dark:text-neutral-400">
                             {p.rating != null ? `${p.rating.toFixed(1)} ★` : ""}
                             {p.priceRange ? ` · ${p.priceRange}` : ""}
                           </p>
                           {spotlightOptions.length ? (
                             <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-slate-500 dark:text-neutral-500">Replace</label>
+                              <label className="text-[10px] font-medium text-[color:var(--on-surface-muted)] dark:text-neutral-500">Replace</label>
                               <select
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-900 dark:border-white/10 dark:bg-[#222] dark:text-[#ebe9e4]"
+                                className="rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-2 py-1 text-[11px] text-[color:var(--on-surface)] dark:border-white/10 dark:bg-[#222] dark:text-[#ebe9e4]"
                                 defaultValue=""
                                 disabled={replaceBusy !== null}
                                 onChange={(ev) => {
@@ -206,7 +206,7 @@ export function TripCardChatWidget({
             <div ref={endRef} />
           </div>
           <form
-            className="border-t border-slate-200 p-2 dark:border-white/10"
+            className="border-t border-[color:var(--hairline)] p-2 dark:border-white/10"
             onSubmit={(e) => {
               e.preventDefault();
               void send();
@@ -217,7 +217,7 @@ export function TripCardChatWidget({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Ask the group assistant…"
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-orange-400/50 dark:border-white/10 dark:bg-[#141414] dark:text-[#ebe9e4]"
+                className="min-w-0 flex-1 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2 text-xs text-[color:var(--on-surface)] outline-none focus:border-orange-400/50 dark:border-white/10 dark:bg-[#141414] dark:text-[#ebe9e4]"
               />
               <button
                 type="submit"

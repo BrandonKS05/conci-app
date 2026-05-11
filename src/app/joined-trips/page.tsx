@@ -97,13 +97,13 @@ export default async function JoinedTripsPage() {
   return (
     <SiteShell title="Joined Trips" eyebrow="Member">
       <div className="mx-auto w-full max-w-3xl space-y-6">
-        <p className="text-sm text-slate-600 dark:text-neutral-400">
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Trips you joined with an invite code — you&apos;re a <strong>member</strong>: vote on decisions and view the plan.
           Only the host can edit details, swap options, delete the trip, or share the invite code.
         </p>
-        <p className="text-sm text-slate-600 dark:text-neutral-400">
+        <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
           Finalized trips also appear under{" "}
-          <Link href="/booking" className="font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400">
+          <Link href="/booking" className="font-medium text-[color:var(--on-surface)] underline-offset-2 hover:underline hover:text-[color:var(--sage)] dark:hover:text-[color:var(--sage-soft)]">
             booking checklists
           </Link>
           .
@@ -111,9 +111,9 @@ export default async function JoinedTripsPage() {
         {trips.length > 0 ? (
           <SavedTripsList initialTrips={trips} showDelete={false} />
         ) : (
-          <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-            <p className="font-display text-lg font-semibold text-slate-900 dark:text-white">No joined trips yet</p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">Use a code from your host to join.</p>
+          <div className="rounded-3xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-16 text-center shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+            <p className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">No joined trips yet</p>
+            <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Use a code from your host to join.</p>
             <Link href="/trip-parser" className={`mt-6 ${primaryFormButtonClass}`}>
               Create a Trip
             </Link>

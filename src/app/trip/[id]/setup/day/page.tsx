@@ -33,7 +33,7 @@ export default async function TripHostSetupDayDetailPage({
   const svc = getSupabaseServiceRoleClient();
   if (!svc) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-16 text-center text-sm text-slate-600 dark:bg-dm-page dark:text-neutral-400">
+      <div className="min-h-screen bg-[color:var(--surface-container-low)] px-4 py-16 text-center text-sm text-[color:var(--on-surface-variant)] dark:bg-dm-page dark:text-neutral-400">
         <p className="mb-4">
           Trip setup needs{" "}
           <code className="rounded bg-slate-100 px-1 dark:bg-dm-card dark:text-neutral-200">SUPABASE_SERVICE_ROLE_KEY</code> on the
@@ -62,7 +62,7 @@ export default async function TripHostSetupDayDetailPage({
   const rawDate = typeof dateParam === "string" ? dateParam.trim() : "";
   if (!ISO_DAY.test(rawDate)) {
     return (
-      <div className="min-h-screen bg-slate-50 py-10 text-slate-900 dark:bg-dm-page dark:text-neutral-100">
+      <div className="min-h-screen bg-[color:var(--surface-container-low)] py-10 text-[color:var(--on-surface)] dark:bg-dm-page dark:text-neutral-100">
         <div className="mx-auto max-w-lg rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/40 dark:bg-amber-950/30">
           <h1 className="font-display text-xl font-semibold text-amber-950 dark:text-amber-100">Missing or invalid date</h1>
           <p className="mt-3 text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">

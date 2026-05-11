@@ -43,11 +43,12 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card sm:p-8">
-      <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+    <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card sm:p-8">
+      <p className="label-caps mb-2 text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Conci</p>
+      <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-white">
         Join a trip
       </h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">
+      <p className="mt-2 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         Have an invite code from your host? Enter it here. You need to be signed in — we&apos;ll link this trip to your
         account.
       </p>
@@ -55,7 +56,7 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
         <div>
           <label
             htmlFor="join-code"
-            className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-500"
+            className="label-caps block text-[color:var(--on-surface-muted)] dark:text-neutral-500"
           >
             Invite code
           </label>
@@ -68,11 +69,11 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
             value={code}
             onChange={(ev) => setCode(ev.target.value)}
             maxLength={12}
-            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100"
+            className="mt-1.5 w-full rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-3 text-sm text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] outline-none transition placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:ring-1 focus:ring-[color:var(--sage)]/40 dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-100"
           />
         </div>
         {error ? (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <p className="rounded-lg border border-[#a8443c]/30 bg-[#a8443c]/8 px-3 py-2 text-xs text-[#a8443c] dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
             {error}
           </p>
         ) : null}

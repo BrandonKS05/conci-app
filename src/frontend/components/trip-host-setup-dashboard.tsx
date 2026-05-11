@@ -747,24 +747,24 @@ export function TripHostSetupDashboard({
       contentWide
     >
       <div className="mx-auto w-full pb-14">
-      <div className="mb-10 border-b border-slate-200 pb-8 dark:border-slate-200">
+      <div className="mb-10 border-b border-[color:var(--hairline)] pb-8 dark:border-white/10">
         <nav className="flex min-w-0 flex-wrap gap-x-3 gap-y-2 text-sm sm:gap-x-4">
           {workspaceNavItems.map((item) => (
             <a
               key={item.id}
               href={resolveWorkspaceNavHref(item.id)}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-900"
+              className="label-caps flex items-center gap-2 rounded-lg px-2 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
             >
-              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
               {item.label}
             </a>
           ))}
           {canEditTripWorkspace ? (
             <Link
               href={`/trip/${tripId}/setup/packing`}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-900"
+              className="label-caps flex items-center gap-2 rounded-lg px-2 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
             >
-              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
               Packing list
             </Link>
           ) : null}
@@ -774,19 +774,21 @@ export function TripHostSetupDashboard({
       <div className="space-y-12">
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start xl:gap-10">
           <div className="space-y-6">
-            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <div className="mb-5">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Trip fund</p>
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-[1.75rem] border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient)] sm:p-8 dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+              <div className="mb-6">
+                <span className="editorial-eyebrow mb-3 dark:text-[color:var(--sage-soft)]">Trip fund</span>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <TripDepositTracker tripId={tripId} />
                   <TripContributeButton tripId={tripId} />
                 </div>
               </div>
               {isHost ? (
                 <div className="mb-6">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                  <span className="editorial-eyebrow mb-3 dark:text-[color:var(--sage-soft)]">
                     Join code · invite people
-                  </p>
+                  </span>
+                  <div className="mt-3" />
+
                   {resolvedInviteCode ? (
                     <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
                       <InviteCodeRow rawCode={resolvedInviteCode} prominent />
@@ -814,16 +816,16 @@ export function TripHostSetupDashboard({
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                    <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                       <p>
                         Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
                         <Link
                           href={JOIN_WITH_CODE_URL}
-                          className="font-medium text-teal-400 underline-offset-2 hover:underline"
+                          className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
                         >
                           Join a Trip
                         </Link>
-                        . Full share text is under <span className="text-slate-800">Share trip</span> in the trip card
+                        . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
                         below.
                       </p>
                     </div>
@@ -833,13 +835,13 @@ export function TripHostSetupDashboard({
                   ) : null}
                 </div>
               ) : (
-                <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                <div className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                   <p>
                     You&apos;re on this trip as a guest.{" "}
                     {canEditTripWorkspace ? (
                       <>
                         Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
-                        <span className="text-slate-900">Group progress</span> for polls and availability.
+                        <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
                       </>
                     ) : (
                       <>This trip is finalized — viewing shared plans and checklist.</>
@@ -847,17 +849,17 @@ export function TripHostSetupDashboard({
                   </p>
                 </div>
               )}
-              <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
-                  <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-900">
+                  <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
                     {budgetDisplayLine}
                   </span>
                   {canEditTripWorkspace ? (
                     <button
                       type="button"
                       onClick={() => setShowBudgetEditor((v) => !v)}
-                      className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-800 transition hover:bg-slate-100"
+                      className="rounded-full border border-[color:var(--hairline-strong)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container)]"
                     >
                       {showBudgetEditor ? "Cancel" : "Change budget"}
                     </button>
@@ -869,7 +871,7 @@ export function TripHostSetupDashboard({
                       value={budgetLine}
                       onChange={(e) => setBudgetLine(e.target.value)}
                       placeholder="e.g. ~$1,200 per person"
-                      className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-neutral-500 focus:border-teal-500/45"
+                      className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-neutral-500 focus:border-[color:var(--sage)]/55"
                     />
                     <button
                       type="button"
@@ -891,7 +893,7 @@ export function TripHostSetupDashboard({
               <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
-              <p className="max-w-3xl text-sm leading-relaxed text-slate-700">
+              <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                 {!canEditTripWorkspace
                   ? "This trip is finalized here — the calendar is for reference. Open the booking checklist for next steps."
                   : datePickMode === "range"
@@ -906,20 +908,23 @@ export function TripHostSetupDashboard({
                 <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
               ) : null}
               {pendingRangeConfirm && datePickMode === "range" ? (
-                <p className="mt-2 text-xs font-medium text-teal-600 dark:text-teal-400">
+                <p className="mt-2 text-xs font-medium text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
                   Confirm your trip dates in the dialog below.
                 </p>
               ) : null}
             </div>
           </div>
 
-          <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-slate-200 dark:bg-dm-card dark:text-slate-900 dark:shadow-none">
+          <div className="w-full overflow-hidden rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-[color:var(--on-surface)] shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:text-[color:var(--on-surface)] dark:shadow-none">
             {/* Header — toolbar like reference */}
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 dark:border-slate-200 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 sm:py-4">
-              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-900 sm:text-xl">
-                  {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
-                </h3>
+            <div className="flex flex-col gap-3 border-b border-[color:var(--hairline)] px-4 py-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-7 sm:py-5">
+              <div className="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Calendar</span>
+                  <h3 className="font-display text-2xl font-semibold tracking-[-0.025em] text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)] sm:text-[1.75rem]">
+                    {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
+                  </h3>
+                </div>
                 {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
                   <button
                     type="button"
@@ -927,7 +932,7 @@ export function TripHostSetupDashboard({
                       setSelectedDayIso(hostSetup.tripRange!.startIso);
                       setAddPlacesOpen(true);
                     }}
-                    className="shrink-0 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-900 shadow-sm transition hover:bg-teal-100 sm:px-3 sm:py-1.5 dark:border-teal-800/50 dark:bg-teal-950/40 dark:text-teal-100 dark:hover:bg-teal-900/50"
+                    className="shrink-0 rounded-lg bg-[#1c1c17] px-2.5 py-1 text-xs font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] sm:px-3 sm:py-1.5 dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
                   >
                     Add places
                   </button>
@@ -942,15 +947,15 @@ export function TripHostSetupDashboard({
                       setAddPlacesOpen(false);
                       setPendingRangeConfirm(null);
                     }}
-                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-1.5 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-800 dark:hover:bg-dm-page"
+                    className="shrink-0 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface-variant)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
                   >
                     Change dates
                   </button>
                 ) : null}
               </div>
               {peers.length > 0 ? (
-                <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 px-1 py-2.5 dark:border-slate-200 sm:border-t-0 sm:py-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400">
+                <div className="flex w-full flex-wrap items-center gap-2 border-t border-[color:var(--hairline)] px-1 py-2.5 dark:border-white/10 sm:border-t-0 sm:py-1.5">
+                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
                     Here now
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
@@ -958,10 +963,10 @@ export function TripHostSetupDashboard({
                       <span
                         key={p.userId}
                         title={`${p.name} · on this calendar`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-0.5 pl-0.5 pr-2 text-xs text-slate-800 shadow-sm dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-900"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-0.5 pl-0.5 pr-2 text-xs text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
                       >
                         <span
-                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 text-[11px] font-semibold text-white dark:border-slate-200"
+                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[11px] font-semibold text-white dark:border-white/15"
                           style={
                             p.avatarUrl
                               ? undefined
@@ -994,7 +999,7 @@ export function TripHostSetupDashboard({
                       return m - 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-200 dark:text-slate-700 dark:hover:border-slate-200 dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--hairline)] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
                 >
                   <ChevLeft className="h-4 w-4" />
                 </button>
@@ -1010,7 +1015,7 @@ export function TripHostSetupDashboard({
                       return m + 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-200 dark:text-slate-700 dark:hover:border-slate-200 dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--hairline)] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
@@ -1018,18 +1023,18 @@ export function TripHostSetupDashboard({
             </div>
 
             {/* Weekday stripe */}
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90 dark:border-slate-200 dark:bg-dm-elevated/80">
+            <div className="grid grid-cols-7 border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated/80">
               {WEEKDAY_MON_FIRST.map((w) => (
                 <div
                   key={w}
-                  className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 first:border-l-0 dark:text-slate-500 sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
+                  className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] first:border-l-0 dark:text-[color:var(--on-surface-muted)] sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
                 >
                   {w}
                 </div>
               ))}
             </div>
 
-            <div className="border-x border-slate-200 bg-white dark:border-slate-200 dark:bg-dm-card">
+            <div className="border-x border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card">
               {weeks.map((weekRow, wi) => (
                 <div key={`wk-${wi}`} className="grid grid-cols-7">
                   {weekRow.map((dom, ci) => {
@@ -1038,8 +1043,8 @@ export function TripHostSetupDashboard({
                         <div
                           key={`e-${wi}-${ci}`}
                           className={[
-                            "min-h-[7.5rem] border-b border-slate-200 bg-slate-50/40 dark:border-slate-200 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
-                            ci < 6 ? "border-r border-slate-200 dark:border-slate-200" : "",
+                            "min-h-[7.5rem] border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/50 dark:border-white/10 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
+                            ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           ].join(" ")}
                         />
                       );
@@ -1061,16 +1066,16 @@ export function TripHostSetupDashboard({
                           key={`stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`}
                           className="min-w-0 w-full"
                         >
-                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-slate-800 dark:text-slate-900">
+                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
                             <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                               {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
                               {hotelForDay.recommendedByConci ? (
-                                <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
                                   recommended by CONCI
                                 </span>
                               ) : null}
                             </span>
-                            <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                            <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
                               {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
                             </span>
                           </div>
@@ -1088,16 +1093,16 @@ export function TripHostSetupDashboard({
                               setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-slate-900">
+                            <div className="flex items-start gap-1.5 leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.place.name}
                                 {p.recommendedByConci ? (
-                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
                                     recommended by CONCI
                                   </span>
                                 ) : null}
                               </span>
-                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
                                 Meal
                               </span>
                             </div>
@@ -1106,7 +1111,7 @@ export function TripHostSetupDashboard({
                             <button
                               type="button"
                               aria-label={`Remove ${p.place.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
                               onClick={(ev) => {
                                 ev.stopPropagation();
                                 setRemovePinConfirm({
@@ -1138,16 +1143,16 @@ export function TripHostSetupDashboard({
                               });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-slate-800 dark:text-slate-900">
+                            <div className="flex items-start gap-1.5 leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.experience.name}
                                 {p.recommendedByConci ? (
-                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-slate-400/70 dark:text-neutral-500/70">
+                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
                                     recommended by CONCI
                                   </span>
                                 ) : null}
                               </span>
-                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-slate-400 sm:text-[10px] dark:text-neutral-500">
+                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
                                 Activity
                               </span>
                             </div>
@@ -1156,7 +1161,7 @@ export function TripHostSetupDashboard({
                             <button
                               type="button"
                               aria-label={`Remove ${p.experience.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-slate-400 opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
                               onClick={(ev) => {
                                 ev.stopPropagation();
                                 setRemovePinConfirm({
@@ -1192,27 +1197,27 @@ export function TripHostSetupDashboard({
                           }
                         }}
                         className={[
-                          "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-slate-200 px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-slate-200",
+                          "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-[color:var(--hairline)] px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           canEditTripWorkspace ? "cursor-pointer" : "cursor-default",
-                          ci < 6 ? "border-r border-slate-200 dark:border-slate-200" : "",
+                          ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           inTripRangeCell(dom)
                             ? "bg-amber-100/85 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-950/60"
-                            : "bg-white hover:bg-slate-50/80 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
+                            : "bg-[color:var(--surface-container-lowest)] hover:bg-[color:var(--surface-container-low)]/90 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
                           datePickMode === "day" && selectedDayIso === cellIso
-                            ? "ring-1 ring-teal-400/80 ring-inset dark:ring-teal-500/50"
+                            ? "ring-1 ring-[color:var(--sage)]/70 ring-inset dark:ring-[color:var(--sage-soft)]/50"
                             : "",
                         ].join(" ")}
                       >
                         <div className="mb-1.5 flex shrink-0 items-start justify-between gap-2">
                           {isCalendarToday(dom) ? (
-                            <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-semibold text-white shadow-sm sm:h-8 sm:min-w-[2rem] sm:text-sm">
+                            <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-[#1c1c17] text-xs font-semibold text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] sm:h-8 sm:min-w-[2rem] sm:text-sm dark:bg-neutral-200 dark:text-dm-page">
                               {dom}
                             </span>
                           ) : (
-                            <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-500 sm:text-base">
+                            <span className="shrink-0 text-sm font-semibold tabular-nums text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)] sm:text-base">
                               {dom}
                             </span>
                           )}
@@ -1221,7 +1226,7 @@ export function TripHostSetupDashboard({
                         <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
                           {visibleCalendarEntries}
                           {calendarMoreCount > 0 ? (
-                            <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-slate-500 dark:text-neutral-500">
+                            <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                               +{calendarMoreCount} more
                             </p>
                           ) : null}
@@ -1250,14 +1255,14 @@ export function TripHostSetupDashboard({
             </div>
 
             {!hostHasConcreteTripRange(plan) ? (
-              <p className="border-t border-slate-100 bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-slate-200 dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="border-t border-[color:var(--hairline)] bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-[color:var(--hairline)] dark:bg-amber-950/40 dark:text-amber-100">
                 {canEditTripWorkspace
                   ? "Choose a trip range — two taps on the calendar — to anchor your plan and invites."
                   : "Trip dates aren't on the calendar yet. When the trip isn't finalized, anyone on the trip can set or adjust the range here."}
               </p>
             ) : null}
             {err ? (
-              <p className="border-t border-slate-100 bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-slate-200 dark:bg-rose-950/40 dark:text-rose-200">
+              <p className="border-t border-[color:var(--hairline)] bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-[color:var(--hairline)] dark:bg-rose-950/40 dark:text-rose-200">
                 {err}
               </p>
             ) : null}
@@ -1270,10 +1275,10 @@ export function TripHostSetupDashboard({
           <aside className="flex flex-col gap-6 xl:sticky xl:top-28">
             <div
               id="sec-flights"
-              className="scroll-mt-28 rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm space-y-4 text-slate-700 [&_h3]:text-slate-900 [&_p]:text-slate-600 [&_strong]:text-slate-900"
+              className="scroll-mt-28 rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card p-6 shadow-sm space-y-4 text-[color:var(--on-surface-variant)] [&_h3]:text-[color:var(--on-surface)] [&_p]:text-[color:var(--on-surface-variant)] [&_strong]:text-[color:var(--on-surface)]"
             >
               <h3 className="font-display text-lg font-semibold text-white">Flights</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-muted)]">
             Search flight options and add the ones you want into the trip itinerary.
           </p>
           {liveFetchErr ? (
@@ -1290,10 +1295,10 @@ export function TripHostSetupDashboard({
             <HostFlightSearchPanel tripId={tripId} enabled />
           ) : null}
           {showFlightTransport ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-100 p-5 shadow-inner">
-              <p className="text-xs text-slate-500">
-                From                 <strong className="text-slate-900">{plan.departureCity}</strong> to{" "}
-                <strong className="text-slate-900">{plan.location}</strong>
+            <div className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-5 shadow-inner">
+              <p className="text-xs text-[color:var(--on-surface-muted)]">
+                From                 <strong className="text-[color:var(--on-surface)]">{plan.departureCity}</strong> to{" "}
+                <strong className="text-[color:var(--on-surface)]">{plan.location}</strong>
               </p>
               <div className="mt-4 space-y-4">
                 <HostLiveScheduleByDay
@@ -1319,13 +1324,13 @@ export function TripHostSetupDashboard({
                 const href =
                   liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
                 return href ? (
-                  <p className="mt-4 text-xs text-slate-500 dark:text-neutral-500">
+                  <p className="mt-4 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                     Driving instead?{" "}
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+                      className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-emerald-300"
                     >
                       Open directions in Google Maps
                     </a>
@@ -1341,17 +1346,17 @@ export function TripHostSetupDashboard({
               })()}
             </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                <p className="mt-3 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                   Flight search appears here once departure city and destination are set on the trip.
                 </p>
               )}
             </div>
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-[1.5rem] border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card p-6 shadow-sm">
               <h3 className="font-display text-lg font-semibold text-white">Home base · hotel</h3>
               {primaryHotelSummary ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-100 p-4 text-sm leading-relaxed text-slate-700">
+                <div className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-4 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                   <p className="font-semibold text-white">{primaryHotelSummary.title}</p>
-                  <p className="mt-2 text-slate-500">{primaryHotelSummary.detail}</p>
+                  <p className="mt-2 text-[color:var(--on-surface-muted)]">{primaryHotelSummary.detail}</p>
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-relaxed text-neutral-500">
@@ -1366,11 +1371,11 @@ export function TripHostSetupDashboard({
 
         {canEditTripWorkspace ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
-            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-slate-200 dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
-              <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-[color:var(--hairline)] dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
+              <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
                 Setup copilot
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                 Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies
                 them.
               </p>
@@ -1382,10 +1387,10 @@ export function TripHostSetupDashboard({
         ) : null}
 
         <section id="sec-preferences-adjustments" className="scroll-mt-28">
-          <h2 className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
             Preferences &amp; adjustments
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
             {isHost
               ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
               : "Share preferences and tweaks here — the group shares one calendar and polls; anyone can edit the trip workspace, and the host can still merge notes with Trip Copilot."}
@@ -1407,8 +1412,8 @@ export function TripHostSetupDashboard({
 
         {canEditTripWorkspace ? (
           <section id="sec-budget" className="scroll-mt-28">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Budget</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-500">
+            <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Budget</h2>
+            <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
               Set or update your trip budget. This is saved on your draft and guides suggestions.
             </p>
             <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
@@ -1417,7 +1422,7 @@ export function TripHostSetupDashboard({
                 value={budgetLine}
                 onChange={(e) => setBudgetLine(e.target.value)}
                 placeholder="e.g. ~$1,200 per person, splurge on one dinner…"
-                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-teal-500 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-900"
+                className="w-full resize-y rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
               />
               <button
                 type="button"
@@ -1433,8 +1438,8 @@ export function TripHostSetupDashboard({
         ) : null}
 
         <section id="sec-trip-chat" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Trip chat</h2>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-500">
+          <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Trip chat</h2>
+          <p className="mt-1 max-w-3xl text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
             Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
           </p>
           <div className="mt-4">
@@ -1449,21 +1454,21 @@ export function TripHostSetupDashboard({
         </section>
 
         <section className="scroll-mt-28">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-dm-card dark:shadow-none sm:p-8">
+          <div className="rounded-2xl border border-[color:var(--hairline)]/90 bg-white p-6 shadow-sm dark:border-[color:var(--hairline)] dark:bg-dm-card dark:shadow-none sm:p-8">
             <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
           </div>
         </section>
 
         <section id="sec-itinerary" className="scroll-mt-28">
           {plan.generatedItinerary ? (
-            <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-200 dark:bg-dm-card">
+            <details className="group overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card">
               <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
-                <span className="text-base font-semibold text-slate-900 dark:text-white">Full text itinerary</span>
-                <span className="mt-1 block text-sm font-normal leading-relaxed text-slate-600 dark:text-slate-500">
+                <span className="text-base font-semibold text-[color:var(--on-surface)] dark:text-white">Full text itinerary</span>
+                <span className="mt-1 block text-sm font-normal leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                   Optional long-form planner text. Pins and votes on the calendar are what guests see day by day.
                 </span>
               </summary>
-              <div className="border-t border-slate-200 dark:border-slate-200">
+              <div className="border-t border-[color:var(--hairline)] dark:border-[color:var(--hairline)]">
                 <GeneratedItineraryView
                   tripId={tripId}
                   initialItinerary={plan.generatedItinerary ?? null}
@@ -1490,15 +1495,15 @@ export function TripHostSetupDashboard({
             aria-label="Cancel"
             onClick={cancelPendingTripRange}
           />
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-200 dark:bg-dm-card">
-            <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-200">
-              <h2 id="confirm-trip-range-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] shadow-2xl dark:border-white/10 dark:bg-dm-card">
+            <div className="border-b border-[color:var(--hairline)] px-5 py-4 dark:border-[color:var(--hairline)]">
+              <h2 id="confirm-trip-range-title" className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
                 Confirm trip dates
               </h2>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-500">
+              <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                 Use these dates for your trip?
               </p>
-              <p className="mt-3 rounded-lg bg-teal-50 px-3 py-2 text-sm font-medium text-teal-900 dark:bg-teal-950/50 dark:text-teal-100">
+              <p className="mt-3 rounded-lg bg-[color:var(--sage-soft)]/25 px-3 py-2 text-sm font-medium text-[color:var(--on-surface)] dark:bg-teal-950/50 dark:text-teal-100">
                 {formatTripRangeLabel(pendingRangeConfirm.startIso, pendingRangeConfirm.endIso)}
               </p>
             </div>
@@ -1506,14 +1511,14 @@ export function TripHostSetupDashboard({
               <button
                 type="button"
                 onClick={cancelPendingTripRange}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-200 dark:bg-dm-elevated dark:text-slate-800 dark:hover:bg-dm-page"
+                className="rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-sm font-semibold text-[color:var(--on-surface-variant)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
               >
                 No
               </button>
               <button
                 type="button"
                 onClick={() => void confirmPendingTripRange()}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-500"
+                className="rounded-lg bg-[#1c1c17] px-4 py-2 text-sm font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page"
               >
                 Yes
               </button>

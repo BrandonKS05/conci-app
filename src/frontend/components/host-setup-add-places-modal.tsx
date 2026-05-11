@@ -14,12 +14,12 @@ import {
 
 function SuggestionThumb({ src, label }: { src?: string | null; label: string }) {
   return (
-    <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-white/5">
+    <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-[color:var(--surface-container)] dark:bg-white/5">
       {src?.trim() ? (
         <Image src={src.trim()} alt={label} fill className="object-cover" sizes="72px" unoptimized />
       ) : (
         <div
-          className="flex h-full w-full items-center justify-center bg-slate-200/60 px-1 text-center text-[10px] font-medium leading-tight text-slate-500 dark:bg-white/10 dark:text-neutral-400"
+          className="flex h-full w-full items-center justify-center bg-slate-200/60 px-1 text-center text-[10px] font-medium leading-tight text-[color:var(--on-surface-muted)] dark:bg-white/10 dark:text-neutral-400"
           aria-hidden
         >
           No photo
@@ -352,10 +352,10 @@ export function HostSetupAddPlacesModal({
       aria-labelledby="edit-activities-title"
     >
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onClose} />
-      <div className="relative max-h-[min(90vh,720px)] w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
+      <div className="relative max-h-[min(90vh,720px)] w-full max-w-lg overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
         {stayPickPlace ? (
           <div className="flex max-h-[min(90vh,720px)] flex-col bg-white dark:bg-dm-card">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+            <div className="flex items-start justify-between gap-3 border-b border-[color:var(--hairline)] px-5 py-4 dark:border-white/10">
               <div className="min-w-0">
                 <button
                   type="button"
@@ -364,13 +364,13 @@ export function HostSetupAddPlacesModal({
                 >
                   ← Back to suggestions
                 </button>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">When is this stay?</h2>
-                <p className="mt-1 text-sm font-medium text-slate-800 dark:text-neutral-200">{stayPickPlace.name}</p>
+                <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">When is this stay?</h2>
+                <p className="mt-1 text-sm font-medium text-[color:var(--on-surface)] dark:text-neutral-200">{stayPickPlace.name}</p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-neutral-400 dark:hover:bg-dm-elevated dark:hover:text-neutral-200"
+                className="rounded-lg px-2 py-1 text-sm text-[color:var(--on-surface-muted)] hover:bg-[color:var(--surface-container)] hover:text-[color:var(--on-surface)] dark:text-neutral-400 dark:hover:bg-dm-elevated dark:hover:text-neutral-200"
               >
                 Close
               </button>
@@ -399,7 +399,7 @@ export function HostSetupAddPlacesModal({
                         });
                       }}
                     />
-                    <span className="text-sm leading-snug text-slate-800 dark:text-neutral-200">
+                    <span className="text-sm leading-snug text-[color:var(--on-surface)] dark:text-neutral-200">
                       I&apos;m staying here for the entire trip
                     </span>
                   </label>
@@ -462,20 +462,20 @@ export function HostSetupAddPlacesModal({
           </div>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+            <div className="flex items-start justify-between gap-3 border-b border-[color:var(--hairline)] px-5 py-4 dark:border-white/10">
               <div>
-                <h2 id="edit-activities-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+                <h2 id="edit-activities-title" className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
                   Add places
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500 dark:text-neutral-400">{dateLabel}</p>
-                <p className="mt-2 text-xs text-slate-500 dark:text-neutral-500">
+                <p className="mt-0.5 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-400">{dateLabel}</p>
+                <p className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                   Suggestions use your trip destination, budget, and vibe from the planner.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-neutral-400 dark:hover:bg-dm-elevated dark:hover:text-neutral-200"
+                className="rounded-lg px-2 py-1 text-sm text-[color:var(--on-surface-muted)] hover:bg-[color:var(--surface-container)] hover:text-[color:var(--on-surface)] dark:text-neutral-400 dark:hover:bg-dm-elevated dark:hover:text-neutral-200"
               >
                 Close
               </button>
@@ -483,7 +483,7 @@ export function HostSetupAddPlacesModal({
 
             <div className="max-h-[min(72vh,560px)] overflow-y-auto px-5 py-4">
               {loading ? (
-                <p className="py-8 text-center text-sm text-slate-500 dark:text-neutral-400">Loading picks…</p>
+                <p className="py-8 text-center text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-400">Loading picks…</p>
               ) : (
                 <div className="space-y-8">
                   {fetchErr ? (
@@ -492,7 +492,7 @@ export function HostSetupAddPlacesModal({
                     </p>
                   ) : null}
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                       Top stays
                     </h3>
                     {hotelsErr ? (
@@ -500,7 +500,7 @@ export function HostSetupAddPlacesModal({
                     ) : null}
                     <ul className="mt-3 space-y-2">
                       {visibleHotels.length === 0 ? (
-                        <li className="text-sm text-slate-500 dark:text-neutral-500">No hotel picks for this trip yet.</li>
+                        <li className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">No hotel picks for this trip yet.</li>
                       ) : (
                         visibleHotels.map((h) => (
                           <li
@@ -510,8 +510,8 @@ export function HostSetupAddPlacesModal({
                             <SuggestionThumb src={h.photoUrl ?? null} label={h.name} />
                             <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-900 dark:text-neutral-100">{h.name}</p>
-                                <p className="text-xs text-slate-500 dark:text-neutral-400">
+                                <p className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{h.name}</p>
+                                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                                   {h.rating != null ? `★ ${h.rating.toFixed(1)}` : ""}
                                   {h.rating != null && h.address ? " · " : ""}
                                   {h.address ?? ""}
@@ -538,7 +538,7 @@ export function HostSetupAddPlacesModal({
                   </section>
 
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                       Top restaurants
                     </h3>
                     {data?.restaurantsError ? (
@@ -546,18 +546,18 @@ export function HostSetupAddPlacesModal({
                     ) : null}
                     <ul className="mt-3 space-y-2">
                       {visibleRestaurants.length === 0 ? (
-                        <li className="text-sm text-slate-500 dark:text-neutral-500">No restaurant picks for this trip yet.</li>
+                        <li className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">No restaurant picks for this trip yet.</li>
                       ) : (
                         visibleRestaurants.map((r) => (
                           <li
                             key={r.id}
-                            className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
+                            className="flex gap-3 rounded-xl border border-[color:var(--hairline)] p-3 dark:border-white/10"
                           >
                             <SuggestionThumb src={r.coverPhotoUrl} label={r.name} />
                             <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-900 dark:text-neutral-100">{r.name}</p>
-                                <p className="text-xs text-slate-500 dark:text-neutral-400">
+                                <p className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{r.name}</p>
+                                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                                   {r.neighborhood} · {r.ratingDisplay} · {r.priceRange}
                                 </p>
                               </div>
@@ -582,7 +582,7 @@ export function HostSetupAddPlacesModal({
                   </section>
 
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                       Top activities
                     </h3>
                     {data?.experiencesError ? (
@@ -590,18 +590,18 @@ export function HostSetupAddPlacesModal({
                     ) : null}
                     <ul className="mt-3 space-y-2">
                       {visibleExperiences.length === 0 ? (
-                        <li className="text-sm text-slate-500 dark:text-neutral-500">No activity picks for this trip yet.</li>
+                        <li className="text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">No activity picks for this trip yet.</li>
                       ) : (
                         visibleExperiences.map((x, i) => (
                           <li
                             key={`${x.bookingUrl}-${i}`}
-                            className="flex gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10"
+                            className="flex gap-3 rounded-xl border border-[color:var(--hairline)] p-3 dark:border-white/10"
                           >
                             <SuggestionThumb src={x.coverPhotoUrl} label={x.name} />
                             <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-900 dark:text-neutral-100">{x.name}</p>
-                                <p className="text-xs text-slate-500 dark:text-neutral-400">
+                                <p className="font-medium text-[color:var(--on-surface)] dark:text-neutral-100">{x.name}</p>
+                                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
                                   {x.duration} · {x.rating} · {x.pricePerPerson}
                                 </p>
                               </div>

@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-600 dark:text-neutral-400">
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
         Loading…
       </div>
     );
@@ -69,8 +69,8 @@ export default function ResetPasswordPage() {
   if (!hasSession) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-slate-800 dark:text-neutral-200">This link is invalid or has expired.</p>
-        <Link href="/auth" className="mt-6 inline-block text-sm font-medium text-indigo-600 dark:text-indigo-400">
+        <p className="text-[color:var(--on-surface)] dark:text-neutral-200">This link is invalid or has expired.</p>
+        <Link href="/auth" className="mt-6 inline-block text-sm font-medium text-[color:var(--on-surface)] hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400">
           Back to sign in
         </Link>
       </div>
@@ -80,55 +80,61 @@ export default function ResetPasswordPage() {
   if (done) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-slate-800 dark:text-neutral-200">Password updated. Redirecting…</p>
+        <p className="text-[color:var(--on-surface)] dark:text-neutral-200">Password updated. Redirecting…</p>
       </div>
     );
   }
 
+  const inputCls =
+    "mt-1.5 block w-full rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-2.5 text-sm text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] outline-none transition focus:border-[color:var(--sage)] focus:ring-1 focus:ring-[color:var(--sage)]/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100";
+
   return (
     <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="font-display text-2xl font-semibold text-slate-900 dark:text-white">Set new password</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">Choose a new password for your account.</p>
-      <form onSubmit={(e) => void submit(e)} className="mt-8 space-y-4">
-        <div>
-          <label htmlFor="pw" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
-            New password
-          </label>
-          <input
-            id="pw"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-dm-page dark:text-neutral-100"
-            required
-            minLength={6}
-          />
-        </div>
-        <div>
-          <label htmlFor="pw2" className="text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Confirm password
-          </label>
-          <input
-            id="pw2"
-            type="password"
-            autoComplete="new-password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-dm-page dark:text-neutral-100"
-            required
-            minLength={6}
-          />
-        </div>
-        {error ? (
-          <p className="text-sm text-rose-600 dark:text-rose-400" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <button type="submit" disabled={busy} className={`w-full ${primaryFormButtonClass} disabled:opacity-50`}>
-          {busy ? "Saving…" : "Update password"}
-        </button>
-      </form>
+      <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card">
+        <p className="label-caps mb-2 text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Conci</p>
+        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-white">Set new password</h1>
+        <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Choose a new password for your account.</p>
+        <form onSubmit={(e) => void submit(e)} className="mt-8 space-y-4">
+          <div>
+            <label htmlFor="pw" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+              New password
+            </label>
+            <input
+              id="pw"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={inputCls}
+              required
+              minLength={6}
+            />
+          </div>
+          <div>
+            <label htmlFor="pw2" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+              Confirm password
+            </label>
+            <input
+              id="pw2"
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className={inputCls}
+              required
+              minLength={6}
+            />
+          </div>
+          {error ? (
+            <p className="text-sm text-[#a8443c] dark:text-rose-400" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <button type="submit" disabled={busy} className={`w-full ${primaryFormButtonClass} disabled:opacity-50`}>
+            {busy ? "Saving…" : "Update password"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

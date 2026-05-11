@@ -25,7 +25,7 @@ export function HostSetupPinDetailModal({ open, detail, onClose }: DetailProps) 
       aria-labelledby="pin-detail-title"
     >
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Close" onClick={onClose} />
-      <div className="relative max-h-[min(90vh,640px)] w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
+      <div className="relative max-h-[min(90vh,640px)] w-full max-w-md overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-2xl dark:border-white/10 dark:bg-dm-card">
         <div className="max-h-[min(90vh,640px)] overflow-y-auto">
           {detail.kind === "meal" ? (
             <MealDetail place={detail.place} dateLabel={detail.dateLabel} onClose={onClose} />
@@ -57,18 +57,18 @@ function MealDetail({
           <div className="flex h-full items-center justify-center text-sm text-slate-400 dark:text-neutral-500">No photo</div>
         )}
       </div>
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+      <div className="border-b border-[color:var(--hairline)] px-5 py-4 dark:border-white/10">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="pin-detail-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 id="pin-detail-title" className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
               {place.name}
             </h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">{dateLabel}</p>
+            <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">{dateLabel}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-[color:var(--on-surface-muted)] hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
           >
             Close
           </button>
@@ -79,20 +79,20 @@ function MealDetail({
       </div>
       <div className="space-y-3 px-5 py-4 text-sm">
         {place.rating != null ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Rating:</span>{" "}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Rating:</span>{" "}
             {typeof place.rating === "number" ? place.rating.toFixed(1) : place.rating}
             {place.reviewCount != null ? ` · ${place.reviewCount.toLocaleString()} reviews` : null}
           </p>
         ) : null}
         {place.priceRange ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Price:</span> {place.priceRange}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Price:</span> {place.priceRange}
           </p>
         ) : null}
         {place.address ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Address:</span> {place.address}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Address:</span> {place.address}
           </p>
         ) : null}
         {place.mapsUrl.startsWith("http") ? (
@@ -129,18 +129,18 @@ function ActivityDetail({
           <div className="flex h-full items-center justify-center text-sm text-slate-400 dark:text-neutral-500">No photo</div>
         )}
       </div>
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+      <div className="border-b border-[color:var(--hairline)] px-5 py-4 dark:border-white/10">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="pin-detail-title" className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 id="pin-detail-title" className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
               {experience.name}
             </h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">{dateLabel}</p>
+            <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">{dateLabel}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-[color:var(--on-surface-muted)] hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-dm-elevated"
           >
             Close
           </button>
@@ -151,18 +151,18 @@ function ActivityDetail({
       </div>
       <div className="space-y-3 px-5 py-4 text-sm">
         {experience.rating ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Rating:</span> {experience.rating}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Rating:</span> {experience.rating}
           </p>
         ) : null}
         {experience.duration ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Duration:</span> {experience.duration}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Duration:</span> {experience.duration}
           </p>
         ) : null}
         {experience.pricePerPerson ? (
-          <p className="text-slate-700 dark:text-neutral-200">
-            <span className="font-medium text-slate-900 dark:text-white">Price:</span> {experience.pricePerPerson}
+          <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-200">
+            <span className="font-medium text-[color:var(--on-surface)] dark:text-white">Price:</span> {experience.pricePerPerson}
           </p>
         ) : null}
         {experience.bookingUrl.startsWith("http") ? (
@@ -197,16 +197,16 @@ export function HostSetupRemovePinConfirm({ open, label, onConfirm, onCancel }: 
       aria-labelledby="remove-pin-title"
     >
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" aria-label="Cancel" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
-        <h2 id="remove-pin-title" className="text-base font-semibold text-slate-900 dark:text-white">
+      <div className="relative w-full max-w-sm rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-dm-card">
+        <h2 id="remove-pin-title" className="text-base font-semibold text-[color:var(--on-surface)] dark:text-white">
           Remove from this day?
         </h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-neutral-400">{label}</p>
+        <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">{label}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200"
+            className="rounded-lg border border-[color:var(--hairline)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200"
           >
             Cancel
           </button>

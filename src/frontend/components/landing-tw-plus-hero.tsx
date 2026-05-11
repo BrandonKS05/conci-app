@@ -11,20 +11,22 @@ export function LandingTwPlusHero() {
       <header className="absolute inset-x-0 top-0 z-50">
         <nav aria-label="Global" className="flex items-center justify-between p-6 lg:px-8">
           <div className="flex min-w-0 flex-1 items-center">
-            <Link href="/" className="-m-1.5 flex min-w-0 items-center gap-2.5 p-1.5 outline-none">
+            <Link href="/" className="-m-1.5 flex min-w-0 items-center p-1.5 outline-none">
               <span className="sr-only">Conci</span>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-900 text-xs font-semibold text-white dark:bg-neutral-200 dark:text-dm-page">
-                C
-              </span>
-              <span className="font-display text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+              <span className="font-display text-2xl font-semibold tracking-tight text-[#1c1c17] dark:text-white sm:text-[1.75rem]">
                 Conci
               </span>
             </Link>
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link href="/trip-parser" className={primaryNavPillClass}>
-              <span className="sm:hidden">Join trip</span>
-              <span className="hidden sm:inline">Join a trip</span>
+          <div className="flex shrink-0 items-center gap-3 sm:gap-6">
+            <Link
+              href="/trip-parser"
+              className="label-caps hidden text-[#444748] transition hover:text-[#1c1c17] dark:text-[#9c9a96] dark:hover:text-[#ebe9e4] sm:inline"
+            >
+              Join a trip
+            </Link>
+            <Link href="/trip-parser" className={`${primaryNavPillClass} sm:hidden`}>
+              <span>Join trip</span>
             </Link>
             <div className="hidden lg:block">
               <UserMenu />
@@ -54,7 +56,7 @@ export function LandingTwPlusHero() {
         <ElDialog>
           <dialog id="mobile-menu" className="backdrop:bg-transparent lg:hidden">
             <div tabIndex={0} className="fixed inset-0 focus:outline-none">
-              <ElDialogPanel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white p-6 dark:bg-dm-card sm:max-w-sm sm:ring-1 sm:ring-gray-900/10 dark:sm:ring-white/10">
+              <ElDialogPanel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto border-l border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 dark:border-white/10 dark:bg-dm-card sm:max-w-sm sm:shadow-[var(--shadow-ambient-lg)]">
                 <div className="flex items-center justify-between">
                   <Link href="/" className="-m-1.5 flex items-center gap-2.5 p-1.5">
                     <span className="sr-only">Conci</span>
@@ -116,22 +118,25 @@ export function LandingTwPlusHero() {
               clipPath:
                 "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
             }}
-            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 dark:hidden sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[color:var(--sage-soft)]/25 to-[color:var(--surface-container-highest)]/60 opacity-50 dark:hidden sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
           />
         </div>
 
-        <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
-          <div className="text-center">
-            <h1 className="font-display text-5xl font-semibold tracking-tight text-balance text-gray-900 dark:text-white sm:text-7xl">
-              Turn messy group chats into a real plan
+        <div className="mx-auto max-w-3xl py-28 sm:py-40 lg:py-48">
+          <div className="flex flex-col items-center text-center">
+            <span className="editorial-eyebrow mb-8 dark:text-[color:var(--sage-soft)]">
+              Conci — Cool Luxury Travel
+            </span>
+            <h1 className="font-display text-[3.25rem] font-semibold leading-[0.98] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5rem] lg:text-[5.75rem]">
+              Turn messy group chats <span className="italic">into a real plan.</span>
             </h1>
-            <p className="mt-8 text-lg font-medium text-pretty text-gray-500 dark:text-slate-400 sm:text-xl/8">
+            <p className="mt-10 max-w-xl text-lg leading-relaxed text-pretty text-[color:var(--on-surface-variant)] dark:text-slate-400 sm:text-xl/8">
               Paste a text, link, or screenshot. Get a shareable trip plan in seconds.
             </p>
-            <p className="mx-auto mt-4 max-w-md text-center text-sm leading-relaxed text-gray-600 dark:text-slate-400">
-              Friends can join with an invite code—vote and RSVP with no login. Creators sign in to build plans.
+            <p className="mx-auto mt-4 max-w-md text-center text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-slate-400">
+              Friends can join with an invite code — vote and RSVP with no login. Creators sign in to build plans.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-x-6">
+            <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-x-6">
               <Link href="/trip-parser" className={primaryHeroLinkPillClass}>
                 Start planning
               </Link>
@@ -140,11 +145,12 @@ export function LandingTwPlusHero() {
               </Link>
               <a
                 href="#example"
-                className="text-sm leading-6 font-semibold text-gray-900 dark:text-slate-200"
+                className="text-sm leading-6 font-semibold text-[color:var(--on-surface)] transition hover:text-[color:var(--sage)] dark:text-slate-200 dark:hover:text-[color:var(--sage-soft)]"
               >
                 See an example <span aria-hidden="true">→</span>
               </a>
             </div>
+            <div className="hairline-rule mt-16 max-w-xs dark:bg-white/10" />
           </div>
         </div>
 
@@ -157,7 +163,7 @@ export function LandingTwPlusHero() {
               clipPath:
                 "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
             }}
-            className="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 dark:hidden sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
+            className="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[color:var(--surface-container-highest)]/70 to-[color:var(--sage-soft)]/20 opacity-50 dark:hidden sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
           />
         </div>
       </div>

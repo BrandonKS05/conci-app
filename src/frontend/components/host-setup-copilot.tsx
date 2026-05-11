@@ -312,7 +312,7 @@ export function HostSetupCopilot({
   }
 
   const shellClass =
-    "relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]";
+    "relative flex flex-col overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]";
 
   const panel = (
     <div
@@ -347,8 +347,8 @@ export function HostSetupCopilot({
         onMouseDown={embedded ? undefined : onHeaderMouseDown}
         className={
           embedded
-            ? "shrink-0 border-b border-slate-200 px-3 py-2.5 dark:border-white/10"
-            : "shrink-0 cursor-grab select-none border-b border-slate-200 px-3 py-2.5 active:cursor-grabbing dark:border-white/10"
+            ? "shrink-0 border-b border-[color:var(--hairline)] px-3 py-2.5 dark:border-white/10"
+            : "shrink-0 cursor-grab select-none border-b border-[color:var(--hairline)] px-3 py-2.5 active:cursor-grabbing dark:border-white/10"
         }
       >
         <div className="flex items-start gap-2">
@@ -369,10 +369,10 @@ export function HostSetupCopilot({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
               Setup copilot
             </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-neutral-500">
+            <p className="mt-0.5 text-[11px] leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">
               AI assistant for this draft — edits save automatically when possible.
             </p>
           </div>
@@ -388,21 +388,21 @@ export function HostSetupCopilot({
             className={[
               "rounded-lg px-2.5 py-2 text-[13px] leading-relaxed",
               msg.role === "user"
-                ? "ml-4 bg-teal-100 text-slate-900 dark:bg-teal-950/50 dark:text-neutral-100"
-                : "mr-2 bg-slate-50 text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
+                ? "ml-4 bg-teal-100 text-[color:var(--on-surface)] dark:bg-teal-950/50 dark:text-neutral-100"
+                : "mr-2 bg-[color:var(--surface-container-low)] text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
             ].join(" ")}
           >
             {msg.text}
           </div>
         ))}
         {loading ? (
-          <div className="mr-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[13px] text-slate-500 dark:bg-dm-elevated dark:text-neutral-400">
+          <div className="mr-2 rounded-lg bg-[color:var(--surface-container-low)] px-2.5 py-2 text-[13px] text-[color:var(--on-surface-muted)] dark:bg-dm-elevated dark:text-neutral-400">
             Thinking…
           </div>
         ) : null}
         <div ref={endRef} />
       </div>
-      <div className="shrink-0 border-t border-slate-200 p-2 dark:border-white/10">
+      <div className="shrink-0 border-t border-[color:var(--hairline)] p-2 dark:border-white/10">
         <textarea
           rows={2}
           value={input}
@@ -415,13 +415,13 @@ export function HostSetupCopilot({
             }
           }}
           placeholder="e.g. Set trip to June 12–18, mid-range budget…"
-          className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+          className="mb-2 w-full resize-none rounded-lg border border-[color:var(--hairline)] bg-white px-2.5 py-2 text-[13px] text-[color:var(--on-surface)] placeholder:text-slate-400 focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
         />
         <button
           type="button"
           disabled={loading || !input.trim()}
           onClick={() => void send()}
-          className="w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-neutral-700"
+          className="w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-[color:var(--on-surface-muted)] dark:disabled:bg-neutral-700"
         >
           {loading ? "Sending…" : "Send"}
         </button>
@@ -431,7 +431,7 @@ export function HostSetupCopilot({
           role="separator"
           aria-label="Resize copilot"
           onMouseDown={onResizeMouseDown}
-          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-slate-100 dark:hover:bg-white/10"
+          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-[color:var(--surface-container)] dark:hover:bg-white/10"
           style={{ touchAction: "none" }}
         >
           <svg
