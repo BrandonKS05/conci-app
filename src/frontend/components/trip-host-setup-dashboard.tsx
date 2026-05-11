@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +22,7 @@ import {
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
   type HostActivityExperience,
+  type HostHotelStay,
   type HostRestaurantPin,
   type HostSetupState,
   type TripPlan,
@@ -52,8 +54,8 @@ import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaur
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 import { parseTripPlanStatus, type TripPlanStatus } from "@/shared/trip-status";
-import { HOST_SETUP_NAV_ITEMS, type HostSetupNavItemId } from "@/shared/trip-host-setup-nav";
-import type { CollabStateV1 } from "@/shared/collaboration";
+import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaboration";
+import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
@@ -61,9 +63,57 @@ import { TripContributeButton } from "@/frontend/components/trip-contribute-butt
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
+import { useActiveTripWorkspaceTab, type TripWorkspaceTabId } from "@/frontend/hooks/use-active-trip-tab";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
 
 const JOIN_WITH_CODE_URL = "https://conci-app-wine.vercel.app/join?from=create";
+
+const LEFT_RAIL_TABS: readonly {
+  id: TripWorkspaceTabId;
+  href: string;
+  label: string;
+  navIconId: string;
+}[] = [
+  { id: "overview", href: "#sec-dates", label: "Overview", navIconId: "overview" },
+  { id: "budget", href: "#sec-budget", label: "Budget", navIconId: "budget" },
+  { id: "fund", href: "#sec-fund", label: "Fund", navIconId: "fund" },
+  { id: "collaborate", href: "#sec-preferences-adjustments", label: "Collaborate", navIconId: "collaborate" },
+];
+
+function firstHotelStayHeroPhotoUrl(place: PlaceSpotlight | undefined | null): string | null {
+  if (!place) return null;
+  const extended = place as PlaceSpotlight & { photoUrls?: unknown };
+  const urls = extended.photoUrls;
+  if (Array.isArray(urls)) {
+    for (const u of urls) {
+      if (typeof u === "string" && u.trim()) return u.trim();
+    }
+  }
+  const single = place.photoUrl?.trim();
+  return single || null;
+}
+
+function formatShortStayRange(startIso: string, endIso: string): string {
+  const a = parseLocalIsoDate(startIso);
+  const b = parseLocalIsoDate(endIso);
+  if (!a || !b) return `${startIso} — ${endIso}`;
+  const o: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  const yA = a.getFullYear();
+  const yB = b.getFullYear();
+  const sameYear = yA === yB;
+  const left = a.toLocaleDateString(undefined, sameYear ? o : { ...o, year: "numeric" });
+  const right = b.toLocaleDateString(undefined, sameYear ? o : { ...o, year: "numeric" });
+  return `${left} — ${right}`;
+}
+
+function homeBaseHeroImageSources(plan: TripPlan): { src: string; unoptimized: boolean } | null {
+  const stay0 = plan.hostSetup?.hotelStays?.[0];
+  const fromPlace = firstHotelStayHeroPhotoUrl(stay0?.place);
+  if (fromPlace) return { src: fromPlace, unoptimized: !fromPlace.startsWith("/") };
+  const cover = tripDestinationCoverFromPlan(plan);
+  if (cover) return { src: cover, unoptimized: !cover.startsWith("/") };
+  return null;
+}
 
 function googleMapsDirUrl(origin: string, dest: string): string {
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -87,7 +137,7 @@ function daysInMonth(y: number, m0: number): number {
   return new Date(y, m0 + 1, 0).getDate();
 }
 
-const WEEKDAY_SUN_FIRST = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAY_SUN_FIRST = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
 
 /** Stay + pins shown per day cell; extra rows summarized so week rows stay a uniform height. */
 const CALENDAR_CELL_MAX_VISIBLE_ITEMS = 2;
@@ -119,6 +169,12 @@ function chunkWeeks(cells: (number | null)[]): (number | null)[][] {
 
 function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
   return formatLocalIsoDate(new Date(viewYear, viewMonth, dom, 12, 0, 0, 0));
+}
+
+function calendarPinShellClass(emphasis: boolean): string {
+  return emphasis
+    ? "rounded-full bg-[#1c1c17] px-2 py-1 text-[color:var(--surface)] shadow-none dark:bg-neutral-200 dark:text-dm-page"
+    : "rounded-full border border-[color:var(--hairline-strong)] bg-transparent px-2 py-0.5 dark:border-white/20";
 }
 
 /** Human-readable range for the confirm dialog. */
@@ -176,6 +232,32 @@ function NavIcon({ id }: { id: string }) {
     "aria-hidden": true,
   };
   switch (id) {
+    case "overview":
+      return (
+        <svg {...stroke}>
+          <rect x="3.2" y="3.2" width="5.8" height="5.8" rx="0.9" />
+          <rect x="11" y="3.2" width="5.8" height="5.8" rx="0.9" />
+          <rect x="3.2" y="11" width="5.8" height="5.8" rx="0.9" />
+          <rect x="11" y="11" width="5.8" height="5.8" rx="0.9" />
+        </svg>
+      );
+    case "fund":
+      return (
+        <svg {...stroke}>
+          <path d="M5.5 4.5h9a1.6 1.6 0 0 1 1.6 1.6v10.3a1.2 1.2 0 0 1-1.2 1.2H5.1a1.2 1.2 0 0 1-1.2-1.2V6.1a1.6 1.6 0 0 1 1.6-1.6Z" />
+          <path d="M7 8.2h6M7 11.2h4" />
+        </svg>
+      );
+    case "collaborate":
+      return (
+        <svg {...stroke}>
+          <circle cx="7.2" cy="7" r="1.9" />
+          <path d="M3.2 15.2c.5-2 2.2-3.3 4-3.3s3.5 1.3 4 3.3" />
+          <circle cx="13.8" cy="6.2" r="1.5" />
+          <path d="M11.2 14.2c.3-1.1 1.1-1.9 2.2-1.9 1 0 1.9.8 2.1 1.9" />
+          <path d="M15.2 3.4h3.2M16.8 1.8v3.2" />
+        </svg>
+      );
     case "preferences-adjustments":
       return (
         <svg {...stroke}>
@@ -206,9 +288,9 @@ function NavIcon({ id }: { id: string }) {
     case "budget":
       return (
         <svg {...stroke}>
-          <rect x="2.8" y="5.5" width="14.4" height="9.5" rx="1.8" />
-          <path d="M2.8 9h14.4" />
-          <path d="M6 12.5h1.6" />
+          <path d="M4.2 6.2h11.6a1.4 1.4 0 0 1 1.4 1.4v8.4a1.2 1.2 0 0 1-1.2 1.2H4a1.2 1.2 0 0 1-1.2-1.2V7.6a1.4 1.4 0 0 1 1.4-1.4Z" />
+          <path d="M4.2 9.8h14" />
+          <path d="M14.2 6.2V5a1.8 1.8 0 0 0-3.6 0v1.2" />
         </svg>
       );
     case "trip-chat":
@@ -439,6 +521,12 @@ export function TripHostSetupDashboard({
     calendarYear: calYear,
     calendarMonth0: calMonth,
   });
+
+  const activeTab = useActiveTripWorkspaceTab(canEditTripWorkspace);
+
+  const scrollToInviteSection = useCallback(() => {
+    document.getElementById("sec-invite")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
   const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
@@ -793,6 +881,13 @@ export function TripHostSetupDashboard({
 
   const chatSeed = initialCollab.cardChat?.messages ?? [];
 
+  const primaryHotelStay = useMemo((): HostHotelStay | null => {
+    const stays = plan.hostSetup?.hotelStays ?? [];
+    return stays[0] ?? null;
+  }, [plan.hostSetup?.hotelStays]);
+
+  const homeBaseHero = useMemo(() => homeBaseHeroImageSources(plan), [plan]);
+
   const primaryHotelSummary = useMemo(() => {
     const stays = plan.hostSetup?.hotelStays ?? [];
     if (stays.length > 0) {
@@ -810,21 +905,6 @@ export function TripHostSetupDashboard({
     }
     return null;
   }, [plan.hostSetup?.hotelStays, plan.location]);
-
-  const resolveWorkspaceNavHref = useCallback(
-    (navId: HostSetupNavItemId): string =>
-      navId === "collab-sidebar" ? "#sec-collab-sidebar" : `#sec-${navId}`,
-    []
-  );
-
-  const workspaceNavItems = useMemo(
-    () =>
-      HOST_SETUP_NAV_ITEMS.filter((item) => {
-        if (!canEditTripWorkspace && (item.id === "budget" || item.id === "setup-copilot")) return false;
-        return true;
-      }),
-    [canEditTripWorkspace]
-  );
 
   const tripDisplayName = (plan.title?.trim() || plan.location?.trim() || "Trip");
   const tripIdentityInitial = (tripDisplayName.match(/\p{L}/u)?.[0] ?? "T").toUpperCase();
@@ -865,29 +945,24 @@ export function TripHostSetupDashboard({
               aria-label="Trip workspace sections"
               className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
             >
-              {workspaceNavItems.map((item) => (
+              {LEFT_RAIL_TABS.filter((tab) => tab.id !== "budget" || canEditTripWorkspace).map((tab) => (
                 <a
-                  key={item.id}
-                  href={resolveWorkspaceNavHref(item.id)}
-                  className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
+                  key={tab.id}
+                  href={tab.href}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
+                  className={[
+                    "group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full",
+                    activeTab === tab.id
+                      ? "bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] dark:bg-white/10 dark:text-[#ebe9e4]"
+                      : "text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)]/80 hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]",
+                  ].join(" ")}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
-                    <NavIcon id={item.id} />
+                    <NavIcon id={tab.navIconId} />
                   </span>
-                  {item.label}
+                  {tab.label}
                 </a>
               ))}
-              {canEditTripWorkspace ? (
-                <Link
-                  href={`/trip/${tripId}/setup/packing`}
-                  className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
-                    <NavIcon id="packing" />
-                  </span>
-                  Packing list
-                </Link>
-              ) : null}
             </nav>
 
             <a
@@ -902,57 +977,89 @@ export function TripHostSetupDashboard({
 
         {/* CENTER COLUMN */}
         <main className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-1">
-          {/* Top stats strip — flat editorial layout: Trip fund · Join code · Trip owner */}
-          <section
-            id="sec-invite"
-            className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8"
-          >
-            <TripDepositTracker tripId={tripId} variant="flat" />
-            <div className="min-w-0">
-              <span className="label-caps mb-2 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                Join code
-              </span>
-              {resolvedInviteCode ? (
-                <InviteCodeRow rawCode={resolvedInviteCode} prominent />
-              ) : (
-                <p className="font-display text-[1.5rem] font-semibold tracking-[0.18em] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
-                  ······
-                </p>
-              )}
-            </div>
-            <div className="ml-auto flex items-center gap-3">
-              <div
-                aria-hidden
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--surface-container-high)] text-base font-display font-semibold text-[color:var(--on-surface)] dark:bg-[#2a2a2a] dark:text-[#ebe9e4]"
-              >
-                {tripIdentityInitial}
-                {isHost ? (
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[color:var(--surface)] bg-[#1c1c17] text-[10px] font-bold leading-none text-[color:var(--surface)] dark:border-dm-card dark:bg-[#ebe9e4] dark:text-[#141414]">
-                    +
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                  {isHost ? "Trip owner" : "Trip member"}
+          {/* Trip fund + join + roster — #sec-fund wraps fund actions for left-rail anchor */}
+          <div id="sec-fund" className="scroll-mt-28 space-y-5">
+            <section className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
+              <TripDepositTracker tripId={tripId} variant="flat" />
+              <div id="sec-invite" className="min-w-0 scroll-mt-28">
+                <span className="label-caps mb-2 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                  Join code
                 </span>
-                <Link
-                  href="/settings"
-                  className="text-sm font-medium text-[color:var(--on-surface)] underline-offset-2 hover:underline dark:text-[#ebe9e4]"
-                >
-                  Manage Settings
-                </Link>
+                {resolvedInviteCode ? (
+                  <InviteCodeRow rawCode={resolvedInviteCode} prominent />
+                ) : (
+                  <p className="font-display text-[1.5rem] font-semibold tracking-[0.18em] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
+                    ······
+                  </p>
+                )}
               </div>
-            </div>
-          </section>
+              <div className="ml-auto flex items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center -space-x-2" aria-label="People on this calendar now">
+                    {peers.length === 0 ? (
+                      <span
+                        className="relative z-0 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-high)] text-sm font-display font-semibold text-[color:var(--on-surface)] ring-2 ring-[color:var(--surface)] dark:border-white/15 dark:bg-[#2a2a2a] dark:text-[#ebe9e4] dark:ring-dm-page"
+                        title="No one else on the calendar right now"
+                      >
+                        {tripIdentityInitial}
+                      </span>
+                    ) : (
+                      peers.slice(0, 5).map((p) => (
+                        <span
+                          key={p.userId}
+                          title={`${p.name} · here now`}
+                          className="relative z-[1] inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[11px] font-semibold text-white ring-2 ring-[color:var(--surface)] dark:border-white/15 dark:ring-dm-page"
+                          style={
+                            p.avatarUrl ? undefined : { backgroundColor: p.color, borderColor: "transparent" }
+                          }
+                        >
+                          {p.avatarUrl ? (
+                            <Image
+                              src={p.avatarUrl}
+                              alt=""
+                              width={36}
+                              height={36}
+                              className="h-full w-full object-cover"
+                              unoptimized
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            p.name.slice(0, 1).toUpperCase()
+                          )}
+                        </span>
+                      ))
+                    )}
+                    <button
+                      type="button"
+                      onClick={scrollToInviteSection}
+                      className="relative z-[2] flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-sm font-semibold text-[color:var(--on-surface)] ring-2 ring-[color:var(--surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/25 dark:bg-dm-page dark:text-[#ebe9e4] dark:ring-dm-page"
+                      aria-label="Invite people — jump to join code"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      {isHost ? "Trip owner" : "Trip member"}
+                    </span>
+                    <Link
+                      href="/settings"
+                      className="text-sm font-medium text-[color:var(--on-surface-muted)] underline-offset-2 hover:text-[color:var(--on-surface)] hover:underline dark:text-neutral-500 dark:hover:text-[#ebe9e4]"
+                    >
+                      Manage Settings
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          {/* Secondary fund/owner actions + collapsible trip details — keeps banners and budget chip available without crowding */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Secondary fund actions + collapsible trip details */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <TripContributeButton tripId={tripId} />
             </div>
             <details className="group min-w-0 flex-1 sm:flex-none">
-              <summary className="label-caps cursor-pointer list-none rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-400 [&::-webkit-details-marker]:hidden">
+              <summary className="label-caps cursor-pointer list-none rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-[color:var(--surface-container-low)] dark:text-neutral-400 [&::-webkit-details-marker]:hidden">
                 <span className="inline-flex items-center gap-2">
                   Trip details
                   <ChevRight className="h-3 w-3 transition group-open:rotate-90" />
@@ -1058,6 +1165,7 @@ export function TripHostSetupDashboard({
               </div>
             </details>
           </div>
+          </div>
 
           <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
@@ -1103,7 +1211,7 @@ export function TripHostSetupDashboard({
                       return m - 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-white/10"
                 >
                   <ChevLeft className="h-4 w-4" />
                 </button>
@@ -1119,7 +1227,7 @@ export function TripHostSetupDashboard({
                       return m + 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-white/10"
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
@@ -1230,22 +1338,35 @@ export function TripHostSetupDashboard({
                     );
 
                     const calendarCellEntries: ReactNode[] = [];
+                    const pinEmphasis =
+                      isCalendarToday(dom) || (datePickMode === "day" && selectedDayIso === cellIso);
+                    let pinOrdinal = 0;
+                    const takePinEmphasis = () => {
+                      const e = pinEmphasis && pinOrdinal === 0;
+                      pinOrdinal += 1;
+                      return e;
+                    };
                     for (const { stay: hotelForDay, edge } of hotelCalendarRows) {
+                      const pem = takePinEmphasis();
+                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
+                      const metaPin = pem
+                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
+                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       calendarCellEntries.push(
                         <div
                           key={`stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`}
-                          className="min-w-0 w-full"
+                          className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}
                         >
-                          <div className="flex items-start gap-1.5 rounded-md px-1 py-0.5 text-left leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
+                          <div className={["flex items-start gap-1.5 text-left leading-snug", onPin].join(" ")}>
                             <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                               {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
                               {hotelForDay.recommendedByConci ? (
-                                <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
+                                <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                   recommended by CONCI
                                 </span>
                               ) : null}
                             </span>
-                            <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
+                            <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
                               {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
                             </span>
                           </div>
@@ -1253,26 +1374,35 @@ export function TripHostSetupDashboard({
                       );
                     }
                     for (const p of mealPinsForCell) {
+                      const pem = takePinEmphasis();
+                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
+                      const metaPin = pem
+                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
+                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       calendarCellEntries.push(
                         <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
                           <button
                             type="button"
-                            className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                            className={[
+                              "w-full text-left transition",
+                              calendarPinShellClass(pem),
+                              pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
+                            ].join(" ")}
                             onClick={(ev) => {
                               ev.stopPropagation();
                               setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
+                            <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.place.name}
                                 {p.recommendedByConci ? (
-                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
+                                  <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                     recommended by CONCI
                                   </span>
                                 ) : null}
                               </span>
-                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
+                              <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
                                 Meal
                               </span>
                             </div>
@@ -1299,11 +1429,20 @@ export function TripHostSetupDashboard({
                       );
                     }
                     for (const p of activityPinsForCell) {
+                      const pem = takePinEmphasis();
+                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
+                      const metaPin = pem
+                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
+                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       calendarCellEntries.push(
                         <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
                           <button
                             type="button"
-                            className="w-full rounded-md px-1 py-0.5 text-left transition hover:bg-white/70 dark:hover:bg-white/5"
+                            className={[
+                              "w-full text-left transition",
+                              calendarPinShellClass(pem),
+                              pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
+                            ].join(" ")}
                             onClick={(ev) => {
                               ev.stopPropagation();
                               setPinDetail({
@@ -1313,16 +1452,16 @@ export function TripHostSetupDashboard({
                               });
                             }}
                           >
-                            <div className="flex items-start gap-1.5 leading-snug text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
+                            <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                                 {p.experience.name}
                                 {p.recommendedByConci ? (
-                                  <span className="ml-1 block text-[9px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)]/70 dark:text-neutral-500/70">
+                                  <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                     recommended by CONCI
                                   </span>
                                 ) : null}
                               </span>
-                              <span className="shrink-0 text-[9px] uppercase tracking-wide text-[color:var(--on-surface-muted)] sm:text-[10px] dark:text-neutral-500">
+                              <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
                                 Activity
                               </span>
                             </div>
@@ -1371,8 +1510,8 @@ export function TripHostSetupDashboard({
                           canEditTripWorkspace ? "cursor-pointer" : "cursor-default",
                           ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           inTripRangeCell(dom)
-                            ? "bg-amber-100/85 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-950/60"
-                            : "bg-transparent hover:bg-[color:var(--surface-container-low)]/60 dark:hover:bg-dm-elevated/40",
+                            ? "bg-transparent ring-1 ring-inset ring-amber-200/60 hover:bg-[color:var(--surface-container-low)]/25 dark:ring-amber-700/35 dark:hover:bg-white/[0.03]"
+                            : "bg-transparent hover:bg-[color:var(--surface-container-low)]/35 dark:hover:bg-white/[0.03]",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
@@ -1436,15 +1575,28 @@ export function TripHostSetupDashboard({
                 {err}
               </p>
             ) : null}
+            {canEditTripWorkspace ? (
+              <div className="border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
+                <Link
+                  href={`/trip/${tripId}/setup/packing`}
+                  className="text-xs font-medium text-[color:var(--on-surface)] underline-offset-2 hover:underline dark:text-[#ebe9e4]"
+                >
+                  Packing list
+                </Link>
+                <span className="text-xs text-[color:var(--on-surface-muted)]"> · shared checklist</span>
+              </div>
+            ) : null}
           </div>
 
         </section>
 
         {canEditTripWorkspace ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
-            <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+            <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/80 px-3 py-2 dark:border-white/10 dark:bg-[color:var(--surface-container-low)]/40">
               <div className="flex items-center gap-3 px-3 py-1">
-                <NavIcon id="setup-copilot" />
+                <span className="text-base" aria-hidden>
+                  ✨
+                </span>
                 <p className="flex-1 text-sm text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)]">
                   Setup copilot or ask for recommendations…
                 </p>
@@ -1478,6 +1630,21 @@ export function TripHostSetupDashboard({
               tripOwnerUserId={tripOwnerUserId}
             />
           </div>
+        </section>
+
+        <section id="sec-collab-sidebar" className="scroll-mt-28">
+          <TripCollaborationPanel
+            tripId={tripId}
+            plan={plan}
+            tripStatus={effectiveTripStatus}
+            isHost={isHost}
+            collabRefreshSignal={collabRefreshSignal}
+            onPlanUpdated={setPlan}
+            viewerUserId={viewerUserId}
+            tripOwnerUserId={tripOwnerUserId}
+            variant="full"
+            omitDecisionKeys={[VIBE_POLL_DECISION_KEY]}
+          />
         </section>
 
         {canEditTripWorkspace ? (
@@ -1523,10 +1690,8 @@ export function TripHostSetupDashboard({
           </div>
         </section>
 
-        <section className="scroll-mt-28">
-          <div className="rounded-2xl border border-[color:var(--hairline)]/90 bg-white p-6 shadow-sm dark:border-[color:var(--hairline)] dark:bg-dm-card dark:shadow-none sm:p-8">
-            <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
-          </div>
+        <section className="scroll-mt-28 border-t border-[color:var(--hairline)] pt-8 dark:border-white/10">
+          <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
         </section>
 
         <section id="sec-itinerary" className="scroll-mt-28">
@@ -1551,16 +1716,12 @@ export function TripHostSetupDashboard({
 
         </main>
 
-        {/* RIGHT RAIL — flights + home base, sticky on xl */}
-        <aside className="space-y-6 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:self-start xl:sticky xl:top-28">
-          <div
-            id="sec-flights"
-            className="scroll-mt-28 space-y-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none"
-          >
-            <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">Flights</h3>
-            <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-              Search flight options and add the ones you want into the trip itinerary.
-            </p>
+        {/* RIGHT RAIL — flights + home base, sticky + independently scrollable on xl */}
+        <aside className="space-y-10 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:overscroll-y-contain xl:self-start xl:sticky xl:top-28 xl:pr-1">
+          <div id="sec-flights" className="scroll-mt-28 space-y-4 border-b border-[color:var(--hairline)] pb-10 dark:border-white/10">
+            <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+              Flights
+            </h3>
             {liveFetchErr ? (
               <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/30 dark:text-amber-200">
                 {liveFetchErr}
@@ -1573,36 +1734,34 @@ export function TripHostSetupDashboard({
               <HostFlightSearchPanel tripId={tripId} enabled />
             ) : null}
             {showFlightTransport ? (
-              <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] p-5 shadow-inner">
-                <p className="text-xs text-[color:var(--on-surface-muted)]">
+              <div className="space-y-4 border-t border-[color:var(--hairline)] pt-6 dark:border-white/10">
+                <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                   From <strong className="text-[color:var(--on-surface)]">{plan.departureCity}</strong> to{" "}
                   <strong className="text-[color:var(--on-surface)]">{plan.location}</strong>
                 </p>
-                <div className="mt-4 space-y-4">
-                  <HostLiveScheduleByDay
-                    plan={plan}
-                    flights={liveData?.flights ?? []}
-                    restaurants={liveData?.restaurants ?? []}
-                    experiences={liveData?.experiences ?? []}
-                  />
-                  <CuratedFlightsRows
-                    plan={plan}
-                    flights={liveData?.flights ?? []}
-                    liveLoading={liveLoading}
-                    flightsError={liveData?.flightsError ?? null}
-                    mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
-                    busyKey={flightCurationBusy}
-                    isHost={canEditTripWorkspace}
-                    tripDays={flightTripDayOptions}
-                  />
-                </div>
+                <HostLiveScheduleByDay
+                  plan={plan}
+                  flights={liveData?.flights ?? []}
+                  restaurants={liveData?.restaurants ?? []}
+                  experiences={liveData?.experiences ?? []}
+                />
+                <CuratedFlightsRows
+                  plan={plan}
+                  flights={liveData?.flights ?? []}
+                  liveLoading={liveLoading}
+                  flightsError={liveData?.flightsError ?? null}
+                  mutate={(a, k, d) => void flightCurationMutate(a, k, d)}
+                  busyKey={flightCurationBusy}
+                  isHost={canEditTripWorkspace}
+                  tripDays={flightTripDayOptions}
+                />
                 {(() => {
                   const dc = plan.departureCity?.trim();
                   const loc = plan.location?.trim();
                   const href =
                     liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
                   return href ? (
-                    <p className="mt-4 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                    <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                       Driving instead?{" "}
                       <a
                         href={href}
@@ -1623,28 +1782,72 @@ export function TripHostSetupDashboard({
                   ) : null;
                 })()}
               </div>
-            ) : (
-              <p className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                Flight search appears here once departure city and destination are set on the trip.
+            ) : canEditTripWorkspace && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
+              <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                Add a departure city on the trip card to see route picks and driving estimates here.
               </p>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                  No flights booked yet. Set departure city and destination on the trip to search.
+                </p>
+                <a
+                  href="#sec-flights"
+                  className="inline-flex items-center justify-center bg-[#1c1c17] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--surface)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
+                >
+                  Search
+                </a>
+              </div>
             )}
           </div>
-          <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-            <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">Home base</h3>
-            {primaryHotelSummary ? (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:border-white/10 dark:from-[#2a2a2a] dark:to-[#1f1f1f]">
-                <div className="px-4 pb-4 pt-12">
-                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Hotel</span>
-                  <p className="mt-1 font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-                    {primaryHotelSummary.title}
+
+          <div className="scroll-mt-28 space-y-4">
+            <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+              Home base
+            </h3>
+            {primaryHotelStay?.place?.name ? (
+              <div className="space-y-4">
+                <div className="relative overflow-hidden rounded-xl">
+                  {homeBaseHero ? (
+                    <>
+                      <div className="relative aspect-[16/10] w-full">
+                        <Image
+                          src={homeBaseHero.src}
+                          alt={primaryHotelStay.place.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 1280px) 100vw, 360px"
+                          unoptimized={homeBaseHero.unoptimized}
+                        />
+                      </div>
+                      <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        Hotel
+                      </span>
+                    </>
+                  ) : (
+                    <div className="aspect-[16/10] w-full bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:from-[#2a2a2a] dark:to-[#1f1f1f]" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-display text-lg font-semibold leading-snug text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+                    {primaryHotelStay.place.name}
                   </p>
-                  <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-                    {primaryHotelSummary.detail}
+                  <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                    {formatShortStayRange(primaryHotelStay.startIso, primaryHotelStay.endIso)}
                   </p>
+                  {(primaryHotelStay.place.address?.trim() || plan.location?.trim()) ? (
+                    <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      {primaryHotelStay.place.address?.trim() || plan.location?.trim()}
+                    </p>
+                  ) : null}
                 </div>
               </div>
+            ) : primaryHotelSummary ? (
+              <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                {primaryHotelSummary.detail}
+              </p>
             ) : (
-              <p className="mt-3 text-sm leading-relaxed text-[color:var(--on-surface-muted)]">
+              <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 {canEditTripWorkspace
                   ? "Add lodging on a calendar day, with Trip Copilot, or in the day editor."
                   : "No home base saved on the plan yet."}
