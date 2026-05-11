@@ -119,7 +119,14 @@ function DepositBreakdownModal({
   );
 }
 
-export function TripDepositTracker({ tripId }: { tripId: string }) {
+export function TripDepositTracker({
+  tripId,
+  variant = "card",
+}: {
+  tripId: string;
+  /** `card` — pill button (default). `flat` — borderless stat (eyebrow + serif amount) for top strips. */
+  variant?: "card" | "flat";
+}) {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [totalCents, setTotalCents] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -158,11 +165,53 @@ export function TripDepositTracker({ tripId }: { tripId: string }) {
   }, [fetchDeposits]);
 
   if (loading) {
+    if (variant === "flat") {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+            Trip fund
+          </span>
+          <span className="h-7 w-16 animate-pulse rounded bg-[color:var(--surface-container-high)] dark:bg-neutral-700" />
+        </div>
+      );
+    }
     return (
       <div className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-sm text-[color:var(--on-surface-muted)] shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-500">
         <span className="h-3 w-3 animate-pulse rounded-full bg-[color:var(--surface-container-high)] dark:bg-neutral-600" />
         Loading…
       </div>
+    );
+  }
+
+  if (variant === "flat") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setShowBreakdown(true)}
+          className="group inline-flex flex-col items-start gap-1 rounded-md text-left transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]"
+          aria-label={`Trip fund ${formatCurrency(totalCents)} — view contributions`}
+        >
+          <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+            Trip fund
+          </span>
+          <span className="font-display text-[1.75rem] font-semibold leading-none tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-white sm:text-[2rem]">
+            {formatCurrency(totalCents)}
+          </span>
+          {deposits.length > 0 ? (
+            <span className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+              {deposits.length} {deposits.length === 1 ? "deposit" : "deposits"}
+            </span>
+          ) : null}
+        </button>
+        {showBreakdown && (
+          <DepositBreakdownModal
+            deposits={deposits}
+            totalCents={totalCents}
+            onClose={() => setShowBreakdown(false)}
+          />
+        )}
+      </>
     );
   }
 

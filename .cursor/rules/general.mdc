@@ -10,6 +10,7 @@ alwaysApply: true
 - Keep UI consistent with the current design.
 - Keep changes minimal and focused.
 - Use TypeScript types for new code.
+- For new Next.js UI, prefer `next/image` over raw `<img>` unless there is a specific reason not to.
 
 # Workflow
 

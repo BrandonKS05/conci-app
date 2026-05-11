@@ -87,7 +87,7 @@ function daysInMonth(y: number, m0: number): number {
   return new Date(y, m0 + 1, 0).getDate();
 }
 
-const WEEKDAY_MON_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const WEEKDAY_SUN_FIRST = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /** Stay + pins shown per day cell; extra rows summarized so week rows stay a uniform height. */
 const CALENDAR_CELL_MAX_VISIBLE_ITEMS = 2;
@@ -98,13 +98,12 @@ const HOST_CALENDAR_HOTEL_EDGE_LABEL: Record<HostHotelCalendarEdge, string> = {
   "check-in-out": "Check-in · Check-out",
 };
 
-/** Monday-first month grid padding (classic wall calendar layout). */
-function calendarCellsMondayFirst(viewYear: number, viewMonth: number): (number | null)[] {
-  const firstDowSun0 = new Date(viewYear, viewMonth, 1).getDay();
-  const padMon0 = (firstDowSun0 + 6) % 7;
+/** Sunday-first month grid padding (matches reference editorial layout). */
+function calendarCellsSundayFirst(viewYear: number, viewMonth: number): (number | null)[] {
+  const padSun = new Date(viewYear, viewMonth, 1).getDay();
   const n = daysInMonth(viewYear, viewMonth);
   const cells: (number | null)[] = [];
-  for (let i = 0; i < padMon0; i++) cells.push(null);
+  for (let i = 0; i < padSun; i++) cells.push(null);
   for (let d = 1; d <= n; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
@@ -161,6 +160,95 @@ function ChevRight({ className }: { className?: string }) {
       />
     </svg>
   );
+}
+
+/** Stroked nav icons for the left rail. Keeps line-weight consistent with editorial typography. */
+function NavIcon({ id }: { id: string }) {
+  const stroke = {
+    xmlns: "http://www.w3.org/2000/svg",
+    viewBox: "0 0 20 20",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.4,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    className: "h-4 w-4",
+    "aria-hidden": true,
+  };
+  switch (id) {
+    case "preferences-adjustments":
+      return (
+        <svg {...stroke}>
+          <path d="M4 6h12M4 10h12M4 14h7" />
+          <circle cx="14" cy="14" r="1.6" />
+        </svg>
+      );
+    case "dates":
+      return (
+        <svg {...stroke}>
+          <rect x="3" y="4.5" width="14" height="12" rx="1.8" />
+          <path d="M3 8.5h14M7 3.2v2.6M13 3.2v2.6" />
+        </svg>
+      );
+    case "setup-copilot":
+      return (
+        <svg {...stroke}>
+          <path d="M10 3.5l1.4 3.1 3.1 1.4-3.1 1.4L10 12.5 8.6 9.4 5.5 8l3.1-1.4L10 3.5Z" />
+          <path d="M15 13.5l.7 1.5 1.5.7-1.5.7-.7 1.5-.7-1.5-1.5-.7 1.5-.7.7-1.5Z" />
+        </svg>
+      );
+    case "flights":
+      return (
+        <svg {...stroke}>
+          <path d="M2.8 11.8 17 6.5l-1.2 2.5-7.4 4.4L7 16.6l-1 .4-.4-2.6-2.6-.4.4-1Z" />
+        </svg>
+      );
+    case "budget":
+      return (
+        <svg {...stroke}>
+          <rect x="2.8" y="5.5" width="14.4" height="9.5" rx="1.8" />
+          <path d="M2.8 9h14.4" />
+          <path d="M6 12.5h1.6" />
+        </svg>
+      );
+    case "trip-chat":
+      return (
+        <svg {...stroke}>
+          <path d="M3.5 5.5h11A1.5 1.5 0 0 1 16 7v5.5a1.5 1.5 0 0 1-1.5 1.5h-7L4.5 16.5v-2.5a1.5 1.5 0 0 1-1-1.4V7a1.5 1.5 0 0 1 1.5-1.5Z" />
+        </svg>
+      );
+    case "collab-sidebar":
+      return (
+        <svg {...stroke}>
+          <circle cx="7" cy="7.5" r="2.2" />
+          <circle cx="13.6" cy="8.3" r="1.7" />
+          <path d="M2.8 15.5c.5-2.1 2.3-3.4 4.2-3.4s3.7 1.3 4.2 3.4" />
+          <path d="M12 14c.4-1.3 1.4-2.2 2.7-2.2 1.2 0 2.3.9 2.6 2.2" />
+        </svg>
+      );
+    case "packing":
+      return (
+        <svg {...stroke}>
+          <rect x="3.5" y="6" width="13" height="10.5" rx="1.8" />
+          <path d="M7 6V4.5h6V6" />
+          <path d="M3.5 11h13" />
+        </svg>
+      );
+    case "invite":
+      return (
+        <svg {...stroke}>
+          <circle cx="8" cy="7.5" r="2.4" />
+          <path d="M3 16.5c.5-2.3 2.4-3.8 4.7-3.8s4.2 1.5 4.7 3.8" />
+          <path d="M13.5 4.5h3.7M15.4 2.6v3.8" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...stroke}>
+          <circle cx="10" cy="10" r="3" />
+        </svg>
+      );
+  }
 }
 
 export function TripHostSetupDashboard({
@@ -667,7 +755,7 @@ export function TripHostSetupDashboard({
     }
   }, []);
 
-  const cells = useMemo(() => calendarCellsMondayFirst(calYear, calMonth), [calYear, calMonth]);
+  const cells = useMemo(() => calendarCellsSundayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
 
   const isCalendarToday = useCallback(
@@ -753,90 +841,83 @@ export function TripHostSetupDashboard({
     <SiteShell tripTypography contentWide>
       <div className="mx-auto w-full pb-24 lg:pb-12">
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_360px] xl:gap-9">
-        {/* LEFT RAIL — trip identity + vertical workspace nav + invite-friends CTA */}
-        <aside className="space-y-5 lg:row-start-1 lg:self-start lg:sticky lg:top-28">
-          <div className="flex items-center gap-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-5 py-5 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:flex-col lg:items-start lg:gap-3">
-            <div
-              aria-hidden
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--sage-soft)] to-[color:var(--surface-container-high)] text-lg font-display font-semibold text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:from-[#3a3a3a] dark:to-[#222] dark:text-[#ebe9e4] lg:h-14 lg:w-14 lg:text-xl"
+        {/* LEFT RAIL — flat identity + icon nav + invite-friends CTA */}
+        <aside className="lg:row-start-1 lg:self-start lg:sticky lg:top-28">
+          <div className="flex h-full flex-col gap-6">
+            <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-3">
+              <div
+                aria-hidden
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--sage-soft)] to-[color:var(--surface-container-high)] text-xl font-display font-semibold text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:from-[#3a3a3a] dark:to-[#222] dark:text-[#ebe9e4]"
+              >
+                {tripIdentityInitial}
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-2xl font-semibold leading-[1.05] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] lg:whitespace-normal">
+                  {tripDisplayName}
+                </h1>
+                <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
+                  {tripIdentityDateLabel}
+                </p>
+              </div>
+            </div>
+
+            <nav
+              aria-label="Trip workspace sections"
+              className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
             >
-              {tripIdentityInitial}
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate font-display text-xl font-semibold leading-[1.05] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] lg:whitespace-normal lg:text-2xl">
-                {tripDisplayName}
-              </h1>
-              <p className="mt-0.5 text-xs text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
-                {tripIdentityDateLabel}
-              </p>
-            </div>
+              {workspaceNavItems.map((item) => (
+                <a
+                  key={item.id}
+                  href={resolveWorkspaceNavHref(item.id)}
+                  className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
+                    <NavIcon id={item.id} />
+                  </span>
+                  {item.label}
+                </a>
+              ))}
+              {canEditTripWorkspace ? (
+                <Link
+                  href={`/trip/${tripId}/setup/packing`}
+                  className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
+                    <NavIcon id="packing" />
+                  </span>
+                  Packing list
+                </Link>
+              ) : null}
+            </nav>
+
+            <a
+              href="#sec-invite"
+              className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:mt-auto lg:inline-flex"
+            >
+              <NavIcon id="invite" />
+              Invite friends
+            </a>
           </div>
-
-          <nav
-            aria-label="Trip workspace sections"
-            className="flex flex-row gap-1 overflow-x-auto rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-1.5 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none lg:flex-col lg:overflow-visible"
-          >
-            {workspaceNavItems.map((item) => (
-              <a
-                key={item.id}
-                href={resolveWorkspaceNavHref(item.id)}
-                className="label-caps flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
-              >
-                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
-                {item.label}
-              </a>
-            ))}
-            {canEditTripWorkspace ? (
-              <Link
-                href={`/trip/${tripId}/setup/packing`}
-                className="label-caps flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)] lg:w-full"
-              >
-                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]" />
-                Packing list
-              </Link>
-            ) : null}
-          </nav>
-
-          <a
-            href="#sec-invite"
-            className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:inline-flex"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3.5 w-3.5"
-              aria-hidden
-            >
-              <circle cx="8" cy="7.5" r="2.4" />
-              <path d="M3 16.5c.5-2.3 2.4-3.8 4.7-3.8s4.2 1.5 4.7 3.8" />
-              <path d="M13.5 4.5h3.7M15.4 2.6v3.8" />
-            </svg>
-            Invite friends
-          </a>
         </aside>
 
         {/* CENTER COLUMN */}
-        <main className="min-w-0 space-y-10 lg:col-start-2 lg:row-start-1">
-          {/* Top stats strip — Trip fund · Join code · Trip owner */}
+        <main className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-1">
+          {/* Top stats strip — flat editorial layout: Trip fund · Join code · Trip owner */}
           <section
             id="sec-invite"
-            className="flex flex-col gap-5 border-b border-[color:var(--hairline)] pb-7 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6 lg:gap-7"
+            className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8"
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <TripDepositTracker tripId={tripId} />
-              <TripContributeButton tripId={tripId} />
-            </div>
-            <span className="hidden h-10 w-px bg-[color:var(--hairline)] dark:bg-white/10 sm:inline-block" />
+            <TripDepositTracker tripId={tripId} variant="flat" />
             <div className="min-w-0">
+              <span className="label-caps mb-2 block text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                Join code
+              </span>
               {resolvedInviteCode ? (
                 <InviteCodeRow rawCode={resolvedInviteCode} prominent />
               ) : (
-                <p className="text-sm text-[color:var(--on-surface-variant)]">Loading invite code…</p>
+                <p className="font-display text-[1.5rem] font-semibold tracking-[0.18em] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
+                  ······
+                </p>
               )}
             </div>
             <div className="ml-auto flex items-center gap-3">
@@ -852,7 +933,7 @@ export function TripHostSetupDashboard({
                 ) : null}
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="label-caps text-[color:var(--on-surface-muted)]">
+                <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                   {isHost ? "Trip owner" : "Trip member"}
                 </span>
                 <Link
@@ -865,103 +946,117 @@ export function TripHostSetupDashboard({
             </div>
           </section>
 
-          {/* Owner controls helper / member helper */}
-          {isHost ? (
-            resolvedInviteCode ? (
-              <div className="rounded-2xl border border-amber-300/50 bg-amber-50/90 px-4 py-3 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
-                <h3 className="font-display text-sm font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
-                <p className="mt-1.5 text-xs text-amber-950/90 dark:text-amber-100/90">
-                  You can override group suggestions anytime.
-                </p>
-                <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-amber-950 dark:text-amber-50/95">
-                  <li>
-                    Use{" "}
-                    <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
-                      Trip chat
-                    </a>{" "}
-                    to change dates, budget, or destination.
-                  </li>
-                  <li>
-                    Under{" "}
-                    <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
-                      Flights
-                    </a>
-                    , keep or dismiss itineraries.
-                  </li>
-                </ul>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                <p>
-                  Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
-                  <Link
-                    href={JOIN_WITH_CODE_URL}
-                    className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
-                  >
-                    Join a Trip
-                  </Link>
-                  . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
-                  below.
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-              <p>
-                You&apos;re on this trip as a guest.{" "}
-                {canEditTripWorkspace ? (
-                  <>
-                    Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
-                    <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
-                  </>
+          {/* Secondary fund/owner actions + collapsible trip details — keeps banners and budget chip available without crowding */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <TripContributeButton tripId={tripId} />
+            </div>
+            <details className="group min-w-0 flex-1 sm:flex-none">
+              <summary className="label-caps cursor-pointer list-none rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-card dark:text-neutral-400 [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-2">
+                  Trip details
+                  <ChevRight className="h-3 w-3 transition group-open:rotate-90" />
+                </span>
+              </summary>
+              <div className="mt-3 space-y-3">
+                {isHost ? (
+                  resolvedInviteCode ? (
+                    <div className="rounded-2xl border border-amber-300/50 bg-amber-50/90 px-4 py-3 shadow-sm dark:border-amber-700/35 dark:bg-amber-950/25 dark:shadow-none">
+                      <h3 className="font-display text-sm font-semibold text-amber-950 dark:text-amber-100">Trip owner controls</h3>
+                      <p className="mt-1.5 text-xs text-amber-950/90 dark:text-amber-100/90">
+                        You can override group suggestions anytime.
+                      </p>
+                      <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-amber-950 dark:text-amber-50/95">
+                        <li>
+                          Use{" "}
+                          <a href="#trip-card-chat" className="font-semibold underline underline-offset-2">
+                            Trip chat
+                          </a>{" "}
+                          to change dates, budget, or destination.
+                        </li>
+                        <li>
+                          Under{" "}
+                          <a href="#trip-live-flights" className="font-semibold underline underline-offset-2">
+                            Flights
+                          </a>
+                          , keep or dismiss itineraries.
+                        </li>
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                      <p>
+                        Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
+                        <Link
+                          href={JOIN_WITH_CODE_URL}
+                          className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
+                        >
+                          Join a Trip
+                        </Link>
+                        . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
+                        below.
+                      </p>
+                    </div>
+                  )
                 ) : (
-                  <>This trip is finalized — viewing shared plans and checklist.</>
+                  <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                    <p>
+                      You&apos;re on this trip as a guest.{" "}
+                      {canEditTripWorkspace ? (
+                        <>
+                          Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
+                          <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
+                        </>
+                      ) : (
+                        <>This trip is finalized — viewing shared plans and checklist.</>
+                      )}
+                    </p>
+                  </div>
                 )}
-              </p>
-            </div>
-          )}
 
-          {/* Budget chip + editor */}
-          <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Trip budget</span>
-              <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
-                {budgetDisplayLine}
-              </span>
-              {canEditTripWorkspace ? (
-                <button
-                  type="button"
-                  onClick={() => setShowBudgetEditor((v) => !v)}
-                  className="rounded-full border border-[color:var(--hairline-strong)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container)]"
-                >
-                  {showBudgetEditor ? "Cancel" : "Change budget"}
-                </button>
-              ) : null}
-            </div>
-            {canEditTripWorkspace && showBudgetEditor ? (
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                <input
-                  value={budgetLine}
-                  onChange={(e) => setBudgetLine(e.target.value)}
-                  placeholder="e.g. ~$1,200 per person"
-                  className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-neutral-500 focus:border-[color:var(--sage)]/55"
-                />
-                <button
-                  type="button"
-                  disabled={savingBudgetInline}
-                  onClick={() => {
-                    setSavingBudgetInline(true);
-                    void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null }).then((ok) => {
-                      if (ok) setShowBudgetEditor(false);
-                      setSavingBudgetInline(false);
-                    });
-                  }}
-                  className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
-                >
-                  {savingBudgetInline ? "Saving..." : "Save budget"}
-                </button>
+                <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="label-caps text-[color:var(--on-surface-muted)]">Trip budget</span>
+                    <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
+                      {budgetDisplayLine}
+                    </span>
+                    {canEditTripWorkspace ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowBudgetEditor((v) => !v)}
+                        className="rounded-full border border-[color:var(--hairline-strong)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container)]"
+                      >
+                        {showBudgetEditor ? "Cancel" : "Change budget"}
+                      </button>
+                    ) : null}
+                  </div>
+                  {canEditTripWorkspace && showBudgetEditor ? (
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <input
+                        value={budgetLine}
+                        onChange={(e) => setBudgetLine(e.target.value)}
+                        placeholder="e.g. ~$1,200 per person"
+                        className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-3 py-2 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-neutral-500 focus:border-[color:var(--sage)]/55"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingBudgetInline}
+                        onClick={() => {
+                          setSavingBudgetInline(true);
+                          void persistHostSetup(undefined, { tier: null, perPerson: budgetLine.trim() || null }).then((ok) => {
+                            if (ok) setShowBudgetEditor(false);
+                            setSavingBudgetInline(false);
+                          });
+                        }}
+                        className="shrink-0 rounded-xl border border-zinc-500/35 bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                      >
+                        {savingBudgetInline ? "Saving..." : "Save budget"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
+            </details>
           </div>
 
           <section id="sec-dates" className="scroll-mt-28">
@@ -989,78 +1084,13 @@ export function TripHostSetupDashboard({
             </div>
           </div>
 
-          <div className="w-full overflow-hidden rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-[color:var(--on-surface)] shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card dark:text-[color:var(--on-surface)] dark:shadow-none">
-            {/* Header — toolbar like reference */}
-            <div className="flex flex-col gap-3 border-b border-[color:var(--hairline)] px-4 py-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-7 sm:py-5">
-              <div className="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Calendar</span>
-                  <h3 className="font-display text-2xl font-semibold tracking-[-0.025em] text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)] sm:text-[1.75rem]">
-                    {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
-                  </h3>
-                </div>
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedDayIso(hostSetup.tripRange!.startIso);
-                      setAddPlacesOpen(true);
-                    }}
-                    className="shrink-0 rounded-lg bg-[#1c1c17] px-2.5 py-1 text-xs font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] sm:px-3 sm:py-1.5 dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
-                  >
-                    Add places
-                  </button>
-                ) : null}
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDatePickMode("range");
-                      setRangeAnchor(null);
-                      setSelectedDayIso(null);
-                      setAddPlacesOpen(false);
-                      setPendingRangeConfirm(null);
-                    }}
-                    className="shrink-0 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-2.5 py-1 text-xs font-medium text-[color:var(--on-surface-variant)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
-                  >
-                    Change dates
-                  </button>
-                ) : null}
-              </div>
-              {peers.length > 0 ? (
-                <div className="flex w-full flex-wrap items-center gap-2 border-t border-[color:var(--hairline)] px-1 py-2.5 dark:border-white/10 sm:border-t-0 sm:py-1.5">
-                  <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-                    Here now
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {peers.map((p) => (
-                      <span
-                        key={p.userId}
-                        title={`${p.name} · on this calendar`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-0.5 pl-0.5 pr-2 text-xs text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
-                      >
-                        <span
-                          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[11px] font-semibold text-white dark:border-white/15"
-                          style={
-                            p.avatarUrl
-                              ? undefined
-                              : { backgroundColor: p.color, borderColor: "transparent" }
-                          }
-                        >
-                          {p.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs from OAuth metadata
-                            <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            p.name.slice(0, 1).toUpperCase()
-                          )}
-                        </span>
-                        <span className="max-w-[8rem] truncate font-medium">{p.name}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <div className="w-full text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
+            {/* Header — flat editorial: month title + chevrons */}
+            <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
+              <h3 className="font-display text-[1.75rem] font-semibold tracking-[-0.025em] text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)] sm:text-[2rem]">
+                {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
+              </h3>
+              <div className="flex items-center gap-2 sm:justify-end">
                 <button
                   type="button"
                   aria-label="Previous month"
@@ -1073,7 +1103,7 @@ export function TripHostSetupDashboard({
                       return m - 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--hairline)] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
                 >
                   <ChevLeft className="h-4 w-4" />
                 </button>
@@ -1089,16 +1119,82 @@ export function TripHostSetupDashboard({
                       return m + 1;
                     })
                   }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--hairline)] text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-dm-elevated"
                 >
                   <ChevRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
+            {/* Secondary calendar toolbar — actions + peers, kept accessible but visually minimal */}
+            {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
+              <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
+                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayIso(hostSetup.tripRange!.startIso);
+                      setAddPlacesOpen(true);
+                    }}
+                    className="shrink-0 rounded-full bg-[#1c1c17] px-3 py-1 text-[11px] font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
+                  >
+                    Add places
+                  </button>
+                ) : null}
+                {canEditTripWorkspace && hostHasConcreteTripRange(plan) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDatePickMode("range");
+                      setRangeAnchor(null);
+                      setSelectedDayIso(null);
+                      setAddPlacesOpen(false);
+                      setPendingRangeConfirm(null);
+                    }}
+                    className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
+                  >
+                    Change dates
+                  </button>
+                ) : null}
+                {peers.length > 0 ? (
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                      Here now
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {peers.map((p) => (
+                        <span
+                          key={p.userId}
+                          title={`${p.name} · on this calendar`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-0.5 pl-0.5 pr-2 text-xs text-[color:var(--on-surface)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
+                        >
+                          <span
+                            className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[10px] font-semibold text-white dark:border-white/15"
+                            style={
+                              p.avatarUrl
+                                ? undefined
+                                : { backgroundColor: p.color, borderColor: "transparent" }
+                            }
+                          >
+                            {p.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs from OAuth metadata
+                              <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              p.name.slice(0, 1).toUpperCase()
+                            )}
+                          </span>
+                          <span className="max-w-[8rem] truncate font-medium">{p.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Weekday stripe */}
-            <div className="grid grid-cols-7 border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated/80">
-              {WEEKDAY_MON_FIRST.map((w) => (
+            <div className="grid grid-cols-7 border-b border-[color:var(--hairline)] dark:border-white/10">
+              {WEEKDAY_SUN_FIRST.map((w) => (
                 <div
                   key={w}
                   className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] first:border-l-0 dark:text-[color:var(--on-surface-muted)] sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
@@ -1108,7 +1204,7 @@ export function TripHostSetupDashboard({
               ))}
             </div>
 
-            <div className="border-x border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card">
+            <div>
               {weeks.map((weekRow, wi) => (
                 <div key={`wk-${wi}`} className="grid grid-cols-7">
                   {weekRow.map((dom, ci) => {
@@ -1117,7 +1213,7 @@ export function TripHostSetupDashboard({
                         <div
                           key={`e-${wi}-${ci}`}
                           className={[
-                            "min-h-[7.5rem] border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/50 dark:border-white/10 dark:bg-dm-page/60 sm:min-h-[8.75rem] lg:min-h-[10rem]",
+                            "min-h-[7.5rem] border-b border-[color:var(--hairline)] bg-transparent dark:border-white/10 sm:min-h-[8.75rem] lg:min-h-[10rem]",
                             ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           ].join(" ")}
                         />
@@ -1276,7 +1372,7 @@ export function TripHostSetupDashboard({
                           ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           inTripRangeCell(dom)
                             ? "bg-amber-100/85 hover:bg-amber-100 dark:bg-amber-950/45 dark:hover:bg-amber-950/60"
-                            : "bg-[color:var(--surface-container-lowest)] hover:bg-[color:var(--surface-container-low)]/90 dark:bg-dm-card dark:hover:bg-dm-elevated/50",
+                            : "bg-transparent hover:bg-[color:var(--surface-container-low)]/60 dark:hover:bg-dm-elevated/40",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
                             : "",
@@ -1346,17 +1442,16 @@ export function TripHostSetupDashboard({
 
         {canEditTripWorkspace ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
-            <div className="rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-6 shadow-[var(--shadow-ambient-sm)] dark:border-[color:var(--hairline)] dark:from-dm-card dark:to-dm-page/80 dark:shadow-none sm:p-8">
-              <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
-                Setup copilot
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-                Change dates, budget, hotels, and pins in plain language — updates save to this draft when the model applies
-                them.
-              </p>
-              <div className="mt-6 flex justify-center sm:justify-start">
-                <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
+            <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+              <div className="flex items-center gap-3 px-3 py-1">
+                <NavIcon id="setup-copilot" />
+                <p className="flex-1 text-sm text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)]">
+                  Setup copilot or ask for recommendations…
+                </p>
               </div>
+            </div>
+            <div className="mt-3">
+              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
             </div>
           </section>
         ) : null}
