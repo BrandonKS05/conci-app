@@ -3,7 +3,18 @@
 import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
 import { UserMenu } from "@/frontend/components/user-menu";
-import { primaryHeroLinkPillClass, primaryNavPillClass } from "@/frontend/ui/primary-action";
+import { primaryNavPillClass } from "@/frontend/ui/primary-action";
+
+/**
+ * Oversized hero CTA pills — local to the landing hero only.
+ * (Do not migrate `primaryHeroLinkPillClass` to these sizes: it is reused
+ * by the home example strip where the smaller size is correct.)
+ */
+const heroFilledPillClass =
+  "inline-flex items-center justify-center rounded-full bg-[#1c1c17] px-9 py-4 text-base font-semibold tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#1c1c17] dark:hover:bg-neutral-200";
+
+const heroOutlinePillClass =
+  "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-9 py-4 text-base font-semibold tracking-wide text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page";
 
 export function LandingTwPlusHero() {
   return (
@@ -23,9 +34,15 @@ export function LandingTwPlusHero() {
               href="/trip-parser"
               className="label-caps hidden text-[#444748] transition hover:text-[#1c1c17] dark:text-[#9c9a96] dark:hover:text-[#ebe9e4] sm:inline"
             >
+              Start a trip
+            </Link>
+            <Link
+              href="/join?from=create"
+              className="label-caps hidden text-[#444748] transition hover:text-[#1c1c17] dark:text-[#9c9a96] dark:hover:text-[#ebe9e4] sm:inline"
+            >
               Join a trip
             </Link>
-            <Link href="/trip-parser" className={`${primaryNavPillClass} sm:hidden`}>
+            <Link href="/join?from=create" className={`${primaryNavPillClass} sm:hidden`}>
               <span>Join trip</span>
             </Link>
             <div className="hidden lg:block">
@@ -92,7 +109,14 @@ export function LandingTwPlusHero() {
                         className="-mx-3 block w-full rounded-lg px-3 py-2.5 text-left text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-dm-elevated"
                         {...({ command: "close", commandfor: "mobile-menu" } as object)}
                       >
-                        Join a trip (no account)
+                        Start a trip
+                      </a>
+                      <a
+                        href="/join?from=create"
+                        className="-mx-3 mt-1 block w-full rounded-lg px-3 py-2.5 text-left text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-dm-elevated"
+                        {...({ command: "close", commandfor: "mobile-menu" } as object)}
+                      >
+                        Join with a code
                       </a>
                     </div>
                     <div className="py-6">
@@ -122,36 +146,38 @@ export function LandingTwPlusHero() {
           />
         </div>
 
-        <div className="mx-auto max-w-3xl py-28 sm:py-40 lg:py-48">
-          <div className="flex flex-col items-center text-center">
-            <span className="editorial-eyebrow mb-8 dark:text-[color:var(--sage-soft)]">
-              Conci — Cool Luxury Travel
-            </span>
-            <h1 className="font-display text-[3.25rem] font-semibold leading-[0.98] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5rem] lg:text-[5.75rem]">
-              Turn messy group chats <span className="italic">into a real plan.</span>
-            </h1>
-            <p className="mt-10 max-w-xl text-lg leading-relaxed text-pretty text-[color:var(--on-surface-variant)] dark:text-slate-400 sm:text-xl/8">
-              Paste a text, link, or screenshot. Get a shareable trip plan in seconds.
-            </p>
-            <p className="mx-auto mt-4 max-w-md text-center text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-slate-400">
-              Friends can join with an invite code — vote and RSVP with no login. Creators sign in to build plans.
-            </p>
-            <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-x-6">
-              <Link href="/trip-parser" className={primaryHeroLinkPillClass}>
-                Start planning
+        <div className="mx-auto flex max-w-4xl flex-col items-center py-28 text-center sm:py-36 lg:py-44">
+          <span className="editorial-eyebrow mb-10 text-[13px] tracking-[0.24em] dark:text-[color:var(--sage-soft)] sm:text-sm">
+            Conci · AI for group trips
+          </span>
+          <h1 className="font-display text-[3.75rem] font-semibold leading-[0.96] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5.5rem] lg:text-[6.25rem]">
+            Get the Trip out of the <span className="italic">Group Chat.</span>
+          </h1>
+          <div className="mt-14 flex flex-col items-center gap-5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-8 sm:gap-y-6">
+            <div className="flex flex-col items-center gap-2.5">
+              <Link href="/trip-parser" className={heroFilledPillClass}>
+                Start a trip
               </Link>
-              <Link href="/trip-parser" className={primaryHeroLinkPillClass}>
+              <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
+                Host &amp; invite the group
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-2.5">
+              <Link href="/join?from=create" className={heroOutlinePillClass}>
                 Join with a code
               </Link>
-              <a
-                href="#example"
-                className="text-sm leading-6 font-semibold text-[color:var(--on-surface)] transition hover:text-[color:var(--sage)] dark:text-slate-200 dark:hover:text-[color:var(--sage-soft)]"
-              >
-                See an example <span aria-hidden="true">→</span>
-              </a>
+              <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
+                Invited by a friend
+              </span>
             </div>
-            <div className="hairline-rule mt-16 max-w-xs dark:bg-white/10" />
           </div>
+          <a
+            href="#example"
+            className="mt-12 text-base leading-6 font-semibold text-[color:var(--on-surface)] transition hover:text-[color:var(--sage)] dark:text-slate-200 dark:hover:text-[color:var(--sage-soft)] sm:text-lg"
+          >
+            See an example <span aria-hidden="true">→</span>
+          </a>
+          <div className="hairline-rule mt-16 w-full max-w-xs dark:bg-white/10" />
         </div>
 
         <div
