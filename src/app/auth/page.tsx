@@ -1,5 +1,12 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { AuthFormClient } from "./auth-form-client";
+
+export const metadata: Metadata = {
+  title: "Sign in · Conci",
+  description: "Sign in to plan and join group trips with Conci.",
+  robots: { index: false, follow: false },
+};
 
 export default function AuthPage() {
   return (

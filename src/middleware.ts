@@ -58,17 +58,28 @@ export async function middleware(request: NextRequest) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
-    url.searchParams.set("next", `${path}${request.nextUrl.search}`);
+    // Build a clean `next` value: keep the destination path and only safe
+    // navigational params (e.g. `from`). Drop anything that could be sensitive
+    // or noisy when echoed in the address bar (invite codes, OAuth bits, etc.).
+    const SAFE_NEXT_PARAMS = new Set(["from", "tab"]);
+    const safeQuery = new URLSearchParams();
+    for (const [k, v] of request.nextUrl.searchParams.entries()) {
+      if (SAFE_NEXT_PARAMS.has(k)) safeQuery.append(k, v);
+    }
+    const safeSearch = safeQuery.toString();
+    url.search = "";
+    url.searchParams.set("next", `${path}${safeSearch ? `?${safeSearch}` : ""}`);
     return NextResponse.redirect(url);
   }
 
   if (user && path === "/auth") {
-    const nextPath = request.nextUrl.searchParams.get("next") || "/trip-parser";
+    const rawNext = request.nextUrl.searchParams.get("next") || "/trip-parser";
     const safeNext =
-      nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/trip-parser";
+      rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/trip-parser";
+    const [nextPathname, nextSearch = ""] = safeNext.split("?", 2);
     const url = request.nextUrl.clone();
-    url.pathname = safeNext;
-    url.searchParams.delete("next");
+    url.pathname = nextPathname;
+    url.search = nextSearch ? `?${nextSearch}` : "";
     return NextResponse.redirect(url);
   }
 

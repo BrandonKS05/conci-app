@@ -69,6 +69,8 @@ import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget"
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { MyPreferencesCard } from "@/frontend/components/my-preferences-card";
+import { TripCostRollup } from "@/frontend/components/trip-cost-rollup";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
@@ -408,6 +410,12 @@ export function TripHostSetupDashboard({
   }, [initialTripStatus]);
 
   const canEditTripWorkspace = effectiveTripStatus !== "finalized";
+  /**
+   * Narrower gate: only the host can mutate the core itinerary (dates, pins, hotels,
+   * budget, flight selections). Guests get a "Suggest a change" fallback that posts
+   * to `collab/adjustment-submissions` via `<MyPreferencesCard>` instead.
+   */
+  const canEditAsHost = isHost && canEditTripWorkspace;
 
   const [resolvedInviteCode, setResolvedInviteCode] = useState<string | null>(inviteCode);
   useEffect(() => {
@@ -614,7 +622,7 @@ export function TripHostSetupDashboard({
       patch?: HostSetupPatch,
       budgetPatch?: { tier?: string | null; perPerson?: string | null }
     ): Promise<boolean> => {
-      if (!canEditTripWorkspace) return false;
+      if (!canEditAsHost) return false;
       setErr(null);
       const body: Record<string, unknown> = {};
       if (patch && Object.keys(patch).length > 0) body.hostSetup = patch;
@@ -642,7 +650,7 @@ export function TripHostSetupDashboard({
         return false;
       }
     },
-    [tripId, canEditTripWorkspace]
+    [tripId, canEditAsHost]
   );
 
   /** Keep the calendar month aligned when trip dates appear (parser hydrate, PATCH, first paint). */
@@ -911,7 +919,7 @@ export function TripHostSetupDashboard({
 
   const onCalendarDayClick = useCallback(
     (dom: number) => {
-      if (!canEditTripWorkspace) return;
+      if (!canEditAsHost) return;
       const iso = isoFromCell(calYear, calMonth, dom);
 
       if (datePickMode === "range") {
@@ -935,7 +943,7 @@ export function TripHostSetupDashboard({
       setSelectedDayIso(iso);
       router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(iso)}`);
     },
-    [canEditTripWorkspace, calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet, router, tripId]
+    [canEditAsHost, calYear, calMonth, rangeAnchor, datePickMode, tripDayIsoSet, router, tripId]
   );
 
   const addRestaurantToDay = useCallback(
@@ -1129,7 +1137,7 @@ export function TripHostSetupDashboard({
               aria-label="Trip workspace sections"
               className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
             >
-              {LEFT_RAIL_TABS.filter((tab) => tab.id !== "budget" || canEditTripWorkspace).map((tab) => (
+              {LEFT_RAIL_TABS.filter((tab) => tab.id !== "budget" || canEditAsHost).map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -1307,7 +1315,7 @@ export function TripHostSetupDashboard({
                       You&apos;re on this trip as a guest.{" "}
                       {canEditTripWorkspace ? (
                         <>
-                          Everyone can edit the calendar, pins, and flights here — changes sync for the group. Use{" "}
+                          Hosts can edit the itinerary, dates, pins, flights, and budget. Guests can add preferences, vote, and suggest changes for the host to apply. Use{" "}
                           <span className="text-[color:var(--on-surface)]">Group progress</span> for polls and availability.
                         </>
                       ) : (
@@ -1323,7 +1331,7 @@ export function TripHostSetupDashboard({
                     <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container)] px-2.5 py-1 text-xs font-semibold text-[color:var(--on-surface)]">
                       {budgetDisplayLine}
                     </span>
-                    {canEditTripWorkspace ? (
+                    {canEditAsHost ? (
                       <button
                         type="button"
                         onClick={() => setShowBudgetEditor((v) => !v)}
@@ -1333,7 +1341,7 @@ export function TripHostSetupDashboard({
                       </button>
                     ) : null}
                   </div>
-                  {canEditTripWorkspace && showBudgetEditor ? (
+                  {canEditAsHost && showBudgetEditor ? (
                     <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                       <input
                         value={budgetLine}
@@ -1366,6 +1374,13 @@ export function TripHostSetupDashboard({
 
           {workspaceTab === "overview" ? (
           <>
+          {!isHost && canEditTripWorkspace ? (
+            <MyPreferencesCard
+              tripId={tripId}
+              viewerUserId={viewerUserId}
+              refreshSignal={collabRefreshSignal}
+            />
+          ) : null}
           <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -1426,6 +1441,8 @@ export function TripHostSetupDashboard({
             </div>
           </div>
 
+          <TripCostRollup tripId={tripId} plan={plan} flights={liveData?.flights ?? []} />
+
           <div className="w-full text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
             {/* Header — flat editorial: month title + chevrons */}
             <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
@@ -1471,7 +1488,7 @@ export function TripHostSetupDashboard({
             {/* Secondary calendar toolbar — actions + peers, kept accessible but visually minimal */}
             {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
               <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
+                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1483,7 +1500,7 @@ export function TripHostSetupDashboard({
                     Add places
                   </button>
                 ) : null}
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
+                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1498,7 +1515,7 @@ export function TripHostSetupDashboard({
                     Change dates
                   </button>
                 ) : null}
-                {canEditTripWorkspace && hostHasConcreteTripRange(plan) && datePickMode === "range" ? (
+                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "range" ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1583,6 +1600,26 @@ export function TripHostSetupDashboard({
                     const activityPinsForCell = (hostSetup.activityPins ?? []).filter(
                       (p) => p.dateIso === cellIso && p.kept
                     );
+                    // Trip start = arrival day, trip end = departure day. Detect whether
+                    // a saved flight pin already represents that travel day; if not, show
+                    // a minimal eyebrow so the calendar still reads as a travel day.
+                    const tripStartIso = hostSetup.tripRange?.startIso ?? null;
+                    const tripEndIso = hostSetup.tripRange?.endIso ?? null;
+                    const hasOutboundFlightPin = activityPinsForCell.some((p) =>
+                      (p.experience.name ?? "").startsWith("Flight out · ")
+                    );
+                    const hasReturnFlightPin = activityPinsForCell.some((p) =>
+                      (p.experience.name ?? "").startsWith("Flight back · ")
+                    );
+                    const isArrivalDay =
+                      tripStartIso != null && cellIso === tripStartIso && !hasOutboundFlightPin;
+                    const isDepartureDay =
+                      tripEndIso != null && cellIso === tripEndIso && !hasReturnFlightPin;
+                    const travelDayChipLabel = isArrivalDay
+                      ? "Arrival day"
+                      : isDepartureDay
+                        ? "Departure day"
+                        : null;
 
                     const calendarCellEntries: ReactNode[] = [];
                     const pinEmphasis =
@@ -1654,7 +1691,7 @@ export function TripHostSetupDashboard({
                               </span>
                             </div>
                           </button>
-                          {canEditTripWorkspace ? (
+                          {canEditAsHost ? (
                             <button
                               type="button"
                               aria-label={`Remove ${p.place.name}`}
@@ -1681,6 +1718,18 @@ export function TripHostSetupDashboard({
                       const metaPin = pem
                         ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
                         : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
+                      // Flight activity pins are written by save-selection as
+                      // `Flight out · ${airline}` / `Flight back · ${airline}`.
+                      // Surface those as Arrival / Departure chips so the calendar
+                      // reads as travel days, not generic activities.
+                      const expName = p.experience.name ?? "";
+                      const isOutboundFlight = expName.startsWith("Flight out · ");
+                      const isReturnFlight = expName.startsWith("Flight back · ");
+                      const pinEyebrow = isOutboundFlight
+                        ? "Arrival"
+                        : isReturnFlight
+                          ? "Departure"
+                          : "Activity";
                       calendarCellEntries.push(
                         <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
                           <button
@@ -1709,11 +1758,11 @@ export function TripHostSetupDashboard({
                                 ) : null}
                               </span>
                               <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                                Activity
+                                {pinEyebrow}
                               </span>
                             </div>
                           </button>
-                          {canEditTripWorkspace ? (
+                          {canEditAsHost ? (
                             <button
                               type="button"
                               aria-label={`Remove ${p.experience.name}`}
@@ -1754,7 +1803,7 @@ export function TripHostSetupDashboard({
                         }}
                         className={[
                           "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-[color:var(--hairline)] px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
-                          canEditTripWorkspace ? "cursor-pointer" : "cursor-default",
+                          canEditAsHost ? "cursor-pointer" : "cursor-default",
                           ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
                           inTripRangeCell(dom)
                             ? "bg-transparent ring-1 ring-inset ring-amber-200/60 hover:bg-[color:var(--surface-container-low)]/25 dark:ring-amber-700/35 dark:hover:bg-white/[0.03]"
@@ -1780,6 +1829,15 @@ export function TripHostSetupDashboard({
                         </div>
 
                         <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
+                          {travelDayChipLabel ? (
+                            <p className="-mt-0.5 mb-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50/70 px-2 py-[3px] text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-800 sm:text-[10px] dark:bg-amber-500/10 dark:text-amber-200">
+                              <span
+                                aria-hidden
+                                className="inline-block h-1 w-1 rounded-full bg-current"
+                              />
+                              {travelDayChipLabel}
+                            </p>
+                          ) : null}
                           {visibleCalendarEntries}
                           {calendarMoreCount > 0 ? (
                             <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">
@@ -1820,9 +1878,11 @@ export function TripHostSetupDashboard({
 
             {!hostHasConcreteTripRange(plan) ? (
               <p className="border-t border-[color:var(--hairline)] bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-[color:var(--hairline)] dark:bg-amber-950/40 dark:text-amber-100">
-                {canEditTripWorkspace
+                {canEditAsHost
                   ? "Choose a trip range — two taps on the calendar — to anchor your plan and invites."
-                  : "Trip dates aren't on the calendar yet. When the trip isn't finalized, anyone on the trip can set or adjust the range here."}
+                  : canEditTripWorkspace
+                    ? "Trip dates aren't on the calendar yet. Ask the host to pick a range, or suggest one from Group progress."
+                    : "Trip dates aren't on the calendar yet."}
               </p>
             ) : null}
             {err ? (
@@ -1845,7 +1905,7 @@ export function TripHostSetupDashboard({
 
         </section>
 
-        {canEditTripWorkspace ? (
+        {canEditAsHost ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
             <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/80 px-3 py-2 dark:border-white/10 dark:bg-[color:var(--surface-container-low)]/40">
               <div className="flex items-center gap-3 px-3 py-1">
@@ -1882,7 +1942,7 @@ export function TripHostSetupDashboard({
           </>
           ) : null}
 
-          {workspaceTab === "budget" && canEditTripWorkspace ? (
+          {workspaceTab === "budget" && canEditAsHost ? (
           <>
             {isHost ? (
           <section id="sec-budget" className="scroll-mt-28">
@@ -2026,7 +2086,7 @@ export function TripHostSetupDashboard({
             {flightCurationErr ? (
               <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
             ) : null}
-            {canEditTripWorkspace && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
+            {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
               <HostFlightSearchPanel tripId={tripId} enabled />
             ) : null}
             {showFlightTransport ? (
@@ -2141,9 +2201,11 @@ export function TripHostSetupDashboard({
               </p>
             ) : (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                {canEditTripWorkspace
+                {canEditAsHost
                   ? "Add lodging on a calendar day, with Trip Copilot, or in the day editor."
-                  : "No home base saved on the plan yet."}
+                  : canEditTripWorkspace
+                    ? "No home base saved yet. Suggest one to the host from Group progress."
+                    : "No home base saved on the plan yet."}
               </p>
             )}
           </div>
@@ -2197,7 +2259,7 @@ export function TripHostSetupDashboard({
       ) : null}
 
       <HostSetupAddPlacesModal
-        open={canEditTripWorkspace && addPlacesOpen && Boolean(selectedDayIso)}
+        open={canEditAsHost && addPlacesOpen && Boolean(selectedDayIso)}
         onClose={() => setAddPlacesOpen(false)}
         tripId={tripId}
         plan={plan}
