@@ -48,7 +48,7 @@ This document supersedes prior versions. It tracks: what was fixed across the la
 | File | Change |
 |------|--------|
 | [src/frontend/components/my-preferences-card.tsx](src/frontend/components/my-preferences-card.tsx) | New. Guest-only card. POSTs to existing `/api/trip-plans/[id]/collab/adjustment-submissions`; re-fetches the viewer's own pending submissions via `/api/trip-plans/[id]/collab` and refreshes on `collabRefreshSignal`. |
-| [src/frontend/components/trip-host-setup-dashboard.tsx](src/frontend/components/trip-host-setup-dashboard.tsx) | Added `canEditAsHost = isHost && canEditTripWorkspace`. Replaced `canEditTripWorkspace` with `canEditAsHost` at every destructive surface: `persistHostSetup` mutator, calendar day click, left-rail Budget tab visibility, "Change budget"/budget editor, Add places / Change dates / Cancel toolbar buttons, meal & activity pin × remove buttons, day-cell `cursor-pointer`, Setup copilot section, Budget tab content, `HostFlightSearchPanel` mount, `HostSetupAddPlacesModal` open prop. Two informational copy lines that wrongly implied "anyone can edit" were rewritten to point guests at Group progress. Mounted `<MyPreferencesCard>` at the top of the Overview tab when `!isHost && canEditTripWorkspace`. |
+| [src/frontend/components/trip-host-setup-dashboard.tsx](src/frontend/components/trip-host-setup-dashboard.tsx) | Added `canEditAsHost = isHost && canEditTripWorkspace`. Replaced `canEditTripWorkspace` with `canEditAsHost` at every destructive surface: `persistHostSetup` mutator, calendar day click, left-rail Budget tab visibility, "Change budget"/budget editor, Add places / Change dates / Cancel toolbar buttons, meal & activity pin × remove buttons, day-cell `cursor-pointer`, Setup copilot section, Budget tab content, `HostFlightSearchPanel` mount, `HostSetupAddPlacesModal` open prop. Two informational copy lines that wrongly implied "anyone can edit" were rewritten to point guests at Group progress. Mounted `<MyPreferencesCard>` at the top of the **Collaborate** tab when `!isHost && canEditTripWorkspace` (Overview stays cost rollup + calendar only). |
 
 ---
 
@@ -65,7 +65,7 @@ This document supersedes prior versions. It tracks: what was fixed across the la
 | Middleware param hygiene | ✅ `?from=create&code=secret123&access_token=xyz` → `?next=%2Fjoin%3Ffrom%3Dcreate` (sensitive params stripped) |
 | `/supabase-test` in dev | ✅ Renders with panel; `robots` set to `noindex,nofollow` |
 | Trip workspace Overview renders `TripCostRollup` | ⚠ Verified statically — `<TripCostRollup>` unconditional inside `workspaceTab === "overview"` block; not driven headlessly (auth wall) |
-| Guest view hides destructive controls + shows `MyPreferencesCard` | ⚠ Verified statically — all destructive surfaces gated by `canEditAsHost`; `MyPreferencesCard` mounted strictly behind `!isHost && canEditTripWorkspace`; not driven headlessly |
+| Guest view hides destructive controls + `MyPreferencesCard` on Collaborate | ⚠ Verified statically — all destructive surfaces gated by `canEditAsHost`; `MyPreferencesCard` on Collaborate tab when `!isHost && canEditTripWorkspace`; not driven headlessly |
 | Build clean | ✅ 31/31 static pages generated; no new lint errors |
 
 **Bugs found during smoke test:** none. Pre-existing lint warning in `src/frontend/components/trip-plan-build-progress-overlay-dark.tsx` (raw `<img>`) remains — out of scope.
@@ -94,10 +94,10 @@ Status legend: ✅ done · 🟡 partially done · ❌ outstanding · 🔒 produc
 | Audit item | Status | Notes |
 |------------|--------|-------|
 | Resolve join-without-login vs auth-required | 🔒 | Landing copy is now honest ("two ways in"). `/join` itself is **still auth-gated** in `middleware.ts`. Requires a product decision (make `/join` public OR keep auth wall everywhere) before further changes. |
-| Calendar-first workspace layout | 🟡 | The Overview tab now reads as: (guest only) `MyPreferencesCard` → `TripCostRollup` → calendar. Copilot/trip-chat still live below the calendar. The bigger collapse-everything-behind-Ask-Conci redesign has not been attempted. |
+| Calendar-first workspace layout | 🟡 | Overview tab reads as: `TripCostRollup` → calendar (guests no longer see `MyPreferencesCard` there). Copilot/trip-chat still live below the calendar. The bigger collapse-everything-behind-Ask-Conci redesign has not been attempted. |
 | Per-day transport summary on calendar cells | 🟡 | Saved flight pins now surface as `Arrival` / `Departure` chips; trip start/end cells without pins show "Arrival day" / "Departure day" placeholders. Multi-leg / mid-trip transport (train hops, city-to-city flights) is **not** modeled as first-class per-day fields yet. |
 | Always-visible cost rollup strip | ✅ | `TripCostRollup` is mounted above the calendar in Overview. Computes estimated total / per-person / fund / still-owed from existing data; placeholders never block. |
-| Non-owner "My preferences" card | 🟡 | `MyPreferencesCard` exists and feeds the existing `adjustment-submissions` pipeline. It is **not yet "unified"** — vibe poll, day availability votes, and other scattered preference inputs still live in their existing surfaces under Collaborate. Folding them into one card is a larger refactor. |
+| Non-owner "My preferences" card | 🟡 | `MyPreferencesCard` lives at the top of the **Collaborate** tab for non-hosts and feeds the existing `adjustment-submissions` pipeline. It is **not yet "unified"** — vibe poll, day availability votes, and other scattered preference inputs still live in their existing surfaces under Collaborate. Folding them into one card is a larger refactor. |
 | Manual "Search & add" hub per day | ❌ | Existing modals + day page reach the same APIs; no single, photo-led "alternatives floating above each day" entry point. |
 
 ### Audit "Big bets" — all outstanding
@@ -132,7 +132,7 @@ Status legend: ✅ done · 🟡 partially done · ❌ outstanding · 🔒 produc
 
 - **Vision:** Owner has full chatbot/edit power; non-owners have a preference box only.
 - **Current:** Aligned. `canEditAsHost` gates every destructive surface; guests now see a dedicated `MyPreferencesCard` and route suggestions to the host via the existing adjustment-submission flow. The host can still review and apply/dismiss from the Collaborate tab.
-- **Caveat:** The Collaborate tab's `ActivityVibePollCard` (and a couple of poll/vote surfaces elsewhere) are not yet collapsed into a single unified card — `MyPreferencesCard` is the Overview entry point, not the only preference surface for guests.
+- **Caveat:** The Collaborate tab's `ActivityVibePollCard` (and a couple of poll/vote surfaces elsewhere) are not yet collapsed into a single unified card — `MyPreferencesCard` is the **Collaborate** entry point for free-text suggestions, not the only preference surface for guests.
 
 ### Calendar as "the main thing"
 

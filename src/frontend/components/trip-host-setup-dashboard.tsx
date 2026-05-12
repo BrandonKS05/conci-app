@@ -413,7 +413,7 @@ export function TripHostSetupDashboard({
   /**
    * Narrower gate: only the host can mutate the core itinerary (dates, pins, hotels,
    * budget, flight selections). Guests get a "Suggest a change" fallback that posts
-   * to `collab/adjustment-submissions` via `<MyPreferencesCard>` instead.
+   * to `collab/adjustment-submissions` via `<MyPreferencesCard>` on the Collaborate tab instead.
    */
   const canEditAsHost = isHost && canEditTripWorkspace;
 
@@ -1374,13 +1374,6 @@ export function TripHostSetupDashboard({
 
           {workspaceTab === "overview" ? (
           <>
-          {!isHost && canEditTripWorkspace ? (
-            <MyPreferencesCard
-              tripId={tripId}
-              viewerUserId={viewerUserId}
-              refreshSignal={collabRefreshSignal}
-            />
-          ) : null}
           <section id="sec-dates" className="scroll-mt-28">
             <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
@@ -1998,6 +1991,13 @@ export function TripHostSetupDashboard({
 
           {workspaceTab === "collaborate" ? (
           <>
+        {!isHost && canEditTripWorkspace ? (
+          <MyPreferencesCard
+            tripId={tripId}
+            viewerUserId={viewerUserId}
+            refreshSignal={collabRefreshSignal}
+          />
+        ) : null}
         <section id="sec-preferences-adjustments" className="scroll-mt-28">
           <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
             Preferences &amp; adjustments
@@ -2005,7 +2005,7 @@ export function TripHostSetupDashboard({
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
             {isHost
               ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
-              : "Share preferences and tweaks here — the group shares one calendar and polls; anyone can edit the trip workspace, and the host can still merge notes with Trip Copilot."}
+              : "Vote in polls, share availability, and suggest changes below — the host applies what works for the group."}
           </p>
           <div className="mt-5">
             <TripCollaborationPanel
