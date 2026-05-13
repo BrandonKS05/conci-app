@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
+import { ScrollReveal } from "@/frontend/components/scroll-reveal";
+import { Sparkles, Calculator, Users, Edit3, CalendarCheck, Link2 } from "lucide-react";
 
 const CREATE_URL = "/trip-parser";
 const JOIN_WITH_CODE_URL = "/join?from=create";
@@ -63,16 +65,37 @@ const features = [
 
 const collabFeatures = [
   {
-    title: "Vote on anything",
-    body: "Dates, hotels, day plans, restaurants. Anyone in the group can vote. Conci tracks consensus and nudges the itinerary toward what everyone actually wants.",
+    title: "Direct booking links",
+    body: "Conci doesn't just name a hotel. It provides the direct Booking.com link with the exact dates and guest count.",
   },
   {
-    title: "Pooled contributions, one place",
-    body: "Everyone contributes their share to the trip fund. The host sees a clear view of who has paid and can pull from the pool to book.",
+    title: "Allergies & Preferences",
+    body: "Tell Conci that Sarah is vegan and Mike hates early flights. It will quietly route around these constraints.",
   },
   {
-    title: "Group memory across trips",
-    body: "Conci remembers your group. Dietary needs, budget comfort, preferred hotel tier, pace, and applies that context the next time you plan.",
+    title: "Group Polls",
+    body: "Need to choose between a catamaran tour or a cooking class? Conci drops a quick poll in the group dashboard.",
+  },
+];
+
+const popularTrips = [
+  {
+    title: "Tokyo & Kyoto",
+    subtitle: "10 days · Culture & Cuisine",
+    image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=2070&auto=format&fit=crop",
+    query: "Plan a 10 day trip to Tokyo and Kyoto focusing on food and temples"
+  },
+  {
+    title: "Amalfi Coast",
+    subtitle: "7 days · Relaxation",
+    image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=2069&auto=format&fit=crop",
+    query: "Plan a 7 day relaxing trip to the Amalfi Coast"
+  },
+  {
+    title: "Swiss Alps",
+    subtitle: "5 days · Adventure",
+    image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=2070&auto=format&fit=crop",
+    query: "Plan a 5 day adventure trip to the Swiss Alps"
   },
 ];
 
@@ -147,77 +170,73 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="relative border-t border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] py-24 dark:border-white/10 dark:bg-dm-elevated sm:py-28">
-        <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
-              Three steps from group chat to plan
+      {/* Preset Popular Trips - Layla.ai inspired */}
+      <section className="relative bg-black py-32 sm:py-40">
+        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="mb-16 max-w-3xl">
+            <h2 className="font-display text-4xl font-medium tracking-tight text-white sm:text-6xl">
+              Start a trip instantly.
             </h2>
-            <p className="mt-4 text-lg leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
-              No blank canvas. No spreadsheets. No twenty tabs.
+            <p className="mt-6 text-xl leading-relaxed text-neutral-400">
+              Select a popular destination below and Conci will instantly generate a full, bookable itinerary.
             </p>
           </div>
-
-          <ol className="mt-16 grid gap-12 lg:mt-20 lg:grid-cols-3 lg:gap-10">
-            {steps.map((step, i) => (
-              <li key={step.title} className="relative">
-                <span className="mb-5 inline-flex font-display text-5xl font-semibold leading-none text-[color:var(--sage-soft)] dark:text-[color:var(--sage)]/50">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <h3 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
-                  {step.title}
-                </h3>
-                <p className="mt-3 leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
-                  {step.body}
-                </p>
-              </li>
+          
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {popularTrips.map((trip, idx) => (
+              <ScrollReveal key={trip.title} delay={idx * 0.1} className="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl bg-neutral-900">
+                <Link href={`/trip-parser?q=${encodeURIComponent(trip.query)}`} className="absolute inset-0 z-20" aria-label={`Start trip to ${trip.title}`} />
+                <img 
+                  src={trip.image} 
+                  alt={trip.title}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute bottom-0 left-0 p-8">
+                  <p className="mb-2 text-sm font-semibold tracking-widest text-white/70 uppercase">
+                    {trip.subtitle}
+                  </p>
+                  <h3 className="font-display text-3xl font-medium text-white">
+                    {trip.title}
+                  </h3>
+                  <div className="mt-6 flex items-center gap-2 text-sm font-medium text-white opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 translate-y-4">
+                    Start planning <span aria-hidden="true">&rarr;</span>
+                  </div>
+                </div>
+              </ScrollReveal>
             ))}
-          </ol>
+          </div>
         </div>
       </section>
 
-      {/* What Conci does, feature grid */}
-      <section className="border-t border-[color:var(--hairline)] bg-[color:var(--surface)] py-24 dark:border-white/10 dark:bg-dm-page sm:py-28">
-        <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
-            <div className="max-w-2xl">
-              <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-                What Conci does
-              </p>
-              <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
-                The AI that actually <span className="italic">does the trip.</span>
-              </h2>
-            </div>
-            <p className="max-w-sm text-sm text-[color:var(--on-surface-variant)] dark:text-slate-400">
-              Conci doesn&apos;t just suggest ideas. It writes the plan, blends the group, tracks the money, and links the bookings.
-            </p>
-          </div>
-
-          <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3 lg:gap-8">
-            {features.map((item) => (
-              <li
-                key={item.title}
-                className="group relative rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-7 shadow-[var(--shadow-ambient-sm)] transition duration-300 hover:border-[color:var(--hairline-strong)] hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-dm-card"
-              >
-                <span className="mb-5 block h-[3px] w-8 rounded-full bg-[color:var(--sage)]" />
-                <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">
-                  {item.title}
+      {/* How it works - Apple Style Alternating */}
+      <section className="relative bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40 overflow-hidden">
+        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 space-y-32 sm:space-y-48">
+          {steps.map((step, i) => (
+            <ScrollReveal key={step.title} direction={i % 2 === 0 ? "up" : "up"} className={`flex flex-col gap-12 lg:flex-row ${i % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:items-center`}>
+              <div className="flex-1 lg:py-16">
+                <span className="label-caps mb-6 text-sm tracking-[0.2em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                  Step 0{i + 1}
+                </span>
+                <h3 className="font-display text-4xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-6xl">
+                  {step.title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
-                  {item.body}
+                <p className="mt-6 text-xl leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400 max-w-xl">
+                  {step.body}
                 </p>
-              </li>
-            ))}
-          </ul>
+              </div>
+              <div className="flex-1 relative aspect-square w-full rounded-[3rem] bg-gradient-to-tr from-[color:var(--surface-container)] to-[color:var(--surface-container-lowest)] dark:from-[#151515] dark:to-[#1a1a1a] shadow-2xl border border-[color:var(--hairline)] dark:border-white/5 flex items-center justify-center overflow-hidden">
+                 {/* Beautiful abstract visual placeholder instead of text boxes */}
+                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage)_0%,transparent_50%)] opacity-10 dark:opacity-5 blur-3xl pointer-events-none" />
+                 <span className="font-display text-9xl font-semibold text-[color:var(--sage)]/20 dark:text-[color:var(--sage-soft)]/10 mix-blend-multiply dark:mix-blend-screen">0{i+1}</span>
+              </div>
+            </ScrollReveal>
+          ))}
         </div>
       </section>
 
       {/* Built for groups, collaboration */}
-      <section className="border-t border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] py-24 dark:border-white/10 dark:bg-dm-elevated sm:py-28">
+      <section className="bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-8">
           <div>
             <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
@@ -226,13 +245,13 @@ export default function HomePage() {
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
               Everyone has a voice. <span className="italic">No one is overwhelmed.</span>
             </h2>
-            <ul className="mt-8 space-y-4">
+            <ul className="mt-12 space-y-8 border-t border-[color:var(--hairline)] pt-8 dark:border-white/10">
               {collabFeatures.map((item) => (
                 <li
                   key={item.title}
-                  className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-5 shadow-[var(--shadow-ambient-sm)] transition duration-300 hover:border-[color:var(--hairline-strong)] dark:border-white/10 dark:bg-dm-card"
+                  className="group flex flex-col"
                 >
-                  <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-white">
+                  <h3 className="font-display text-lg font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white">
                     {item.title}
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
@@ -250,7 +269,7 @@ export default function HomePage() {
       {/* Example */}
       <section
         id="example"
-        className="scroll-mt-24 border-t border-[color:var(--hairline)] bg-[color:var(--surface)] py-24 dark:border-white/10 dark:bg-dm-page sm:py-28"
+        className="scroll-mt-24 bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40"
       >
         <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
@@ -274,7 +293,7 @@ export default function HomePage() {
       </section>
 
       {/* Host vs Join */}
-      <section className="border-t border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] py-24 dark:border-white/10 dark:bg-dm-elevated sm:py-28">
+      <section className="bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40">
         <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
@@ -288,39 +307,31 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-3xl gap-5 sm:grid-cols-2">
-            {hostJoinPaths.map((path) => (
-              <Link
+          <div className="mx-auto mt-20 grid max-w-5xl gap-x-8 gap-y-12 sm:grid-cols-2">
+            {hostJoinPaths.map((path, idx) => (
+              <ScrollReveal
                 key={path.title}
-                href={path.href}
-                className={`group flex flex-col gap-5 rounded-2xl border bg-[color:var(--surface-container-lowest)] p-7 shadow-[var(--shadow-ambient-sm)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-ambient)] dark:bg-dm-card ${
-                  path.accent
-                    ? "border-[color:var(--sage)]/60 dark:border-[color:var(--sage-soft)]/40"
-                    : "border-[color:var(--hairline-strong)] dark:border-white/10"
-                }`}
+                delay={idx * 0.1}
+                direction="up"
+                className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-[color:var(--hairline)] bg-gradient-to-b from-[color:var(--surface-container-lowest)] to-[color:var(--surface)] p-10 transition-all hover:-translate-y-1 hover:shadow-2xl dark:border-white/10 dark:from-[#1a1a1a] dark:to-[#121212]"
               >
-                <span
-                  className={`label-caps ${
-                    path.accent
-                      ? "text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]"
-                      : "text-[color:var(--on-surface-muted)] dark:text-neutral-500"
-                  }`}
-                >
-                  {path.eyebrow}
-                </span>
-                <div>
-                  <h3 className="font-display text-2xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[color:var(--sage)]/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 flex flex-col h-full">
+                  <span className="label-caps mb-6 text-[10px] tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                    {path.eyebrow}
+                  </span>
+                  <h3 className="font-display text-3xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white">
                     {path.title}
                   </h3>
-                  <p className="mt-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
+                  <p className="mt-4 text-base leading-relaxed text-[color:var(--on-surface-variant)] dark:text-slate-400">
                     {path.body}
                   </p>
+                  <span className="mt-12 inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-[color:var(--on-surface)] transition group-hover:text-[color:var(--sage)] dark:text-white">
+                    {path.cta}
+                    <span aria-hidden="true" className="transition-transform group-hover:translate-x-2">→</span>
+                  </span>
                 </div>
-                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--on-surface)] transition group-hover:text-[color:var(--sage)] dark:text-white">
-                  {path.cta}
-                  <span aria-hidden="true">→</span>
-                </span>
-              </Link>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -412,18 +423,20 @@ function ExampleTripMockup() {
           and spread vertically to match the main card's height. Middle column
           is the main itinerary. Right column is the AI dates card, centered
           vertically. No overlapping anywhere. */}
-      <div className="mx-auto hidden w-full max-w-[1080px] items-stretch gap-6 md:flex">
-        <aside className="flex w-[260px] flex-shrink-0 flex-col justify-between gap-5">
-          <ExamplePrefsCard />
-          <ExampleCostCard />
+      <div className="mx-auto hidden w-full max-w-[1080px] items-stretch gap-6 md:flex relative">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[color:var(--sage)]/20 rounded-full blur-[100px] pointer-events-none dark:bg-[color:var(--sage)]/10" />
+        
+        <aside className="flex w-[260px] flex-shrink-0 flex-col justify-between gap-5 relative z-10">
+          <ScrollReveal delay={0.1} direction="left"><ExamplePrefsCard /></ScrollReveal>
+          <ScrollReveal delay={0.2} direction="left"><ExampleCostCard /></ScrollReveal>
         </aside>
 
-        <div className="w-[440px] flex-shrink-0">
+        <ScrollReveal delay={0.3} direction="up" className="w-[440px] flex-shrink-0 relative z-10">
           <ExampleMainCard days={days} />
-        </div>
+        </ScrollReveal>
 
-        <aside className="flex w-[280px] flex-shrink-0 flex-col justify-center">
-          <ExampleAIDatesCard />
+        <aside className="flex w-[280px] flex-shrink-0 flex-col justify-center relative z-10">
+          <ScrollReveal delay={0.4} direction="right"><ExampleAIDatesCard /></ScrollReveal>
         </aside>
       </div>
     </div>
@@ -583,24 +596,27 @@ function ExampleCostCard() {
 
 function GroupCollabMockup() {
   return (
-    <div
-      aria-hidden="true"
-      className="rounded-3xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-5 shadow-[var(--shadow-ambient-lg)] dark:border-white/10 dark:bg-dm-card sm:p-6"
-    >
-      <div className="flex items-center justify-between">
-        <p className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-white">
+    <ScrollReveal delay={0.2} direction="left" className="relative">
+      <div className="absolute -inset-1 rounded-[2.5rem] bg-gradient-to-tr from-[color:var(--sage)]/20 to-transparent blur-2xl dark:from-[color:var(--sage-soft)]/10 pointer-events-none" />
+      <div
+        aria-hidden="true"
+        className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/60 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#151515]/80 sm:p-8"
+      >
+        <div className="absolute inset-0 rounded-[2.5rem] ring-1 ring-inset ring-white/20 pointer-events-none" />
+        <div className="flex items-center justify-between border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
+        <p className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
           Lisbon · 4 travelers
         </p>
-        <span className="rounded-full bg-[color:var(--sage)]/20 px-3 py-1 text-[11px] font-semibold tracking-wide text-[color:var(--on-sage)] dark:bg-[color:var(--sage)]/25 dark:text-[color:var(--sage-soft)]">
+        <span className="rounded-full bg-[color:var(--sage)]/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[color:var(--on-sage)] dark:bg-[color:var(--sage)]/20 dark:text-[color:var(--sage-soft)]">
           3 of 4 contributed
         </span>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-2 flex flex-col">
         {memberRows.map((member) => (
           <div
             key={member.initials}
-            className="flex items-center gap-3 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3.5 py-3 dark:border-white/10 dark:bg-dm-elevated"
+            className="flex items-center gap-4 border-b border-[color:var(--hairline)] py-4 last:border-0 dark:border-white/5"
           >
             <span
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tracking-wide text-white ${member.bg}`}
@@ -633,22 +649,23 @@ function GroupCollabMockup() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-xl border border-[color:var(--sage)]/30 bg-gradient-to-br from-[color:var(--surface-container)] to-[color:var(--surface-container-lowest)] p-4 dark:border-[color:var(--sage-soft)]/25 dark:from-dm-elevated dark:to-dm-card">
-        <p className="label-caps flex items-center gap-1.5 text-[10px] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+      <div className="mt-6 rounded-2xl bg-[color:var(--surface-container)] p-5 dark:bg-[#1a1a1a]">
+        <p className="label-caps flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
           <span aria-hidden>✦</span> Conci suggestion
         </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-          Marcus flagged the Day 3 restaurant (it has shellfish). I found <strong className="font-semibold text-[color:var(--on-surface)] dark:text-white">Bodega da Mouraria</strong>, similar vibe, allergy-friendly, about $15 less per person. Swap it?
+        <p className="mt-3 text-[13px] leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+          Marcus flagged the Day 3 restaurant (it has shellfish). I found <strong className="font-medium text-[color:var(--on-surface)] dark:text-white">Bodega da Mouraria</strong>, similar vibe, allergy-friendly, about $15 less per person. Swap it?
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="rounded-full bg-[#1c1c17] px-3 py-1.5 text-[11px] font-semibold tracking-wide text-[color:var(--surface)] dark:bg-[#ebe9e4] dark:text-[#141414]">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full bg-[#1c1c17] px-4 py-2 text-[11px] font-semibold tracking-wide text-[color:var(--surface)] transition hover:bg-[#2a2a23] dark:bg-white dark:text-[#1c1c17] dark:hover:bg-neutral-200">
             Accept change
           </span>
-          <span className="rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1.5 text-[11px] font-medium tracking-wide text-[color:var(--on-surface-variant)] dark:border-white/15 dark:bg-dm-elevated dark:text-neutral-300">
+          <span className="rounded-full border border-[color:var(--hairline-strong)] px-4 py-2 text-[11px] font-medium tracking-wide text-[color:var(--on-surface-variant)] transition hover:bg-black/5 dark:border-white/15 dark:text-neutral-300 dark:hover:bg-white/5">
             Keep original
           </span>
         </div>
       </div>
-    </div>
+      </div>
+    </ScrollReveal>
   );
 }

@@ -4,6 +4,8 @@ import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { primaryNavPillClass } from "@/frontend/ui/primary-action";
+import { LandingGlobe } from "@/frontend/components/landing-globe";
+import { motion } from "framer-motion";
 
 /**
  * Oversized hero CTA pills — local to the landing hero only.
@@ -11,10 +13,10 @@ import { primaryNavPillClass } from "@/frontend/ui/primary-action";
  * by the home example strip where the smaller size is correct.)
  */
 const heroFilledPillClass =
-  "inline-flex items-center justify-center rounded-full bg-[#1c1c17] px-9 py-4 text-base font-semibold tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#1c1c17] dark:hover:bg-neutral-200";
+  "inline-flex items-center justify-center rounded-full bg-[#1c1c17] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--surface)] transition hover:bg-[#2a2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#1c1c17] dark:hover:bg-neutral-200";
 
 const heroOutlinePillClass =
-  "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-9 py-4 text-base font-semibold tracking-wide text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[color:var(--surface-container-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page";
+  "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:border-white/15 dark:text-[color:var(--on-surface)] dark:hover:bg-white/5";
 
 export function LandingTwPlusHero() {
   return (
@@ -146,38 +148,71 @@ export function LandingTwPlusHero() {
           />
         </div>
 
-        <div className="mx-auto flex max-w-4xl flex-col items-center py-28 text-center sm:py-36 lg:py-44">
-          <span className="editorial-eyebrow mb-10 text-[13px] tracking-[0.24em] dark:text-[color:var(--sage-soft)] sm:text-sm">
-            Conci · AI for group trips
-          </span>
-          <h1 className="font-display text-[3.75rem] font-semibold leading-[0.96] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5.5rem] lg:text-[6.25rem]">
-            Get the Trip out of the <span className="italic">Group Chat.</span>
-          </h1>
-          <div className="mt-14 flex flex-col items-center gap-5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-8 sm:gap-y-6">
-            <div className="flex flex-col items-center gap-2.5">
-              <Link href="/trip-parser" className={heroFilledPillClass}>
-                Start a trip
-              </Link>
-              <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
-                Host &amp; invite the group
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-2.5">
-              <Link href="/join?from=create" className={heroOutlinePillClass}>
-                Join with a code
-              </Link>
-              <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
-                Invited by a friend
-              </span>
-            </div>
-          </div>
-          <a
-            href="#example"
-            className="mt-12 text-base leading-6 font-semibold text-[color:var(--on-surface)] transition hover:text-[color:var(--sage)] dark:text-slate-200 dark:hover:text-[color:var(--sage-soft)] sm:text-lg"
+        <div className="mx-auto flex max-w-7xl flex-col items-center py-28 text-center sm:py-36 lg:grid lg:grid-cols-2 lg:gap-12 lg:py-44 lg:text-left">
+          <motion.div 
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
+            }}
+            className="flex max-w-3xl flex-col items-center lg:items-start mx-auto lg:mx-0"
           >
-            See an example <span aria-hidden="true">→</span>
-          </a>
-          <div className="hairline-rule mt-16 w-full max-w-xs dark:bg-white/10" />
+            <motion.span 
+              variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
+              className="editorial-eyebrow mb-12 text-[11px] font-medium uppercase tracking-[0.2em] dark:text-[color:var(--sage-soft)] sm:text-[13px]"
+            >
+              Conci · AI for group trips
+            </motion.span>
+            <motion.h1 
+              variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
+              className="font-display text-[3.75rem] font-medium leading-[0.96] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5.5rem] lg:text-[5rem] xl:text-[6.25rem]"
+            >
+              Get the Trip out of the <span className="italic text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Group Chat.</span>
+            </motion.h1>
+            <motion.div 
+              variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
+              className="mt-14 flex flex-col items-center gap-5 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start sm:gap-x-8 sm:gap-y-6"
+            >
+              <div className="flex flex-col items-center lg:items-start gap-3">
+                <Link 
+                  href="/trip-parser" 
+                  className={`${heroFilledPillClass} relative overflow-hidden group shadow-[0_0_40px_rgba(0,0,0,0.1)] hover:shadow-[0_0_60px_rgba(0,0,0,0.15)] dark:shadow-[0_0_40px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_60px_rgba(255,255,255,0.2)]`}
+                >
+                  <span className="relative z-10 transition-transform duration-300 group-hover:scale-105">Start a trip</span>
+                  <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] dark:via-black/10" />
+                </Link>
+                <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
+                  Host &amp; invite the group
+                </span>
+              </div>
+              <div className="flex flex-col items-center lg:items-start gap-3">
+                <Link href="/join?from=create" className={`${heroOutlinePillClass} transition-all duration-300 hover:border-[color:var(--sage)]/50 dark:hover:border-white/30 dark:hover:bg-white/5`}>
+                  <span className="transition-transform duration-300 hover:scale-105">Join with a code</span>
+                </Link>
+                <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
+                  Invited by a friend
+                </span>
+              </div>
+            </motion.div>
+            <motion.a
+              variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
+              href="#example"
+              className="mt-16 border-b border-[color:var(--hairline-strong)] pb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--on-surface)] transition-colors hover:border-[color:var(--sage)] hover:text-[color:var(--sage)] dark:border-white/30 dark:text-slate-400 dark:hover:border-[color:var(--sage-soft)] dark:hover:text-[color:var(--sage-soft)]"
+            >
+              See an example
+            </motion.a>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="hidden lg:flex justify-center mt-16 lg:mt-0 relative"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage-soft)_0%,transparent_70%)] opacity-20 dark:opacity-10 blur-3xl pointer-events-none mix-blend-screen" />
+            <LandingGlobe />
+          </motion.div>
         </div>
 
         <div

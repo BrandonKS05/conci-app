@@ -32,7 +32,7 @@ export default function RootLayout({
       className={`${inter.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] antialiased dark:bg-[#0f0f0f] dark:text-neutral-200">
+      <body suppressHydrationWarning className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] antialiased dark:bg-[#0f0f0f] dark:text-neutral-200">
         {children}
       </body>
     </html>
