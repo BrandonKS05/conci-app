@@ -15,16 +15,16 @@ export const metadata: Metadata = {
 
 const steps = [
   {
-    title: "Describe the trip in one message",
-    body: "Paste your group chat, drop a link, or write a sentence. Conci reads it, fills the gaps, and asks only what it actually needs.",
+    title: "Everyone has a voice",
+    body: "Invite the group and let Conci do the interrogating. Everyone drops in their dates, budgets, dietary restrictions, and hotel preferences.",
   },
   {
-    title: "AI builds the full itinerary for you",
-    body: "Dates, destinations, stays, and day-by-day plans appear instantly, already shaped by everyone's preferences.",
+    title: "AI builds the impossible",
+    body: "Conci synthesizes the group's conflicting constraints and builds a complete, bookable itinerary. Say 'find a cheaper flight' and watch the calendar update.",
   },
   {
-    title: "Invite the group with a single code",
-    body: "Friends join with an invite code, drop their preferences, and vote. The plan keeps updating itself as you go.",
+    title: "Seamless booking & money",
+    body: "No more manual Venmo tracking. Conci tracks exactly who owes what, and provides direct booking links for every flight, hotel, and dinner.",
   },
 ];
 
@@ -150,11 +150,12 @@ const memberRows = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-dm-page dark:text-neutral-200">
+    <div className="min-h-screen bg-[color:var(--surface-dim)] text-[color:var(--on-surface)] dark:bg-black dark:text-neutral-200">
       <LandingTwPlusHero />
 
+      <div className="flex flex-col gap-4 bg-white dark:bg-black pt-4">
       {/* Integrations strip */}
-      <section className="border-y border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-6 dark:border-white/10 dark:bg-dm-card">
+      <section className="overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-6 shadow-sm dark:border-white/10 dark:bg-dm-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-5 sm:px-6 lg:px-8">
           <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Works with
@@ -171,13 +172,13 @@ export default function HomePage() {
       </section>
 
       {/* Preset Popular Trips - Layla.ai inspired */}
-      <section className="relative bg-black py-32 sm:py-40">
+      <section className="relative overflow-hidden border-y border-[color:var(--hairline)] bg-gradient-to-b from-[#e3f2fd] to-[#f8fbff] py-32 shadow-sm sm:py-40 dark:border-white/5 dark:from-[#0f172a] dark:to-[#050505]">
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="mb-16 max-w-3xl">
-            <h2 className="font-display text-4xl font-medium tracking-tight text-white sm:text-6xl">
+            <h2 className="font-display text-4xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-6xl">
               Start a trip instantly.
             </h2>
-            <p className="mt-6 text-xl leading-relaxed text-neutral-400">
+            <p className="mt-6 text-xl leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400">
               Select a popular destination below and Conci will instantly generate a full, bookable itinerary.
             </p>
           </div>
@@ -210,7 +211,7 @@ export default function HomePage() {
       </section>
 
       {/* How it works - Apple Style Alternating */}
-      <section className="relative bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40 overflow-hidden">
+      <section className="relative overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-32 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-40">
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 space-y-32 sm:space-y-48">
           {steps.map((step, i) => (
             <ScrollReveal key={step.title} direction={i % 2 === 0 ? "up" : "up"} className={`flex flex-col gap-12 lg:flex-row ${i % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:items-center`}>
@@ -236,7 +237,7 @@ export default function HomePage() {
       </section>
 
       {/* Built for groups, collaboration */}
-      <section className="bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40">
+      <section className="overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-32 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-40">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-8">
           <div>
             <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
@@ -269,7 +270,7 @@ export default function HomePage() {
       {/* Example */}
       <section
         id="example"
-        className="scroll-mt-24 bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40"
+        className="scroll-mt-24 overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-32 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-40"
       >
         <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
@@ -293,7 +294,7 @@ export default function HomePage() {
       </section>
 
       {/* Host vs Join */}
-      <section className="bg-[color:var(--surface)] py-32 dark:bg-dm-page sm:py-40">
+      <section className="overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-32 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-40">
         <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
@@ -338,7 +339,7 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-[color:var(--surface)] px-5 pb-24 pt-12 dark:bg-dm-page sm:px-6 lg:px-8">
+      <section className="overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] px-5 pb-24 pt-12 shadow-sm dark:border-white/5 dark:bg-dm-card sm:px-6 lg:px-8">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-[#1c1c17] px-6 py-20 text-center shadow-[var(--shadow-ambient-lg)] sm:px-10 sm:py-24">
           <div
             aria-hidden="true"
@@ -370,7 +371,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-10 dark:border-white/10 dark:bg-dm-page">
+      <footer className="overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-10 shadow-sm dark:border-white/10 dark:bg-dm-card">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500 sm:flex-row sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <div className="flex items-center gap-2">
@@ -395,6 +396,7 @@ export default function HomePage() {
         </div>
       </footer>
 
+      </div>
     </div>
   );
 }

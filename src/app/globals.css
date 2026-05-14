@@ -10,41 +10,41 @@
  * everything else flows from the light-mode tokens below.
  */
 :root {
-  /* Surfaces */
-  --surface: #fcf9f1;
-  --surface-bright: #fcf9f1;
-  --surface-dim: #f4f0e8;
+  /* Surfaces - Crisp Whites & Cool Grays */
+  --surface: #ffffff;
+  --surface-bright: #ffffff;
+  --surface-dim: #f8fafc;
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #f7f3eb;
-  --surface-container: #f1eee5;
-  --surface-container-high: #ebe8e0;
-  --surface-container-highest: #e5e2da;
+  --surface-container-low: #f8fafc;
+  --surface-container: #f1f5f9;
+  --surface-container-high: #e2e8f0;
+  --surface-container-highest: #cbd5e1;
 
-  /* Ink */
-  --on-surface: #1c1c17;
-  --on-surface-variant: #444748;
-  --on-surface-muted: #6c6c63;
+  /* Ink - Deep Slate */
+  --on-surface: #0f172a;
+  --on-surface-variant: #334155;
+  --on-surface-muted: #64748b;
 
   /* Structure */
-  --outline: #747878;
-  --outline-variant: #c4c7c7;
-  --hairline: rgba(28, 28, 23, 0.08);
-  --hairline-strong: rgba(28, 28, 23, 0.14);
+  --outline: #94a3b8;
+  --outline-variant: #cbd5e1;
+  --hairline: rgba(15, 23, 42, 0.06);
+  --hairline-strong: rgba(15, 23, 42, 0.12);
 
   /* Brand */
-  --primary: #000000;
+  --primary: #0f172a;
   --on-primary: #ffffff;
-  --primary-container: #1c1b1b;
+  --primary-container: #1e293b;
 
-  /* Accent — sage green, used sparingly for active states / premium chips */
-  --sage: #9b9d82;
-  --sage-soft: #c7c9b3;
-  --on-sage: #1c1c17;
+  /* Accent — Aegean Blue (Variable name kept as 'sage' for backwards compatibility) */
+  --sage: #2563EB;
+  --sage-soft: #60A5FA;
+  --on-sage: #ffffff;
 
-  /* Shadow — soft ambient charcoal glow */
-  --shadow-ambient-sm: 0 4px 16px rgba(28, 28, 23, 0.03);
-  --shadow-ambient: 0 12px 40px rgba(28, 28, 23, 0.04);
-  --shadow-ambient-lg: 0 24px 60px rgba(28, 28, 23, 0.05);
+  /* Shadow — Crisp ambient glow */
+  --shadow-ambient-sm: 0 4px 16px rgba(15, 23, 42, 0.04);
+  --shadow-ambient: 0 12px 40px rgba(15, 23, 42, 0.06);
+  --shadow-ambient-lg: 0 24px 60px rgba(15, 23, 42, 0.08);
 }
 
 html {
@@ -75,8 +75,8 @@ body {
 }
 
 html.dark body {
-  background: #0f0f0f;
-  color: #e5e5e5;
+  background: #050505;
+  color: #F5F5F0;
 }
 
 * {
@@ -95,11 +95,11 @@ textarea {
 }
 
 ::selection {
-  background: rgba(155, 157, 130, 0.28);
+  background: rgba(37, 99, 235, 0.2);
 }
 
 html.dark ::selection {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(37, 99, 235, 0.35);
 }
 
 /**
@@ -131,7 +131,7 @@ h3 {
 html.dark h1,
 html.dark h2,
 html.dark h3 {
-  color: #ebe9e4;
+  color: #f8fafc;
 }
 
 /**

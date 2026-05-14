@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
  * by the home example strip where the smaller size is correct.)
  */
 const heroFilledPillClass =
-  "inline-flex items-center justify-center rounded-full bg-[#1c1c17] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--surface)] transition hover:bg-[#2a2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#1c1c17] dark:hover:bg-neutral-200";
+  "inline-flex items-center justify-center rounded-full bg-[color:var(--on-surface)] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--surface)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#0f172a] dark:hover:bg-neutral-200";
 
 const heroOutlinePillClass =
   "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:border-white/15 dark:text-[color:var(--on-surface)] dark:hover:bg-white/5";
@@ -26,7 +26,7 @@ export function LandingTwPlusHero() {
           <div className="flex min-w-0 flex-1 items-center">
             <Link href="/" className="-m-1.5 flex min-w-0 items-center p-1.5 outline-none">
               <span className="sr-only">Conci</span>
-              <span className="font-display text-2xl font-semibold tracking-tight text-[#1c1c17] dark:text-white sm:text-[1.75rem]">
+              <span className="font-display text-2xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-[1.75rem]">
                 Conci
               </span>
             </Link>
@@ -135,18 +135,7 @@ export function LandingTwPlusHero() {
       </header>
 
       <div className="relative isolate px-6 pt-14 lg:px-8">
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-        >
-          <div
-            style={{
-              clipPath:
-                "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-            }}
-            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[color:var(--sage-soft)]/25 to-[color:var(--surface-container-highest)]/60 opacity-50 dark:hidden sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-          />
-        </div>
+
 
         <div className="mx-auto flex max-w-7xl flex-col items-center py-28 text-center sm:py-36 lg:grid lg:grid-cols-2 lg:gap-12 lg:py-44 lg:text-left">
           <motion.div 
@@ -166,7 +155,7 @@ export function LandingTwPlusHero() {
             </motion.span>
             <motion.h1 
               variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
-              className="font-display text-[3.75rem] font-medium leading-[0.96] tracking-[-0.035em] text-balance text-[#1c1c17] dark:text-white sm:text-[5.5rem] lg:text-[5rem] xl:text-[6.25rem]"
+              className="font-display text-[3.75rem] font-medium leading-[0.96] tracking-[-0.035em] text-balance text-[color:var(--on-surface)] dark:text-white sm:text-[5.5rem] lg:text-[5rem] xl:text-[6.25rem]"
             >
               Get the Trip out of the <span className="italic text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Group Chat.</span>
             </motion.h1>
@@ -205,28 +194,17 @@ export function LandingTwPlusHero() {
           </motion.div>
 
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
             className="hidden lg:flex justify-center mt-16 lg:mt-0 relative"
           >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage-soft)_0%,transparent_70%)] opacity-20 dark:opacity-10 blur-3xl pointer-events-none mix-blend-screen" />
+
             <LandingGlobe />
           </motion.div>
         </div>
 
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
-        >
-          <div
-            style={{
-              clipPath:
-                "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-            }}
-            className="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[color:var(--surface-container-highest)]/70 to-[color:var(--sage-soft)]/20 opacity-50 dark:hidden sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
-          />
-        </div>
+
       </div>
 
     </>
