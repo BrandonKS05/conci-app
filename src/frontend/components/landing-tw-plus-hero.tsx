@@ -13,10 +13,10 @@ import { motion } from "framer-motion";
  * by the home example strip where the smaller size is correct.)
  */
 const heroFilledPillClass =
-  "inline-flex items-center justify-center rounded-full bg-[color:var(--on-surface)] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--surface)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:bg-white dark:text-[#0f172a] dark:hover:bg-neutral-200";
+  "inline-flex items-center justify-center rounded-full bg-[color:var(--on-surface)] px-10 py-5 text-base font-medium tracking-wide text-[color:var(--surface)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-12 sm:py-5 sm:text-lg dark:bg-white dark:text-[#0f172a] dark:hover:bg-neutral-200";
 
 const heroOutlinePillClass =
-  "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] px-9 py-4 text-base font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-10 sm:py-4 sm:text-lg dark:border-white/15 dark:text-[color:var(--on-surface)] dark:hover:bg-white/5";
+  "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] px-10 py-5 text-base font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-12 sm:py-5 sm:text-lg dark:border-white/15 dark:text-[color:var(--on-surface)] dark:hover:bg-white/5";
 
 export function LandingTwPlusHero() {
   return (
@@ -147,15 +147,10 @@ export function LandingTwPlusHero() {
             }}
             className="flex max-w-3xl flex-col items-center lg:items-start mx-auto lg:mx-0"
           >
-            <motion.span 
-              variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
-              className="editorial-eyebrow mb-12 text-[11px] font-medium uppercase tracking-[0.2em] dark:text-[color:var(--sage-soft)] sm:text-[13px]"
-            >
-              Conci · AI for group trips
-            </motion.span>
+
             <motion.h1 
               variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } } }}
-              className="font-display text-[3.75rem] font-medium leading-[0.96] tracking-[-0.035em] text-balance text-[color:var(--on-surface)] dark:text-white sm:text-[5.5rem] lg:text-[5rem] xl:text-[6.25rem]"
+              className="font-display text-[3rem] font-medium leading-[0.96] tracking-[-0.035em] text-balance text-[color:var(--on-surface)] dark:text-white sm:text-[4rem] lg:text-[3.75rem] xl:text-[4.75rem]"
             >
               Get the Trip out of the <span className="italic text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Group Chat.</span>
             </motion.h1>
@@ -171,17 +166,11 @@ export function LandingTwPlusHero() {
                   <span className="relative z-10 transition-transform duration-300 group-hover:scale-105">Start a trip</span>
                   <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] dark:via-black/10" />
                 </Link>
-                <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
-                  Host &amp; invite the group
-                </span>
               </div>
               <div className="flex flex-col items-center lg:items-start gap-3">
                 <Link href="/join?from=create" className={`${heroOutlinePillClass} transition-all duration-300 hover:border-[color:var(--sage)]/50 dark:hover:border-white/30 dark:hover:bg-white/5`}>
                   <span className="transition-transform duration-300 hover:scale-105">Join with a code</span>
                 </Link>
-                <span className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-slate-500 sm:text-[13px]">
-                  Invited by a friend
-                </span>
               </div>
             </motion.div>
             <motion.a
