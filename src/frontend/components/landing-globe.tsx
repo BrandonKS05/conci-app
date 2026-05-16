@@ -77,6 +77,60 @@ const N_POINTS: Destination[] = [
     highlights: ["Christ the Redeemer", "Ipanema Beach", "Lapa nightlife"],
     funFact: "Rio's Carnival is the world's biggest party — 2 million people take to the streets every day.",
   },
+  {
+    lat: 51.5074, lng: -0.1278,
+    name: "London", country: "United Kingdom",
+    image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&q=80&fit=crop",
+    bestTime: "May – Sep",
+    avgCost: "$2,600 / person",
+    highlights: ["Tower Bridge", "British Museum", "West End shows"],
+    funFact: "Big Ben is actually the name of the bell, not the clock tower.",
+  },
+  {
+    lat: 41.9028, lng: 12.4964,
+    name: "Rome", country: "Italy",
+    image: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=600&q=80&fit=crop",
+    bestTime: "Apr – Jun · Sep – Oct",
+    avgCost: "$2,100 / person",
+    highlights: ["Colosseum", "Vatican City", "Trevi Fountain"],
+    funFact: "Modern Rome has 280 fountains and more than 900 churches.",
+  },
+  {
+    lat: -8.4095, lng: 115.1889,
+    name: "Bali", country: "Indonesia",
+    image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600&q=80&fit=crop",
+    bestTime: "Apr – Oct",
+    avgCost: "$1,500 / person",
+    highlights: ["Ubud Monkey Forest", "Seminyak beaches", "Uluwatu Temple"],
+    funFact: "Bali relies on a unique 9th-century water management system called Subak.",
+  },
+  {
+    lat: -33.9249, lng: 18.4241,
+    name: "Cape Town", country: "South Africa",
+    image: "https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=600&q=80&fit=crop",
+    bestTime: "Oct – Apr",
+    avgCost: "$1,800 / person",
+    highlights: ["Table Mountain", "Cape Point", "Boulders Beach penguins"],
+    funFact: "Table Mountain is one of the oldest mountains in the world.",
+  },
+  {
+    lat: 21.3069, lng: -157.8583,
+    name: "Honolulu", country: "United States",
+    image: "https://images.unsplash.com/photo-1542259009477-d625272157b7?w=600&q=80&fit=crop",
+    bestTime: "Sep – Nov",
+    avgCost: "$3,200 / person",
+    highlights: ["Waikiki Beach", "Pearl Harbor", "Diamond Head crater"],
+    funFact: "Honolulu is the only U.S. city to have a royal palace.",
+  },
+  {
+    lat: 41.0082, lng: 28.9784,
+    name: "Istanbul", country: "Turkey",
+    image: "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=600&q=80&fit=crop",
+    bestTime: "Mar – May · Sep – Nov",
+    avgCost: "$1,400 / person",
+    highlights: ["Hagia Sophia", "Grand Bazaar", "Bosphorus cruise"],
+    funFact: "Istanbul is the only city in the world situated on two continents.",
+  }
 ];
 
 const ARCS = [
@@ -84,7 +138,12 @@ const ARCS = [
   { startLat: 48.8566, startLng: 2.3522, endLat: 25.2048, endLng: 55.2708 },
   { startLat: 25.2048, startLng: 55.2708, endLat: 35.6762, endLng: 139.6503 },
   { startLat: 35.6762, startLng: 139.6503, endLat: -33.8688, endLng: 151.2093 },
-  { startLat: 40.7128, startLng: -74.0060, endLat: -22.9068, endLng: -43.1729 }
+  { startLat: 40.7128, startLng: -74.0060, endLat: -22.9068, endLng: -43.1729 },
+  { startLat: 51.5074, startLng: -0.1278, endLat: 41.9028, endLng: 12.4964 },
+  { startLat: 48.8566, startLng: 2.3522, endLat: -33.9249, endLng: 18.4241 },
+  { startLat: 35.6762, startLng: 139.6503, endLat: -8.4095, endLng: 115.1889 },
+  { startLat: -33.8688, startLng: 151.2093, endLat: 21.3069, endLng: -157.8583 },
+  { startLat: 41.9028, startLng: 12.4964, endLat: 41.0082, endLng: 28.9784 },
 ];
 
 export function LandingGlobe() {
@@ -198,7 +257,18 @@ export function LandingGlobe() {
       })
       .on("end", () => { isDragging = false; });
 
-    d3.select(canvas).call(dragBehavior);
+    d3.select(canvas)
+      .call(dragBehavior)
+      .on("wheel.zoom", (event) => {
+        event.preventDefault();
+        const baseScale = (Math.min(dimensions.width, dimensions.height) / 2) - 4;
+        const currentScale = projection.scale();
+        // Zoom in on wheel up (negative deltaY), zoom out on wheel down
+        let nextScale = currentScale * Math.pow(0.995, event.deltaY);
+        // Clamp scale between baseScale and 5x baseScale
+        nextScale = Math.max(baseScale, Math.min(baseScale * 5, nextScale));
+        projection.scale(nextScale);
+      });
 
     function render() {
       if (!context) return;
@@ -209,30 +279,30 @@ export function LandingGlobe() {
         projection.rotate([rotate[0] + rotationVelocity, rotate[1], rotate[2]]);
       }
 
-      // 1. Ocean
+      // 1. Ocean (Deep Navy/Aegean)
       context.beginPath();
       path({ type: "Sphere" });
-      context.fillStyle = "#050505";
+      context.fillStyle = "#0a192f";
       context.fill();
       context.lineWidth = 1;
-      context.strokeStyle = "rgba(255, 255, 255, 0.06)";
+      context.strokeStyle = "rgba(255, 255, 255, 0.08)";
       context.stroke();
 
       // 2. Graticule
       context.beginPath();
       path(graticuleGeoJson);
       context.lineWidth = 0.4;
-      context.strokeStyle = "rgba(255, 255, 255, 0.025)";
+      context.strokeStyle = "rgba(255, 255, 255, 0.02)";
       context.stroke();
 
-      // 3. Landmasses
+      // 3. Landmasses (Earthy Forest/Slate)
       context.beginPath();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       path(worldGeoJson as any);
-      context.fillStyle = "#151515";
+      context.fillStyle = "#1e3025";
       context.fill();
       context.lineWidth = 0.5;
-      context.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      context.strokeStyle = "rgba(255, 255, 255, 0.12)";
       context.stroke();
 
       // 4. Arcs
