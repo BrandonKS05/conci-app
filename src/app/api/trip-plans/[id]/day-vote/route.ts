@@ -34,8 +34,11 @@ type ActionBody =
   | { action: "vote"; dateIso: string; category: DayVoteCategory; optionId: string }
   | { action: "toggleNotInterested"; dateIso: string; category: DayVoteCategory; optionId: string }
   | { action: "pinToCalendar"; dateIso: string; category: PinCategory; optionId: string }
-  | { action: "lock"; dateIso: string; category: DayVoteCategory; optionId: string; detail: string }
-  | { action: "unlock"; dateIso: string; category: DayVoteCategory };
+  | { action: "skip"; dateIso: string; category: DayVoteCategory; optionId: string }
+  | { action: "lock"; dateIso: string; category: DayVoteCategory; optionId: string; detail: string; time?: string }
+  | { action: "unlock"; dateIso: string; category: DayVoteCategory }
+  | { action: "remove"; dateIso: string; category: DayVoteCategory; optionId: string }
+  | { action: "set-time"; dateIso: string; category: DayVoteCategory; optionId: string; time: string };
 
 function isDayCategory(value: unknown): value is DayVoteCategory {
   return typeof value === "string" && (DAY_VOTE_CATEGORIES as readonly string[]).includes(value);
@@ -225,7 +228,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       ...(detail ? { detail } : {}),
       ...(href.startsWith("http") ? { href } : {}),
       votes: [user.id],
-      downvotes: [],
+      skipVotes: [],
       suggestedBy: user.id,
     });
   } else if (body.action === "vote") {
@@ -233,29 +236,41 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const target = state.options.find((o) => o.id === optionId);
     if (!target) return NextResponse.json({ error: "Option not found" }, { status: 404 });
     const has = target.votes.includes(user.id);
-    const downs = target.downvotes ?? [];
+    const downs = target.skipVotes ?? [];
     if (has) {
       target.votes = target.votes.filter((v) => v !== user.id);
     } else {
       target.votes = [...target.votes, user.id];
-      target.downvotes = downs.filter((v) => v !== user.id);
+      target.skipVotes = downs.filter((v) => v !== user.id);
     }
   } else if (body.action === "toggleNotInterested") {
     const optionId = cleanText(body.optionId, 120);
     const target = state.options.find((o) => o.id === optionId);
     if (!target) return NextResponse.json({ error: "Option not found" }, { status: 404 });
-    const downs = target.downvotes ?? [];
+    const downs = target.skipVotes ?? [];
     const hasDown = downs.includes(user.id);
     if (hasDown) {
-      target.downvotes = downs.filter((v) => v !== user.id);
+      target.skipVotes = downs.filter((v) => v !== user.id);
     } else {
-      target.downvotes = [...downs, user.id];
+      target.skipVotes = [...downs, user.id];
+      target.votes = target.votes.filter((v) => v !== user.id);
+    }
+  } else if (body.action === "skip") {
+    const optionId = cleanText(body.optionId, 120);
+    const target = state.options.find((o) => o.id === optionId);
+    if (!target) return NextResponse.json({ error: "Option not found" }, { status: 404 });
+    const hasSkipped = (target.skipVotes ?? []).includes(user.id);
+    if (hasSkipped) {
+      target.skipVotes = (target.skipVotes ?? []).filter((v) => v !== user.id);
+    } else {
+      target.skipVotes = [...(target.skipVotes ?? []), user.id];
       target.votes = target.votes.filter((v) => v !== user.id);
     }
   } else if (body.action === "lock") {
-    if (!access.isHost) return NextResponse.json({ error: "Only host can lock options" }, { status: 403 });
+    if (!access.isHost) return NextResponse.json({ error: "Only host can confirm options" }, { status: 403 });
     const optionId = cleanText(body.optionId, 120);
     const detail = cleanText(body.detail, 220);
+    const time = cleanText(body.time, 32);
     if (!detail) return NextResponse.json({ error: "Add confirmation detail" }, { status: 400 });
     const target = state.options.find((o) => o.id === optionId);
     if (!target) return NextResponse.json({ error: "Option not found" }, { status: 404 });
@@ -263,9 +278,27 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     target.lockedDetail = detail;
     target.lockedAt = new Date().toISOString();
     target.lockedBy = user.id;
+    if (time) target.time = time;
   } else if (body.action === "unlock") {
-    if (!access.isHost) return NextResponse.json({ error: "Only host can unlock options" }, { status: 403 });
+    if (!access.isHost) return NextResponse.json({ error: "Only host can unconfirm options" }, { status: 403 });
     delete state.lockedOptionId;
+  } else if (body.action === "set-time") {
+    if (!access.isHost) return NextResponse.json({ error: "Only host can set times" }, { status: 403 });
+    const optionId = cleanText(body.optionId, 120);
+    const time = cleanText(body.time, 32);
+    if (!time) return NextResponse.json({ error: "Time is required" }, { status: 400 });
+    const target = state.options.find((o) => o.id === optionId);
+    if (!target) return NextResponse.json({ error: "Option not found" }, { status: 404 });
+    target.time = time;
+  } else if (body.action === "remove") {
+    if (!access.isHost) return NextResponse.json({ error: "Only host can remove options" }, { status: 403 });
+    const optionId = cleanText(body.optionId, 120);
+    const idx = state.options.findIndex((o) => o.id === optionId);
+    if (idx === -1) return NextResponse.json({ error: "Option not found" }, { status: 404 });
+    state.options.splice(idx, 1);
+    if (state.lockedOptionId === optionId) delete state.lockedOptionId;
+    // Persist removal so re-seeding from pins doesn't bring it back
+    state.removedIds = [...new Set([...(state.removedIds ?? []), optionId])];
   } else {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
 import { ScrollReveal } from "@/frontend/components/scroll-reveal";
-import { Sparkles, Calculator, Users, Edit3, CalendarCheck, Link2 } from "lucide-react";
+import Image from "next/image";
 
 const CREATE_URL = "/trip-parser";
 const JOIN_WITH_CODE_URL = "/join?from=create";
@@ -36,32 +36,7 @@ const integrations = [
   "Stripe",
 ];
 
-const features = [
-  {
-    title: "Full itinerary from one prompt",
-    body: "Describe the trip in plain language. Conci returns flights, stays, dining, and experiences day by day, already pre-filled.",
-  },
-  {
-    title: "Live cost estimator",
-    body: "Specific costs for flights and hotels, sensible estimates for dining. Conci keeps a running total per person as the plan changes.",
-  },
-  {
-    title: "Preference blending",
-    body: "One person needs beachfront. Another has a shellfish allergy. Another is budget-conscious. Conci synthesizes constraints into one plan that actually works.",
-  },
-  {
-    title: "AI that edits, not just suggests",
-    body: "Ask Conci to swap a hotel, move dinner, or find a cheaper flight, and it updates the itinerary in place. The chat does the work, not your notes app.",
-  },
-  {
-    title: "Date voting & group calendar",
-    body: "Send out a date poll or let everyone drop their availability. Conci proposes the window where the most people are free.",
-  },
-  {
-    title: "Direct booking links",
-    body: "Every hotel, flight, restaurant, and experience card links straight to the source. The host sees everything in one place and can book through.",
-  },
-];
+
 
 const collabFeatures = [
   {
@@ -187,9 +162,11 @@ export default function HomePage() {
             {popularTrips.map((trip, idx) => (
               <ScrollReveal key={trip.title} delay={idx * 0.1} className="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl bg-neutral-900">
                 <Link href={`/trip-parser?q=${encodeURIComponent(trip.query)}`} className="absolute inset-0 z-20" aria-label={`Start trip to ${trip.title}`} />
-                <img 
-                  src={trip.image} 
+                <Image
+                  src={trip.image}
                   alt={trip.title}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

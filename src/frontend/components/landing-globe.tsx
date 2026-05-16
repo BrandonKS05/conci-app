@@ -5,6 +5,7 @@ import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 // Import map data directly. Next.js handles JSON imports.
 import mapData from "world-atlas/countries-110m.json";
@@ -355,9 +356,11 @@ export function LandingGlobe() {
           >
             {/* Hero image */}
             <div className="relative h-28 w-full overflow-hidden">
-              <img
+              <Image
                 src={selected.image}
                 alt={selected.name}
+                fill
+                sizes="340px"
                 className="h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />

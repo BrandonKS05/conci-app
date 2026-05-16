@@ -32,9 +32,12 @@ export type DayVoteOption = {
   detail?: string;
   href?: string;
   imageUrl?: string;
+  /** AI-suggested or host-confirmed time for this option (e.g. "7:30 PM"). */
+  time?: string;
+  /** User IDs who said they're interested. */
   votes: string[];
-  /** Members who marked “not for me” (mutually exclusive with votes for that user). */
-  downvotes?: string[];
+  /** User IDs who said "not for me". Mutually exclusive with votes. */
+  skipVotes?: string[];
   suggestedBy?: string;
   lockedDetail?: string;
   lockedAt?: string;
@@ -44,6 +47,8 @@ export type DayVoteOption = {
 export type DayVoteCategoryState = {
   options: DayVoteOption[];
   lockedOptionId?: string;
+  /** IDs of seeded options the host explicitly removed. Prevents re-seeding them. */
+  removedIds?: string[];
 };
 
 export type DayVoteState = Record<DayVoteCategory, DayVoteCategoryState>;
@@ -73,15 +78,18 @@ function normalizeOption(row: unknown): DayVoteOption | null {
   const id = typeof o.id === "string" ? o.id.trim() : "";
   const label = typeof o.label === "string" ? o.label.trim() : "";
   if (!id || !label) return null;
-  const dv = dedupeVotes(Array.isArray(o.downvotes) ? (o.downvotes as string[]) : []);
+
   return {
     id,
     label,
     ...(typeof o.detail === "string" && o.detail.trim() ? { detail: o.detail.trim() } : {}),
     ...(typeof o.href === "string" && o.href.startsWith("http") ? { href: o.href } : {}),
     ...(typeof o.imageUrl === "string" && o.imageUrl.startsWith("http") ? { imageUrl: o.imageUrl } : {}),
+    ...(typeof o.time === "string" && o.time.trim() ? { time: o.time.trim() } : {}),
     votes: dedupeVotes(Array.isArray(o.votes) ? (o.votes as string[]) : []),
-    ...(dv.length ? { downvotes: dv } : {}),
+    ...(Array.isArray(o.skipVotes) && (o.skipVotes as string[]).length
+      ? { skipVotes: dedupeVotes(o.skipVotes as string[]) }
+      : {}),
     ...(typeof o.suggestedBy === "string" && o.suggestedBy.trim() ? { suggestedBy: o.suggestedBy.trim() } : {}),
     ...(typeof o.lockedDetail === "string" && o.lockedDetail.trim() ? { lockedDetail: o.lockedDetail.trim() } : {}),
     ...(typeof o.lockedAt === "string" && o.lockedAt.trim() ? { lockedAt: o.lockedAt.trim() } : {}),
@@ -116,13 +124,17 @@ export function parseDayVoteState(raw: unknown): DayVoteStateByDate {
       if (typeof state.lockedOptionId === "string" && state.lockedOptionId.trim()) {
         parsed[category].lockedOptionId = state.lockedOptionId.trim();
       }
+      if (Array.isArray(state.removedIds)) {
+        const ids = (state.removedIds as unknown[]).filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+        if (ids.length) parsed[category].removedIds = ids;
+      }
     }
     out[dateIso] = parsed;
   }
   return out;
 }
 
-type SeedOption = Omit<DayVoteOption, "votes" | "downvotes">;
+type SeedOption = Omit<DayVoteOption, "votes" | "skipVotes">;
 
 function mapsSearchUrl(q: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.replace(/\s+/g, " ").trim())}`;
@@ -239,26 +251,53 @@ function seedTailoredFromGroupContext(
   return { restaurants, hotels, flights: [], activities, other: [] };
 }
 
+/** Fuzzy name match: true if one name contains the other (normalised). */
+function namesOverlap(a: string, b: string): boolean {
+  const na = a.trim().toLowerCase();
+  const nb = b.trim().toLowerCase();
+  return na.length >= 3 && nb.length >= 3 && (na.includes(nb) || nb.includes(na));
+}
+
 function seedOptionsFromPlan(plan: TripPlan, dateIso: string): Record<DayVoteCategory, SeedOption[]> {
+  // Cross-reference generatedItinerary for AI-suggested times
+  const genDay = plan.generatedItinerary?.days.find((d) => d.dateIso === dateIso);
+  const genActivities = genDay?.activities ?? [];
+
+  function findGenTime(name: string, genCategory: "food" | "activity"): string | undefined {
+    for (const act of genActivities) {
+      if (act.category !== genCategory) continue;
+      if (namesOverlap(act.title, name) && act.time) return act.time;
+    }
+    return undefined;
+  }
+
   const restaurants = (plan.hostSetup?.restaurantPins ?? [])
     .filter((p) => p.kept && p.dateIso === dateIso && p.place?.name?.trim())
-    .map((p) => ({
-      id: stableId("rest", p.place.mapsUrl || p.place.name),
-      label: p.place.name.trim(),
-      detail: p.place.address || undefined,
-      href: p.place.mapsUrl || undefined,
-      imageUrl: p.place.photoUrl || undefined,
-    }));
+    .map((p) => {
+      const suggestedTime = findGenTime(p.place.name, "food");
+      return {
+        id: stableId("rest", p.place.mapsUrl || p.place.name),
+        label: p.place.name.trim(),
+        detail: p.place.address || undefined,
+        href: p.place.mapsUrl || undefined,
+        imageUrl: p.place.photoUrl || undefined,
+        ...(suggestedTime ? { time: suggestedTime } : {}),
+      };
+    });
 
   const activities = (plan.hostSetup?.activityPins ?? [])
     .filter((p) => p.kept && p.dateIso === dateIso && p.experience?.name?.trim())
-    .map((p) => ({
-      id: stableId("act", p.experience.bookingUrl || p.experience.name),
-      label: p.experience.name.trim(),
-      detail: [p.experience.duration, p.experience.pricePerPerson].filter(Boolean).join(" · ") || undefined,
-      href: p.experience.bookingUrl || undefined,
-      imageUrl: p.experience.coverPhotoUrl || undefined,
-    }));
+    .map((p) => {
+      const suggestedTime = findGenTime(p.experience.name, "activity");
+      return {
+        id: stableId("act", p.experience.bookingUrl || p.experience.name),
+        label: p.experience.name.trim(),
+        detail: [p.experience.duration, p.experience.pricePerPerson].filter(Boolean).join(" · ") || undefined,
+        href: p.experience.bookingUrl || undefined,
+        imageUrl: p.experience.coverPhotoUrl || undefined,
+        ...(suggestedTime ? { time: suggestedTime } : {}),
+      };
+    });
 
   const stay = plan.hostSetup?.hotelStays?.find((s) => dateIso >= s.startIso && dateIso <= s.endIso);
   const hotels =
@@ -278,6 +317,7 @@ function seedOptionsFromPlan(plan: TripPlan, dateIso: string): Record<DayVoteCat
 }
 
 function mergeCategoryLists(prior: DayVoteCategoryState, planSeeds: SeedOption[], tailoredSeeds: SeedOption[]): DayVoteCategoryState {
+  const removedIds = new Set<string>(prior.removedIds ?? []);
   const priorMap = new Map(prior.options.map((o) => [o.id, o]));
   const merged: DayVoteOption[] = [];
   const seenLabels = new Set<string>();
@@ -285,18 +325,21 @@ function mergeCategoryLists(prior: DayVoteCategoryState, planSeeds: SeedOption[]
   const pushSeed = (s: SeedOption) => {
     const labelKey = s.label.trim().toLowerCase();
     if (seenLabels.has(labelKey)) return;
+    if (removedIds.has(s.id)) return;
     const existing = priorMap.get(s.id);
     seenLabels.add(labelKey);
     const votes = existing?.votes ?? [];
-    const downvotes = existing?.downvotes ?? [];
+    const skipVotes = existing?.skipVotes ?? [];
     merged.push({
       id: s.id,
       label: s.label,
       ...(s.detail ? { detail: s.detail } : {}),
       ...(s.href ? { href: s.href } : {}),
       ...(s.imageUrl ? { imageUrl: s.imageUrl } : {}),
+      // Prefer persisted time (host-set) over AI-seeded time
+      ...((existing?.time ?? s.time) ? { time: existing?.time ?? s.time } : {}),
       votes,
-      ...(downvotes.length ? { downvotes } : {}),
+      ...(skipVotes.length ? { skipVotes } : {}),
       suggestedBy: s.suggestedBy ?? existing?.suggestedBy,
       ...(existing?.lockedDetail ? { lockedDetail: existing.lockedDetail } : {}),
       ...(existing?.lockedAt ? { lockedAt: existing.lockedAt } : {}),
@@ -309,7 +352,7 @@ function mergeCategoryLists(prior: DayVoteCategoryState, planSeeds: SeedOption[]
   for (const s of tailoredSeeds) pushSeed(s);
   for (const leftover of priorMap.values()) {
     const lk = leftover.label.trim().toLowerCase();
-    if (seenLabels.has(lk)) continue;
+    if (seenLabels.has(lk) || removedIds.has(leftover.id)) continue;
     seenLabels.add(lk);
     merged.push(leftover);
   }
@@ -317,6 +360,7 @@ function mergeCategoryLists(prior: DayVoteCategoryState, planSeeds: SeedOption[]
   return {
     options: merged,
     ...(prior.lockedOptionId ? { lockedOptionId: prior.lockedOptionId } : {}),
+    ...(removedIds.size > 0 ? { removedIds: [...removedIds] } : {}),
   };
 }
 
@@ -335,4 +379,3 @@ export function mergeDayVoteStateForDate(
   }
   return { ...byDate, [dateIso]: next };
 }
-

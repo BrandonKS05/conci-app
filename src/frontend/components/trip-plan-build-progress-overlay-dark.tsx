@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 export type TripParserBuildStep = "structuring" | "saving" | "generating" | "launching";
@@ -103,7 +104,7 @@ export function TripPlanBuildProgressOverlayDark({
               className={`relative h-32 overflow-hidden border border-white/10 bg-[#202020] shadow-lg sm:h-40 ${CARD_ROTATIONS[i]}`}
               style={{ borderRadius: CARD_MASKS[i] }}
             >
-              <img src={src} alt="" className="h-full w-full object-cover opacity-90" loading="eager" />
+              <Image src={src} alt="" fill sizes="(max-width: 640px) 50vw, 25vw" className="object-cover opacity-90" loading="eager" />
             </div>
           ))}
         </div>
