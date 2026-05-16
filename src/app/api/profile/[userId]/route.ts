@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
-import { getUserProfile } from "@/backend/social-follow";
+import { getFullUserProfile } from "@/backend/user-profile-page";
 import { isUuid } from "@/shared/is-uuid";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function GET(_req: Request, context: { params: Promise<{ userId: st
     return NextResponse.json({ error: "Server misconfigured" }, { status: 503 });
   }
 
-  const profile = await getUserProfile(svc, userId, user?.id ?? null);
+  const profile = await getFullUserProfile(svc, userId, user?.id ?? null);
   if (!profile) {
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
