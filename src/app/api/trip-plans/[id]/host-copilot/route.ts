@@ -149,7 +149,7 @@ const buildCopilotSystem = (year: number, focusDateIso?: string | null) => `You 
 **Trip dates (critical):** The only source of truth for "which calendar days exist" is **Host trip range** and **Trip calendar days** in the user message. If those are set, **ignore** older months or date ranges mentioned in "Planner dates slot" — that field is from the first chat parse and is often stale after the host moves the trip on the calendar. Never assign meal pins or reservations to ISO dates outside **Trip calendar days**.
 ${
   focusDateIso
-    ? `\n**Day-focused session:** The host is editing **${focusDateIso}** ONLY unless they clearly ask about another calendar day inside the trip window. Prefer **autoPinRestaurant** with \`dateIso\`="${focusDateIso}" and **autoBookHotel** with \`stayStartIso\` / \`stayEndIso\` set to nights that cover **${focusDateIso}**. If you populate **hostSetupPatch.restaurantPins** or **activityPins**, every pin's \`dateIso\` should be ${focusDateIso} unless the host named a different trip day explicitly.\n`
+    ? `\n**Day-focused session:** The host is editing **${focusDateIso}** ONLY unless they clearly ask about another calendar day inside the trip window. Prefer **autoPinRestaurant** with \`dateIso\`="${focusDateIso}". For **autoBookHotel**, use **fullTrip: true** OR \`stayStartIso\`/\`stayEndIso\` covering **${focusDateIso}** when they want a hotel — never omit scope. If you populate **hostSetupPatch.restaurantPins** or **activityPins**, every pin's \`dateIso\` should be ${focusDateIso} unless the host named a different trip day explicitly.\n`
     : ""
 }
 
@@ -163,9 +163,12 @@ Return ONLY valid JSON (no markdown) with this exact shape:
   "autoBookHotel": null
 }
 
-**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** for the trip. The server runs a Google Maps (SerpAPI) search near the destination and saves the top result into host setup (same as choosing a stay in the UI — not a third-party OTA checkout).
-  - Shape: { "searchHint": "boutique hotel" } — optional style/neighborhood; defaults to a short hotel query.
-  - Optional **stayStartIso** / **stayEndIso** (YYYY-MM-DD, within **Trip calendar days**): if both set, the stay is limited to that inclusive night range; otherwise the stay covers the **full trip range**.
+**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** and they (or you) have nailed down **scope**. The server runs Google Maps (SerpAPI) search and saves the top result (not an OTA checkout).
+  - You MUST set one of:
+    - **fullTrip**: true — stay covers the entire **Host trip range** (first night through last night).
+    - **stayStartIso** AND **stayEndIso** (YYYY-MM-DD, within **Trip calendar days**, inclusive) — specific check-in through check-out range.
+  - **searchHint** (optional): style/neighborhood, e.g. "boutique hotel", "near beach".
+  - If they have not said whole trip vs which nights, ask in **assistantText** and leave **autoBookHotel** null.
 
 **autoPinRestaurant** (optional): Use when the host asks to add/set a **restaurant reservation or dinner** on a **specific trip day** (e.g. "reservation on July 16th", "dinner on the 16th"). The server will call Google Places near the trip destination and pin the top result — do **not** tell them to do it manually.
   - Shape: { "dateIso": "YYYY-MM-DD", "searchHint": "dinner" } — \`dateIso\` must be one of **Trip calendar days** in the user message. Omit or set \`null\` for all other requests.
@@ -197,6 +200,7 @@ type AutoPinRestaurantReq = { dateIso: string; searchHint?: string };
 
 type AutoBookHotelReq = {
   searchHint?: string;
+  fullTrip?: boolean;
   stayStartIso?: string;
   stayEndIso?: string;
 };
@@ -211,6 +215,31 @@ async function applyAutoBookHotel(
   }
   if (!plan.location?.trim()) {
     return { plan, placeName: null, error: "Add a trip destination so we can search for hotels." };
+  }
+
+  const tripStart = tr.startIso;
+  const tripEnd = tr.endIso;
+  const allowed = new Set(enumerateLocalIsoDays(tripStart, tripEnd));
+  const a = req.stayStartIso?.trim();
+  const b = req.stayEndIso?.trim();
+  const validRange =
+    a &&
+    b &&
+    /^\d{4}-\d{2}-\d{2}$/.test(a) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(b) &&
+    allowed.has(a) &&
+    allowed.has(b) &&
+    a <= b;
+  if (!req.fullTrip && !validRange) {
+    return {
+      plan,
+      placeName: null,
+      error:
+        "Say whether this stay should cover the **whole trip**, or name **check-in and check-out days** (YYYY-MM-DD from your trip calendar: " +
+        [...allowed].slice(0, 6).join(", ") +
+        (allowed.size > 6 ? ", …" : "") +
+        "), then ask again.",
+    };
   }
 
   const hintRaw = (req.searchHint ?? "boutique hotel").trim() || "boutique hotel";
@@ -230,19 +259,15 @@ async function applyAutoBookHotel(
   }
 
   const place: PlaceSpotlight = { ...top, spotlightCategory: "hotel" };
-  const tripStart = tr.startIso;
-  const tripEnd = tr.endIso;
 
   let hotelStays;
   let hotel: PlaceSpotlight;
-  const a = req.stayStartIso?.trim();
-  const b = req.stayEndIso?.trim();
-  if (a && b && /^\d{4}-\d{2}-\d{2}$/.test(a) && /^\d{4}-\d{2}-\d{2}$/.test(b)) {
-    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tripStart, tripEnd, a, b, place);
+  if (req.fullTrip) {
+    const r = applyHostHotelSelection(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, place, "full");
     hotelStays = r.hotelStays;
     hotel = r.hotel;
   } else {
-    const r = applyHostHotelSelection(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, place, "full");
+    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tripStart, tripEnd, a!, b!, place);
     hotelStays = r.hotelStays;
     hotel = r.hotel;
   }
@@ -375,6 +400,10 @@ function tryInferAutoBookHotelFromMessage(
   const f = typeof focusNightIso === "string" ? focusNightIso.trim() : "";
   if (f && /^\d{4}-\d{2}-\d{2}$/.test(f) && days.includes(f)) {
     return { searchHint, stayStartIso: f, stayEndIso: f };
+  }
+
+  if (/\b(whole|entire|full)\s+(trip|stay)\b|\b(all|every)\s+(night|nights)\b|for\s+the\s+(whole|entire)\s+trip\b/i.test(message)) {
+    return { searchHint, fullTrip: true };
   }
 
   return { searchHint };
@@ -600,6 +629,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
                 typeof ah.stayStartIso === "string" ? ah.stayStartIso.trim() : undefined;
               const stayEndIso = typeof ah.stayEndIso === "string" ? ah.stayEndIso.trim() : undefined;
               autoBookHotelRequest = {
+                fullTrip: ah.fullTrip === true,
                 searchHint:
                   typeof ah.searchHint === "string" && ah.searchHint.trim()
                     ? ah.searchHint.trim().slice(0, 100)

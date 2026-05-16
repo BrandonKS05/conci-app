@@ -1385,7 +1385,7 @@ export function TripHostSetupDashboard({
                       ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
                       : "Tap two days to set your trip; days in range are highlighted below."
                     : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                      ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day for the day editor (stays, meals, activities). Use Add places for shortcuts or choose a day first. Everyone on the trip sees updates live.`
+                      ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day for the day editor (meals, activities). Manage lodging in the Lodging card above or on calendar cells. Use Add places for shortcuts. Everyone on the trip sees updates live.`
                       : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
@@ -1435,6 +1435,73 @@ export function TripHostSetupDashboard({
           </div>
 
           <TripCostRollup tripId={tripId} plan={plan} flights={liveData?.flights ?? []} />
+
+          {hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
+            <div className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-4 dark:border-white/10 dark:bg-dm-elevated">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+                    Lodging
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                    Choose whether a stay applies to the <span className="font-medium text-[color:var(--on-surface)]">whole trip</span>{" "}
+                    or <span className="font-medium text-[color:var(--on-surface)]">specific nights</span> when you use{" "}
+                    <span className="font-medium">Add places</span> or ask Trip Copilot (say &quot;whole trip&quot; or give check-in /
+                    check-out days).
+                  </p>
+                </div>
+                {canEditAsHost && tripDisplayRange?.startIso ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayIso(tripDisplayRange.startIso);
+                      setAddPlacesOpen(true);
+                    }}
+                    className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
+                  >
+                    Add or change hotel
+                  </button>
+                ) : null}
+              </div>
+              {(() => {
+                const stays = plan.hostSetup?.hotelStays ?? [];
+                if (!stays.length) {
+                  return (
+                    <p className="mt-3 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      No stay saved yet — add one above or from the calendar cells after you pick dates.
+                    </p>
+                  );
+                }
+                return (
+                  <ul className="mt-3 space-y-2">
+                    {stays.map((s) => (
+                      <li
+                        key={`${s.startIso}-${s.endIso}-${s.place.mapsUrl}`}
+                        className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 dark:border-white/10 dark:bg-dm-card"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="font-medium text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{s.place.name}</span>
+                          <span className="text-xs tabular-nums text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                            {formatShortStayRange(s.startIso, s.endIso)}
+                          </span>
+                        </div>
+                        {s.place.mapsUrl?.startsWith("http") ? (
+                          <a
+                            href={s.place.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
+                          >
+                            Open in Maps
+                          </a>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          ) : null}
 
           <div className="w-full text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
             {/* Header — flat editorial: month title + chevrons */}
@@ -2202,7 +2269,7 @@ export function TripHostSetupDashboard({
             ) : (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 {canEditAsHost
-                  ? "Add lodging on a calendar day, with Trip Copilot, or in the day editor."
+                  ? "Add lodging from Lodging on the calendar (above), Add places, or Trip Copilot — say whole trip vs which nights."
                   : canEditTripWorkspace
                     ? "No home base saved yet. Suggest one to the host from Group progress."
                     : "No home base saved on the plan yet."}

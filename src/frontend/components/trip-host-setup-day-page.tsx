@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CollabStateV1 } from "@/shared/collaboration";
-import { DAY_VOTE_CATEGORIES, mergeDayVoteStateForDate, parseDayVoteState, type DayVoteCategory } from "@/shared/day-collaboration";
+import {
+  DAY_VOTE_DAY_PAGE_CATEGORIES,
+  mergeDayVoteStateForDate,
+  parseDayVoteState,
+  type DayVoteCategory,
+} from "@/shared/day-collaboration";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
@@ -13,6 +18,9 @@ import {
   hotelStayForDay,
   normalizePlan,
   parseLocalIsoDate,
+  type HostActivityPin,
+  type HostRestaurantPin,
+  type ItineraryDay,
   type TripPlan,
 } from "@/shared/trip-plan";
 
@@ -29,6 +37,13 @@ type Props = {
 
 type SuggestPermission = "vote_only" | "can_suggest";
 type MemberSuggestPermissionRow = { userId: string; displayName: string; permission: SuggestPermission };
+
+function collabHintsFrom(collab: CollabStateV1) {
+  return {
+    cardChat: collab.cardChat,
+    adjustmentSubmissions: collab.adjustmentSubmissions,
+  };
+}
 
 function startOfDay(x: Date) {
   return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 0, 0, 0, 0);
@@ -209,6 +224,190 @@ function DaySpendEstimateBar({
   );
 }
 
+function isFlightActivityPin(p: HostActivityPin): boolean {
+  const n = (p.experience.name ?? "").trim();
+  return n.startsWith("Flight out ·") || n.startsWith("Flight back ·");
+}
+
+function itineraryDayForDate(plan: TripPlan, dateIso: string): ItineraryDay | null {
+  const days = plan.generatedItinerary?.days;
+  if (!days?.length) return null;
+  const byIso = days.find((d) => d.dateIso === dateIso);
+  if (byIso) return byIso;
+  const tr = plan.hostSetup?.tripRange;
+  if (tr?.startIso && tr.endIso) {
+    const idx = enumerateLocalIsoDays(tr.startIso, tr.endIso).indexOf(dateIso);
+    if (idx >= 0 && idx < days.length) return days[idx]!;
+  }
+  return null;
+}
+
+function normalizeMatchKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Match pinned label to generated itinerary row for time hints (food / activity titles). */
+function itineraryTimeForPinnedTitle(itin: ItineraryDay | null, pinTitle: string): string | null {
+  if (!itin) return null;
+  const pinKey = normalizeMatchKey(pinTitle);
+  if (!pinKey) return null;
+  const pinWords = pinKey.split(" ").filter((w) => w.length > 2);
+  for (const a of itin.activities) {
+    const actKey = normalizeMatchKey(a.title);
+    if (!actKey) continue;
+    const timeRaw = a.time?.trim();
+    if (!timeRaw) continue;
+    if (actKey.includes(pinKey) || pinKey.includes(actKey)) return timeRaw;
+    const actWords = actKey.split(" ").filter((w) => w.length > 2);
+    const overlap = actWords.filter((w) => pinWords.includes(w)).length;
+    if (overlap >= 2 || (overlap >= 1 && pinWords.length <= 2)) return timeRaw;
+  }
+  return null;
+}
+
+function parseClockOrPhaseMinutes(raw: string): number | null {
+  const s = raw.trim();
+  const lower = s.toLowerCase();
+
+  const m = s.match(/\b(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?\b/i);
+  if (m) {
+    let h = Number.parseInt(m[1]!, 10);
+    const min = Number.parseInt(m[2]!, 10);
+    const ap = m[3]?.toLowerCase().replace(/\./g, "");
+    if ((ap === "pm" || ap === "p") && h < 12) h += 12;
+    if ((ap === "am" || ap === "a") && h === 12) h = 0;
+    if (h >= 0 && h <= 23 && min >= 0 && min <= 59) return h * 60 + min;
+  }
+
+  const buckets: [string, number][] = [
+    ["early morning", 8 * 60],
+    ["morning", 9 * 60 + 30],
+    ["breakfast", 8 * 60 + 30],
+    ["brunch", 10 * 60 + 30],
+    ["noon", 12 * 60],
+    ["lunch", 12 * 60 + 30],
+    ["midday", 12 * 60 + 45],
+    ["afternoon", 15 * 60],
+    ["evening", 18 * 60],
+    ["sunset", 18 * 60 + 30],
+    ["dinner", 19 * 60 + 30],
+    ["night", 21 * 60],
+    ["late night", 22 * 60 + 30],
+  ];
+  for (const [word, mins] of buckets) {
+    if (lower.includes(word)) return mins;
+  }
+  return null;
+}
+
+function sortMinutesWithFallback(raw: string | null | undefined, tieBreak: number): number {
+  if (raw?.trim()) {
+    const n = parseClockOrPhaseMinutes(raw);
+    if (n != null) return n + (tieBreak % 12);
+  }
+  return 9 * 60 + tieBreak * 24;
+}
+
+function defaultMealPhaseLabel(index: number, total: number): string {
+  if (total <= 1) return "Meal";
+  if (total === 2) return index === 0 ? "Lunch" : "Dinner";
+  return index === 0 ? "Breakfast" : index === 1 ? "Lunch" : index === 2 ? "Dinner" : `Meal ${index + 1}`;
+}
+
+type ScheduleTimelineEntry = {
+  key: string;
+  sortMinutes: number;
+  timeDisplay: string;
+  label: string;
+  kindLabel: string;
+  href?: string;
+  recommendedByConci?: boolean;
+};
+
+function buildScheduleTimeline(
+  plan: TripPlan,
+  dateIso: string,
+  meals: HostRestaurantPin[],
+  activitiesNoFlights: HostActivityPin[]
+): ScheduleTimelineEntry[] {
+  const itin = itineraryDayForDate(plan, dateIso);
+  const rows: ScheduleTimelineEntry[] = [];
+
+  meals.forEach((p, i) => {
+    const fromItin = itineraryTimeForPinnedTitle(itin, p.place.name);
+    const fallbackLabel = defaultMealPhaseLabel(i, meals.length);
+    const timeDisplay = fromItin?.trim() || fallbackLabel;
+    rows.push({
+      key: `m-${p.place.mapsUrl}`,
+      sortMinutes: sortMinutesWithFallback(fromItin ?? fallbackLabel, i),
+      timeDisplay,
+      label: p.place.name,
+      kindLabel: "Restaurant",
+      href: p.place.mapsUrl,
+      recommendedByConci: p.recommendedByConci === true,
+    });
+  });
+
+  activitiesNoFlights.forEach((p, i) => {
+    const fromItin = itineraryTimeForPinnedTitle(itin, p.experience.name);
+    const dur = p.experience.duration?.trim();
+    const timeDisplay = fromItin?.trim() || dur || "Time TBD";
+    rows.push({
+      key: `a-${p.experience.bookingUrl}`,
+      sortMinutes: sortMinutesWithFallback(fromItin ?? dur, meals.length + i + 3),
+      timeDisplay,
+      label: p.experience.name,
+      kindLabel: "Activity",
+      href: p.experience.bookingUrl || undefined,
+      recommendedByConci: p.recommendedByConci === true,
+    });
+  });
+
+  rows.sort((a, b) => a.sortMinutes - b.sortMinutes || a.label.localeCompare(b.label));
+  return rows;
+}
+
+function DayScheduleTimeline({ entries }: { entries: ScheduleTimelineEntry[] }) {
+  return (
+    <div className="ml-1 border-l-2 border-neutral-300 py-1 dark:border-white/20">
+      <ul className="space-y-0">
+        {entries.map((e) => (
+          <li key={e.key} className="relative pb-8 pl-8 last:pb-1">
+            <span
+              className="absolute left-0 top-1.5 size-3 -translate-x-[calc(50%+1px)] rounded-full bg-[#e91e8c] shadow-[0_0_0_4px_rgba(247,246,248,1)] dark:bg-[#ff4da6] dark:shadow-[0_0_0_4px_rgba(18,18,18,1)]"
+              aria-hidden
+            />
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="font-mono text-[13px] font-bold tabular-nums text-neutral-800 dark:text-neutral-200">
+                {e.timeDisplay}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c4176d] dark:text-[#ff7eb8]">
+                {e.kindLabel}
+              </span>
+            </div>
+            <p className="mt-1.5 font-sans text-base font-bold text-neutral-950 dark:text-white">{e.label}</p>
+            {e.recommendedByConci ? (
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/80 dark:text-neutral-500/70">
+                recommended by CONCI
+              </p>
+            ) : null}
+            {e.href ? (
+              <a
+                href={e.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex font-sans text-[10px] font-black uppercase tracking-wide text-[#0066cc] underline-offset-2 hover:underline dark:text-sky-400"
+              >
+                Map / link
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function EmptyHint({ label }: { label: string }) {
   return (
     <div className="flex h-full min-h-[6rem] items-center justify-center rounded-xl border border-dashed border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 text-center text-sm text-[color:var(--on-surface-muted)] dark:border-white/10 dark:bg-dm-page/80 dark:text-neutral-500">
@@ -229,6 +428,21 @@ function dayCategoryTitle(category: DayVoteCategory): string {
       return "Activities";
     default:
       return "Other options";
+  }
+}
+
+function categoryCollaborationSubtitle(
+  category: "restaurants" | "hotels" | "activities" | "other"
+): string {
+  switch (category) {
+    case "restaurants":
+      return "Ideas from your polls, trip chat, traveler notes, and pinned meals";
+    case "hotels":
+      return "Stay ideas from your trip setup — owner adds one to the plan";
+    case "activities":
+      return "Ideas from your polls, chat, notes, and pinned experiences";
+    default:
+      return "Free-form extras for this day";
   }
 }
 
@@ -259,7 +473,7 @@ export function TripHostSetupDayPage({
   const router = useRouter();
   const [plan, setPlan] = useState(initialPlan);
   const [dayVotingByDate, setDayVotingByDate] = useState(() =>
-    mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso)
+    mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso, collabHintsFrom(initialCollab))
   );
   const [dayErr, setDayErr] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -273,7 +487,7 @@ export function TripHostSetupDayPage({
 
   useEffect(() => {
     setPlan(initialPlan);
-    setDayVotingByDate(mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso));
+    setDayVotingByDate(mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso, collabHintsFrom(initialCollab)));
   }, [initialPlan, initialCollab.dayVoting, dateIso]);
 
   useEffect(() => {
@@ -324,10 +538,12 @@ export function TripHostSetupDayPage({
         }
         const payload = row.collab_state as { dayVoting?: unknown } | undefined;
         if (payload?.dayVoting !== undefined) {
-          setDayVotingByDate((prev) => mergeDayVoteStateForDate(plan, { ...prev, ...parseDayVoteState(payload.dayVoting) }, dateIso));
+          setDayVotingByDate((prev) =>
+            mergeDayVoteStateForDate(plan, { ...prev, ...parseDayVoteState(payload.dayVoting) }, dateIso, collabHintsFrom(initialCollab))
+          );
         }
       },
-      [plan, dateIso]
+      [plan, dateIso, initialCollab]
     ),
     { enabled: true, suppressRealtimeUntilRef }
   );
@@ -335,7 +551,15 @@ export function TripHostSetupDayPage({
   const runDayAction = useCallback(
     async (payload: Record<string, unknown>) => {
       setDayErr(null);
-      const key = `${String(payload.action)}:${String(payload.category ?? "")}`;
+      const act = String(payload.action);
+      const cat = String(payload.category ?? "");
+      const oid = typeof payload.optionId === "string" ? payload.optionId : "";
+      const key =
+        act === "pinToCalendar"
+          ? `pinToCalendar:${cat}:${oid}`
+          : act === "toggleNotInterested"
+            ? `toggleNotInterested:${cat}:${oid}`
+            : `${act}:${cat}`;
       setBusyKey(key);
       try {
         const res = await fetch(`/api/trip-plans/${tripId}/day-vote`, {
@@ -344,10 +568,17 @@ export function TripHostSetupDayPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dateIso, ...payload }),
         });
-        const j = (await res.json().catch(() => ({}))) as { error?: string; dayVoting?: unknown };
+        const j = (await res.json().catch(() => ({}))) as { error?: string; dayVoting?: unknown; plan?: TripPlan };
         if (!res.ok) throw new Error(j.error || "Could not save");
+        const mergedPlan = j.plan ? normalizePlan(j.plan) : plan;
+        if (j.plan) {
+          setPlan(mergedPlan);
+          void router.refresh();
+        }
         if (j.dayVoting) {
-          setDayVotingByDate(mergeDayVoteStateForDate(plan, parseDayVoteState(j.dayVoting), dateIso));
+          setDayVotingByDate(
+            mergeDayVoteStateForDate(mergedPlan, parseDayVoteState(j.dayVoting), dateIso, collabHintsFrom(initialCollab))
+          );
         }
       } catch (e) {
         setDayErr(e instanceof Error ? e.message : "Could not save.");
@@ -355,7 +586,7 @@ export function TripHostSetupDayPage({
         setBusyKey(null);
       }
     },
-    [tripId, dateIso, plan]
+    [tripId, dateIso, plan, initialCollab, router]
   );
 
   const submitDayDream = useCallback(async () => {
@@ -420,34 +651,22 @@ export function TripHostSetupDayPage({
     return { line2, dayIndexLabel };
   }, [dateIso, locale, plan]);
 
-  const hotel = hotelStayForDay(hostSetup?.hotelStays ?? [], dateIso);
-
   const meals = (hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
   const activities = (hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
-  const dayVoting = useMemo(() => mergeDayVoteStateForDate(plan, dayVotingByDate, dateIso)[dateIso], [plan, dayVotingByDate, dateIso]);
+  const dayVoting = useMemo(
+    () => mergeDayVoteStateForDate(plan, dayVotingByDate, dateIso, collabHintsFrom(initialCollab))[dateIso],
+    [plan, dayVotingByDate, dateIso, initialCollab]
+  );
 
-  const scheduleItems = useMemo(() => {
-    const rows: { key: string; label: string; sub: string; href?: string; recommendedByConci?: boolean }[] = [];
-    for (const p of meals) {
-      rows.push({
-        key: `m-${p.place.mapsUrl}`,
-        label: p.place.name,
-        sub: "Restaurant",
-        href: p.place.mapsUrl,
-        recommendedByConci: p.recommendedByConci === true,
-      });
-    }
-    for (const p of activities) {
-      rows.push({
-        key: `a-${p.experience.bookingUrl}`,
-        label: p.experience.name,
-        sub: "Activity",
-        href: p.experience.bookingUrl || undefined,
-        recommendedByConci: p.recommendedByConci === true,
-      });
-    }
-    return rows;
-  }, [meals, activities]);
+  const activitiesNoFlights = useMemo(
+    () => activities.filter((p) => !isFlightActivityPin(p)),
+    [activities]
+  );
+
+  const scheduleTimeline = useMemo(
+    () => buildScheduleTimeline(plan, dateIso, meals, activitiesNoFlights),
+    [plan, dateIso, meals, activitiesNoFlights]
+  );
 
   const prevIso = shiftIsoDay(dateIso, -1);
   const nextIso = shiftIsoDay(dateIso, 1);
@@ -457,7 +676,9 @@ export function TripHostSetupDayPage({
     if (!tripRange?.startIso || !tripRange.endIso) return null;
     if (!enumerateLocalIsoDays(tripRange.startIso, tripRange.endIso).includes(dateIso)) return null;
     const dayMeals = (plan.hostSetup?.restaurantPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
-    const dayActs = (plan.hostSetup?.activityPins ?? []).filter((p) => p.dateIso === dateIso && p.kept);
+    const dayActs = (plan.hostSetup?.activityPins ?? []).filter(
+      (p) => p.dateIso === dateIso && p.kept && !isFlightActivityPin(p)
+    );
     const dayHotel = hotelStayForDay(plan.hostSetup?.hotelStays ?? [], dateIso);
     return estimateHostDaySpendUsd(
       plan,
@@ -486,13 +707,18 @@ export function TripHostSetupDayPage({
       <header className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,220px)_1fr_minmax(0,280px)] lg:items-start">
         <div className="rounded-[1.35rem] border-4 border-black bg-[#ffb6d9]/35 px-5 py-4 shadow-[inset_0_0_0_1px_rgba(236,72,153,0.35)] dark:border-white/25 dark:bg-rose-950/40 dark:shadow-none">
           <p className="font-sans text-sm font-black uppercase tracking-[0.12em] text-neutral-950 dark:text-white">{dest}</p>
-          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-300">Hotel</p>
+          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-300">Lodging</p>
           <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">
-            {hotel ? hotel.place.name : "TBD"}
+            <Link
+              href={`/trip/${tripId}/setup#sec-dates`}
+              className="underline-offset-4 hover:underline"
+            >
+              On trip calendar
+            </Link>
           </p>
           <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-300">Main Plans</p>
           <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">
-            {scheduleItems.length > 0 ? `${scheduleItems.length} stops` : "TBD"}
+            {scheduleTimeline.length > 0 ? `${scheduleTimeline.length} stops` : "TBD"}
           </p>
         </div>
 
@@ -505,13 +731,13 @@ export function TripHostSetupDayPage({
               What do you want to do?
             </label>
             <p className="mt-2 text-xs font-normal leading-relaxed text-neutral-600 dark:text-neutral-400">
-              Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
-              experience — we scope edits to{" "}
-              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
+              Same Trip Copilot as on the calendar: change dinner, pin an experience, tweak the plan — edits anchor to{" "}
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible. Add or move
+              lodging on the <Link href={`/trip/${tripId}/setup#sec-dates`} className="font-semibold underline-offset-2 hover:underline">main calendar</Link> (whole trip vs specific nights).
             </p>
             <textarea
               id={`daydream-${dateIso}`}
-              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
+              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · swap lunch for a food tour…`}
               rows={5}
               value={dreamText}
               onChange={(e) => setDreamText(e.target.value)}
@@ -654,123 +880,61 @@ export function TripHostSetupDayPage({
           </DropSection>
         ) : null}
 
-        <DropSection title="Schedule" subtitle="— Auto populated" sectionId="day-schedule" defaultOpen>
-          {scheduleItems.length === 0 ? (
-            <EmptyHint label="No meals or activities pinned yet — use Add places on the trip calendar, or pull from live picks after." />
-          ) : (
-            <div className="overflow-x-auto">
-              <div className="flex min-w-[36rem] gap-3 pb-1">
-                {scheduleItems.map((row) => (
-                  <article
-                    key={row.key}
-                    className="min-w-[10.5rem] flex-1 rounded-xl border-2 border-neutral-900/10 bg-[#ffe4f1]/50 px-3 py-3 dark:border-white/10 dark:bg-rose-950/25"
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c4176d] dark:text-[#ff7eb8]">
-                      {row.sub}
-                    </span>
-                    <p className="mt-2 font-sans text-sm font-bold text-neutral-950 dark:text-white">{row.label}</p>
-                    {row.recommendedByConci ? (
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/70 dark:text-neutral-500/70">
-                        recommended by CONCI
-                      </p>
-                    ) : null}
-                    {row.href ? (
-                      <a
-                        href={row.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex font-sans text-[10px] font-black uppercase tracking-wide text-[#0066cc] underline-offset-2 hover:underline dark:text-sky-400"
-                      >
-                        Map me there
-                      </a>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </div>
-          )}
-        </DropSection>
+        <section
+          className="rounded-xl border border-neutral-900/15 bg-neutral-50/80 px-5 py-5 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:border-white/10 dark:bg-white/[0.04] sm:px-6 sm:py-6"
+          aria-labelledby="day-schedule-heading"
+        >
+          <h2
+            id="day-schedule-heading"
+            className="font-sans text-lg font-black uppercase tracking-[0.04em] text-neutral-950 dark:text-white"
+          >
+            Schedule
+          </h2>
+          <p className="mt-1 font-sans text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-600 dark:text-neutral-400">
+            Today&apos;s pinned plans — time order (flights stay on the trip calendar)
+          </p>
+          <div className="mt-6">
+            {scheduleTimeline.length === 0 ? (
+              <EmptyHint label="No meals or activities pinned for this day yet — use Add places on the trip calendar. Flight details stay on the main calendar." />
+            ) : (
+              <DayScheduleTimeline entries={scheduleTimeline} />
+            )}
+          </div>
+        </section>
 
-        {DAY_VOTE_CATEGORIES.map((category) => {
+        {DAY_VOTE_DAY_PAGE_CATEGORIES.map((category) => {
           const cat = dayVoting[category];
           const lockedId = cat.lockedOptionId ?? null;
-          const subtitle =
-            category === "restaurants"
-              ? "Catered to your group's taste"
-              : category === "hotels"
-                ? "Stay for this night"
-                : "Collaborative options";
+          const showSuggestForm = category === "other";
+          const showTailoredIntro = category !== "other";
           const draft = suggestDraft[category] ?? { label: "", detail: "", href: "" };
+          const canPinCategory =
+            isHost &&
+            (category === "restaurants" || category === "activities" || category === "hotels");
+
           return (
             <DropSection
               key={category}
               title={dayCategoryTitle(category)}
-              subtitle={subtitle}
+              subtitle={categoryCollaborationSubtitle(category)}
               sectionId={`day-${category}`}
             >
-              <div className="mb-4 rounded-xl border border-[color:var(--hairline)]/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                  Suggest an option
+              {showTailoredIntro ? (
+                <p className="mb-4 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">
+                  We blend pinned calendar items with quick picks based on your group&apos;s answers, vibe, budget, trip chat,
+                  and open traveler suggestions.
                 </p>
-                {!canSuggest ? (
-                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                    Host set you to vote-only on suggestions. You can still vote on all options.
-                  </p>
-                ) : null}
-                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  <input
-                    value={draft.label}
-                    onChange={(e) =>
-                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
-                    }
-                    disabled={!canSuggest}
-                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                    placeholder={`${dayCategoryTitle(category)} option`}
-                  />
-                  <input
-                    value={draft.detail}
-                    onChange={(e) =>
-                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
-                    }
-                    disabled={!canSuggest}
-                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                    placeholder="Optional detail"
-                  />
-                  <input
-                    value={draft.href}
-                    onChange={(e) =>
-                      setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
-                    }
-                    disabled={!canSuggest}
-                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                    placeholder="Optional URL"
-                  />
-                  <button
-                    type="button"
-                    disabled={!canSuggest || busyKey === `suggest:${category}` || !draft.label.trim()}
-                    onClick={() =>
-                      void runDayAction({
-                        action: "suggest",
-                        category,
-                        label: draft.label,
-                        detail: draft.detail,
-                        href: draft.href,
-                      }).then(() =>
-                        setSuggestDraft((prev) => ({ ...prev, [category]: { label: "", detail: "", href: "" } }))
-                      )
-                    }
-                    className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
+              ) : null}
+
               {cat.options.length === 0 ? (
                 <EmptyHint label={`No ${dayCategoryTitle(category).toLowerCase()} options yet for this day.`} />
               ) : (
-                <ul className="grid gap-3 sm:grid-cols-2">
+                <ul className={`grid gap-3 sm:grid-cols-2 ${showSuggestForm ? "mb-6" : ""}`}>
                   {cat.options.map((opt) => {
                     const voted = opt.votes.includes(viewerUserId);
+                    const down = opt.downvotes?.includes(viewerUserId) ?? false;
+                    const nInterested = opt.votes.length;
+                    const nNot = opt.downvotes?.length ?? 0;
                     const isLocked = lockedId === opt.id;
                     const dimmed = Boolean(lockedId && lockedId !== opt.id);
                     return (
@@ -785,7 +949,7 @@ export function TripHostSetupDayPage({
                         <p className="font-sans text-base font-bold text-neutral-950 dark:text-white">{opt.label}</p>
                         {opt.suggestedBy === "conci:auto" ? (
                           <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/70 dark:text-neutral-500/70">
-                            recommended by CONCI
+                            tailored from your trip / group
                           </p>
                         ) : null}
                         {opt.detail ? <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{opt.detail}</p> : null}
@@ -815,8 +979,42 @@ export function TripHostSetupDayPage({
                                 : "border-neutral-900/20 dark:border-white/15"
                             }`}
                           >
-                            {voted ? "Voted" : "Vote"} · {opt.votes.length}
+                            Interested · {nInterested}
                           </button>
+                          <button
+                            type="button"
+                            disabled={busyKey === `toggleNotInterested:${category}:${opt.id}` || Boolean(lockedId)}
+                            onClick={() =>
+                              void runDayAction({
+                                action: "toggleNotInterested",
+                                category,
+                                optionId: opt.id,
+                              })
+                            }
+                            className={`rounded-full border px-3 py-1 text-[11px] font-bold ${
+                              down
+                                ? "border-rose-500/70 bg-rose-50 text-rose-900 dark:border-rose-400/50 dark:bg-rose-950/35 dark:text-rose-100"
+                                : "border-neutral-900/20 dark:border-white/15"
+                            }`}
+                          >
+                            Not for me · {nNot}
+                          </button>
+                          {canPinCategory ? (
+                            <button
+                              type="button"
+                              disabled={busyKey === `pinToCalendar:${category}:${opt.id}` || Boolean(lockedId)}
+                              onClick={() =>
+                                void runDayAction({
+                                  action: "pinToCalendar",
+                                  category,
+                                  optionId: opt.id,
+                                })
+                              }
+                              className="rounded-full border border-indigo-500/50 bg-indigo-50/80 px-3 py-1 text-[11px] font-bold text-indigo-900 dark:border-indigo-400/40 dark:bg-indigo-950/40 dark:text-indigo-100"
+                            >
+                              {busyKey === `pinToCalendar:${category}:${opt.id}` ? "Adding…" : "Add to trip"}
+                            </button>
+                          ) : null}
                           {isHost ? (
                             isLocked ? (
                               <button
@@ -848,6 +1046,66 @@ export function TripHostSetupDayPage({
                   })}
                 </ul>
               )}
+
+              {showSuggestForm ? (
+                <div className="rounded-xl border border-[color:var(--hairline)]/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                    Suggest an option
+                  </p>
+                  {!canSuggest ? (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                      Host set you to vote-only on suggestions. You can still vote on all options.
+                    </p>
+                  ) : null}
+                  <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <input
+                      value={draft.label}
+                      onChange={(e) =>
+                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
+                      }
+                      disabled={!canSuggest}
+                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                      placeholder={`${dayCategoryTitle(category)} option`}
+                    />
+                    <input
+                      value={draft.detail}
+                      onChange={(e) =>
+                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
+                      }
+                      disabled={!canSuggest}
+                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                      placeholder="Optional detail"
+                    />
+                    <input
+                      value={draft.href}
+                      onChange={(e) =>
+                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
+                      }
+                      disabled={!canSuggest}
+                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
+                      placeholder="Optional URL"
+                    />
+                    <button
+                      type="button"
+                      disabled={!canSuggest || busyKey === `suggest:${category}` || !draft.label.trim()}
+                      onClick={() =>
+                        void runDayAction({
+                          action: "suggest",
+                          category,
+                          label: draft.label,
+                          detail: draft.detail,
+                          href: draft.href,
+                        }).then(() =>
+                          setSuggestDraft((prev) => ({ ...prev, [category]: { label: "", detail: "", href: "" } }))
+                        )
+                      }
+                      className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </DropSection>
           );
         })}
