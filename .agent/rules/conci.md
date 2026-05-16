@@ -10,6 +10,8 @@
   - Audit and plan before editing files for broad requests.
   - Inspect relevant files and explain the smallest safe change before coding.
   - Work on one coherent improvement at a time.
+  - Naturally use Codex Browser when it is the best way to verify changes, especially for frontend UI, layout, interaction flows, visual polish, and end-to-end user behavior.
+  - After meaningful frontend changes, prefer browser-based verification in addition to code inspection when practical.
   - Summarize changed files, user-facing changes, risks, and follow-ups after completing a task.
 
 ## Guardrails (Safety)

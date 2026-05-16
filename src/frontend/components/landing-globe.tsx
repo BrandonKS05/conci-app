@@ -51,6 +51,33 @@ const ARCS = [
   { startLat: 41.9028, startLng: 12.4964, endLat: 41.0082, endLng: 28.9784 },
 ];
 
+const GLOBE_COLORS = {
+  ocean: "#2563EB",
+  oceanDeep: "#2563EB",
+  land: "#22C55E",
+  landDeep: "#15803D",
+  route: "#93C5FD",
+  routeGlow: "rgba(147, 197, 253, 0.35)",
+  dot: "#F97316",
+  dotSoft: "#FDBA74",
+  dotGlow: "rgba(249, 115, 22, 0.82)",
+  grid: "rgba(255, 255, 255, 0.14)",
+  coast: "rgba(255, 255, 255, 0.24)",
+};
+
+const FALLBACK_GLOBE_COLORS = {
+  ocean: "#4F7FE8",
+  oceanDeep: "#2F5FBE",
+  land: "#57B87C",
+  landDeep: "#2F8F55",
+  routeGlow: "rgba(96, 165, 250, 0.22)",
+  dot: "#F59E0B",
+  dotSoft: "#FCD34D",
+  dotGlow: "rgba(245, 158, 11, 0.56)",
+  grid: "rgba(255, 255, 255, 0.1)",
+  coast: "rgba(255, 255, 255, 0.18)",
+};
+
 function latLonToVector3(lat: number, lon: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
@@ -72,27 +99,35 @@ function generateEarthTexture() {
   const path = d3.geoPath(projection, context);
 
   // Ocean
-  context.fillStyle = "#0a192f";
+  const oceanGradient = context.createLinearGradient(0, 0, 2048, 1024);
+  oceanGradient.addColorStop(0, GLOBE_COLORS.ocean);
+  oceanGradient.addColorStop(1, GLOBE_COLORS.oceanDeep);
+  context.fillStyle = oceanGradient;
   context.fillRect(0, 0, 2048, 1024);
 
   // Graticule
   context.beginPath();
   path(d3.geoGraticule10());
   context.lineWidth = 1;
-  context.strokeStyle = "rgba(255, 255, 255, 0.05)";
+  context.strokeStyle = GLOBE_COLORS.grid;
   context.stroke();
 
   // Landmasses
   context.beginPath();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   path(topojson.feature(mapData as any, (mapData as any).objects.land || (mapData as any).objects.countries) as any);
-  context.fillStyle = "#1e3025";
+  const landGradient = context.createLinearGradient(0, 0, 2048, 1024);
+  landGradient.addColorStop(0, GLOBE_COLORS.land);
+  landGradient.addColorStop(1, GLOBE_COLORS.landDeep);
+  context.fillStyle = landGradient;
   context.fill();
   context.lineWidth = 1.5;
-  context.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  context.strokeStyle = GLOBE_COLORS.coast;
   context.stroke();
 
-  return new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function generateHaloTexture() {
@@ -102,11 +137,14 @@ function generateHaloTexture() {
   const context = canvas.getContext("2d");
   if (!context) return null;
   const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gradient.addColorStop(0, "rgba(56, 189, 248, 0.5)"); // blue-400 equivalent
-  gradient.addColorStop(1, "rgba(56, 189, 248, 0)");
+  gradient.addColorStop(0, "rgba(37, 99, 235, 0.44)");
+  gradient.addColorStop(0.45, "rgba(34, 197, 94, 0.18)");
+  gradient.addColorStop(1, "rgba(37, 99, 235, 0)");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 256, 256);
-  return new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function generateCityGlow() {
@@ -117,11 +155,13 @@ function generateCityGlow() {
   if (!context) return null;
   const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-  gradient.addColorStop(0.3, "rgba(56, 189, 248, 0.8)");
-  gradient.addColorStop(1, "rgba(56, 189, 248, 0)");
+  gradient.addColorStop(0.24, GLOBE_COLORS.dotGlow);
+  gradient.addColorStop(1, "rgba(249, 115, 22, 0)");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 // --- THREE.JS GLOBE (High Quality) ---
@@ -150,7 +190,7 @@ function ThreeGlobe({ onSelect, onFallback }: { onSelect: (d: Destination | null
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-    camera.position.z = 4.5;
+    camera.position.z = 3.75;
     
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -162,7 +202,7 @@ function ThreeGlobe({ onSelect, onFallback }: { onSelect: (d: Destination | null
     controls.minDistance = 2.5;
     controls.maxDistance = 8.0;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.8;
+    controls.autoRotateSpeed = 1.08;
     controls.enableDamping = true;
 
     container.addEventListener("mouseenter", () => { controls.autoRotate = false; });
@@ -182,10 +222,8 @@ function ThreeGlobe({ onSelect, onFallback }: { onSelect: (d: Destination | null
 
     const earthTex = generateEarthTexture();
     const earthGeo = new THREE.SphereGeometry(1, 64, 64);
-    const earthMat = new THREE.MeshPhongMaterial({
+    const earthMat = new THREE.MeshBasicMaterial({
       map: earthTex,
-      specular: new THREE.Color(0x333333),
-      shininess: 5,
     });
     const earth = new THREE.Mesh(earthGeo, earthMat);
     earthGroup.add(earth);
@@ -200,7 +238,7 @@ function ThreeGlobe({ onSelect, onFallback }: { onSelect: (d: Destination | null
       depthWrite: false
     });
     const halo = new THREE.Sprite(haloMat);
-    halo.scale.set(2.6, 2.6, 1);
+    halo.scale.set(2.9, 2.9, 1);
     scene.add(halo);
 
     const starGeo = new THREE.BufferGeometry();
@@ -238,7 +276,7 @@ function ThreeGlobe({ onSelect, onFallback }: { onSelect: (d: Destination | null
       citySprites.push(sprite);
     });
 
-    const arcMaterial = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
+    const arcMaterial = new THREE.LineBasicMaterial({ color: GLOBE_COLORS.route, transparent: true, opacity: 0.5 });
     ARCS.forEach(arc => {
       const start = latLonToVector3(arc.startLat, arc.startLng, 1);
       const end = latLonToVector3(arc.endLat, arc.endLng, 1);
@@ -417,14 +455,7 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
 
     d3.select(canvas)
       .call(dragBehavior)
-      .on("wheel.zoom", (event) => {
-        event.preventDefault();
-        const baseScale = (Math.min(dimensions.width, dimensions.height) / 2) - 4;
-        const currentScale = projection.scale();
-        let nextScale = currentScale * Math.pow(0.995, event.deltaY);
-        nextScale = Math.max(baseScale, Math.min(baseScale * 5, nextScale));
-        projection.scale(nextScale);
-      });
+      .on("wheel.zoom", null);
 
     function render() {
       if (!context) return;
@@ -436,18 +467,24 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
 
       // Ocean
       context.beginPath(); path({ type: "Sphere" });
-      context.fillStyle = "#0a192f"; context.fill();
-      context.strokeStyle = "rgba(255,255,255,0.08)"; context.stroke();
+      const oceanGradient = context.createLinearGradient(0, 0, dimensions.width, dimensions.height);
+      oceanGradient.addColorStop(0, FALLBACK_GLOBE_COLORS.ocean);
+      oceanGradient.addColorStop(1, FALLBACK_GLOBE_COLORS.oceanDeep);
+      context.fillStyle = oceanGradient; context.fill();
+      context.strokeStyle = FALLBACK_GLOBE_COLORS.grid; context.stroke();
 
       // Graticule
       context.beginPath(); path(graticuleGeoJson);
-      context.lineWidth = 0.4; context.strokeStyle = "rgba(255,255,255,0.02)"; context.stroke();
+      context.lineWidth = 0.4; context.strokeStyle = "rgba(255,255,255,0.08)"; context.stroke();
 
       // Landmasses
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       context.beginPath(); path(worldGeoJson as any);
-      context.fillStyle = "#1e3025"; context.fill();
-      context.lineWidth = 0.5; context.strokeStyle = "rgba(255,255,255,0.12)"; context.stroke();
+      const landGradient = context.createLinearGradient(0, 0, dimensions.width, dimensions.height);
+      landGradient.addColorStop(0, FALLBACK_GLOBE_COLORS.land);
+      landGradient.addColorStop(1, FALLBACK_GLOBE_COLORS.landDeep);
+      context.fillStyle = landGradient; context.fill();
+      context.lineWidth = 0.5; context.strokeStyle = FALLBACK_GLOBE_COLORS.coast; context.stroke();
 
       // Arcs
       context.beginPath();
@@ -456,7 +493,7 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
         path(arc as any);
       });
       context.lineWidth = 1;
-      context.strokeStyle = "rgba(56, 189, 248, 0.25)";
+      context.strokeStyle = FALLBACK_GLOBE_COLORS.routeGlow;
       context.setLineDash([3, 5]);
       context.stroke();
       context.setLineDash([]);
@@ -470,7 +507,7 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
         const interp = d3.geoInterpolate([arc.startLng, arc.startLat], [arc.endLng, arc.endLat]);
         path({ type: "Point", coordinates: interp(t) });
       });
-      context.fillStyle = "rgba(56, 189, 248, 0.35)";
+      context.fillStyle = "rgba(252, 211, 77, 0.28)";
       context.fill();
 
       path.pointRadius(1.8);
@@ -480,7 +517,7 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
         const interp = d3.geoInterpolate([arc.startLng, arc.startLat], [arc.endLng, arc.endLat]);
         path({ type: "Point", coordinates: interp(t) });
       });
-      context.fillStyle = "#38bdf8";
+      context.fillStyle = FALLBACK_GLOBE_COLORS.dot;
       context.fill();
 
       // Dots
@@ -518,8 +555,17 @@ function D3Globe({ onSelect, selected }: { onSelect: (d: Destination | null) => 
         {N_POINTS.map((pt, i) => (
           <div key={pt.name} ref={(el) => { dotRefs.current[i] = el; }} className="absolute left-0 top-0 transition-opacity duration-150">
             <button onClick={() => onSelect(pt)} className="group relative flex items-center justify-center pointer-events-auto cursor-pointer focus:outline-none" aria-label={`Explore ${pt.name}`}>
-              <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)] transition-transform duration-200 group-hover:scale-150 ${selected?.name === pt.name ? "bg-blue-400 scale-125" : "bg-blue-500"}`} />
-              <div className="absolute w-7 h-7 rounded-full bg-blue-500 opacity-15 animate-ping pointer-events-none" />
+              <div
+                className={`h-2.5 w-2.5 rounded-full transition-transform duration-200 group-hover:scale-150 ${selected?.name === pt.name ? "scale-125" : ""}`}
+                style={{
+                  backgroundColor: selected?.name === pt.name ? FALLBACK_GLOBE_COLORS.dotSoft : FALLBACK_GLOBE_COLORS.dot,
+                  boxShadow: `0 0 8px ${FALLBACK_GLOBE_COLORS.dotGlow}, 0 0 14px rgba(252, 211, 77, 0.22)`,
+                }}
+              />
+              <div
+                className="absolute h-7 w-7 animate-ping rounded-full opacity-15 pointer-events-none"
+                style={{ backgroundColor: FALLBACK_GLOBE_COLORS.dot }}
+              />
               <div className="absolute left-4 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-[#050505]/90 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                 {pt.name}
               </div>
@@ -545,8 +591,12 @@ export function LandingGlobe() {
     }
   }, []);
 
+  const sizeClass = useWebGL
+    ? "max-w-[370px] sm:max-w-[500px] lg:max-w-[610px]"
+    : "max-w-[300px] sm:max-w-[380px] lg:max-w-[455px]";
+
   return (
-    <div className="relative mx-auto flex aspect-square w-full max-w-[320px] items-center justify-center sm:max-w-[420px] lg:max-w-[500px]">
+    <div className={`relative mx-auto flex aspect-square w-full items-center justify-center ${sizeClass}`}>
       {useWebGL ? (
         <ThreeGlobe onSelect={setSelected} onFallback={() => setUseWebGL(false)} />
       ) : (
@@ -554,7 +604,7 @@ export function LandingGlobe() {
       )}
 
       {/* Glare/Shadow overlays - removed because Three.js lighting handles this now, but keeping a faint radial gradient behind it can help blend it with background */}
-      <div className="absolute inset-0 rounded-full bg-blue-900/5 blur-[100px] pointer-events-none" />
+      <div className="absolute inset-0 rounded-full bg-[color:var(--sage)]/10 blur-[100px] pointer-events-none" />
 
       {/* Destination Info Card */}
       <AnimatePresence>

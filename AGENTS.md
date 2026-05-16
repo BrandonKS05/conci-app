@@ -1,9 +1,8 @@
----
-description: General project guidelines for Conci agents
-alwaysApply: true
----
+# Conci Agent Rules
 
-# General Guidelines
+These rules apply to work in this repository unless the user explicitly overrides them for a task.
+
+## General Guidelines
 
 - Do not rewrite large sections unnecessarily.
 - Reuse existing components whenever possible.
@@ -12,7 +11,7 @@ alwaysApply: true
 - Use TypeScript types for new code.
 - For new Next.js UI, prefer `next/image` over raw `<img>` unless there is a specific reason not to.
 
-# Workflow
+## Workflow
 
 - For broad requests, audit and plan first before editing files.
 - Before coding, inspect the relevant files and explain the smallest safe change.
@@ -23,7 +22,7 @@ alwaysApply: true
 - If the build fails, fix the failure before stopping.
 - Summarize changed files, user-facing changes, risks, and follow-ups.
 
-# Safety
+## Safety
 
 - Do not read, print, modify, copy, summarize, or expose `.env.local` or secrets.
 - Do not push to `main`.
@@ -32,7 +31,7 @@ alwaysApply: true
 - Do not install new packages unless explicitly approved.
 - Do not delete files unless clearly necessary and approved.
 
-# Product Direction
+## Product Direction
 
 - Conci is a web app for AI-led group trip planning.
 - Prioritize start/join trip flow, itinerary clarity, AI-assisted editing, group preferences, voting/collaboration, booking links, costs, and contributions.
