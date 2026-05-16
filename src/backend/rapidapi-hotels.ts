@@ -287,7 +287,8 @@ async function bookingSearchHotels(
   destId: string,
   checkIn: string,
   checkOut: string,
-  adults: number
+  adults: number,
+  roomQty = 1
 ): Promise<Record<string, unknown>[]> {
   const body = await rapidGet("/api/v1/hotels/searchHotels", {
     dest_id: destId,
@@ -296,10 +297,31 @@ async function bookingSearchHotels(
     departure_date: checkOut,
     adults,
     currency_code: "USD",
-    room_qty: 1,
+    room_qty: roomQty,
     languagecode: "en-us",
   });
-  return extractHotelsArray(body);
+  const rows = extractHotelsArray(body);
+  console.info(`${LOG_PREFIX} searchHotels parsed`, {
+    destId,
+    checkIn,
+    checkOut,
+    adults,
+    roomQty,
+    rawHotelCount: rows.length,
+    topLevelKeys:
+      body && typeof body === "object" && !Array.isArray(body)
+        ? Object.keys(body as Record<string, unknown>)
+        : [],
+    dataKeys:
+      body &&
+      typeof body === "object" &&
+      (body as Record<string, unknown>).data &&
+      typeof (body as Record<string, unknown>).data === "object" &&
+      !Array.isArray((body as Record<string, unknown>).data)
+        ? Object.keys((body as Record<string, unknown>).data as Record<string, unknown>)
+        : [],
+  });
+  return rows;
 }
 
 /**
@@ -357,4 +379,47 @@ export async function searchHotelsForTrip(plan: TripPlan): Promise<HotelPick[]> 
   }
 
   return top;
+}
+
+export type LodgingHotelSearchParams = {
+  destination: string;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  rooms: number;
+};
+
+/**
+ * Host lodging browse: searchDestination → searchHotels with explicit trip fields.
+ * Returns all mappable rows (up to limit), not just top 3.
+ */
+export async function searchHotelsForLodging(
+  params: LodgingHotelSearchParams,
+  options?: { limit?: number }
+): Promise<{
+  rows: Record<string, unknown>[];
+  destId: string;
+  destinationQuery: string;
+}> {
+  const destinationQuery = params.destination.trim();
+  if (destinationQuery.length < 2) {
+    throw new Error('Enter a full destination (e.g. "Los Angeles, CA") — at least 2 characters.');
+  }
+
+  const destId = await bookingSearchDestination(destinationQuery);
+  if (!destId) {
+    throw new Error(`No destination found for "${destinationQuery}". Try a full city name.`);
+  }
+
+  const adults = Math.min(9, Math.max(1, params.adults));
+  const rooms = Math.min(8, Math.max(1, params.rooms));
+
+  const rows = await bookingSearchHotels(destId, params.checkIn, params.checkOut, adults, rooms);
+
+  const limit = options?.limit ?? 25;
+  return {
+    rows: rows.slice(0, limit),
+    destId,
+    destinationQuery,
+  };
 }

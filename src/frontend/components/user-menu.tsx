@@ -16,6 +16,7 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,8 +30,10 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
       if (!sessionUser) {
         setAvatarUrl(null);
         setInitial("");
+        setUserId(null);
         return;
       }
+      setUserId((sessionUser as { id?: string }).id ?? null);
       const meta = sessionUser.user_metadata ?? {};
       const pic =
         (typeof meta.avatar_url === "string" && meta.avatar_url) ||
@@ -123,6 +126,20 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
               : "absolute right-0 z-50 mt-2 min-w-[10rem] rounded-2xl border border-slate-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-black/40"
           }
         >
+          {userId ? (
+            <Link
+              href={`/profile/${userId}`}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className={
+                tone === "dark"
+                  ? "block w-full px-4 py-2 text-left text-sm text-zinc-100 hover:bg-white/10"
+                  : "block w-full px-4 py-2 text-left text-sm text-slate-800 hover:bg-slate-50 dark:text-neutral-200 dark:hover:bg-white/5"
+              }
+            >
+              My profile
+            </Link>
+          ) : null}
           <Link
             href="/settings"
             role="menuitem"

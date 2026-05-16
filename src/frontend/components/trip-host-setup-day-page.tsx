@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CollabStateV1 } from "@/shared/collaboration";
 import {
-  DAY_VOTE_CATEGORIES,
+  DAY_VOTE_DAY_PAGE_CATEGORIES,
   mergeDayVoteStateForDate,
   parseDayVoteState,
   type DayVoteCategory,
@@ -255,25 +255,135 @@ function dayCategoryTitle(category: DayVoteCategory): string {
   }
 }
 
-/** Assign a time string to Morning / Afternoon / Evening / Unscheduled. */
-function timeBucket(time: string): "Morning" | "Afternoon" | "Evening" | "Unscheduled" {
+type ScheduleRow = {
+  key: string;
+  label: string;
+  sub: string;
+  time?: string;
+  href?: string;
+  description?: string;
+  dotClass: string;
+  confirmed?: boolean;
+  confirmedDetail?: string;
+};
+
+/** Minutes from midnight for chronological sort; null = no parseable time. */
+function parseTimeToSortKey(time?: string): number | null {
+  if (!time?.trim()) return null;
   const t = time.trim().toLowerCase();
-  // Try HH:MM or H:MM
-  const match = t.match(/(\d{1,2}):(\d{2})/);
-  if (match) {
-    let h = parseInt(match[1]!, 10);
-    const ampm = t.includes("pm") ? "pm" : t.includes("am") ? "am" : null;
+
+  const clock = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if (clock) {
+    let h = parseInt(clock[1]!, 10);
+    const m = clock[2] ? parseInt(clock[2], 10) : 0;
+    const ampm = clock[3] ?? (t.includes("pm") ? "pm" : t.includes("am") ? "am" : null);
     if (ampm === "pm" && h < 12) h += 12;
     if (ampm === "am" && h === 12) h = 0;
-    if (h < 12) return "Morning";
-    if (h < 17) return "Afternoon";
-    return "Evening";
+    if (!ampm && h >= 1 && h <= 7) h += 12;
+    return h * 60 + m;
   }
-  // Text hints
-  if (/morning|breakfast|brunch|am\b/i.test(t)) return "Morning";
-  if (/afternoon|lunch|midday|noon/i.test(t)) return "Afternoon";
-  if (/evening|dinner|night|pm\b/i.test(t)) return "Evening";
-  return "Unscheduled";
+
+  if (/early morning|sunrise|breakfast|brunch/i.test(t)) return 8 * 60;
+  if (/morning|late morning/i.test(t)) return 10 * 60;
+  if (/noon|midday|lunch/i.test(t)) return 12 * 60;
+  if (/afternoon/i.test(t)) return 14 * 60;
+  if (/evening|dinner|sunset/i.test(t)) return 18 * 60;
+  if (/night|late/i.test(t)) return 21 * 60;
+  return null;
+}
+
+function sortScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
+  return [...rows].sort((a, b) => {
+    const ka = parseTimeToSortKey(a.time);
+    const kb = parseTimeToSortKey(b.time);
+    if (ka == null && kb == null) return a.label.localeCompare(b.label);
+    if (ka == null) return 1;
+    if (kb == null) return -1;
+    if (ka !== kb) return ka - kb;
+    return a.label.localeCompare(b.label);
+  });
+}
+
+function DayScheduleTimeline({ items, subtitle }: { items: ScheduleRow[]; subtitle?: string }) {
+  const sorted = useMemo(() => sortScheduleRows(items), [items]);
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-neutral-900/12 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="border-b border-neutral-900/8 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
+        <h2 className="font-sans text-[13px] font-black uppercase tracking-[0.08em] text-neutral-950 dark:text-white">
+          Today&apos;s itinerary
+        </h2>
+        {subtitle ? (
+          <p className="mt-0.5 font-sans text-[11px] text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+        ) : null}
+      </div>
+      <div className="px-5 py-5 sm:px-6 sm:py-6">
+        {sorted.length === 0 ? (
+          <EmptyHint label="No itinerary yet — generate one from the trip calendar, or pin places manually." />
+        ) : (
+          <ol className="relative space-y-0">
+            {sorted.map((row, index) => (
+              <li key={row.key} className="relative flex gap-4 pb-8 last:pb-0">
+                {index < sorted.length - 1 ? (
+                  <span
+                    className="absolute left-[5px] top-3 h-[calc(100%-4px)] w-px bg-neutral-200 dark:bg-white/10"
+                    aria-hidden
+                  />
+                ) : null}
+                <span
+                  className={`relative z-[1] mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-dm-card ${row.confirmed ? "bg-emerald-500" : row.dotClass}`}
+                  aria-hidden
+                />
+                <div className="min-w-[4.5rem] shrink-0 pt-0.5">
+                  <p className="text-xs font-bold tabular-nums leading-tight text-[#2563EB] dark:text-[#60A5FA]">
+                    {row.time?.trim() || "—"}
+                  </p>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <ScheduleTimelineRowContent row={row} />
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ScheduleTimelineRowContent({ row }: { row: ScheduleRow }) {
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
+          {row.sub}
+        </span>
+        {row.confirmed ? (
+          <span className="rounded-full bg-emerald-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+            ✓ Confirmed
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-0.5 font-sans text-sm font-semibold text-neutral-900 dark:text-white">{row.label}</p>
+      {row.confirmedDetail ? (
+        <p className="mt-0.5 text-[11px] text-emerald-700 dark:text-emerald-300">{row.confirmedDetail}</p>
+      ) : row.description ? (
+        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+          {row.description}
+        </p>
+      ) : null}
+      {row.href ? (
+        <a
+          href={row.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/10 dark:text-neutral-400 dark:hover:border-[#60A5FA] dark:hover:text-[#60A5FA]"
+        >
+          {row.sub === "Transport" ? "Details" : row.confirmed ? "Open ↗" : "Book"}
+        </a>
+      ) : null}
+    </>
+  );
 }
 
 const CATEGORY_DOT: Record<string, string> = {
@@ -499,18 +609,6 @@ export function TripHostSetupDayPage({
 
   /** Items for Today's Itinerary — generatedItinerary base, confirmed vote options override/inject. */
   const scheduleItems = useMemo(() => {
-    type ScheduleRow = {
-      key: string;
-      label: string;
-      sub: string;
-      time?: string;
-      bucket: "Morning" | "Afternoon" | "Evening" | "Unscheduled";
-      href?: string;
-      description?: string;
-      dotClass: string;
-      confirmed?: boolean;
-      confirmedDetail?: string;
-    };
     const rows: ScheduleRow[] = [];
 
     // Base: generatedItinerary activities
@@ -529,7 +627,6 @@ export function TripHostSetupDayPage({
             : act.category === "lodging" ? "Lodging"
             : "Activity",
           time: act.time || undefined,
-          bucket: timeBucket(act.time || ""),
           href: act.bookingUrl || undefined,
           description: act.description || undefined,
           dotClass: CATEGORY_DOT[act.category] ?? "bg-neutral-300",
@@ -539,12 +636,12 @@ export function TripHostSetupDayPage({
       // Fallback: use pins
       for (const p of meals) {
         rows.push({ key: `m-${p.place.mapsUrl}`, label: p.place.name, sub: "Restaurant",
-          bucket: "Unscheduled", href: p.place.mapsUrl, dotClass: CATEGORY_DOT["Restaurant"]! });
+          href: p.place.mapsUrl, dotClass: CATEGORY_DOT["Restaurant"]! });
       }
       for (const p of activities) {
         if (/->/.test(p.experience.name) || /flight/i.test(p.experience.name)) continue;
         rows.push({ key: `a-${p.experience.bookingUrl}`, label: p.experience.name, sub: "Activity",
-          bucket: "Unscheduled", href: p.experience.bookingUrl || undefined, dotClass: CATEGORY_DOT["Activity"]! });
+          href: p.experience.bookingUrl || undefined, dotClass: CATEGORY_DOT["Activity"]! });
       }
     }
 
@@ -570,7 +667,6 @@ export function TripHostSetupDayPage({
         rows[existingIdx] = {
           ...existing,
           time: confirmedTime,
-          bucket: confirmedTime ? timeBucket(confirmedTime) : existing.bucket,
           href: locked.href ?? existing.href,
           confirmed: true,
           confirmedDetail: locked.lockedDetail,
@@ -583,7 +679,6 @@ export function TripHostSetupDayPage({
           label: locked.label,
           sub: voteCategory === "restaurants" ? "Restaurant" : "Activity",
           time: t || undefined,
-          bucket: t ? timeBucket(t) : "Unscheduled",
           href: locked.href || undefined,
           dotClass: voteCategory === "restaurants" ? "bg-amber-400" : "bg-[#2563EB]",
           confirmed: true,
@@ -592,7 +687,7 @@ export function TripHostSetupDayPage({
       }
     }
 
-    return rows;
+    return sortScheduleRows(rows);
   }, [plan.generatedItinerary, dateIso, meals, activities, dayVoting]);
 
 
@@ -745,61 +840,12 @@ export function TripHostSetupDayPage({
 
       <div className="mt-10 space-y-4">
 
-        <DropSection
-          title="Today's Itinerary"
+        <DayScheduleTimeline
+          items={scheduleItems}
           subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
-          sectionId="day-schedule"
-          defaultOpen
-        >
-          {scheduleItems.length === 0 ? (
-            <EmptyHint label="No itinerary yet — generate one from the trip calendar, or pin places manually." />
-          ) : (() => {
-            const BUCKETS = ["Morning", "Afternoon", "Evening", "Unscheduled"] as const;
-            return (
-              <div className="space-y-5">
-                {BUCKETS.map((bucket) => {
-                  const items = scheduleItems.filter((r) => r.bucket === bucket);
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={bucket}>
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-neutral-400 dark:text-neutral-500">
-                        {bucket}
-                      </p>
-                      <div className="flex flex-col divide-y divide-neutral-100 dark:divide-white/5">
-                        {items.map((row) => (
-                          <article key={row.key} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span className={`shrink-0 h-2 w-2 rounded-full ${row.confirmed ? "bg-emerald-500" : row.dotClass}`} />
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">{row.sub}</span>
-                                  {row.time ? <span className="text-[10px] font-semibold tabular-nums text-[#2563EB] dark:text-[#60A5FA]">{row.time}</span> : null}
-                                  {row.confirmed ? <span className="rounded-full bg-emerald-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">✓ Confirmed</span> : null}
-                                </div>
-                                <p className="mt-0.5 font-sans text-sm font-semibold text-neutral-900 dark:text-white">{row.label}</p>
-                                {row.confirmedDetail ? <p className="mt-0.5 text-[11px] text-emerald-700 dark:text-emerald-300">{row.confirmedDetail}</p> : row.description ? <p className="mt-0.5 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400 line-clamp-2">{row.description}</p> : null}
-                              </div>
-                            </div>
-                            {row.href ? (
-                              <a href={row.href} target="_blank" rel="noopener noreferrer"
-                                className="shrink-0 rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/10 dark:text-neutral-400 dark:hover:border-[#60A5FA] dark:hover:text-[#60A5FA]">
-                                {row.sub === "Transport" ? "Details" : row.confirmed ? "Open ↗" : "Book"}
-                              </a>
-                            ) : null}
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </DropSection>
+        />
 
-        {/* Lodging — only if we hid the voting section (meaning 0-1 options) */}
-        {dayVoting.hotels.options.length <= 1 && (
-          <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-400 dark:text-neutral-500">Lodging tonight</p>
@@ -819,23 +865,14 @@ export function TripHostSetupDayPage({
                 </a>
               )}
             </div>
-          </div>
-        )}
+        </div>
 
-        {DAY_VOTE_CATEGORIES.map((category) => {
+        {DAY_VOTE_DAY_PAGE_CATEGORIES.filter((c) => c !== "other").map((category) => {
           const cat = dayVoting[category];
-          // Always hide "other" — unused
-          if (category === "other") return null;
-          // Hide Transportation unless host has explicitly added flight options
-          if (category === "flights" && cat.options.length === 0) return null;
-          // Hide Lodging vote section when there's a single hotel (show inline instead)
-          if (category === "hotels" && cat.options.length <= 1) return null;
 
           const lockedId = cat.lockedOptionId ?? null;
           const sectionSubtitles: Record<string, string> = {
             restaurants: "Group input — who's interested?",
-            hotels: "Lodging options",
-            flights: "Transportation",
             activities: "Group input — who's interested?",
           };
           const draft = suggestDraft[category] ?? { label: "", detail: "", href: "" };

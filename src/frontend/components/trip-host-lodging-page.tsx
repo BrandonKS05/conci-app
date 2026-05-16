@@ -6,10 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   mockHotelResultToPlace,
-  mockHotelSearchBrowse,
   type MockHotelAmenityIcon,
   type MockHotelBrowseResult,
 } from "@/shared/mock-hotel-search";
+import type { LodgingSearchApiResponse } from "@/shared/lodging-search";
 import {
   applyHostLodgingSegment,
   upsertLodgingActivitiesInGeneratedItinerary,
@@ -257,38 +257,109 @@ export function TripHostLodgingPage(props: {
   const [results, setResults] = useState<MockHotelBrowseResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchDetail, setSearchDetail] = useState<string | null>(null);
+  const [searchMeta, setSearchMeta] = useState<LodgingSearchApiResponse["meta"] | null>(null);
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
-  const [priceMin, setPriceMin] = useState("230");
-  const [priceMax, setPriceMax] = useState("1550");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const [propertyNameQuery, setPropertyNameQuery] = useState("");
   const [compareOpen, setCompareOpen] = useState(true);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const runSearch = useCallback(async () => {
+    const dest = destination.trim();
     setLoading(true);
     setSearchError(null);
+    setSearchDetail(null);
+    setSearchMeta(null);
+
+    if (dest.length < 2) {
+      setSearchError(
+        dest.length === 0
+          ? "Enter a destination before searching."
+          : `Destination "${dest}" is too short — use a full city name (e.g. Los Angeles, CA).`
+      );
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    const params = new URLSearchParams({
+      destination: dest,
+      checkIn,
+      checkOut,
+      guests: String(guests),
+      rooms: String(rooms),
+      lodgingType,
+    });
+    const url = `/api/trip-plans/${props.tripId}/lodging/search?${params.toString()}`;
+
+    console.info("[lodging-search] API request", {
+      url,
+      fullUrl: typeof window !== "undefined" ? `${window.location.origin}${url}` : url,
+      destination: dest,
+      checkIn,
+      checkOut,
+      guests,
+      rooms,
+      lodgingType,
+    });
+
     try {
-      const rows = await mockHotelSearchBrowse({
-        destination,
-        checkInIso: checkIn,
-        checkOutIso: checkOut,
-        guests,
-        rooms,
-        lodgingType,
+      const res = await fetch(url, { credentials: "include", cache: "no-store" });
+      const raw = (await res.json().catch(() => ({}))) as LodgingSearchApiResponse;
+
+      console.info("[lodging-search] API response", {
+        status: res.status,
+        ok: res.ok,
+        raw,
+        hotelCount: raw.hotels?.length ?? 0,
+        meta: raw.meta,
+        error: raw.error,
+        detail: raw.detail,
       });
-      setResults(rows);
-    } catch {
-      setSearchError("Search failed. Try again.");
+
+      setSearchMeta(raw.meta ?? null);
+
+      if (!res.ok) {
+        setSearchError(raw.error || `Search failed (${res.status}).`);
+        setSearchDetail(raw.detail ?? null);
+        setResults([]);
+        return;
+      }
+
+      const hotels = raw.hotels ?? [];
+      setResults(hotels);
+
+      if (hotels.length === 0) {
+        setSearchError(raw.error || "No properties returned for this search.");
+        setSearchDetail(
+          raw.detail ??
+            (raw.meta
+              ? `RapidAPI returned ${raw.meta.rawHotelCount} raw result(s); ${raw.meta.mappedHotelCount} mapped. Try different dates or a larger city.`
+              : "Try a different destination or date range.")
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Search failed.";
+      console.error("[lodging-search] fetch error", e);
+      setSearchError(msg);
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [destination, checkIn, checkOut, guests, rooms, lodgingType]);
+  }, [destination, checkIn, checkOut, guests, rooms, lodgingType, props.tripId]);
 
   useEffect(() => {
-    void runSearch();
-  }, [runSearch]);
+    if (props.initialDestination.trim().length >= 2) {
+      void runSearch();
+    } else {
+      setLoading(false);
+      setSearchError("Enter a destination above (full city name), then press Search.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount with server-provided destination
+  }, []);
 
   const filteredResults = useMemo(() => {
     let rows = [...results];
@@ -296,8 +367,10 @@ export function TripHostLodgingPage(props: {
     if (stayTab === "homes") rows = rows.filter((r) => r.propertyKind === "home");
     const q = propertyNameQuery.trim().toLowerCase();
     if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
-    const min = Number(priceMin) || 0;
-    const max = Number(priceMax) || Infinity;
+    const minParsed = priceMin.trim() === "" ? 0 : Number(priceMin);
+    const maxParsed = priceMax.trim() === "" ? Infinity : Number(priceMax);
+    const min = Number.isFinite(minParsed) ? minParsed : 0;
+    const max = Number.isFinite(maxParsed) ? maxParsed : Infinity;
     rows = rows.filter((r) => r.nightlyUsd >= min && r.nightlyUsd <= max);
     if (selectedFilters.has("pay_later")) rows = rows.filter((r) => r.reserveNowPayLater);
     if (selectedFilters.has("breakfast")) rows = rows.filter((r) => r.dealHighlight?.toLowerCase().includes("breakfast"));
@@ -345,6 +418,7 @@ export function TripHostLodgingPage(props: {
           roomCount: rooms,
           userSelected: true,
           lodgingType: hotel.lodgingType,
+          bookingUrl: hotel.bookingUrl ?? undefined,
         }
       );
       const gi = plan.generatedItinerary
@@ -354,7 +428,7 @@ export function TripHostLodgingPage(props: {
             checkOut,
             place.name,
             [destination, place.address].filter(Boolean).join(" · ") || place.address || "",
-            undefined
+            hotel.bookingUrl
           )
         : undefined;
       try {
@@ -426,7 +500,12 @@ export function TripHostLodgingPage(props: {
             <ResultsTabs stayTab={stayTab} setStayTab={setStayTab} count={filteredResults.length} sortKey={sortKey} setSortKey={setSortKey} />
             <PromoBanner />
             {searchError ? (
-              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{searchError}</p>
+              <SearchErrorBanner
+                error={searchError}
+                detail={searchDetail}
+                meta={searchMeta}
+                destination={destination.trim()}
+              />
             ) : null}
             {loading ? (
               <p className="py-12 text-center text-sm text-neutral-500">Searching stays…</p>
@@ -441,8 +520,13 @@ export function TripHostLodgingPage(props: {
                     />
                   </li>
                 ))}
-                {!filteredResults.length ? (
-                  <li className="py-12 text-center text-sm text-neutral-500">No properties match your filters.</li>
+                {!filteredResults.length && results.length > 0 ? (
+                  <li className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-950">
+                    <p className="font-semibold">No properties match your filters</p>
+                    <p className="mt-1 text-amber-900/90">
+                      {results.length} propert{results.length === 1 ? "y" : "ies"} from search — try clearing filters or widening the price range.
+                    </p>
+                  </li>
                 ) : null}
               </ul>
             )}
@@ -451,6 +535,34 @@ export function TripHostLodgingPage(props: {
           <RightAdColumn />
         </div>
       </div>
+    </div>
+  );
+}
+
+function SearchErrorBanner({
+  error,
+  detail,
+  meta,
+  destination,
+}: {
+  error: string;
+  detail: string | null;
+  meta: LodgingSearchApiResponse["meta"] | null;
+  destination: string;
+}) {
+  return (
+    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950" role="alert">
+      <p className="font-semibold">{error}</p>
+      {detail ? <p className="mt-1 leading-relaxed text-rose-900">{detail}</p> : null}
+      {meta ? (
+        <p className="mt-2 text-xs text-rose-800/90">
+          Search: &quot;{meta.destinationQuery || destination}&quot; · dest_id {meta.destId ?? "—"} ·{" "}
+          {meta.rawHotelCount} raw / {meta.mappedHotelCount} mapped
+        </p>
+      ) : null}
+      <p className="mt-2 text-xs text-rose-800/80">
+        Open DevTools (F12) → Console and look for <code className="rounded bg-rose-100 px-1">[lodging-search]</code> logs.
+      </p>
     </div>
   );
 }

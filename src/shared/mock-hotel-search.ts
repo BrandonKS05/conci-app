@@ -40,6 +40,7 @@ export type MockHotelBrowseResult = MockHotelResult & {
   vipAccess?: boolean;
   urgencyText?: string;
   propertyKind: "hotel" | "home";
+  bookingUrl?: string;
 };
 
 const HOTEL_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [

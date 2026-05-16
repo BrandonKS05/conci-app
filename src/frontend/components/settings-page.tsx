@@ -16,6 +16,7 @@ function tierLabel(t: SubscriptionTier): string {
 }
 
 type SettingsPayload = {
+  id: string;
   email: string;
   displayName: string;
   avatarUrl: string | null;
@@ -267,7 +268,17 @@ export function SettingsPageClient() {
         ) : null}
 
         <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Account</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Account</h2>
+            {payload.id ? (
+              <Link
+                href={`/profile/${payload.id}`}
+                className="text-sm font-semibold text-[#2563EB] underline-offset-2 hover:underline dark:text-[#60A5FA]"
+              >
+                View public profile
+              </Link>
+            ) : null}
+          </div>
           <form onSubmit={(e) => void saveAccount(e)} className="mt-6 space-y-5">
             <div>
               <label htmlFor="display-name" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">

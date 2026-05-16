@@ -31,6 +31,7 @@ export async function GET() {
     "";
 
   return NextResponse.json({
+    id: user.id,
     email: user.email ?? "",
     displayName:
       (typeof profile?.display_name === "string" && profile.display_name.trim()) || metaName || "",
