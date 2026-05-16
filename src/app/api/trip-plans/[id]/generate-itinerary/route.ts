@@ -7,6 +7,9 @@ import { parseCollabState } from "@/shared/collaboration";
 import { parseDayVoteState, type DayVoteStateByDate, type DayVoteCategoryState } from "@/shared/day-collaboration";
 import {
   enumerateLocalIsoDays,
+  hasUserSelectedLodging,
+  isUserSelectedLodgingStay,
+  mergeAiHotelStaysPreservingUser,
   normalizePlan,
   parseLocalIsoDate,
   safeParseJson,
@@ -94,6 +97,8 @@ function inferTripDays(plan: TripPlan, itinerary: GeneratedItinerary): string[] 
 }
 
 function inferHomeBaseName(plan: TripPlan, itinerary: GeneratedItinerary): string {
+  const userStay = plan.hostSetup?.hotelStays?.find(isUserSelectedLodgingStay);
+  if (userStay?.place?.name?.trim()) return userStay.place.name.trim();
   const fromHost = plan.hostSetup?.hotel?.name?.trim();
   if (fromHost) return fromHost;
   for (const d of itinerary.days) {
@@ -238,6 +243,16 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
         })),
       },
       other: { options: [] },
+    };
+  }
+
+  const existingStays = plan.hostSetup?.hotelStays ?? [];
+  if (hasUserSelectedLodging(existingStays)) {
+    return {
+      restaurantPins,
+      activityPins,
+      hotelStays: existingStays.filter(isUserSelectedLodgingStay),
+      dayVoting,
     };
   }
 
@@ -477,13 +492,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
 
   const generated = buildAutofillRecommendations(plan, itinerary);
+  const mergedHotelStays = mergeAiHotelStaysPreservingUser(plan.hostSetup?.hotelStays, generated.hotelStays);
   const updatedPlan: TripPlan = {
     ...plan,
     generatedItinerary: itinerary,
     hostSetup: {
       ...(plan.hostSetup ?? {}),
-      hotel: generated.hotelStays[0]?.place ?? plan.hostSetup?.hotel ?? null,
-      hotelStays: generated.hotelStays,
+      hotel: mergedHotelStays[0]?.place ?? plan.hostSetup?.hotel ?? generated.hotelStays[0]?.place ?? null,
+      hotelStays: mergedHotelStays,
       restaurantPins: generated.restaurantPins,
       activityPins: generated.activityPins,
     },

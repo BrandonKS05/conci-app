@@ -72,6 +72,18 @@ export type HostActivityPin = {
   recommendedByConci?: boolean;
 };
 
+/** Optional fields saved on a lodging segment (multi-city / booking links). */
+export type HostLodgingStayMeta = {
+  /** City or stop this stay is tied to (may differ from plan-wide `location`). */
+  destinationCity?: string;
+  bookingUrl?: string | null;
+  notes?: string | null;
+  guestCount?: number;
+  roomCount?: number;
+  /** Host picked this stay in the app (modal / calendar); refits must not replace it unless they ask AI to change hotel. */
+  userSelected?: boolean;
+};
+
 /** Inclusive lodging segment (host may split stays across the trip). */
 export type HostHotelStay = {
   startIso: string;
@@ -79,7 +91,7 @@ export type HostHotelStay = {
   place: PlaceSpotlight;
   /** Auto-seeded recommendation provenance (subtle badge in UI). */
   recommendedByConci?: boolean;
-};
+} & HostLodgingStayMeta;
 
 /**
  * Persisted while `trip_plans.status === 'draft'`: concrete range, hotel, restaurant pins before invite is minted.
@@ -309,8 +321,30 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       const place = spotlightFromUnknown(o.place);
       if (!place) continue;
       const recommendedByConci = o.recommendedByConci === true;
+      const destinationCity = typeof o.destinationCity === "string" ? o.destinationCity.trim() || undefined : undefined;
+      const bookingUrl =
+        typeof o.bookingUrl === "string" && o.bookingUrl.startsWith("http")
+          ? o.bookingUrl
+          : o.bookingUrl === null
+            ? null
+            : undefined;
+      const notes = typeof o.notes === "string" ? o.notes.trim() || undefined : undefined;
+      const guestCount = typeof o.guestCount === "number" && Number.isFinite(o.guestCount) ? o.guestCount : undefined;
+      const roomCount = typeof o.roomCount === "number" && Number.isFinite(o.roomCount) ? o.roomCount : undefined;
+      const userSelected = o.userSelected === true;
       if (startIso <= endIso) {
-        list.push({ startIso, endIso, place, ...(recommendedByConci ? { recommendedByConci: true } : {}) });
+        list.push({
+          startIso,
+          endIso,
+          place,
+          ...(recommendedByConci ? { recommendedByConci: true } : {}),
+          ...(userSelected ? { userSelected: true } : {}),
+          ...(destinationCity ? { destinationCity } : {}),
+          ...(bookingUrl !== undefined ? { bookingUrl } : {}),
+          ...(notes ? { notes } : {}),
+          ...(guestCount !== undefined ? { guestCount } : {}),
+          ...(roomCount !== undefined ? { roomCount } : {}),
+        });
       }
     }
     if (list.length) hotelStays = list;
@@ -884,6 +918,9 @@ export function normalizePlan(value: unknown): TripPlan {
     spotlights: parseSpotlights(plan.spotlights),
     itineraryLiveCuration: parseItineraryLiveCuration(plan.itineraryLiveCuration),
     hostSetup: parseHostSetup(plan.hostSetup),
+    ...(plan.generatedItinerary && typeof plan.generatedItinerary === "object"
+      ? { generatedItinerary: plan.generatedItinerary as GeneratedItinerary }
+      : {}),
     nextStep: typeof plan.nextStep === "string" ? plan.nextStep : null,
     confidence: typeof plan.confidence === "number" ? Math.max(0, Math.min(1, plan.confidence)) : 0,
   };
@@ -1143,6 +1180,163 @@ export function applyHostHotelDateRange(
   trimmed.push({ startIso: a, endIso: b, place });
   trimmed.sort((x, y) => x.startIso.localeCompare(y.startIso));
   return { hotelStays: trimmed, hotel: place };
+}
+
+export function lodgingStaysOverlap(a: HostHotelStay, b: HostHotelStay): boolean {
+  return a.startIso <= b.endIso && b.startIso <= a.endIso;
+}
+
+export function isUserSelectedLodgingStay(stay: HostHotelStay): boolean {
+  return stay.userSelected === true;
+}
+
+export function hasUserSelectedLodging(stays: HostHotelStay[] | undefined): boolean {
+  return (stays ?? []).some(isUserSelectedLodgingStay);
+}
+
+/**
+ * Keep host-picked segments on itinerary refit/generate; only apply AI stays on non-overlapping nights.
+ * When there are no user-selected segments, returns `ai` (or existing if AI produced none).
+ */
+export function mergeAiHotelStaysPreservingUser(
+  existing: HostHotelStay[] | undefined,
+  ai: HostHotelStay[]
+): HostHotelStay[] {
+  const userStays = (existing ?? []).filter(isUserSelectedLodgingStay);
+  if (userStays.length === 0) {
+    return ai.length > 0 ? ai : [...(existing ?? [])];
+  }
+  const aiFiltered = ai.filter((aiS) => !userStays.some((u) => lodgingStaysOverlap(aiS, u)));
+  return [...userStays, ...aiFiltered].sort((a, b) => a.startIso.localeCompare(b.startIso));
+}
+
+/** Apply provenance flags to the stay matching an inclusive date range + place. */
+export function tagLodgingStayAtRange(
+  stays: HostHotelStay[],
+  startIso: string,
+  endIso: string,
+  mapsUrl: string,
+  flags: { userSelected?: boolean; recommendedByConci?: boolean }
+): HostHotelStay[] {
+  return stays.map((s) => {
+    if (s.place.mapsUrl !== mapsUrl || s.startIso !== startIso || s.endIso !== endIso) return s;
+    return {
+      ...s,
+      ...(flags.userSelected === true
+        ? { userSelected: true, recommendedByConci: false }
+        : flags.userSelected === false
+          ? { userSelected: false }
+          : {}),
+      ...(flags.recommendedByConci === true
+        ? { recommendedByConci: true }
+        : flags.recommendedByConci === false
+          ? { recommendedByConci: false }
+          : {}),
+    };
+  });
+}
+
+/**
+ * Same merge as {@link applyHostHotelDateRange}, then attaches optional segment metadata to the new stay.
+ */
+export function applyHostLodgingSegment(
+  existing: HostHotelStay[] | undefined,
+  tripStartIso: string,
+  tripEndIso: string,
+  stayStartIso: string,
+  stayEndIso: string,
+  place: PlaceSpotlight,
+  meta?: HostLodgingStayMeta
+): { hotelStays: HostHotelStay[]; hotel: PlaceSpotlight } {
+  const { hotelStays, hotel } = applyHostHotelDateRange(
+    existing,
+    tripStartIso,
+    tripEndIso,
+    stayStartIso,
+    stayEndIso,
+    place
+  );
+  if (!meta) return { hotelStays, hotel };
+
+  let a = stayStartIso;
+  let b = stayEndIso;
+  if (!ISO_DAY.test(a) || !ISO_DAY.test(b)) {
+    return { hotelStays, hotel };
+  }
+  if (a > b) [a, b] = [b, a];
+  if (ISO_DAY.test(tripStartIso) && ISO_DAY.test(tripEndIso)) {
+    if (a < tripStartIso) a = tripStartIso;
+    if (b > tripEndIso) b = tripEndIso;
+  }
+  if (a > b) return { hotelStays, hotel };
+
+  let merged = hotelStays.map((s) => {
+    if (s.place.mapsUrl === place.mapsUrl && s.startIso === a && s.endIso === b) {
+      return {
+        ...s,
+        ...(meta.destinationCity?.trim() ? { destinationCity: meta.destinationCity.trim() } : {}),
+        ...(meta.bookingUrl !== undefined ? { bookingUrl: meta.bookingUrl } : {}),
+        ...(meta.notes?.trim() ? { notes: meta.notes.trim() } : {}),
+        ...(meta.guestCount !== undefined ? { guestCount: meta.guestCount } : {}),
+        ...(meta.roomCount !== undefined ? { roomCount: meta.roomCount } : {}),
+        ...(meta.userSelected === true ? { userSelected: true, recommendedByConci: false } : {}),
+      };
+    }
+    return s;
+  });
+  if (meta.userSelected === true) {
+    merged = tagLodgingStayAtRange(merged, a, b, place.mapsUrl, {
+      userSelected: true,
+      recommendedByConci: false,
+    });
+  }
+  return { hotelStays: merged, hotel };
+}
+
+/** Replace check-in / check-out lodging rows on the given days (client-side itinerary assist). */
+export function upsertLodgingActivitiesInGeneratedItinerary(
+  itinerary: GeneratedItinerary,
+  stayStartIso: string,
+  stayEndIso: string,
+  hotelName: string,
+  detail: string,
+  bookingUrl?: string | null
+): GeneratedItinerary {
+  const days = itinerary.days.map((d) => ({
+    ...d,
+    activities: d.activities.filter(
+      (a) =>
+        !(
+          a.category === "lodging" &&
+          (a.title.startsWith("Check-in") || a.title.startsWith("Check-out")) &&
+          (hotelName.trim() === "" || a.title.includes(hotelName.trim()))
+        )
+    ),
+  }));
+
+  const mk = (title: string, time: string): ItineraryActivity => ({
+    time,
+    title,
+    description: detail,
+    category: "lodging",
+    estimatedCostPp: null,
+    ...(bookingUrl?.trim() ? { bookingUrl: bookingUrl.trim() } : {}),
+  });
+
+  const dayMap = new Map(days.map((d) => [d.dateIso, d] as const));
+  if (stayStartIso === stayEndIso) {
+    const d = dayMap.get(stayStartIso);
+    if (d) {
+      d.activities.unshift(mk(`Check-in & check-out · ${hotelName}`, "15:00"));
+    }
+  } else {
+    const din = dayMap.get(stayStartIso);
+    if (din) din.activities.unshift(mk(`Check-in · ${hotelName}`, "15:00"));
+    const dout = dayMap.get(stayEndIso);
+    if (dout) dout.activities.push(mk(`Check-out · ${hotelName}`, "11:00"));
+  }
+
+  return { ...itinerary, days };
 }
 
 export function hotelStayForDay(stays: HostHotelStay[] | undefined, dayIso: string): HostHotelStay | null {

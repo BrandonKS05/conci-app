@@ -6,6 +6,7 @@ import {
   normalizePlan,
   parseHostSetup,
   planRecordWithDatesSyncedToTripRange,
+  type GeneratedItinerary,
   type HostSetupState,
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
@@ -53,6 +54,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   let body: {
     hostSetup?: HostSetupPatch;
     budget?: { tier?: string | null; perPerson?: string | null };
+    /** When set, replaces `plan.generatedItinerary` (e.g. after lodging sync). */
+    generatedItinerary?: GeneratedItinerary;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -62,9 +65,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   const hasHostPatch = body.hostSetup && typeof body.hostSetup === "object";
   const hasBudgetPatch = body.budget && typeof body.budget === "object";
-  if (!hasHostPatch && !hasBudgetPatch) {
+  const hasGiPatch = body.generatedItinerary !== undefined;
+  if (!hasHostPatch && !hasBudgetPatch && !hasGiPatch) {
     return NextResponse.json(
-      { error: "Provide `hostSetup` and/or `budget`." },
+      { error: "Provide `hostSetup`, `budget`, and/or `generatedItinerary`." },
       { status: 400 }
     );
   }
@@ -92,6 +96,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     ...planObj,
     hostSetup: mergedSetup,
   };
+
+  if (hasGiPatch) {
+    planMerged = { ...planMerged, generatedItinerary: body.generatedItinerary };
+  }
 
   if (hasBudgetPatch && body.budget) {
     const pb = planObj.budget && typeof planObj.budget === "object" ? (planObj.budget as Record<string, unknown>) : {};

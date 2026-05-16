@@ -10,6 +10,7 @@ import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
   applyHostHotelDateRange,
   applyHostHotelSelection,
+  tagLodgingStayAtRange,
   applyTripPlanChatPatch,
   enumerateLocalIsoDays,
   normalizePlan,
@@ -262,15 +263,25 @@ async function applyAutoBookHotel(
 
   let hotelStays;
   let hotel: PlaceSpotlight;
+  let stayStart: string;
+  let stayEnd: string;
   if (req.fullTrip) {
     const r = applyHostHotelSelection(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, place, "full");
     hotelStays = r.hotelStays;
     hotel = r.hotel;
+    stayStart = tripStart;
+    stayEnd = tripEnd;
   } else {
     const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tripStart, tripEnd, a!, b!, place);
     hotelStays = r.hotelStays;
     hotel = r.hotel;
+    stayStart = a!;
+    stayEnd = b!;
   }
+  hotelStays = tagLodgingStayAtRange(hotelStays, stayStart, stayEnd, place.mapsUrl, {
+    userSelected: false,
+    recommendedByConci: true,
+  });
 
   const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { hotelStays, hotel });
   const planRecord = {

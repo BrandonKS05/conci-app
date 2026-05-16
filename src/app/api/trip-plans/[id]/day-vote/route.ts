@@ -13,6 +13,7 @@ import { parseCollabState } from "@/shared/collaboration";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
   applyHostHotelDateRange,
+  tagLodgingStayAtRange,
   enumerateLocalIsoDays,
   normalizePlan,
   parseHostSetup,
@@ -185,7 +186,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         mapsUrl,
         spotlightCategory: "hotel",
       };
-      const { hotelStays, hotel } = applyHostHotelDateRange(
+      let { hotelStays } = applyHostHotelDateRange(
         plan.hostSetup?.hotelStays,
         tr.startIso,
         tr.endIso,
@@ -193,6 +194,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         dateIso,
         place
       );
+      hotelStays = tagLodgingStayAtRange(hotelStays, dateIso, dateIso, place.mapsUrl, {
+        userSelected: true,
+        recommendedByConci: false,
+      });
+      const hotel = hotelStays.find((s) => s.startIso === dateIso && s.endIso === dateIso)?.place ?? place;
       nextPlan = mergeTripHostSetup(planRecord, { hotelStays, hotel });
       planUpdated = true;
     }

@@ -17,9 +17,10 @@ import {
   inferYearMonthFromDateOptionsHints,
 } from "@/shared/date-option-parse";
 import {
-  applyHostHotelDateRange,
-  applyHostHotelSelection,
+  applyHostLodgingSegment,
   concreteTripRangeFromPlanDates,
+  hasUserSelectedLodging,
+  mergeAiHotelStaysPreservingUser,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
   hostCalendarHotelDisplayTitle,
@@ -29,6 +30,7 @@ import {
   parseLocalIsoDate,
   seedTextMentionsDining,
   tripLiveRecommendationsContextFingerprint,
+  upsertLodgingActivitiesInGeneratedItinerary,
   type HostActivityExperience,
   type HostActivityPin,
   type HostHotelStay,
@@ -44,8 +46,11 @@ import {
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
 import {
+  HostHotelSearchModal,
+  type HostLodgingCommitPayload,
+} from "@/frontend/components/host-hotel-search-modal";
+import {
   HostSetupAddPlacesModal,
-  type HostSetupHotelAddSpec,
 } from "@/frontend/components/host-setup-add-places-modal";
 import {
   HostSetupPinDetailModal,
@@ -124,7 +129,11 @@ function homeBaseHeroImageSources(
   plan: TripPlan,
   destinationCoverUrl?: string | null
 ): { src: string; unoptimized: boolean } | null {
-  const stay0 = plan.hostSetup?.hotelStays?.[0];
+  const stays = plan.hostSetup?.hotelStays ?? [];
+  const stay0 =
+    stays.length > 0
+      ? [...stays].sort((a, b) => a.startIso.localeCompare(b.startIso))[0]
+      : undefined;
   const fromPlace = firstHotelStayHeroPhotoUrl(stay0?.place);
   if (fromPlace) return { src: fromPlace, unoptimized: !fromPlace.startsWith("/") };
   const trimmedServer = typeof destinationCoverUrl === "string" ? destinationCoverUrl.trim() : "";
@@ -462,6 +471,7 @@ export function TripHostSetupDashboard({
   );
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
+  const [hotelSearchOpen, setHotelSearchOpen] = useState(false);
   const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
   const [removePinConfirm, setRemovePinConfirm] = useState<{
     kind: "meal" | "activity";
@@ -620,14 +630,16 @@ export function TripHostSetupDashboard({
   const persistHostSetup = useCallback(
     async (
       patch?: HostSetupPatch,
-      budgetPatch?: { tier?: string | null; perPerson?: string | null }
+      budgetPatch?: { tier?: string | null; perPerson?: string | null },
+      generatedItineraryReplace?: TripPlan["generatedItinerary"]
     ): Promise<boolean> => {
       if (!canEditAsHost) return false;
       setErr(null);
       const body: Record<string, unknown> = {};
       if (patch && Object.keys(patch).length > 0) body.hostSetup = patch;
       if (budgetPatch) body.budget = budgetPatch;
-      if (!body.hostSetup && !body.budget) return false;
+      if (generatedItineraryReplace !== undefined) body.generatedItinerary = generatedItineraryReplace;
+      if (!body.hostSetup && !body.budget && body.generatedItinerary === undefined) return false;
       try {
         const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
           method: "PATCH",
@@ -737,32 +749,44 @@ export function TripHostSetupDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when persisted range is ready
   }, [hostSetup.tripRange?.startIso, hostSetup.tripRange?.endIso, tripId, seedText]);
 
-  const onHotelAddFromModal = useCallback(
-    (place: PlaceSpotlight, spec: HostSetupHotelAddSpec) => {
+  const onLodgingCommitFromModal = useCallback(
+    (payload: HostLodgingCommitPayload) => {
       if (!tripDisplayRange?.startIso || !tripDisplayRange?.endIso) return;
-      if (spec.kind === "entireTrip") {
-        const { hotelStays, hotel } = applyHostHotelSelection(
-          hostSetup.hotelStays,
-          tripDisplayRange.startIso,
-          tripDisplayRange.endIso,
-          tripDisplayRange.startIso,
-          place,
-          "full"
-        );
-        void persistHostSetup({ hotelStays, hotel });
-        return;
-      }
-      const { hotelStays, hotel } = applyHostHotelDateRange(
+      const { hotelStays, hotel } = applyHostLodgingSegment(
         hostSetup.hotelStays,
         tripDisplayRange.startIso,
         tripDisplayRange.endIso,
-        spec.stayStartIso,
-        spec.stayEndIso,
-        place
+        payload.stayStartIso,
+        payload.stayEndIso,
+        payload.place,
+        {
+          destinationCity: payload.destinationCity,
+          bookingUrl: payload.bookingUrl,
+          notes: payload.notes ?? undefined,
+          guestCount: payload.guestCount,
+          roomCount: payload.roomCount,
+          userSelected: true,
+        }
       );
-      void persistHostSetup({ hotelStays, hotel });
+      const gi = plan.generatedItinerary
+        ? upsertLodgingActivitiesInGeneratedItinerary(
+            plan.generatedItinerary,
+            payload.stayStartIso,
+            payload.stayEndIso,
+            payload.place.name,
+            [payload.destinationCity, payload.place.address].filter(Boolean).join(" · ") || payload.place.address || "",
+            payload.bookingUrl
+          )
+        : undefined;
+      void persistHostSetup({ hotelStays, hotel }, undefined, gi);
     },
-    [tripDisplayRange?.startIso, tripDisplayRange?.endIso, hostSetup.hotelStays, persistHostSetup]
+    [
+      tripDisplayRange?.startIso,
+      tripDisplayRange?.endIso,
+      hostSetup.hotelStays,
+      plan.generatedItinerary,
+      persistHostSetup,
+    ]
   );
 
   const removeRestaurantPinByKey = useCallback(
@@ -836,13 +860,30 @@ export function TripHostSetupDashboard({
             (p) => !preservedActivityKeys.has(`${p.dateIso}::${p.experience.bookingUrl}`)
           ),
         ];
-        setPlan(serverPlan);
+        const mergedHotelStays = mergeAiHotelStaysPreservingUser(
+          hostSetup.hotelStays,
+          serverHost.hotelStays ?? []
+        );
+        const mergedHotel = mergedHotelStays[0]?.place ?? serverHost.hotel ?? null;
+        const hadUserLodging = hasUserSelectedLodging(hostSetup.hotelStays);
+        const mergedPlan: TripPlan = {
+          ...serverPlan,
+          hostSetup: {
+            ...serverHost,
+            hotelStays: mergedHotelStays,
+            hotel: mergedHotel,
+          },
+        };
+        setPlan(mergedPlan);
         const hadPreserved =
-          preservedRestaurantPins.length > 0 || preservedActivityPins.length > 0;
+          preservedRestaurantPins.length > 0 ||
+          preservedActivityPins.length > 0 ||
+          hadUserLodging;
         if (hadPreserved) {
           await persistHostSetup({
             restaurantPins: mergedRestaurants,
             activityPins: mergedActivities,
+            ...(hadUserLodging ? { hotelStays: mergedHotelStays, hotel: mergedHotel } : {}),
           });
         }
       } catch {
@@ -851,7 +892,7 @@ export function TripHostSetupDashboard({
         setRefittingItinerary(false);
       }
     },
-    [tripId, hostSetup.restaurantPins, hostSetup.activityPins, persistHostSetup]
+    [tripId, hostSetup.restaurantPins, hostSetup.activityPins, hostSetup.hotelStays, persistHostSetup]
   );
 
   const confirmPendingTripRange = useCallback(async () => {
@@ -1070,9 +1111,9 @@ export function TripHostSetupDashboard({
 
   const chatSeed = initialCollab.cardChat?.messages ?? [];
 
-  const primaryHotelStay = useMemo((): HostHotelStay | null => {
+  const sortedHotelStays = useMemo(() => {
     const stays = plan.hostSetup?.hotelStays ?? [];
-    return stays[0] ?? null;
+    return [...stays].sort((a, b) => a.startIso.localeCompare(b.startIso));
   }, [plan.hostSetup?.hotelStays]);
 
   const homeBaseHero = useMemo(
@@ -1081,7 +1122,7 @@ export function TripHostSetupDashboard({
   );
 
   const primaryHotelSummary = useMemo(() => {
-    const stays = plan.hostSetup?.hotelStays ?? [];
+    const stays = sortedHotelStays;
     if (stays.length > 0) {
       const p = stays[0]?.place;
       if (p?.name) {
@@ -1096,7 +1137,7 @@ export function TripHostSetupDashboard({
       return { title: loc, detail: "Add stays on a calendar day or with Trip Copilot." };
     }
     return null;
-  }, [plan.hostSetup?.hotelStays, plan.location]);
+  }, [sortedHotelStays, plan.location]);
 
   const tripDisplayName = (plan.title?.trim() || plan.location?.trim() || "Trip");
   const tripIdentityInitial = (tripDisplayName.match(/\p{L}/u)?.[0] ?? "T").toUpperCase();
@@ -1444,18 +1485,17 @@ export function TripHostSetupDashboard({
                     Lodging
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                    Choose whether a stay applies to the <span className="font-medium text-[color:var(--on-surface)]">whole trip</span>{" "}
-                    or <span className="font-medium text-[color:var(--on-surface)]">specific nights</span> when you use{" "}
-                    <span className="font-medium">Add places</span> or ask Trip Copilot (say &quot;whole trip&quot; or give check-in /
-                    check-out days).
+                    Conci still suggests a home base when you have none. Use <span className="font-medium">Add or change hotel</span> to
+                    override with your own pick — those stays are kept on refit. Trip Copilot can change lodging when you ask it to book a
+                    hotel.
                   </p>
                 </div>
                 {canEditAsHost && tripDisplayRange?.startIso ? (
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedDayIso(tripDisplayRange.startIso);
-                      setAddPlacesOpen(true);
+                      setAddPlacesOpen(false);
+                      setHotelSearchOpen(true);
                     }}
                     className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
                   >
@@ -1468,7 +1508,7 @@ export function TripHostSetupDashboard({
                 if (!stays.length) {
                   return (
                     <p className="mt-3 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                      No stay saved yet — add one above or from the calendar cells after you pick dates.
+                      No stay saved yet — use Add or change hotel above after you pick dates.
                     </p>
                   );
                 }
@@ -1485,16 +1525,49 @@ export function TripHostSetupDashboard({
                             {formatShortStayRange(s.startIso, s.endIso)}
                           </span>
                         </div>
-                        {s.place.mapsUrl?.startsWith("http") ? (
-                          <a
-                            href={s.place.mapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 inline-flex text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
-                          >
-                            Open in Maps
-                          </a>
+                        {s.userSelected ? (
+                          <span className="mt-1 inline-block rounded-full bg-[color:var(--surface-container-high)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:bg-white/10 dark:text-neutral-400">
+                            Your pick
+                          </span>
+                        ) : s.recommendedByConci ? (
+                          <span className="mt-1 inline-block rounded-full bg-teal-950/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-800 dark:bg-teal-950/40 dark:text-teal-300">
+                            Suggested by Conci
+                          </span>
                         ) : null}
+                        {s.destinationCity?.trim() ? (
+                          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                            {s.destinationCity.trim()}
+                          </p>
+                        ) : null}
+                        {(s.guestCount != null || s.roomCount != null) ? (
+                          <p className="mt-0.5 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                            {s.guestCount != null ? `${s.guestCount} guests` : null}
+                            {s.guestCount != null && s.roomCount != null ? " · " : null}
+                            {s.roomCount != null ? `${s.roomCount} room${s.roomCount === 1 ? "" : "s"}` : null}
+                          </p>
+                        ) : null}
+                        <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                          {s.bookingUrl?.startsWith("http") ? (
+                            <a
+                              href={s.bookingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
+                            >
+                              Booking
+                            </a>
+                          ) : null}
+                          {s.place.mapsUrl?.startsWith("http") ? (
+                            <a
+                              href={s.place.mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
+                            >
+                              Maps
+                            </a>
+                          ) : null}
+                        </p>
                       </li>
                     ))}
                   </ul>
@@ -1552,6 +1625,7 @@ export function TripHostSetupDashboard({
                   <button
                     type="button"
                     onClick={() => {
+                      setHotelSearchOpen(false);
                       setSelectedDayIso(hostSetup.tripRange!.startIso);
                       setAddPlacesOpen(true);
                     }}
@@ -1568,6 +1642,7 @@ export function TripHostSetupDashboard({
                       setRangeAnchor(null);
                       setSelectedDayIso(null);
                       setAddPlacesOpen(false);
+                      setHotelSearchOpen(false);
                       setPendingRangeConfirm(null);
                     }}
                     className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
@@ -2225,42 +2300,64 @@ export function TripHostSetupDashboard({
             <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
               Home base
             </h3>
-            {primaryHotelStay?.place?.name ? (
-              <div className="space-y-4">
-                <div className="relative overflow-hidden rounded-xl">
-                  {homeBaseHero ? (
-                    <>
-                      <div className="relative aspect-[16/10] w-full">
-                        <Image
-                          src={homeBaseHero.src}
-                          alt={primaryHotelStay.place.name}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 1280px) 100vw, 360px"
-                          unoptimized={homeBaseHero.unoptimized}
-                        />
-                      </div>
-                      <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                        Hotel
-                      </span>
-                    </>
-                  ) : (
-                    <div className="aspect-[16/10] w-full bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:from-[#2a2a2a] dark:to-[#1f1f1f]" />
-                  )}
-                </div>
-                <div>
-                  <p className="font-display text-lg font-semibold leading-snug text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-                    {primaryHotelStay.place.name}
-                  </p>
-                  <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-                    {formatShortStayRange(primaryHotelStay.startIso, primaryHotelStay.endIso)}
-                  </p>
-                  {(primaryHotelStay.place.address?.trim() || plan.location?.trim()) ? (
-                    <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                      {primaryHotelStay.place.address?.trim() || plan.location?.trim()}
-                    </p>
-                  ) : null}
-                </div>
+            {sortedHotelStays.length > 0 ? (
+              <div className="space-y-5">
+                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                  {sortedHotelStays.length} segment{sortedHotelStays.length === 1 ? "" : "s"} — shown by leg (dates + city).
+                </p>
+                <ul className="space-y-4">
+                  {sortedHotelStays.map((stay, idx) => (
+                    <li
+                      key={`${stay.startIso}-${stay.endIso}-${stay.place.mapsUrl}-${idx}`}
+                      className="rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-3 dark:border-white/10 dark:bg-dm-card"
+                    >
+                      {idx === 0 ? (
+                        <div className="relative -mx-3 -mt-3 mb-3 overflow-hidden rounded-t-xl">
+                          {homeBaseHero ? (
+                            <div className="relative aspect-[16/10] w-full">
+                              <Image
+                                src={homeBaseHero.src}
+                                alt={stay.place.name}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 1280px) 100vw, 360px"
+                                unoptimized={homeBaseHero.unoptimized}
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-[16/10] w-full bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:from-[#2a2a2a] dark:to-[#1f1f1f]" />
+                          )}
+                          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                            Hotel
+                          </span>
+                        </div>
+                      ) : null}
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                        {stay.destinationCity?.trim() || plan.location?.trim() || "Stay"}
+                      </p>
+                      <p className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+                        {stay.place.name}
+                      </p>
+                      {stay.userSelected ? (
+                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+                          Your pick
+                        </span>
+                      ) : stay.recommendedByConci ? (
+                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                          Suggested by Conci
+                        </span>
+                      ) : null}
+                      <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                        {formatShortStayRange(stay.startIso, stay.endIso)}
+                      </p>
+                      {(stay.place.address?.trim() || stay.notes?.trim()) ? (
+                        <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                          {stay.place.address?.trim() || stay.notes?.trim()}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : primaryHotelSummary ? (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
@@ -2269,12 +2366,24 @@ export function TripHostSetupDashboard({
             ) : (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 {canEditAsHost
-                  ? "Add lodging from Lodging on the calendar (above), Add places, or Trip Copilot — say whole trip vs which nights."
+                  ? "Choose a stay with Add hotel below, Lodging on the calendar, or Trip Copilot — say whole trip vs which nights."
                   : canEditTripWorkspace
                     ? "No home base saved yet. Suggest one to the host from Group progress."
                     : "No home base saved on the plan yet."}
               </p>
             )}
+            {canEditAsHost && tripDisplayRange?.startIso && tripDisplayRange?.endIso ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddPlacesOpen(false);
+                  setHotelSearchOpen(true);
+                }}
+                className="w-full rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-center text-xs font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4] sm:w-auto"
+              >
+                {sortedHotelStays.length > 0 ? "Change hotel" : "Add hotel"}
+              </button>
+            ) : null}
           </div>
         </aside>
       </div>
@@ -2331,14 +2440,19 @@ export function TripHostSetupDashboard({
         tripId={tripId}
         plan={plan}
         dateLabel={selectedDayLabel}
+        onAddRestaurant={addRestaurantToDay}
+        onAddExperience={addExperienceToDay}
+      />
+      <HostHotelSearchModal
+        open={canEditAsHost && hotelSearchOpen}
+        onClose={() => setHotelSearchOpen(false)}
+        plan={plan}
         tripRange={
           tripDisplayRange?.startIso && tripDisplayRange?.endIso
             ? { startIso: tripDisplayRange.startIso, endIso: tripDisplayRange.endIso }
             : null
         }
-        onAddRestaurant={addRestaurantToDay}
-        onAddExperience={addExperienceToDay}
-        onAddHotel={onHotelAddFromModal}
+        onCommit={onLodgingCommitFromModal}
       />
       <HostSetupPinDetailModal
         open={pinDetail !== null}
