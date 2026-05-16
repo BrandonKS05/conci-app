@@ -7,6 +7,7 @@ export type TripWorkspaceTabId =
   | "budget"
   | "fund"
   | "collaborate"
+  | "lodging"
   | "transportation";
 
 /** Section element ids (without #) → which main-column tab owns that block. */
@@ -16,6 +17,7 @@ export const TRIP_WORKSPACE_SECTION_TO_TAB: Record<string, TripWorkspaceTabId> =
   "sec-setup-copilot": "overview",
   "sec-preferences-adjustments": "collaborate",
   "sec-collab-sidebar": "collaborate",
+  "sec-lodging": "lodging",
   "sec-budget": "budget",
   "sec-trip-chat": "overview",
   "sec-itinerary": "collaborate",
