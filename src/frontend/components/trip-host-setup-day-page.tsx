@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CollabStateV1 } from "@/shared/collaboration";
 import {
-  DAY_VOTE_DAY_PAGE_CATEGORIES,
+  DAY_VOTE_CATEGORIES,
   mergeDayVoteStateForDate,
   parseDayVoteState,
   type DayVoteCategory,
@@ -19,8 +19,6 @@ import {
   normalizePlan,
   parseLocalIsoDate,
   type HostActivityPin,
-  type HostRestaurantPin,
-  type ItineraryDay,
   type TripPlan,
 } from "@/shared/trip-plan";
 
@@ -228,184 +226,11 @@ function isFlightActivityPin(p: HostActivityPin): boolean {
   return n.startsWith("Flight out ·") || n.startsWith("Flight back ·");
 }
 
-function itineraryDayForDate(plan: TripPlan, dateIso: string): ItineraryDay | null {
-  const days = plan.generatedItinerary?.days;
-  if (!days?.length) return null;
-  const byIso = days.find((d) => d.dateIso === dateIso);
-  if (byIso) return byIso;
-  const tr = plan.hostSetup?.tripRange;
-  if (tr?.startIso && tr.endIso) {
-    const idx = enumerateLocalIsoDays(tr.startIso, tr.endIso).indexOf(dateIso);
-    if (idx >= 0 && idx < days.length) return days[idx]!;
-  }
-  return null;
-}
 
-function normalizeMatchKey(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
 
-/** Match pinned label to generated itinerary row for time hints (food / activity titles). */
-function itineraryTimeForPinnedTitle(itin: ItineraryDay | null, pinTitle: string): string | null {
-  if (!itin) return null;
-  const pinKey = normalizeMatchKey(pinTitle);
-  if (!pinKey) return null;
-  const pinWords = pinKey.split(" ").filter((w) => w.length > 2);
-  for (const a of itin.activities) {
-    const actKey = normalizeMatchKey(a.title);
-    if (!actKey) continue;
-    const timeRaw = a.time?.trim();
-    if (!timeRaw) continue;
-    if (actKey.includes(pinKey) || pinKey.includes(actKey)) return timeRaw;
-    const actWords = actKey.split(" ").filter((w) => w.length > 2);
-    const overlap = actWords.filter((w) => pinWords.includes(w)).length;
-    if (overlap >= 2 || (overlap >= 1 && pinWords.length <= 2)) return timeRaw;
-  }
-  return null;
-}
 
-function parseClockOrPhaseMinutes(raw: string): number | null {
-  const s = raw.trim();
-  const lower = s.toLowerCase();
 
-  const m = s.match(/\b(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?\b/i);
-  if (m) {
-    let h = Number.parseInt(m[1]!, 10);
-    const min = Number.parseInt(m[2]!, 10);
-    const ap = m[3]?.toLowerCase().replace(/\./g, "");
-    if ((ap === "pm" || ap === "p") && h < 12) h += 12;
-    if ((ap === "am" || ap === "a") && h === 12) h = 0;
-    if (h >= 0 && h <= 23 && min >= 0 && min <= 59) return h * 60 + min;
-  }
 
-  const buckets: [string, number][] = [
-    ["early morning", 8 * 60],
-    ["morning", 9 * 60 + 30],
-    ["breakfast", 8 * 60 + 30],
-    ["brunch", 10 * 60 + 30],
-    ["noon", 12 * 60],
-    ["lunch", 12 * 60 + 30],
-    ["midday", 12 * 60 + 45],
-    ["afternoon", 15 * 60],
-    ["evening", 18 * 60],
-    ["sunset", 18 * 60 + 30],
-    ["dinner", 19 * 60 + 30],
-    ["night", 21 * 60],
-    ["late night", 22 * 60 + 30],
-  ];
-  for (const [word, mins] of buckets) {
-    if (lower.includes(word)) return mins;
-  }
-  return null;
-}
-
-function sortMinutesWithFallback(raw: string | null | undefined, tieBreak: number): number {
-  if (raw?.trim()) {
-    const n = parseClockOrPhaseMinutes(raw);
-    if (n != null) return n + (tieBreak % 12);
-  }
-  return 9 * 60 + tieBreak * 24;
-}
-
-function defaultMealPhaseLabel(index: number, total: number): string {
-  if (total <= 1) return "Meal";
-  if (total === 2) return index === 0 ? "Lunch" : "Dinner";
-  return index === 0 ? "Breakfast" : index === 1 ? "Lunch" : index === 2 ? "Dinner" : `Meal ${index + 1}`;
-}
-
-type ScheduleTimelineEntry = {
-  key: string;
-  sortMinutes: number;
-  timeDisplay: string;
-  label: string;
-  kindLabel: string;
-  href?: string;
-  recommendedByConci?: boolean;
-};
-
-function buildScheduleTimeline(
-  plan: TripPlan,
-  dateIso: string,
-  meals: HostRestaurantPin[],
-  activitiesNoFlights: HostActivityPin[]
-): ScheduleTimelineEntry[] {
-  const itin = itineraryDayForDate(plan, dateIso);
-  const rows: ScheduleTimelineEntry[] = [];
-
-  meals.forEach((p, i) => {
-    const fromItin = itineraryTimeForPinnedTitle(itin, p.place.name);
-    const fallbackLabel = defaultMealPhaseLabel(i, meals.length);
-    const timeDisplay = fromItin?.trim() || fallbackLabel;
-    rows.push({
-      key: `m-${p.place.mapsUrl}`,
-      sortMinutes: sortMinutesWithFallback(fromItin ?? fallbackLabel, i),
-      timeDisplay,
-      label: p.place.name,
-      kindLabel: "Restaurant",
-      href: p.place.mapsUrl,
-      recommendedByConci: p.recommendedByConci === true,
-    });
-  });
-
-  activitiesNoFlights.forEach((p, i) => {
-    const fromItin = itineraryTimeForPinnedTitle(itin, p.experience.name);
-    const dur = p.experience.duration?.trim();
-    const timeDisplay = fromItin?.trim() || dur || "Time TBD";
-    rows.push({
-      key: `a-${p.experience.bookingUrl}`,
-      sortMinutes: sortMinutesWithFallback(fromItin ?? dur, meals.length + i + 3),
-      timeDisplay,
-      label: p.experience.name,
-      kindLabel: "Activity",
-      href: p.experience.bookingUrl || undefined,
-      recommendedByConci: p.recommendedByConci === true,
-    });
-  });
-
-  rows.sort((a, b) => a.sortMinutes - b.sortMinutes || a.label.localeCompare(b.label));
-  return rows;
-}
-
-function DayScheduleTimeline({ entries }: { entries: ScheduleTimelineEntry[] }) {
-  return (
-    <div className="ml-1 border-l-2 border-neutral-300 py-1 dark:border-white/20">
-      <ul className="space-y-0">
-        {entries.map((e) => (
-          <li key={e.key} className="relative pb-8 pl-8 last:pb-1">
-            <span
-              className="absolute left-0 top-1.5 size-3 -translate-x-[calc(50%+1px)] rounded-full bg-[#e91e8c] shadow-[0_0_0_4px_rgba(247,246,248,1)] dark:bg-[#ff4da6] dark:shadow-[0_0_0_4px_rgba(18,18,18,1)]"
-              aria-hidden
-            />
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="font-mono text-[13px] font-bold tabular-nums text-neutral-800 dark:text-neutral-200">
-                {e.timeDisplay}
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#c4176d] dark:text-[#ff7eb8]">
-                {e.kindLabel}
-              </span>
-            </div>
-            <p className="mt-1.5 font-sans text-base font-bold text-neutral-950 dark:text-white">{e.label}</p>
-            {e.recommendedByConci ? (
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-neutral-500/80 dark:text-neutral-500/70">
-                recommended by CONCI
-              </p>
-            ) : null}
-            {e.href ? (
-              <a
-                href={e.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex font-sans text-[10px] font-black uppercase tracking-wide text-[#0066cc] underline-offset-2 hover:underline dark:text-sky-400"
-              >
-                Map / link
-              </a>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 function EmptyHint({ label }: { label: string }) {
   return (
@@ -502,7 +327,7 @@ export function TripHostSetupDayPage({
   useEffect(() => {
     setPlan(initialPlan);
     setDayVotingByDate(mergeDayVoteStateForDate(initialPlan, parseDayVoteState(initialCollab.dayVoting), dateIso, collabHintsFrom(initialCollab)));
-  }, [initialPlan, initialCollab.dayVoting, dateIso]);
+  }, [initialPlan, initialCollab, dateIso]);
 
   useEffect(() => {
     let cancelled = false;
@@ -670,10 +495,7 @@ export function TripHostSetupDayPage({
     [plan, dayVotingByDate, dateIso, initialCollab]
   );
 
-  const activitiesNoFlights = useMemo(
-    () => activities.filter((p) => !isFlightActivityPin(p)),
-    [activities]
-  );
+
 
   /** Items for Today's Itinerary — generatedItinerary base, confirmed vote options override/inject. */
   const scheduleItems = useMemo(() => {
@@ -1227,65 +1049,7 @@ export function TripHostSetupDayPage({
                 </ul>
               )}
 
-              {showSuggestForm ? (
-                <div className="rounded-xl border border-[color:var(--hairline)]/90 bg-white p-3 dark:border-white/10 dark:bg-dm-elevated">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                    Suggest an option
-                  </p>
-                  {!canSuggest ? (
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                      Host set you to vote-only on suggestions. You can still vote on all options.
-                    </p>
-                  ) : null}
-                  <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <input
-                      value={draft.label}
-                      onChange={(e) =>
-                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))
-                      }
-                      disabled={!canSuggest}
-                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                      placeholder={`${dayCategoryTitle(category)} option`}
-                    />
-                    <input
-                      value={draft.detail}
-                      onChange={(e) =>
-                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, detail: e.target.value } }))
-                      }
-                      disabled={!canSuggest}
-                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                      placeholder="Optional detail"
-                    />
-                    <input
-                      value={draft.href}
-                      onChange={(e) =>
-                        setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, href: e.target.value } }))
-                      }
-                      disabled={!canSuggest}
-                      className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1.5 text-sm dark:border-white/10 dark:bg-dm-card"
-                      placeholder="Optional URL"
-                    />
-                    <button
-                      type="button"
-                      disabled={!canSuggest || busyKey === `suggest:${category}` || !draft.label.trim()}
-                      onClick={() =>
-                        void runDayAction({
-                          action: "suggest",
-                          category,
-                          label: draft.label,
-                          detail: draft.detail,
-                          href: draft.href,
-                        }).then(() =>
-                          setSuggestDraft((prev) => ({ ...prev, [category]: { label: "", detail: "", href: "" } }))
-                        )
-                      }
-                      className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+
             </DropSection>
           );
         })}
