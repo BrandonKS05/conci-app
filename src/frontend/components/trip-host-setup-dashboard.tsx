@@ -203,9 +203,8 @@ function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
 }
 
 function calendarPinShellClass(emphasis: boolean): string {
-  return emphasis
-    ? "rounded-full bg-[#1c1c17] px-2 py-1 text-[color:var(--surface)] shadow-none dark:bg-neutral-200 dark:text-dm-page"
-    : "rounded-full border border-[color:var(--hairline-strong)] bg-transparent px-2 py-0.5 dark:border-white/20";
+  if (!emphasis) return "min-w-0 py-0.5";
+  return "rounded-md bg-[#1c1c17] px-1.5 py-1 shadow-none dark:bg-neutral-200";
 }
 
 /** Human-readable range for the confirm dialog. */
