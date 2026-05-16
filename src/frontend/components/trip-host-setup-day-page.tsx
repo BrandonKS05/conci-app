@@ -152,7 +152,7 @@ function DaySpendEstimateBar({
     <div className="mt-3 space-y-2">
       {estimatedTotalUsd <= 0 ? (
         <p className="font-sans text-xs text-neutral-500 dark:text-neutral-500">
-          Pin a hotel night, restaurants, or experiences on this day to build an estimate.
+          Pin restaurants or experiences on this day to build an estimate. Lodging is managed on the trip calendar.
         </p>
       ) : (
         <div className="h-3 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/15">
@@ -169,7 +169,7 @@ function DaySpendEstimateBar({
       <ul className="space-y-1 font-sans text-[11px] text-neutral-600 dark:text-neutral-400">
         {estimatedTotalUsd <= 0 ? null : hotelUsd > 0 ? (
           <li className="flex justify-between gap-2">
-            <span className="text-teal-700 dark:text-teal-300">Hotel (night share)</span>
+            <span className="text-teal-700 dark:text-teal-300">Lodging (night share)</span>
             <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
               {formatUsd(hotelUsd)}
             </span>
@@ -910,7 +910,7 @@ export function TripHostSetupDayPage({
           const draft = suggestDraft[category] ?? { label: "", detail: "", href: "" };
           const canPinCategory =
             isHost &&
-            (category === "restaurants" || category === "activities" || category === "hotels");
+            (category === "restaurants" || category === "activities");
 
           return (
             <DropSection

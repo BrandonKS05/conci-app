@@ -34,6 +34,7 @@ import {
   type HostActivityExperience,
   type HostActivityPin,
   type HostHotelStay,
+  type HostLodgingType,
   type HostRestaurantPin,
   type HostSetupState,
   type TripPlan,
@@ -48,6 +49,7 @@ import {
 import {
   HostHotelSearchModal,
   type HostLodgingCommitPayload,
+  type LodgingModalSeed,
 } from "@/frontend/components/host-hotel-search-modal";
 import {
   HostSetupAddPlacesModal,
@@ -178,6 +180,10 @@ const HOST_CALENDAR_HOTEL_EDGE_LABEL: Record<HostHotelCalendarEdge, string> = {
   "check-out": "Check-out",
   "check-in-out": "Check-in · Check-out",
 };
+
+function lodgingTypeBadgeLabel(type: HostLodgingType | undefined): string {
+  return type === "airbnb" ? "Airbnb" : "Hotel";
+}
 
 /** Sunday-first month grid padding (matches reference editorial layout). */
 function calendarCellsSundayFirst(viewYear: number, viewMonth: number): (number | null)[] {
@@ -471,6 +477,13 @@ export function TripHostSetupDashboard({
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [addPlacesOpen, setAddPlacesOpen] = useState(false);
   const [hotelSearchOpen, setHotelSearchOpen] = useState(false);
+  const [lodgingModalSeed, setLodgingModalSeed] = useState<LodgingModalSeed | null>(null);
+
+  const openLodgingModal = useCallback((seed?: LodgingModalSeed | null) => {
+    setAddPlacesOpen(false);
+    setLodgingModalSeed(seed ?? null);
+    setHotelSearchOpen(true);
+  }, []);
   const [pinDetail, setPinDetail] = useState<PinDetailState | null>(null);
   const [removePinConfirm, setRemovePinConfirm] = useState<{
     kind: "meal" | "activity";
@@ -765,6 +778,7 @@ export function TripHostSetupDashboard({
           guestCount: payload.guestCount,
           roomCount: payload.roomCount,
           userSelected: true,
+          lodgingType: payload.lodgingType,
         }
       );
       const gi = plan.generatedItinerary
@@ -1484,21 +1498,18 @@ export function TripHostSetupDashboard({
                     Lodging
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                    Conci still suggests a home base when you have none. Use <span className="font-medium">Add or change hotel</span> to
+                    Conci still suggests lodging when you have none. Use <span className="font-medium">Add or change lodging</span> to
                     override with your own pick — those stays are kept on refit. Trip Copilot can change lodging when you ask it to book a
-                    hotel.
+                    stay.
                   </p>
                 </div>
                 {canEditAsHost && tripDisplayRange?.startIso ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setAddPlacesOpen(false);
-                      setHotelSearchOpen(true);
-                    }}
+                    onClick={() => openLodgingModal()}
                     className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
                   >
-                    Add or change hotel
+                    Add or change lodging
                   </button>
                 ) : null}
               </div>
@@ -1507,7 +1518,7 @@ export function TripHostSetupDashboard({
                 if (!stays.length) {
                   return (
                     <p className="mt-3 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                      No stay saved yet — use Add or change hotel above after you pick dates.
+                      No stay saved yet — use Add or change lodging above, the calendar toolbar, or tap a lodging row on the calendar.
                     </p>
                   );
                 }
@@ -1620,11 +1631,21 @@ export function TripHostSetupDashboard({
             {/* Secondary calendar toolbar — actions + peers, kept accessible but visually minimal */}
             {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
               <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
+                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
+                  <button
+                    type="button"
+                    onClick={() => openLodgingModal()}
+                    className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
+                  >
+                    Add lodging
+                  </button>
+                ) : null}
                 {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
                   <button
                     type="button"
                     onClick={() => {
                       setHotelSearchOpen(false);
+                      setLodgingModalSeed(null);
                       setSelectedDayIso(hostSetup.tripRange!.startIso);
                       setAddPlacesOpen(true);
                     }}
@@ -1642,6 +1663,7 @@ export function TripHostSetupDashboard({
                       setSelectedDayIso(null);
                       setAddPlacesOpen(false);
                       setHotelSearchOpen(false);
+                      setLodgingModalSeed(null);
                       setPendingRangeConfirm(null);
                     }}
                     className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
@@ -1770,25 +1792,46 @@ export function TripHostSetupDashboard({
                       const metaPin = pem
                         ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
                         : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
-                      calendarCellEntries.push(
-                        <div
-                          key={`stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`}
-                          className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}
-                        >
-                          <div className={["flex items-start gap-1.5 text-left leading-snug", onPin].join(" ")}>
-                            <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                              {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
-                              {hotelForDay.recommendedByConci ? (
-                                <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
-                                  recommended by CONCI
-                                </span>
-                              ) : null}
-                            </span>
-                            <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                              {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
-                            </span>
-                          </div>
+                      const lodgingPinBody = (
+                        <div className={["flex items-start gap-1.5 text-left leading-snug", onPin].join(" ")}>
+                          <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                            {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
+                            {hotelForDay.recommendedByConci ? (
+                              <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
+                                recommended by CONCI
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
+                            {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
+                          </span>
                         </div>
+                      );
+                      const lodgingPinKey = `stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`;
+                      calendarCellEntries.push(
+                        canEditAsHost ? (
+                          <button
+                            key={lodgingPinKey}
+                            type="button"
+                            title="Change lodging for this stay"
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              openLodgingModal({
+                                checkIn: hotelForDay.startIso,
+                                checkOut: hotelForDay.endIso,
+                                destination: hotelForDay.destinationCity?.trim() || undefined,
+                                lodgingType: hotelForDay.lodgingType ?? "hotel",
+                              });
+                            }}
+                            className={["min-w-0 w-full cursor-pointer text-left", calendarPinShellClass(pem)].join(" ")}
+                          >
+                            {lodgingPinBody}
+                          </button>
+                        ) : (
+                          <div key={lodgingPinKey} className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}>
+                            {lodgingPinBody}
+                          </div>
+                        )
                       );
                     }
                     for (const p of mealPinsForCell) {
@@ -2293,11 +2336,11 @@ export function TripHostSetupDashboard({
 
         </main>
 
-        {/* RIGHT RAIL — home base only; flights live on the Transportation tab */}
+        {/* RIGHT RAIL — lodging only; flights live on the Transportation tab */}
         <aside className="space-y-10 lg:col-span-2 lg:row-start-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:self-start xl:sticky xl:top-28 xl:pr-1">
           <div className="scroll-mt-28 space-y-4">
             <h3 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-              Home base
+              Lodging
             </h3>
             {sortedHotelStays.length > 0 ? (
               <div className="space-y-5">
@@ -2327,7 +2370,7 @@ export function TripHostSetupDashboard({
                             <div className="aspect-[16/10] w-full bg-gradient-to-br from-[color:var(--surface-container-low)] to-[color:var(--surface-container-high)] dark:from-[#2a2a2a] dark:to-[#1f1f1f]" />
                           )}
                           <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                            Hotel
+                            {lodgingTypeBadgeLabel(stay.lodgingType)}
                           </span>
                         </div>
                       ) : null}
@@ -2365,22 +2408,19 @@ export function TripHostSetupDashboard({
             ) : (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                 {canEditAsHost
-                  ? "Choose a stay with Add hotel below, Lodging on the calendar, or Trip Copilot — say whole trip vs which nights."
+                  ? "Choose a stay with Add lodging below, the Lodging card, or Trip Copilot — say whole trip vs which nights."
                   : canEditTripWorkspace
-                    ? "No home base saved yet. Suggest one to the host from Group progress."
-                    : "No home base saved on the plan yet."}
+                    ? "No lodging saved yet. Suggest one to the host from Group progress."
+                    : "No lodging saved on the plan yet."}
               </p>
             )}
             {canEditAsHost && tripDisplayRange?.startIso && tripDisplayRange?.endIso ? (
               <button
                 type="button"
-                onClick={() => {
-                  setAddPlacesOpen(false);
-                  setHotelSearchOpen(true);
-                }}
+                onClick={() => openLodgingModal()}
                 className="w-full rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-center text-xs font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4] sm:w-auto"
               >
-                {sortedHotelStays.length > 0 ? "Change hotel" : "Add hotel"}
+                {sortedHotelStays.length > 0 ? "Change lodging" : "Add lodging"}
               </button>
             ) : null}
           </div>
@@ -2444,13 +2484,17 @@ export function TripHostSetupDashboard({
       />
       <HostHotelSearchModal
         open={canEditAsHost && hotelSearchOpen}
-        onClose={() => setHotelSearchOpen(false)}
+        onClose={() => {
+          setHotelSearchOpen(false);
+          setLodgingModalSeed(null);
+        }}
         plan={plan}
         tripRange={
           tripDisplayRange?.startIso && tripDisplayRange?.endIso
             ? { startIso: tripDisplayRange.startIso, endIso: tripDisplayRange.endIso }
             : null
         }
+        initialSeed={lodgingModalSeed}
         onCommit={onLodgingCommitFromModal}
       />
       <HostSetupPinDetailModal

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import type { TripPlan } from "@/shared/trip-plan";
+import type { HostLodgingType, TripPlan } from "@/shared/trip-plan";
 import { buildLodgingSegmentPresets, type LodgingSegmentPreset } from "@/shared/lodging-segments";
 import {
   mockHotelResultToPlace,
@@ -15,10 +15,19 @@ export type HostLodgingCommitPayload = {
   stayStartIso: string;
   stayEndIso: string;
   destinationCity?: string;
+  lodgingType?: HostLodgingType;
   bookingUrl?: string | null;
   notes?: string | null;
   guestCount?: number;
   roomCount?: number;
+};
+
+export type LodgingModalSeed = {
+  segmentId?: string;
+  checkIn?: string;
+  checkOut?: string;
+  destination?: string;
+  lodgingType?: HostLodgingType;
 };
 
 type Props = {
@@ -26,8 +35,17 @@ type Props = {
   onClose: () => void;
   plan: TripPlan;
   tripRange: { startIso: string; endIso: string } | null;
+  initialSeed?: LodgingModalSeed | null;
   onCommit: (payload: HostLodgingCommitPayload) => void;
 };
+
+const lodgingTabClass = (active: boolean) =>
+  [
+    "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition",
+    active
+      ? "bg-[#1c1c17] text-[color:var(--surface)] dark:bg-neutral-200 dark:text-dm-page"
+      : "text-[color:var(--on-surface-muted)] hover:bg-[color:var(--surface-container-low)] dark:text-neutral-400 dark:hover:bg-white/5",
+  ].join(" ");
 
 const fieldLabel = "text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500";
 
@@ -57,9 +75,10 @@ function applyPresetToFields(p: LodgingSegmentPreset, trip: { startIso: string; 
   };
 }
 
-export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit }: Props) {
+export function HostHotelSearchModal({ open, onClose, plan, tripRange, initialSeed, onCommit }: Props) {
   const segmentPresets = useMemo(() => buildLodgingSegmentPresets(plan, tripRange), [plan, tripRange]);
   const [segmentId, setSegmentId] = useState<string>("whole");
+  const [lodgingType, setLodgingType] = useState<HostLodgingType>("hotel");
 
   const [destination, setDestination] = useState("");
   const [checkIn, setCheckIn] = useState("");
@@ -80,8 +99,12 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
     segmentPresets.find((s) => s.id === segmentId) ?? segmentPresets[0] ?? null;
 
   const resetOnOpen = useCallback(() => {
-    const first = segmentPresets[0];
-    setSegmentId(first?.id ?? "whole");
+    const seedPreset = initialSeed?.segmentId
+      ? segmentPresets.find((s) => s.id === initialSeed.segmentId)
+      : null;
+    const first = seedPreset ?? segmentPresets[0];
+    const sid = initialSeed?.segmentId ?? first?.id ?? "whole";
+    setSegmentId(sid);
     const preset = first ?? {
       id: "fallback",
       label: "",
@@ -90,9 +113,10 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
       endIso: tripRange?.endIso ?? "",
     };
     const f = applyPresetToFields(preset as LodgingSegmentPreset, tripRange);
-    setDestination(f.destination);
-    setCheckIn(f.checkIn);
-    setCheckOut(f.checkOut);
+    setDestination(initialSeed?.destination?.trim() || f.destination);
+    setCheckIn(initialSeed?.checkIn || f.checkIn);
+    setCheckOut(initialSeed?.checkOut || f.checkOut);
+    setLodgingType(initialSeed?.lodgingType ?? "hotel");
     const pc = plan.people.count;
     if (typeof pc === "number" && pc > 0) setGuests(Math.min(12, pc));
     setRooms(1);
@@ -100,15 +124,15 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
     setManualOpen(false);
     setManualName("");
     setManualAddress("");
-    setManualCity(f.destination);
+    setManualCity(initialSeed?.destination?.trim() || f.destination);
     setManualBookingUrl("");
     setManualNotes("");
-  }, [segmentPresets, plan.location, plan.title, plan.people.count, tripRange]);
+  }, [segmentPresets, plan.location, plan.title, plan.people.count, tripRange, initialSeed]);
 
   useEffect(() => {
     if (!open) return;
     resetOnOpen();
-  }, [open, resetOnOpen]);
+  }, [open, initialSeed, resetOnOpen]);
 
   useEffect(() => {
     if (!open || !activePreset) return;
@@ -128,12 +152,13 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
         checkOutIso: checkOut,
         guests,
         rooms,
+        lodgingType,
       });
       setResults(rows);
     } finally {
       setSearching(false);
     }
-  }, [destination, checkIn, checkOut, guests, rooms]);
+  }, [destination, checkIn, checkOut, guests, rooms, lodgingType]);
 
   const commit = useCallback(
     (place: PlaceSpotlight, extra?: { bookingUrl?: string | null; notes?: string | null }) => {
@@ -143,6 +168,7 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
         stayStartIso: checkIn,
         stayEndIso: checkOut,
         destinationCity: destination.trim() || activePreset?.cityLabel,
+        lodgingType,
         bookingUrl: extra?.bookingUrl ?? null,
         notes: extra?.notes ?? null,
         guestCount: guests,
@@ -150,7 +176,7 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
       });
       onClose();
     },
-    [activePreset?.cityLabel, checkIn, checkOut, destination, guests, rooms, onCommit, onClose]
+    [activePreset?.cityLabel, checkIn, checkOut, destination, guests, rooms, lodgingType, onCommit, onClose]
   );
 
   const onSetManual = useCallback(() => {
@@ -185,7 +211,20 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
   if (!open) return null;
 
   const showSegmentPicker = segmentPresets.length > 1;
+  const cityLegPresets = segmentPresets.filter((p) => p.id !== "whole");
+  const isWholeTrip =
+    segmentId === "whole" &&
+    tripRange &&
+    checkIn === tripRange.startIso &&
+    checkOut === tripRange.endIso;
   const datesValid = Boolean(checkIn && checkOut && checkIn <= checkOut);
+
+  const pickNextCityLeg = () => {
+    if (!cityLegPresets.length) return;
+    const idx = cityLegPresets.findIndex((p) => p.id === segmentId);
+    const next = cityLegPresets[(idx + 1) % cityLegPresets.length]!;
+    setSegmentId(next.id);
+  };
 
   return (
     <div
@@ -203,12 +242,11 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
                 id="lodging-search-title"
                 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]"
               >
-                Find your stay
+                Add lodging
               </h2>
               <p className="mt-1 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-400">
-                Optional override — Conci still suggests a home base when you have not picked one. Your choice here is saved as{" "}
-                <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">your pick</span> and kept on itinerary
-                refit. Ask Trip Copilot to book or change a hotel when you want AI to set lodging instead.
+                Defaults to your <span className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">whole trip</span> — narrow
+                check-in and check-out for multi-city legs. Conci still suggests lodging when you have none; your picks stay on refit.
               </p>
             </div>
             <button
@@ -222,10 +260,19 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+          <div className="mb-4 flex rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-1 dark:border-white/10 dark:bg-dm-page">
+            <button type="button" className={lodgingTabClass(lodgingType === "hotel")} onClick={() => setLodgingType("hotel")}>
+              Hotel
+            </button>
+            <button type="button" className={lodgingTabClass(lodgingType === "airbnb")} onClick={() => setLodgingType("airbnb")}>
+              Airbnb
+            </button>
+          </div>
+
           {showSegmentPicker ? (
             <div className="mb-4">
               <label htmlFor="lodging-segment" className={fieldLabel}>
-                Trip segment
+                Which leg of the trip?
               </label>
               <select
                 id="lodging-segment"
@@ -240,10 +287,18 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
                 ))}
               </select>
               <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                Multi-city trips: pick which leg this hotel belongs to. Dates prefilled from an even split of your trip days across
-                destination poll options (heuristic).
+                Start with whole trip, or pick a city leg and adjust dates. Add multiple stays for split itineraries.
               </p>
+              {cityLegPresets.length > 0 ? (
+                <button type="button" className={`${btnSecondary} mt-2 text-xs`} onClick={pickNextCityLeg}>
+                  Add stay in another city
+                </button>
+              ) : null}
             </div>
+          ) : isWholeTrip ? (
+            <p className="mb-4 rounded-xl bg-[color:var(--surface-container-low)] px-3 py-2 text-xs text-[color:var(--on-surface-muted)] dark:bg-dm-page dark:text-neutral-400">
+              Covering your full trip ({checkIn} → {checkOut}). Change dates below for a shorter stay or add another stay after saving.
+            </p>
           ) : null}
 
           <div className="space-y-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/60 p-4 dark:border-white/10 dark:bg-dm-page/40">
@@ -342,7 +397,7 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
                 value={manualName}
                 onChange={(e) => setManualName(e.target.value)}
                 className={inputClass}
-                placeholder="Hotel name *"
+                placeholder={lodgingType === "airbnb" ? "Listing name *" : "Hotel name *"}
               />
               <input
                 value={manualAddress}
@@ -411,7 +466,7 @@ export function HostHotelSearchModal({ open, onClose, plan, tripRange, onCommit 
                       disabled={!datesValid}
                       onClick={() => commit(mockHotelResultToPlace(r, destination))}
                     >
-                      Set as hotel
+                      {lodgingType === "airbnb" ? "Set as stay" : "Set as lodging"}
                     </button>
                   </div>
                 </li>

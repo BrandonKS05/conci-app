@@ -12,10 +12,9 @@ export const DAY_VOTE_CATEGORIES = [
 
 export type DayVoteCategory = (typeof DAY_VOTE_CATEGORIES)[number];
 
-/** Host day page: collaboration for dining, lodging, and activities — not flights (calendar / transport). */
+/** Host day page: dining & activities — lodging is managed on the trip calendar, not day view. */
 export const DAY_VOTE_DAY_PAGE_CATEGORIES = [
   "restaurants",
-  "hotels",
   "activities",
   "other",
 ] as const satisfies readonly DayVoteCategory[];

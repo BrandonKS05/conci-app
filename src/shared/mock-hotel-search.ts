@@ -1,4 +1,5 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
+import type { HostLodgingType } from "@/shared/trip-plan";
 
 export type MockHotelSearchInput = {
   destination: string;
@@ -6,6 +7,7 @@ export type MockHotelSearchInput = {
   checkOutIso: string;
   guests: number;
   rooms: number;
+  lodgingType: HostLodgingType;
 };
 
 export type MockHotelResult = {
@@ -18,9 +20,10 @@ export type MockHotelResult = {
   priceEstimatePerNight: string;
   gradientFrom: string;
   gradientTo: string;
+  lodgingType: HostLodgingType;
 };
 
-const SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine">[] = [
+const HOTEL_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [
   {
     neighborhood: "Waterfront",
     rating: 4.7,
@@ -45,21 +48,32 @@ const SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine">[] = [
     gradientFrom: "#9a3412",
     gradientTo: "#78350f",
   },
+];
+
+const AIRBNB_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [
   {
-    neighborhood: "Central station",
-    rating: 4.3,
-    description: "Practical pick for train arrivals; soundproofed windows and 24h desk.",
-    priceEstimatePerNight: "~$132 / night",
-    gradientFrom: "#1e3a8a",
-    gradientTo: "#172554",
+    neighborhood: "Residential core",
+    rating: 4.9,
+    description: "Bright 2BR with kitchen, washer/dryer, and a small balcony — ideal for groups.",
+    priceEstimatePerNight: "~$142 / night",
+    gradientFrom: "#ff385c",
+    gradientTo: "#e11d48",
   },
   {
-    neighborhood: "Garden side",
+    neighborhood: "Walkable downtown",
+    rating: 4.7,
+    description: "Entire loft, fast Wi‑Fi, dedicated workspace, self check-in lockbox.",
+    priceEstimatePerNight: "~$118 / night",
+    gradientFrom: "#c2410c",
+    gradientTo: "#9a3412",
+  },
+  {
+    neighborhood: "Quiet block",
     rating: 4.6,
-    description: "Courtyard seating, family-sized rooms, breakfast included in many rates.",
-    priceEstimatePerNight: "~$174 / night",
-    gradientFrom: "#166534",
-    gradientTo: "#14532d",
+    description: "Cozy 1BR guest suite with street parking and a shared patio.",
+    priceEstimatePerNight: "~$96 / night",
+    gradientFrom: "#be185d",
+    gradientTo: "#831843",
   },
 ];
 
@@ -68,16 +82,27 @@ export async function mockHotelSearch(input: MockHotelSearchInput): Promise<Mock
   await new Promise((r) => setTimeout(r, 420));
   const city = input.destination.trim() || "City center";
   const seed =
-    (input.checkInIso + input.checkOutIso + input.guests + input.rooms).split("").reduce((a, c) => a + c.charCodeAt(0), 0) %
-    1000;
+    (input.checkInIso + input.checkOutIso + input.guests + input.rooms + input.lodgingType)
+      .split("")
+      .reduce((a, c) => a + c.charCodeAt(0), 0) % 1000;
 
-  return SKELETONS.map((s, i) => {
-    const n = `${["The", "Hotel", "Studio", "Inn"][i % 4]!} ${["North", "South", "East", "West"][Math.floor(i / 2) % 4]!} ${city.split(/\s+/)[0] ?? city}`;
+  const skeletons = input.lodgingType === "airbnb" ? AIRBNB_SKELETONS : HOTEL_SKELETONS;
+  const namePrefixes =
+    input.lodgingType === "airbnb"
+      ? ["Sunny", "Cozy", "Modern", "Garden"]
+      : ["The", "Hotel", "Studio", "Inn"];
+  const nameSuffixes =
+    input.lodgingType === "airbnb"
+      ? ["Flat", "Loft", "Suite", "Townhouse"]
+      : ["North", "South", "East", "West"];
+
+  return skeletons.map((s, i) => {
+    const n = `${namePrefixes[i % namePrefixes.length]!} ${nameSuffixes[Math.floor(i / 2) % nameSuffixes.length]!} · ${city.split(/\s+/)[0] ?? city}`;
     const streetNum = 120 + ((seed + i * 17) % 80);
     const street = ["Harbor", "Maple", "Station", "Garden", "River"][i % 5]!;
     return {
-      id: `mock-${seed}-${i}`,
-      name: `${n}`,
+      id: `mock-${input.lodgingType}-${seed}-${i}`,
+      name: n,
       neighborhood: s.neighborhood,
       addressLine: `${streetNum} ${street} St, ${city}`,
       rating: Math.min(5, s.rating + ((seed + i) % 3) * 0.05),
@@ -85,11 +110,15 @@ export async function mockHotelSearch(input: MockHotelSearchInput): Promise<Mock
       priceEstimatePerNight: s.priceEstimatePerNight,
       gradientFrom: s.gradientFrom,
       gradientTo: s.gradientTo,
+      lodgingType: input.lodgingType,
     };
   });
 }
 
-export function mockHotelResultToPlace(r: MockHotelResult, destinationCity: string): PlaceSpotlight {
+export function mockHotelResultToPlace(
+  r: MockHotelResult,
+  destinationCity: string
+): PlaceSpotlight {
   const q = `${r.name} ${r.addressLine}`;
   return {
     name: r.name,

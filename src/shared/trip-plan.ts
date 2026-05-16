@@ -72,15 +72,18 @@ export type HostActivityPin = {
   recommendedByConci?: boolean;
 };
 
+export type HostLodgingType = "hotel" | "airbnb";
+
 /** Optional fields saved on a lodging segment (multi-city / booking links). */
 export type HostLodgingStayMeta = {
   /** City or stop this stay is tied to (may differ from plan-wide `location`). */
   destinationCity?: string;
+  lodgingType?: HostLodgingType;
   bookingUrl?: string | null;
   notes?: string | null;
   guestCount?: number;
   roomCount?: number;
-  /** Host picked this stay in the app (modal / calendar); refits must not replace it unless they ask AI to change hotel. */
+  /** Host picked this stay in the app (modal / calendar); refits must not replace it unless they ask AI to change lodging. */
   userSelected?: boolean;
 };
 
@@ -332,6 +335,9 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       const guestCount = typeof o.guestCount === "number" && Number.isFinite(o.guestCount) ? o.guestCount : undefined;
       const roomCount = typeof o.roomCount === "number" && Number.isFinite(o.roomCount) ? o.roomCount : undefined;
       const userSelected = o.userSelected === true;
+      const lodgingTypeRaw = o.lodgingType;
+      const lodgingType =
+        lodgingTypeRaw === "hotel" || lodgingTypeRaw === "airbnb" ? lodgingTypeRaw : undefined;
       if (startIso <= endIso) {
         list.push({
           startIso,
@@ -339,6 +345,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
           place,
           ...(recommendedByConci ? { recommendedByConci: true } : {}),
           ...(userSelected ? { userSelected: true } : {}),
+          ...(lodgingType ? { lodgingType } : {}),
           ...(destinationCity ? { destinationCity } : {}),
           ...(bookingUrl !== undefined ? { bookingUrl } : {}),
           ...(notes ? { notes } : {}),
@@ -1280,6 +1287,7 @@ export function applyHostLodgingSegment(
         ...(meta.guestCount !== undefined ? { guestCount: meta.guestCount } : {}),
         ...(meta.roomCount !== undefined ? { roomCount: meta.roomCount } : {}),
         ...(meta.userSelected === true ? { userSelected: true, recommendedByConci: false } : {}),
+        ...(meta.lodgingType ? { lodgingType: meta.lodgingType } : {}),
       };
     }
     return s;
