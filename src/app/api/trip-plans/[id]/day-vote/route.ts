@@ -10,6 +10,7 @@ import {
   type DayVoteCategory,
 } from "@/shared/day-collaboration";
 import { parseCollabState } from "@/shared/collaboration";
+import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
   applyHostHotelDateRange,
   enumerateLocalIsoDays,
@@ -19,7 +20,6 @@ import {
   type HostActivityPin,
   type HostRestaurantPin,
   type HostSetupState,
-  type PlaceSpotlight,
   type TripPlan,
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
