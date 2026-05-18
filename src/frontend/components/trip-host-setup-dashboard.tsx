@@ -180,6 +180,38 @@ function lodgingTypeBadgeLabel(type: HostLodgingType | undefined): string {
   return type === "airbnb" ? "Airbnb" : "Hotel";
 }
 
+function StayCardHeroImage({
+  src,
+  alt,
+  unoptimized,
+  lodgingType,
+}: {
+  src: string;
+  alt: string;
+  unoptimized: boolean;
+  lodgingType: HostLodgingType | undefined;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+
+  return (
+    <div className="relative h-28 w-full overflow-hidden border-b border-[color:var(--hairline)] sm:h-32 dark:border-white/10">
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className="object-cover"
+        sizes="(max-width: 768px) 100vw, 480px"
+        unoptimized={unoptimized}
+        onError={() => setFailed(true)}
+      />
+      <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+        {lodgingTypeBadgeLabel(lodgingType)}
+      </span>
+    </div>
+  );
+}
+
 type TripLodgingPanelProps = {
   plan: TripPlan;
   canEditAsHost: boolean;
@@ -249,19 +281,12 @@ function TripLodgingPanel({
                 className="overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card"
               >
                 {idx === 0 && homeBaseHero ? (
-                  <div className="relative aspect-[16/10] w-full">
-                    <Image
-                      src={homeBaseHero.src}
-                      alt={stay.place.name}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1280px) 100vw, 720px"
-                      unoptimized={homeBaseHero.unoptimized}
-                    />
-                    <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                      {lodgingTypeBadgeLabel(stay.lodgingType)}
-                    </span>
-                  </div>
+                  <StayCardHeroImage
+                    src={homeBaseHero.src}
+                    alt={stay.place.name}
+                    unoptimized={homeBaseHero.unoptimized}
+                    lodgingType={stay.lodgingType}
+                  />
                 ) : null}
                 <div className="px-3 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
