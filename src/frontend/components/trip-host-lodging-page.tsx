@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AppTopNav } from "@/frontend/components/app-top-nav";
 import {
   mockHotelResultToPlace,
   type MockHotelAmenityIcon,
@@ -20,16 +21,13 @@ import {
 type StayTab = "all" | "hotels" | "homes";
 type SortKey = "recommended" | "price_low" | "price_high" | "rating";
 
-const TEAL = "#00897b";
-const RATING_GREEN = "#1b5e20";
-
 const POPULAR_FILTERS = [
-  { id: "downtown", label: "Downtown", count: 38 },
-  { id: "breakfast", label: "Breakfast included", count: 571 },
-  { id: "shuttle", label: "Airport shuttle included", count: 72 },
-  { id: "hotel", label: "Hotel", count: 893 },
-  { id: "pay_later", label: "Reserve now, pay later", count: null as number | null },
-];
+  { id: "downtown", label: "Downtown" },
+  { id: "breakfast", label: "Breakfast included" },
+  { id: "shuttle", label: "Airport shuttle included" },
+  { id: "hotel", label: "Hotel" },
+  { id: "pay_later", label: "Reserve now, pay later" },
+] as const;
 
 function formatSearchDateRange(checkIn: string, checkOut: string): string {
   const fmt = (iso: string) => {
@@ -101,10 +99,10 @@ function LodgingCardPhoto({
   setSavedHeart: (v: boolean) => void;
 }) {
   return (
-    <div className="relative w-full shrink-0 sm:w-[220px]">
+    <div className="relative w-full shrink-0 sm:w-[200px]">
       {hotel.imageUrl ? (
-        <div className="relative h-48 w-full sm:h-full sm:min-h-[200px]">
-          <Image src={hotel.imageUrl} alt={hotel.name} fill className="object-cover" sizes="220px" />
+        <div className="relative aspect-[16/10] w-full bg-neutral-100 sm:aspect-auto sm:h-[168px] dark:bg-neutral-800">
+          <Image src={hotel.imageUrl} alt={hotel.name} fill className="object-cover" sizes="200px" />
         </div>
       ) : (
         <LodgingCardPhotoGradient hotel={hotel} />
@@ -142,7 +140,7 @@ function LodgingCardPhoto({
 function LodgingCardPhotoGradient({ hotel }: { hotel: MockHotelBrowseResult }) {
   return (
     <div
-      className="h-48 w-full sm:h-full sm:min-h-[200px]"
+      className="aspect-[16/10] w-full sm:aspect-auto sm:h-[168px]"
       style={{ background: `linear-gradient(135deg, ${hotel.gradientFrom}, ${hotel.gradientTo})` }}
     />
   );
@@ -158,10 +156,10 @@ function HotelCardDetails({
   selecting: boolean;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 sm:flex-row sm:gap-4">
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <h3 className="text-lg font-bold leading-snug text-neutral-900">{hotel.name}</h3>
-        <p className="text-sm text-neutral-600">{hotel.distanceLabel}</p>
+    <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5">
+      <div className="min-w-0 flex-1 space-y-2">
+        <h3 className="font-display text-lg font-semibold leading-snug text-neutral-900 dark:text-white">{hotel.name}</h3>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">{hotel.distanceLabel}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 pt-0.5">
           {hotel.amenities.map((a) => (
             <span key={a.label} className="inline-flex items-center gap-1 text-xs text-neutral-700">
@@ -171,22 +169,20 @@ function HotelCardDetails({
           ))}
         </div>
         {hotel.dealHighlight ? (
-          <p className="pt-1 text-sm font-semibold" style={{ color: TEAL }}>
+          <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
             {hotel.dealHighlight}
           </p>
         ) : null}
         <p className="text-sm leading-relaxed text-neutral-500">{hotel.description}</p>
         {hotel.reserveNowPayLater ? (
-          <button type="button" className="text-left text-sm font-medium hover:underline" style={{ color: TEAL }}>
-            Reserve now, pay later
-          </button>
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Reserve now, pay later</p>
         ) : null}
         {hotel.urgencyText ? <p className="text-sm font-medium text-rose-600">{hotel.urgencyText}</p> : null}
         <button
           type="button"
           disabled={selecting}
           onClick={onSelect}
-          className="mt-2 rounded-lg bg-[#1668e3] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d4fbf] disabled:opacity-50"
+          className="mt-2 rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           {selecting ? "Adding…" : "Add to trip"}
         </button>
@@ -198,10 +194,7 @@ function HotelCardDetails({
           <p className="text-sm text-neutral-700">${hotel.totalUsd} total</p>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className="flex h-9 min-w-[2.25rem] items-center justify-center rounded-md px-1 text-sm font-bold text-white"
-            style={{ backgroundColor: RATING_GREEN }}
-          >
+          <span className="flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg bg-emerald-800 px-1 text-sm font-bold text-white">
             {hotel.reviewScore.toFixed(1)}
           </span>
           <div className="text-right text-sm">
@@ -224,7 +217,7 @@ function HotelResultCard({
   selecting: boolean;
 }) {
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-md sm:flex-row">
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--hairline-strong)] hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/15 sm:flex-row">
       <HotelCardImage hotel={hotel} />
       <HotelCardDetails hotel={hotel} onSelect={onSelect} selecting={selecting} />
     </article>
@@ -263,7 +256,6 @@ export function TripHostLodgingPage(props: {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [propertyNameQuery, setPropertyNameQuery] = useState("");
-  const [compareOpen, setCompareOpen] = useState(true);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -462,12 +454,23 @@ export function TripHostLodgingPage(props: {
   const dateLabel = formatSearchDateRange(checkIn, checkOut);
 
   return (
-    <div className="min-h-screen bg-neutral-100 font-sans text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <LodgingPageHeader tripId={props.tripId} />
-      </header>
+    <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
+      <AppTopNav />
 
-      <div className="mx-auto w-full max-w-[1280px] px-3 py-4 sm:px-4 sm:py-5">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
+        <div className="mb-6">
+          <Link
+            href={`/trip/${props.tripId}/setup#sec-lodging`}
+            className="text-sm font-medium text-[#2563EB] hover:underline dark:text-[#60A5FA]"
+          >
+            ← Back to trip setup
+          </Link>
+          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight dark:text-white sm:text-4xl">Find lodging</h1>
+          <p className="mt-1 text-sm text-[color:var(--on-surface-muted)]">
+            {destination.trim() || "Your trip"} · {dateLabel} · {travelersLabel}
+          </p>
+        </div>
+
         <SearchBar
           destination={destination}
           setDestination={setDestination}
@@ -482,10 +485,8 @@ export function TripHostLodgingPage(props: {
           </p>
         ) : null}
 
-        <div className="mt-4 flex flex-col gap-4 xl:grid xl:grid-cols-[260px_minmax(0,1fr)_180px] xl:gap-5">
+        <div className="mt-6 flex flex-col gap-6 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
           <LeftSidebar
-            compareOpen={compareOpen}
-            setCompareOpen={setCompareOpen}
             propertyNameQuery={propertyNameQuery}
             setPropertyNameQuery={setPropertyNameQuery}
             selectedFilters={selectedFilters}
@@ -508,7 +509,7 @@ export function TripHostLodgingPage(props: {
               />
             ) : null}
             {loading ? (
-              <p className="py-12 text-center text-sm text-neutral-500">Searching stays…</p>
+              <LodgingResultsSkeleton />
             ) : (
               <ul className="space-y-4">
                 {filteredResults.map((hotel) => (
@@ -531,11 +532,26 @@ export function TripHostLodgingPage(props: {
               </ul>
             )}
           </main>
-
-          <RightAdColumn />
         </div>
       </div>
     </div>
+  );
+}
+
+function LodgingResultsSkeleton() {
+  return (
+    <ul className="space-y-4" aria-busy="true" aria-label="Loading results">
+      {[1, 2, 3].map((i) => (
+        <li key={i} className="animate-pulse overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-[#1a1a1a] sm:flex">
+          <div className="aspect-[16/10] w-full bg-neutral-200 dark:bg-neutral-800 sm:h-[168px] sm:w-[200px] sm:aspect-auto" />
+          <div className="flex-1 space-y-3 p-5">
+            <div className="h-5 w-2/3 rounded bg-neutral-200 dark:bg-neutral-800" />
+            <div className="h-4 w-1/3 rounded bg-neutral-100 dark:bg-neutral-800/80" />
+            <div className="h-14 rounded bg-neutral-100 dark:bg-neutral-800/60" />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -567,18 +583,6 @@ function SearchErrorBanner({
   );
 }
 
-function LodgingPageHeader({ tripId }: { tripId: string }) {
-  return (
-    <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-4 py-3">
-      <Link href={`/trip/${tripId}/setup`} className="text-sm font-medium text-[#1668e3] hover:underline">
-        ← Back to trip setup
-      </Link>
-      <span className="text-lg font-bold tracking-tight text-[#191e3b]">Lodging search</span>
-      <span className="w-24" aria-hidden />
-    </div>
-  );
-}
-
 function SearchBar(props: {
   destination: string;
   setDestination: (v: string) => void;
@@ -587,14 +591,14 @@ function SearchBar(props: {
   onSearch: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-2 shadow-sm sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--hairline)] bg-white p-3 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-[#1a1a1a] sm:flex-row sm:items-stretch sm:p-4">
       <SearchPill icon="pin" label="Where to?" value={props.destination} onChange={props.setDestination} editable />
       <SearchPill icon="calendar" label="Dates" value={props.dateLabel} />
       <SearchPill icon="person" label="Travelers" value={props.travelersLabel} />
       <button
         type="button"
         onClick={props.onSearch}
-        className="flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-full bg-[#1668e3] text-white shadow-md transition hover:bg-[#0d4fbf] sm:self-center"
+        className="flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-[#2563EB] text-white shadow-sm transition hover:bg-[#1d4ed8] sm:h-auto sm:w-11 sm:self-center sm:rounded-full"
         aria-label="Search"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -620,7 +624,7 @@ function SearchPill({
   editable?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-neutral-200 px-4 py-2.5">
+    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-2.5 dark:border-white/10 dark:bg-[#141414]">
       <SearchPillIcon icon={icon} />
       <SearchPillContent label={label} value={value} onChange={onChange} editable={editable} />
     </div>
@@ -681,8 +685,6 @@ function SearchPillContent({
 }
 
 function LeftSidebar(props: {
-  compareOpen: boolean;
-  setCompareOpen: (v: boolean) => void;
   propertyNameQuery: string;
   setPropertyNameQuery: (v: string) => void;
   selectedFilters: Set<string>;
@@ -693,30 +695,18 @@ function LeftSidebar(props: {
   setPriceMax: (v: string) => void;
 }) {
   return (
-    <aside className="hidden w-full shrink-0 space-y-4 xl:block xl:w-[260px]">
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <div className="relative h-28 bg-gradient-to-br from-sky-100 to-sky-200">
-          <div className="absolute inset-0 flex items-center justify-center">
-            {[20, 45, 70].map((left) => (
-              <span
-                key={left}
-                className="absolute bottom-8 h-3 w-3 rounded-full bg-[#1668e3] shadow"
-                style={{ left: `${left}%` }}
-              />
-            ))}
-          </div>
+    <aside className="hidden w-full shrink-0 space-y-4 lg:block lg:w-[240px]">
+      <div className="overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-[#1a1a1a]">
+        <div className="relative h-24 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-100 dark:from-sky-950/40 dark:via-indigo-950/30 dark:to-violet-950/20">
+          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle at 30% 60%, #2563EB 2px, transparent 2px), radial-gradient(circle at 70% 40%, #2563EB 2px, transparent 2px)", backgroundSize: "24px 24px" }} />
         </div>
-        <button type="button" className="w-full px-3 py-2 text-left text-sm font-medium text-[#1668e3] hover:underline">
-          View in a map
+        <button type="button" className="w-full px-3 py-2.5 text-left text-sm font-medium text-[#2563EB] hover:underline dark:text-[#60A5FA]">
+          View on map
         </button>
       </div>
 
-      {props.compareOpen ? (
-        <ComparePropertiesBox setCompareOpen={props.setCompareOpen} />
-      ) : null}
-
-      <div className="rounded-lg border border-neutral-200 bg-white p-3">
-        <label className="text-xs font-semibold text-neutral-800">Search by property name</label>
+      <div className="rounded-2xl border border-[color:var(--hairline)] bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
+        <label className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Search by name</label>
         <div className="relative mt-1.5">
           <svg
             className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -733,65 +723,33 @@ function LeftSidebar(props: {
             value={props.propertyNameQuery}
             onChange={(e) => props.setPropertyNameQuery(e.target.value)}
             placeholder="e.g. Marriott"
-            className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-2 text-sm outline-none focus:border-[#1668e3]"
+            className="w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] py-2 pl-8 pr-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
           />
         </div>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-3">
-        <h2 className="text-base font-bold text-neutral-900">Filter by</h2>
-        <h3 className="mt-3 text-sm font-bold text-neutral-900">Popular filters</h3>
-        <ul className="mt-2 space-y-2">
+      <div className="rounded-2xl border border-[color:var(--hairline)] bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
+        <h2 className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-white">Filters</h2>
+        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">Popular</h3>
+        <ul className="mt-2 space-y-2.5">
           {POPULAR_FILTERS.map((f) => (
             <li key={f.id}>
-              <label className="flex cursor-pointer items-start gap-2 text-sm text-neutral-800">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-[color:var(--on-surface)] dark:text-neutral-300">
                 <input
                   type="checkbox"
                   checked={props.selectedFilters.has(f.id)}
                   onChange={() => props.toggleFilter(f.id)}
-                  className="mt-0.5 rounded border-neutral-400"
+                  className="mt-0.5 rounded border-neutral-300 accent-[#2563EB]"
                 />
-                <span>
-                  {f.label}
-                  {f.count != null ? <span className="text-neutral-500"> ({f.count})</span> : null}
-                </span>
+                <span>{f.label}</span>
               </label>
             </li>
           ))}
         </ul>
-        <h3 className="mt-4 text-sm font-bold text-neutral-900">Total price</h3>
+        <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">Nightly price</h3>
         <PriceRangeInputs {...props} />
       </div>
     </aside>
-  );
-}
-
-function ComparePropertiesBox({ setCompareOpen }: { setCompareOpen: (v: boolean) => void }) {
-  return (
-    <div className="flex items-start justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-3">
-      <ComparePropertiesContent />
-      <button
-        type="button"
-        onClick={() => setCompareOpen(false)}
-        className="shrink-0 text-neutral-400 hover:text-neutral-700"
-        aria-label="Dismiss compare properties"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
-
-function ComparePropertiesContent() {
-  return (
-    <div>
-      <p className="text-sm font-bold text-neutral-900">Compare properties</p>
-      <p className="mt-1 text-xs text-neutral-600">Get a side-by-side view of up to 5 properties.</p>
-      <label className="mt-2 flex cursor-pointer items-center gap-2">
-        <input type="checkbox" className="rounded border-neutral-400" />
-        <span className="text-xs text-neutral-700">Enable compare</span>
-      </label>
-    </div>
   );
 }
 
@@ -810,7 +768,7 @@ function PriceRangeInputs(props: {
           <input
             value={props.priceMin}
             onChange={(e) => props.setPriceMin(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 py-1.5 pl-5 pr-1 text-sm outline-none focus:border-[#1668e3]"
+            className="w-full rounded-lg border border-[color:var(--hairline)] py-1.5 pl-5 pr-1 text-sm outline-none focus:border-[#2563EB] dark:border-white/15"
           />
         </div>
       </div>
@@ -831,7 +789,7 @@ function PriceMaxInput(props: {
         <input
           value={props.priceMax}
           onChange={(e) => props.setPriceMax(e.target.value)}
-          className="w-full rounded-md border border-neutral-300 py-1.5 pl-5 pr-1 text-sm outline-none focus:border-[#1668e3]"
+          className="w-full rounded-lg border border-[color:var(--hairline)] py-1.5 pl-5 pr-1 text-sm outline-none focus:border-[#2563EB] dark:border-white/15"
         />
       </div>
     </div>
@@ -845,34 +803,29 @@ function ResultsTabs(props: {
   sortKey: SortKey;
   setSortKey: (k: SortKey) => void;
 }) {
-  const tabs: { id: StayTab; label: string; icon: string }[] = [
-    { id: "all", label: "All stays", icon: "🛏" },
-    { id: "hotels", label: "Hotels", icon: "🏢" },
-    { id: "homes", label: "Homes", icon: "🏠" },
+  const tabs: { id: StayTab; label: string }[] = [
+    { id: "all", label: "All stays" },
+    { id: "hotels", label: "Hotels" },
+    { id: "homes", label: "Homes" },
   ];
   return (
     <div className="space-y-3">
       <ResultsTabsRow tabs={tabs} stayTab={props.stayTab} setStayTab={props.setStayTab} />
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <p className="font-medium text-neutral-900">{props.count} properties</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="inline-flex items-center gap-1 text-[#1668e3] hover:underline">
-            How our sort order works
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#1668e3] text-[10px]">
-              i
-            </span>
-          </button>
-          <select
-            value={props.sortKey}
-            onChange={(e) => props.setSortKey(e.target.value as SortKey)}
-            className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-[#1668e3]"
-          >
-            <option value="recommended">Sort by recommended for you</option>
-            <option value="price_low">Price: low to high</option>
-            <option value="price_high">Price: high to low</option>
-            <option value="rating">Guest rating</option>
-          </select>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p className="font-medium text-[color:var(--on-surface)] dark:text-neutral-200">
+          {props.count} {props.count === 1 ? "property" : "properties"}
+        </p>
+        <select
+          value={props.sortKey}
+          onChange={(e) => props.setSortKey(e.target.value as SortKey)}
+          className="rounded-lg border border-[color:var(--hairline)] bg-white px-3 py-1.5 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#1a1a1a]"
+          aria-label="Sort results"
+        >
+          <option value="recommended">Recommended</option>
+          <option value="price_low">Price: low to high</option>
+          <option value="price_high">Price: high to low</option>
+          <option value="rating">Guest rating</option>
+        </select>
       </div>
     </div>
   );
@@ -883,23 +836,24 @@ function ResultsTabsRow({
   stayTab,
   setStayTab,
 }: {
-  tabs: { id: StayTab; label: string; icon: string }[];
+  tabs: { id: StayTab; label: string }[];
   stayTab: StayTab;
   setStayTab: (t: StayTab) => void;
 }) {
   return (
-    <div className="flex gap-1 rounded-lg bg-neutral-200/80 p-1">
+    <div className="inline-flex gap-1 rounded-full border border-[color:var(--hairline)] bg-white p-1 dark:border-white/10 dark:bg-[#1a1a1a]">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => setStayTab(tab.id)}
           className={[
-            "flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition",
-            stayTab === tab.id ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600 hover:text-neutral-900",
+            "rounded-full px-4 py-2 text-sm font-medium transition",
+            stayTab === tab.id
+              ? "bg-[#2563EB] text-white shadow-sm"
+              : "text-[color:var(--on-surface-muted)] hover:text-[color:var(--on-surface)] dark:hover:text-white",
           ].join(" ")}
         >
-          <span aria-hidden>{tab.icon}</span>
           {tab.label}
         </button>
       ))}
@@ -909,38 +863,11 @@ function ResultsTabsRow({
 
 function PromoBanner() {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-amber-100 bg-[#f5f0e6] p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#1668e3]/10 text-xl" aria-hidden>
-          🏷
-        </span>
-        <div>
-          <p className="font-bold text-neutral-900">Up to an extra $25 off, just for you</p>
-          <p className="mt-0.5 text-sm text-neutral-600">
-            Members can save more on select stays. Discount applied at checkout when eligible.
-          </p>
-        </div>
-      </div>
-      <button type="button" className="shrink-0 text-sm font-medium text-[#1668e3] hover:underline">
-        View terms
-      </button>
+    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/90 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/25">
+      <p className="text-sm font-semibold text-neutral-900 dark:text-amber-50">Member savings on select stays</p>
+      <p className="mt-0.5 text-xs text-neutral-600 dark:text-amber-200/75">
+        Eligible discounts apply at checkout when available.
+      </p>
     </div>
-  );
-}
-
-function RightAdColumn() {
-  return (
-    <aside className="hidden w-[180px] shrink-0 space-y-4 xl:block">
-      <div className="flex h-72 flex-col justify-end overflow-hidden rounded-lg bg-gradient-to-b from-sky-600 to-sky-800 p-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-90">San Diego</p>
-        <p className="mt-1 text-lg font-bold leading-tight">Summer of SOCCER</p>
-        <button type="button" className="mt-3 w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-sky-800">
-          Book now
-        </button>
-      </div>
-      <div className="flex h-72 flex-col justify-end overflow-hidden rounded-lg bg-gradient-to-b from-amber-700 to-amber-900 p-4 text-white">
-        <p className="text-sm font-semibold leading-snug">Put yourself in a golden state of mind.</p>
-      </div>
-    </aside>
   );
 }
