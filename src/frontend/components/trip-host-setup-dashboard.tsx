@@ -412,6 +412,119 @@ function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
   return formatLocalIsoDate(new Date(viewYear, viewMonth, dom, 12, 0, 0, 0));
 }
 
+type TripCalendarDayRole = "arrival" | "departure" | "on-trip" | null;
+
+function tripCalendarDayRole(
+  cellIso: string,
+  range: { startIso: string; endIso: string } | null
+): TripCalendarDayRole {
+  if (!range?.startIso || !range?.endIso) return null;
+  const days = enumerateLocalIsoDays(range.startIso, range.endIso);
+  if (!days.includes(cellIso)) return null;
+  if (cellIso === range.startIso && cellIso === range.endIso) return "arrival";
+  if (cellIso === range.startIso) return "arrival";
+  if (cellIso === range.endIso) return "departure";
+  return "on-trip";
+}
+
+function tripCalendarCellSurfaceClass(role: TripCalendarDayRole): string {
+  if (!role) return "";
+  if (role === "arrival") {
+    return "bg-sky-50/95 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50";
+  }
+  if (role === "departure") {
+    return "bg-violet-50/95 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-950/40 dark:ring-violet-500/50";
+  }
+  return "bg-[#2563EB]/[0.08] ring-2 ring-inset ring-[#2563EB]/35 dark:bg-[#2563EB]/[0.14] dark:ring-[#60A5FA]/40";
+}
+
+function tripCalendarDayBadgeLabel(
+  role: TripCalendarDayRole,
+  range: { startIso: string; endIso: string } | null
+): string | null {
+  if (!role || !range) return null;
+  if (range.startIso === range.endIso) return "Trip day";
+  if (role === "arrival") return "Arrival";
+  if (role === "departure") return "Departure";
+  return "On trip";
+}
+
+function TripCalendarDayBadge({
+  role,
+  range,
+}: {
+  role: TripCalendarDayRole;
+  range: { startIso: string; endIso: string } | null;
+}) {
+  const label = tripCalendarDayBadgeLabel(role, range);
+  if (!label) return null;
+  const tone =
+    role === "arrival"
+      ? "border-sky-300/80 bg-sky-100/90 text-sky-900 dark:border-sky-600/50 dark:bg-sky-900/50 dark:text-sky-100"
+      : role === "departure"
+        ? "border-violet-300/80 bg-violet-100/90 text-violet-900 dark:border-violet-600/50 dark:bg-violet-900/50 dark:text-violet-100"
+        : "border-[#2563EB]/30 bg-white/80 text-[#1e40af] dark:border-[#60A5FA]/35 dark:bg-[#2563EB]/20 dark:text-[#93c5fd]";
+  return (
+    <span
+      className={[
+        "inline-flex max-w-full items-center rounded-md border px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.1em] sm:text-[10px]",
+        tone,
+      ].join(" ")}
+    >
+      {label}
+    </span>
+  );
+}
+
+function TripCalendarLegend({
+  range,
+}: {
+  range: { startIso: string; endIso: string } | null;
+}) {
+  if (!range?.startIso || !range?.endIso) return null;
+  const singleDay = range.startIso === range.endIso;
+  return (
+    <div
+      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color:var(--hairline)] pb-3 text-[11px] font-medium text-[color:var(--on-surface-muted)] dark:border-white/10"
+      aria-label="Trip calendar legend"
+    >
+      {singleDay ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-4 w-5 shrink-0 rounded-sm bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50"
+            aria-hidden
+          />
+          Trip day
+        </span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-4 w-5 shrink-0 rounded-sm bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50"
+              aria-hidden
+            />
+            Arrival
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-4 w-5 shrink-0 rounded-sm bg-[#2563EB]/10 ring-2 ring-inset ring-[#2563EB]/35 dark:bg-[#2563EB]/20 dark:ring-[#60A5FA]/40"
+              aria-hidden
+            />
+            On trip
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-4 w-5 shrink-0 rounded-sm bg-violet-50 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-950/40 dark:ring-violet-500/50"
+              aria-hidden
+            />
+            Departure
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 function calendarPinShellClass(emphasis: boolean): string {
   if (!emphasis) return "min-w-0 py-0.5";
   return "rounded-md bg-[#1c1c17] px-1.5 py-1 shadow-none dark:bg-neutral-200";
@@ -1244,16 +1357,6 @@ export function TripHostSetupDashboard({
     [calYear, calMonth]
   );
 
-  const inTripRangeCell = useCallback(
-    (dom: number | null): boolean => {
-      if (!dom || !effectiveHighlightRange?.startIso || !effectiveHighlightRange.endIso) return false;
-      const iso = isoFromCell(calYear, calMonth, dom);
-      const days = enumerateLocalIsoDays(effectiveHighlightRange.startIso, effectiveHighlightRange.endIso);
-      return days.includes(iso);
-    },
-    [effectiveHighlightRange, calYear, calMonth]
-  );
-
   /**
    * Calendar view modes:
    *  - "expanded": full Sunday-first month grid (the owner is in range-pick mode,
@@ -1797,6 +1900,8 @@ export function TripHostSetupDashboard({
               </div>
             ) : null}
 
+            <TripCalendarLegend range={effectiveHighlightRange} />
+
             {/* Weekday stripe */}
             <div className="grid grid-cols-7 border-b border-[color:var(--hairline)] dark:border-white/10">
               {WEEKDAY_SUN_FIRST.map((w) => (
@@ -1825,6 +1930,7 @@ export function TripHostSetupDashboard({
                       );
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
+                    const tripDayRole = tripCalendarDayRole(cellIso, effectiveHighlightRange);
                     const hotelCalendarRows = hotelStayRowsForCalendarDay(hostSetup.hotelStays, cellIso);
                     const dayLabel = formatPinDayLabel(cellIso);
                     const mealPinsForCell = (hostSetup.restaurantPins ?? []).filter(
@@ -1833,27 +1939,6 @@ export function TripHostSetupDashboard({
                     const activityPinsForCell = (hostSetup.activityPins ?? []).filter(
                       (p) => p.dateIso === cellIso && p.kept
                     );
-                    // Trip start = arrival day, trip end = departure day. Detect whether
-                    // a saved flight pin already represents that travel day; if not, show
-                    // a minimal eyebrow so the calendar still reads as a travel day.
-                    const tripStartIso = hostSetup.tripRange?.startIso ?? null;
-                    const tripEndIso = hostSetup.tripRange?.endIso ?? null;
-                    const hasOutboundFlightPin = activityPinsForCell.some((p) =>
-                      (p.experience.name ?? "").startsWith("Flight out · ")
-                    );
-                    const hasReturnFlightPin = activityPinsForCell.some((p) =>
-                      (p.experience.name ?? "").startsWith("Flight back · ")
-                    );
-                    const isArrivalDay =
-                      tripStartIso != null && cellIso === tripStartIso && !hasOutboundFlightPin;
-                    const isDepartureDay =
-                      tripEndIso != null && cellIso === tripEndIso && !hasReturnFlightPin;
-                    const travelDayChipLabel = isArrivalDay
-                      ? "Arrival day"
-                      : isDepartureDay
-                        ? "Departure day"
-                        : null;
-
                     const calendarCellEntries: ReactNode[] = [];
                     const pinEmphasis =
                       isCalendarToday(dom) || (datePickMode === "day" && selectedDayIso === cellIso);
@@ -2059,39 +2144,41 @@ export function TripHostSetupDashboard({
                           "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-[color:var(--hairline)] px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
                           canEditAsHost ? "cursor-pointer" : "cursor-default",
                           ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
-                          inTripRangeCell(dom)
-                            ? "bg-transparent ring-1 ring-inset ring-amber-200/60 hover:bg-[color:var(--surface-container-low)]/25 dark:ring-amber-700/35 dark:hover:bg-white/[0.03]"
+                          tripDayRole
+                            ? tripCalendarCellSurfaceClass(tripDayRole)
                             : "bg-transparent hover:bg-[color:var(--surface-container-low)]/35 dark:hover:bg-white/[0.03]",
+                          tripDayRole ? "hover:brightness-[0.98] dark:hover:brightness-110" : "",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
-                            ? "ring-2 ring-amber-300 ring-inset dark:ring-amber-500/50"
+                            ? "!ring-2 !ring-amber-400 ring-inset dark:!ring-amber-400/70"
                             : "",
                           datePickMode === "day" && selectedDayIso === cellIso
-                            ? "ring-1 ring-[color:var(--sage)]/70 ring-inset dark:ring-[color:var(--sage-soft)]/50"
+                            ? "!ring-2 !ring-[color:var(--sage)] ring-inset shadow-sm dark:!ring-[color:var(--sage-soft)]"
                             : "",
                         ].join(" ")}
                       >
-                        <div className="mb-1.5 flex shrink-0 items-start justify-between gap-2">
-                          {isCalendarToday(dom) ? (
-                            <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-[#1c1c17] text-xs font-semibold text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] sm:h-8 sm:min-w-[2rem] sm:text-sm dark:bg-neutral-200 dark:text-dm-page">
-                              {dom}
-                            </span>
-                          ) : (
-                            <span className="shrink-0 text-sm font-semibold tabular-nums text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)] sm:text-base">
-                              {dom}
-                            </span>
-                          )}
+                        <div className="mb-1.5 flex shrink-0 flex-col gap-1">
+                          <div className="flex items-start justify-between gap-2">
+                            {isCalendarToday(dom) ? (
+                              <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-[#1c1c17] text-xs font-semibold text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] sm:h-8 sm:min-w-[2rem] sm:text-sm dark:bg-neutral-200 dark:text-dm-page">
+                                {dom}
+                              </span>
+                            ) : (
+                              <span
+                                className={[
+                                  "shrink-0 text-sm font-semibold tabular-nums sm:text-base",
+                                  tripDayRole
+                                    ? "text-[color:var(--on-surface)] dark:text-white"
+                                    : "text-[color:var(--on-surface-muted)]",
+                                ].join(" ")}
+                              >
+                                {dom}
+                              </span>
+                            )}
+                          </div>
+                          <TripCalendarDayBadge role={tripDayRole} range={effectiveHighlightRange} />
                         </div>
 
                         <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
-                          {travelDayChipLabel ? (
-                            <p className="-mt-0.5 mb-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50/70 px-2 py-[3px] text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-800 sm:text-[10px] dark:bg-amber-500/10 dark:text-amber-200">
-                              <span
-                                aria-hidden
-                                className="inline-block h-1 w-1 rounded-full bg-current"
-                              />
-                              {travelDayChipLabel}
-                            </p>
-                          ) : null}
                           {visibleCalendarEntries}
                           {calendarMoreCount > 0 ? (
                             <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">

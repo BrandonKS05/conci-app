@@ -9,6 +9,7 @@ import {
   mergeDayVoteStateForDate,
   parseDayVoteState,
   type DayVoteCategory,
+  type DayVoteOption,
 } from "@/shared/day-collaboration";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
@@ -237,6 +238,271 @@ function EmptyHint({ label }: { label: string }) {
     <div className="flex h-full min-h-[6rem] items-center justify-center rounded-xl border border-dashed border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/80 text-center text-sm text-[color:var(--on-surface-muted)] dark:border-white/10 dark:bg-dm-page/80 dark:text-neutral-500">
       {label}
     </div>
+  );
+}
+
+function displayOptionLabel(label: string): string {
+  const trimmed = label.trim();
+  if (trimmed.length > 0 && trimmed === trimmed.toLowerCase() && /[a-z]/.test(trimmed)) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  return trimmed;
+}
+
+function parseDetailSegments(detail: string): { prefix?: string; segments: string[] } {
+  const trimmed = detail.trim();
+  const groupMatch = /^From your group:\s*(.*)$/i.exec(trimmed);
+  const body = groupMatch ? groupMatch[1]!.trim() : trimmed;
+  const segments = body
+    .split("·")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    prefix: groupMatch ? "From your group" : undefined,
+    segments: segments.length > 0 ? segments : [trimmed],
+  };
+}
+
+function DayOptionDetail({ detail }: { detail: string }) {
+  const { prefix, segments } = parseDetailSegments(detail);
+  const useChips = segments.length > 1 || Boolean(prefix);
+
+  if (!useChips) {
+    return <p className="mt-1.5 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{detail}</p>;
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      {prefix ? (
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+          {prefix}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5">
+        {segments.map((segment) => (
+          <span
+            key={segment}
+            className="rounded-md border border-neutral-200/80 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-300"
+          >
+            {segment}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+    </svg>
+  );
+}
+
+function DayVoteOptionCard({
+  opt,
+  isHost,
+  voted,
+  skipped,
+  isLocked,
+  dimmed,
+  voteBusy,
+  hostBusy,
+  onVote,
+  onSkip,
+  onConfirm,
+  onSetTime,
+  onRemove,
+  onUnlock,
+}: {
+  opt: DayVoteOption;
+  isHost: boolean;
+  voted: boolean;
+  skipped: boolean;
+  isLocked: boolean;
+  dimmed: boolean;
+  voteBusy: boolean;
+  hostBusy: boolean;
+  onVote: () => void;
+  onSkip: () => void;
+  onConfirm: () => void;
+  onSetTime: () => void;
+  onRemove: () => void;
+  onUnlock: () => void;
+}) {
+  const isConci = opt.suggestedBy === "conci:auto";
+  const voteCount = opt.votes.length;
+  const skipCount = opt.skipVotes?.length ?? 0;
+
+  return (
+    <li
+      className={[
+        "overflow-hidden rounded-2xl border transition",
+        isLocked
+          ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/20"
+          : dimmed
+            ? "border-neutral-100 bg-neutral-50/80 opacity-55 dark:border-white/5 dark:bg-white/[0.02]"
+            : "border-neutral-200/90 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/10 dark:bg-dm-elevated dark:shadow-none",
+      ].join(" ")}
+    >
+      <div className="px-4 py-3.5 sm:px-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-sans text-base font-semibold leading-snug text-neutral-900 dark:text-white">
+                {displayOptionLabel(opt.label)}
+              </h3>
+              {isLocked ? (
+                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  Confirmed
+                </span>
+              ) : null}
+              {isConci && !isLocked ? (
+                <span className="rounded-full border border-[#2563EB]/25 bg-[#2563EB]/8 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#2563EB] dark:border-[#60A5FA]/30 dark:bg-[#60A5FA]/10 dark:text-[#60A5FA]">
+                  Conci pick
+                </span>
+              ) : null}
+            </div>
+            {opt.time ? (
+              <p className="mt-1 text-sm font-medium text-[#2563EB] dark:text-[#60A5FA]">
+                {isLocked ? opt.time : `Suggested · ${opt.time}`}
+              </p>
+            ) : null}
+            {opt.detail && !isLocked ? <DayOptionDetail detail={opt.detail} /> : null}
+            {isLocked && opt.lockedDetail ? (
+              <p className="mt-1.5 text-sm text-emerald-800 dark:text-emerald-200">
+                {opt.time ? `${opt.time} · ` : ""}
+                {opt.lockedDetail}
+              </p>
+            ) : null}
+          </div>
+          {opt.href ? (
+            <a
+              href={opt.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/15 dark:text-neutral-300 dark:hover:border-[#60A5FA] dark:hover:text-[#60A5FA]"
+            >
+              Open
+              <ExternalLinkIcon className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
+        </div>
+
+        {!isLocked ? (
+          <div className="mt-4 border-t border-neutral-100 pt-3 dark:border-white/8">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400 dark:text-neutral-500">
+                Your vote
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={voteBusy}
+                  onClick={onVote}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40",
+                    voted
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "border border-neutral-200 bg-white text-neutral-700 hover:border-emerald-500 hover:text-emerald-700 dark:border-white/15 dark:bg-transparent dark:text-neutral-300",
+                  ].join(" ")}
+                >
+                  Interested
+                  {voteCount > 0 ? (
+                    <span
+                      className={[
+                        "rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums",
+                        voted ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-600 dark:bg-white/10",
+                      ].join(" ")}
+                    >
+                      {voteCount}
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  disabled={voteBusy}
+                  onClick={onSkip}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40",
+                    skipped
+                      ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900"
+                      : "border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400 dark:border-white/15 dark:bg-transparent dark:text-neutral-400",
+                  ].join(" ")}
+                >
+                  Not for me
+                  {skipCount > 0 ? (
+                    <span
+                      className={[
+                        "rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums",
+                        skipped ? "bg-white/20" : "bg-neutral-100 text-neutral-600 dark:bg-white/10",
+                      ].join(" ")}
+                    >
+                      {skipCount}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isHost ? (
+          <div
+            className={[
+              "mt-3 flex flex-col gap-2 border-t border-neutral-100 pt-3 dark:border-white/8 sm:flex-row sm:items-center sm:justify-between",
+              isLocked ? "mt-4" : "",
+            ].join(" ")}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400 dark:text-neutral-500">
+              {isLocked ? "Host" : "Finalize"}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {isLocked ? (
+                <button
+                  type="button"
+                  disabled={hostBusy}
+                  onClick={onUnlock}
+                  className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 transition hover:border-neutral-400 disabled:opacity-40 dark:border-white/15 dark:text-neutral-400"
+                >
+                  Unconfirm
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={hostBusy}
+                    onClick={onConfirm}
+                    className="rounded-lg bg-[#2563EB] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:opacity-40"
+                  >
+                    Confirm
+                  </button>
+                  {!opt.time ? (
+                    <button
+                      type="button"
+                      disabled={hostBusy}
+                      onClick={onSetTime}
+                      className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 transition hover:border-[#2563EB] hover:text-[#2563EB] disabled:opacity-40 dark:border-white/15 dark:text-neutral-400"
+                    >
+                      Set time
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={hostBusy}
+                    onClick={onRemove}
+                    className="rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-40 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -949,142 +1215,56 @@ export function TripHostSetupDayPage({
               {dedupedOptions.length === 0 ? (
                 <EmptyHint label={`No ${dayCategoryTitle(category).toLowerCase()} options yet \u2014 be the first to suggest one above.`} />
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {dedupedOptions.map((opt) => {
                     const voted = opt.votes.includes(viewerUserId);
                     const skipped = (opt.skipVotes ?? []).includes(viewerUserId);
                     const isLocked = lockedId === opt.id;
                     const dimmed = Boolean(lockedId && lockedId !== opt.id);
-                    const isConci = opt.suggestedBy === "conci:auto";
+                    const hostBusy = Boolean(busyKey) || dimmed;
+                    const voteBusy = Boolean(busyKey) || Boolean(lockedId && !isLocked);
                     return (
-                      <li
+                      <DayVoteOptionCard
                         key={opt.id}
-                        className={`rounded-xl border px-4 py-3 transition ${
-                          isLocked
-                            ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10"
-                            : dimmed
-                            ? "border-neutral-100 bg-neutral-50 opacity-50 dark:border-white/5 dark:bg-white/[0.02]"
-                            : "border-neutral-100 bg-white dark:border-white/10 dark:bg-dm-elevated"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <p className="font-sans text-[15px] font-semibold text-neutral-900 dark:text-white">{opt.label}</p>
-                              {isLocked ? (
-                                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">✓ Confirmed</span>
-                              ) : null}
-                              {isConci ? (
-                                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-white/10 dark:text-neutral-400">Conci pick</span>
-                              ) : null}
-                            </div>
-                            {/* AI-suggested time */}
-                            {opt.time && !isLocked ? (
-                              <p className="mt-0.5 text-[11px] font-medium text-[#2563EB] dark:text-[#60A5FA]">Suggested: {opt.time}</p>
-                            ) : null}
-                            {opt.detail ? (
-                              <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{opt.detail}</p>
-                            ) : null}
-                            {isLocked && opt.lockedDetail ? (
-                              <p className="mt-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">{opt.time ? `${opt.time} · ` : ""}{opt.lockedDetail}</p>
-                            ) : null}
-                          </div>
-                          {opt.href ? (
-                            <a href={opt.href} target="_blank" rel="noopener noreferrer"
-                              className="shrink-0 text-[11px] font-semibold text-[#2563EB] underline-offset-2 hover:underline dark:text-[#60A5FA]">
-                              Open ↗
-                            </a>
-                          ) : null}
-                        </div>
-                        {/* Action row */}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {/* 👍 Interested */}
-                          <button
-                            type="button"
-                            disabled={Boolean(busyKey) || Boolean(lockedId)}
-                            onClick={() => void runDayAction({ action: "vote", category, optionId: opt.id })}
-                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                              voted
-                                ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300"
-                                : "border-neutral-200 text-neutral-500 hover:border-emerald-400 hover:text-emerald-700 dark:border-white/15 dark:text-neutral-400"
-                            } disabled:opacity-40`}
-                          >
-                            👍 Interested{opt.votes.length > 0 ? ` · ${opt.votes.length}` : ""}
-                          </button>
-                          {/* 👎 Not for me */}
-                          <button
-                            type="button"
-                            disabled={Boolean(busyKey) || Boolean(lockedId)}
-                            onClick={() => void runDayAction({ action: "skip", category, optionId: opt.id })}
-                            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                              skipped
-                                ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-500 dark:bg-rose-900/20 dark:text-rose-300"
-                                : "border-neutral-200 text-neutral-500 hover:border-rose-300 hover:text-rose-600 dark:border-white/15 dark:text-neutral-400"
-                            } disabled:opacity-40`}
-                          >
-                            👎 Not for me{(opt.skipVotes?.length ?? 0) > 0 ? ` · ${opt.skipVotes!.length}` : ""}
-                          </button>
-                          {/* Host-only actions */}
-                          {isHost ? (
-                            isLocked ? (
-                              <button
-                                type="button"
-                                disabled={Boolean(busyKey)}
-                                onClick={() => void runDayAction({ action: "unlock", category })}
-                                className="rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-500 transition hover:border-neutral-400 dark:border-white/10 dark:text-neutral-400"
-                              >
-                                Unconfirm
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={Boolean(busyKey)}
-                                  onClick={() => {
-                                    const timeStr = window.prompt("Set time (e.g. 7:30 PM) — leave blank to skip", opt.time ?? "");
-                                    const detail = window.prompt(lockPromptText(category), "");
-                                    if (!detail?.trim()) return;
-                                    void runDayAction({ action: "lock", category, optionId: opt.id, detail: detail.trim(), time: timeStr?.trim() || undefined });
-                                  }}
-                                  className="rounded-full border border-[#2563EB]/40 px-3 py-1 text-[11px] font-semibold text-[#2563EB] transition hover:bg-[#2563EB] hover:text-white dark:border-[#60A5FA]/30 dark:text-[#60A5FA]"
-                                >
-                                  Confirm
-                                </button>
-                                {!opt.time && (
-                                  <button
-                                    type="button"
-                                    disabled={Boolean(busyKey)}
-                                    onClick={() => {
-                                      const t = window.prompt("Set time (e.g. 7:30 PM)", "");
-                                      if (!t?.trim()) return;
-                                      void runDayAction({ action: "set-time", category, optionId: opt.id, time: t.trim() });
-                                    }}
-                                    className="rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-500 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/10 dark:text-neutral-400"
-                                  >
-                                    Set time
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={Boolean(busyKey)}
-                                  onClick={() => {
-                                    if (!window.confirm(`Remove "${opt.label}" from options?`)) return;
-                                    void runDayAction({ action: "remove", category, optionId: opt.id });
-                                  }}
-                                  className="rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-500 transition hover:border-rose-300 hover:text-rose-600 dark:border-white/10 dark:text-neutral-500"
-                                >
-                                  Remove
-                                </button>
-                              </>
-                            )
-                          ) : null}
-                        </div>
-                      </li>
+                        opt={opt}
+                        isHost={isHost}
+                        voted={voted}
+                        skipped={skipped}
+                        isLocked={isLocked}
+                        dimmed={dimmed}
+                        voteBusy={voteBusy}
+                        hostBusy={hostBusy}
+                        onVote={() => void runDayAction({ action: "vote", category, optionId: opt.id })}
+                        onSkip={() => void runDayAction({ action: "skip", category, optionId: opt.id })}
+                        onConfirm={() => {
+                          const timeStr = window.prompt("Set time (e.g. 7:30 PM) — leave blank to skip", opt.time ?? "");
+                          const detail = window.prompt(lockPromptText(category), "");
+                          if (!detail?.trim()) return;
+                          void runDayAction({
+                            action: "lock",
+                            category,
+                            optionId: opt.id,
+                            detail: detail.trim(),
+                            time: timeStr?.trim() || undefined,
+                          });
+                        }}
+                        onSetTime={() => {
+                          const t = window.prompt("Set time (e.g. 7:30 PM)", "");
+                          if (!t?.trim()) return;
+                          void runDayAction({ action: "set-time", category, optionId: opt.id, time: t.trim() });
+                        }}
+                        onRemove={() => {
+                          if (!window.confirm(`Remove "${opt.label}" from options?`)) return;
+                          void runDayAction({ action: "remove", category, optionId: opt.id });
+                        }}
+                        onUnlock={() => void runDayAction({ action: "unlock", category })}
+                      />
                     );
                   })}
 
                 </ul>
               )}
+
 
 
             </DropSection>
