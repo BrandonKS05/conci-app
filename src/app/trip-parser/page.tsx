@@ -1,5 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
-import TripParser from "@/frontend/components/TripParser";
+import { TripFormParser } from "@/frontend/components/trip-form-parser";
 import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
 import {
   TripParserActiveTripCard,
@@ -129,7 +129,7 @@ export default async function TripParserPage() {
     <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
       <AppTopNav />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6 sm:pt-12">
-        <TripParser />
+        <TripFormParser />
         <section
           aria-label="Quick actions"
           className="mt-12 grid gap-5 sm:grid-cols-2"

@@ -1234,8 +1234,8 @@ export function TripHostSetupDashboard({
     });
     if (!ok) return;
 
-    setPendingRangeConfirm(null);
-    setDatePickMode("day");
+      setPendingRangeConfirm(null);
+      setDatePickMode("day");
     void refitItineraryForRange(pendingRangeConfirm);
   }, [
     pendingRangeConfirm,
@@ -1456,7 +1456,7 @@ export function TripHostSetupDashboard({
                 className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--sage-soft)] to-[color:var(--surface-container-high)] text-xl font-display font-semibold text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:from-[#3a3a3a] dark:to-[#222] dark:text-[#ebe9e4]"
               >
                 {tripIdentityInitial}
-              </div>
+          </div>
               <div className="min-w-0">
                 <h1 className="truncate font-display text-2xl font-semibold leading-[1.05] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] lg:whitespace-normal">
                   {tripDisplayName}
@@ -1464,7 +1464,7 @@ export function TripHostSetupDashboard({
                 <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
                   {tripIdentityDateLabel}
                 </p>
-              </div>
+        </div>
             </div>
 
             <nav
@@ -1500,7 +1500,7 @@ export function TripHostSetupDashboard({
               <NavIcon id="invite" />
               Invite friends
             </button>
-          </div>
+      </div>
         </aside>
 
         {/* CENTER COLUMN */}
@@ -1524,7 +1524,7 @@ export function TripHostSetupDashboard({
                   ······
                 </p>
               )}
-            </div>
+    </div>
           </section>
 
           {workspaceTab === "fund" ? (
@@ -1575,7 +1575,7 @@ export function TripHostSetupDashboard({
                     >
                       +
                     </button>
-                  </div>
+        </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                       {isHost ? "Trip owner" : "Trip member"}
@@ -1632,16 +1632,16 @@ export function TripHostSetupDashboard({
                     <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                       <p>
                         Invite code loads from your trip — refresh the page if you just created this trip. Guests use{" "}
-                        <Link
+          <Link
                           href={JOIN_WITH_CODE_URL}
                           className="font-medium text-[color:var(--sage-soft)] underline-offset-2 hover:underline"
-                        >
+          >
                           Join a Trip
-                        </Link>
+          </Link>
                         . Full share text is under <span className="text-[color:var(--on-surface)]">Share trip</span> in the trip card
                         below.
                       </p>
-                    </div>
+        </div>
                   )
                 ) : (
                   <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-3 text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
@@ -1708,19 +1708,19 @@ export function TripHostSetupDashboard({
 
           {workspaceTab === "overview" ? (
           <>
-          <section id="sec-dates" className="scroll-mt-28">
-            <div className="mb-5 flex flex-col gap-3">
+        <section id="sec-dates" className="scroll-mt-28">
+          <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
               <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
                 {!canEditTripWorkspace
                   ? "This trip is finalized here — the calendar is for reference. Open the booking checklist for next steps."
                   : datePickMode === "range"
-                    ? tripDisplayRange?.startIso && tripDisplayRange.endIso
-                      ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
-                      : "Tap two days to set your trip; days in range are highlighted below."
-                    : tripDisplayRange?.startIso && tripDisplayRange.endIso
+                  ? tripDisplayRange?.startIso && tripDisplayRange.endIso
+                    ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
+                    : "Tap two days to set your trip; days in range are highlighted below."
+                  : tripDisplayRange?.startIso && tripDisplayRange.endIso
                       ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day for the day editor (meals, activities). Manage lodging under Lodging in the left nav or tap a lodging row below. Use Add places for shortcuts. Everyone on the trip sees updates live.`
-                      : "Tap two days to set your trip."}
+                    : "Tap two days to set your trip."}
               </p>
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
                 <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
@@ -1743,8 +1743,8 @@ export function TripHostSetupDashboard({
                 >
                   <span>{refitError}</span>
                   {tripDisplayRange?.startIso && tripDisplayRange.endIso ? (
-                    <button
-                      type="button"
+                  <button
+                    type="button"
                       onClick={() =>
                         void refitItineraryForRange({
                           startIso: tripDisplayRange.startIso!,
@@ -1754,7 +1754,7 @@ export function TripHostSetupDashboard({
                       className="rounded-full border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100/60 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-amber-900/30"
                     >
                       Retry refit
-                    </button>
+                  </button>
                   ) : null}
                   <button
                     type="button"
@@ -1764,8 +1764,8 @@ export function TripHostSetupDashboard({
                     Dismiss
                   </button>
                 </p>
-              ) : null}
-            </div>
+                ) : null}
+              </div>
           </div>
 
           <TripCostRollup tripId={tripId} plan={plan} flights={liveData?.flights ?? []} />
@@ -1816,13 +1816,13 @@ export function TripHostSetupDashboard({
             {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
               <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
                 {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
-                  <button
-                    type="button"
+                <button
+                  type="button"
                     onClick={() => router.push(`/trip/${tripId}/setup/lodging`)}
                     className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
-                  >
+                >
                     Add lodging
-                  </button>
+                </button>
                 ) : null}
                 {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
                   <button
@@ -1894,8 +1894,8 @@ export function TripHostSetupDashboard({
                           <span className="max-w-[8rem] truncate font-medium">{p.name}</span>
                         </span>
                       ))}
-                    </div>
-                  </div>
+              </div>
+            </div>
                 ) : null}
               </div>
             ) : null}
@@ -1956,18 +1956,18 @@ export function TripHostSetupDashboard({
                         : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       const lodgingPinBody = (
                         <div className={["flex items-start gap-1.5 text-left leading-snug", onPin].join(" ")}>
-                          <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
                             {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
                             {hotelForDay.recommendedByConci ? (
                               <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                 recommended by CONCI
-                              </span>
+                                </span>
                             ) : null}
                           </span>
                           <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
                             {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
-                          </span>
-                        </div>
+                                </span>
+                              </div>
                       );
                       const lodgingPinKey = `stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`;
                       calendarCellEntries.push(
@@ -1992,7 +1992,7 @@ export function TripHostSetupDashboard({
                         ) : (
                           <div key={lodgingPinKey} className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}>
                             {lodgingPinBody}
-                          </div>
+                            </div>
                         )
                       );
                     }
@@ -2003,52 +2003,52 @@ export function TripHostSetupDashboard({
                         ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
                         : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       calendarCellEntries.push(
-                        <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
+                              <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
+                                <button
+                                  type="button"
                             className={[
                               "w-full text-left transition",
                               calendarPinShellClass(pem),
                               pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
                             ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
-                            }}
-                          >
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
+                                  }}
+                                >
                             <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
-                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                {p.place.name}
+                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                      {p.place.name}
                                 {p.recommendedByConci ? (
                                   <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                     recommended by CONCI
-                                  </span>
+                                    </span>
                                 ) : null}
                               </span>
                               <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                                Meal
-                              </span>
-                            </div>
-                          </button>
+                                      Meal
+                                    </span>
+                                  </div>
+                                </button>
                           {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.place.name}`}
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${p.place.name}`}
                               className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "meal",
-                                  dateIso: p.dateIso,
-                                  mapsUrl: p.place.mapsUrl,
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setRemovePinConfirm({
+                                      kind: "meal",
+                                      dateIso: p.dateIso,
+                                      mapsUrl: p.place.mapsUrl,
                                   title: `"${p.place.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
+                                    });
+                                  }}
+                                >
+                                  ×
+                                </button>
                           ) : null}
-                        </div>
+                              </div>
                       );
                     }
                     for (const p of activityPinsForCell) {
@@ -2070,56 +2070,56 @@ export function TripHostSetupDashboard({
                           ? "Departure"
                           : "Activity";
                       calendarCellEntries.push(
-                        <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
+                              <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
+                                <button
+                                  type="button"
                             className={[
                               "w-full text-left transition",
                               calendarPinShellClass(pem),
                               pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
                             ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({
-                                kind: "activity",
-                                experience: p.experience,
-                                dateLabel: dayLabel,
-                              });
-                            }}
-                          >
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setPinDetail({
+                                      kind: "activity",
+                                      experience: p.experience,
+                                      dateLabel: dayLabel,
+                                    });
+                                  }}
+                                >
                             <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
-                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                {p.experience.name}
+                                    <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
+                                      {p.experience.name}
                                 {p.recommendedByConci ? (
                                   <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
                                     recommended by CONCI
-                                  </span>
+                                    </span>
                                 ) : null}
                               </span>
                               <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
                                 {pinEyebrow}
-                              </span>
-                            </div>
-                          </button>
+                                    </span>
+                                  </div>
+                                </button>
                           {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.experience.name}`}
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${p.experience.name}`}
                               className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "activity",
-                                  dateIso: p.dateIso,
-                                  bookingUrl: p.experience.bookingUrl,
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setRemovePinConfirm({
+                                      kind: "activity",
+                                      dateIso: p.dateIso,
+                                      bookingUrl: p.experience.bookingUrl,
                                   title: `"${p.experience.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
+                                    });
+                                  }}
+                                >
+                                  ×
+                                </button>
                           ) : null}
-                        </div>
+                              </div>
                       );
                     }
 
@@ -2127,10 +2127,10 @@ export function TripHostSetupDashboard({
                     const calendarMoreCount = Math.max(0, calendarCellEntries.length - CALENDAR_CELL_MAX_VISIBLE_ITEMS);
 
                     return (
-                      <div
+                          <div
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
                         tabIndex={0}
-                        role="presentation"
+                            role="presentation"
                         onClick={() => onCalendarDayClick(dom)}
                         onMouseEnter={() => setFocusedCell(cellIso)}
                         onMouseLeave={() => setFocusedCell(null)}
@@ -2206,7 +2206,7 @@ export function TripHostSetupDashboard({
                                 <span className="text-[9px] font-semibold tabular-nums text-[color:var(--on-surface-muted)] dark:text-neutral-500">
                                   +{extra}
                                 </span>
-                              ) : null}
+                        ) : null}
                             </div>
                           );
                         })()}
@@ -2240,7 +2240,7 @@ export function TripHostSetupDashboard({
                   Packing list
                 </Link>
                 <span className="text-xs text-[color:var(--on-surface-muted)]"> · shared checklist</span>
-              </div>
+          </div>
             ) : null}
           </div>
 
@@ -2439,18 +2439,18 @@ export function TripHostSetupDashboard({
               </p>
             </div>
 
-            {liveFetchErr ? (
+          {liveFetchErr ? (
               <p className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/30 dark:text-amber-200">
-                {liveFetchErr}
-              </p>
-            ) : null}
-            {flightCurationErr ? (
+              {liveFetchErr}
+            </p>
+          ) : null}
+          {flightCurationErr ? (
               <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
             ) : null}
             {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
               <HostFlightSearchPanel tripId={tripId} enabled />
-            ) : null}
-            {showFlightTransport ? (
+          ) : null}
+          {showFlightTransport ? (
               <div className="space-y-4 border-t border-[color:var(--hairline)] pt-6 dark:border-white/10">
                 <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                   From <strong className="text-[color:var(--on-surface)]">{plan.departureCity}</strong> to{" "}
@@ -2472,33 +2472,33 @@ export function TripHostSetupDashboard({
                   isHost={isHost}
                   tripDays={flightTripDayOptions}
                 />
-                {(() => {
-                  const dc = plan.departureCity?.trim();
-                  const loc = plan.location?.trim();
-                  const href =
-                    liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
-                  return href ? (
+              {(() => {
+                const dc = plan.departureCity?.trim();
+                const loc = plan.location?.trim();
+                const href =
+                  liveData?.drive?.mapsDirectionsUrl ?? (dc && loc ? googleMapsDirUrl(dc, loc) : undefined);
+                return href ? (
                     <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                      Driving instead?{" "}
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    Driving instead?{" "}
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                         className="font-semibold text-[color:var(--on-surface)] underline-offset-2 hover:text-[color:var(--sage)] hover:underline dark:text-emerald-300"
-                      >
-                        Open directions in Google Maps
-                      </a>
-                      {liveData?.drive?.durationEstimate ? (
-                        <>
-                          {" "}
-                          (~{liveData.drive.durationEstimate}
-                          {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
-                        </>
-                      ) : null}
-                    </p>
-                  ) : null;
-                })()}
-              </div>
+                    >
+                      Open directions in Google Maps
+                    </a>
+                    {liveData?.drive?.durationEstimate ? (
+                      <>
+                        {" "}
+                        (~{liveData.drive.durationEstimate}
+                        {liveData.drive.distanceMiles != null ? ` · ~${liveData.drive.distanceMiles} mi` : ""})
+                      </>
+                    ) : null}
+                  </p>
+                ) : null;
+              })()}
+            </div>
             ) : canEditTripWorkspace && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                 Add a departure city on the trip card to see route picks and driving estimates here.
@@ -2506,9 +2506,9 @@ export function TripHostSetupDashboard({
             ) : (
               <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
                 No flights booked yet. Set departure city and destination on the trip to search.
-              </p>
-            )}
-          </section>
+            </p>
+          )}
+        </section>
           ) : null}
 
         </main>

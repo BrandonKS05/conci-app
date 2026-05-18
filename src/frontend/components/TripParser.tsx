@@ -152,7 +152,10 @@ function composeTripPrompt(seed: string, slots: Partial<Record<SlotKey, string>>
     seed.trim(),
     "",
     "Confirmed details from our chat:",
-    ...SLOT_ORDER.filter((k) => (slots[k] ?? "").trim()).map(
+    ...SLOT_ORDER.filter((k) => {
+      const v = (slots[k] ?? "").trim();
+      return v && v !== "__skipped__";
+    }).map(
       (k) => `• ${k}: ${(slots[k] ?? "").trim()}`
     ),
   ];
@@ -870,8 +873,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
       ]);
       setReplyDraft("");
       setActiveSlot(null);
+      const skipped = { ...slots, [slotKey]: "__skipped__" };
+      setSlots(skipped);
       const nextOpt = OPTIONAL_SLOT_ORDER.filter(
-        (k) => k !== slotKey && !(slots[k] ?? "").trim()
+        (k) => k !== slotKey && !(skipped[k] ?? "").trim()
       );
       if (nextOpt.length > 0) {
         const optKey = nextOpt[0];
@@ -882,7 +887,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
         setActiveSlot(optKey);
         return;
       }
-      await finalizePlan(slots);
+      await finalizePlan(skipped);
       return;
     }
 
