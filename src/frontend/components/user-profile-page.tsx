@@ -6,9 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 import { ProfileHeaderCard } from "@/frontend/components/profile/profile-header-card";
 import { ProfileHotelsSection } from "@/frontend/components/profile/profile-hotels-section";
-import { ProfileExperiencesSection } from "@/frontend/components/profile/profile-experiences-section";
+import { ProfileCitiesSection } from "@/frontend/components/profile/profile-cities-section";
 import { ProfileRecentTripsSection } from "@/frontend/components/profile/profile-recent-trips";
-import { ProfileRestaurantsSection } from "@/frontend/components/profile/profile-restaurants-section";
 import { ProfileVisitsDrawer } from "@/frontend/components/profile/profile-visits-drawer";
 import { ProfileSocialDrawer } from "@/frontend/components/profile-social-drawer";
 import { getSupabaseClient } from "@/frontend/supabase/client";
@@ -203,7 +202,11 @@ export function UserProfilePageClient({ userId }: { userId: string }) {
 
         {saveBusy ? <p className="mt-2 text-center text-xs text-neutral-400">Saving…</p> : null}
 
-        <ProfileRecentTripsSection trips={profile.recentTrips} isSelf={profile.isSelf} />
+        <ProfileRecentTripsSection
+          trips={profile.recentTrips}
+          isSelf={profile.isSelf}
+          recentTripsPublic={profile.recentTripsPublic}
+        />
 
         <ProfileHotelsSection
           hotels={profile.hotels}
@@ -212,18 +215,11 @@ export function UserProfilePageClient({ userId }: { userId: string }) {
           onSave={async (hotels) => patchProfile({ hotels })}
         />
 
-        <ProfileExperiencesSection
-          experiences={profile.experiences}
+        <ProfileCitiesSection
+          cities={profile.cities}
           editMode={editMode && profile.isSelf}
           isSelf={profile.isSelf}
-          onSave={async (experiences) => patchProfile({ experiences })}
-        />
-
-        <ProfileRestaurantsSection
-          restaurants={profile.restaurants}
-          editMode={editMode && profile.isSelf}
-          isSelf={profile.isSelf}
-          onSave={async (restaurants) => patchProfile({ restaurants })}
+          onSave={async (cities) => patchProfile({ cities })}
         />
       </main>
 

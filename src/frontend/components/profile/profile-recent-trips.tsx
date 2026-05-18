@@ -13,7 +13,15 @@ function SectionIcon({ children }: { children: ReactNode }) {
   );
 }
 
-export function ProfileRecentTripsSection({ trips, isSelf }: { trips: ProfileRecentTrip[]; isSelf: boolean }) {
+export function ProfileRecentTripsSection({
+  trips,
+  isSelf,
+  recentTripsPublic,
+}: {
+  trips: ProfileRecentTrip[];
+  isSelf: boolean;
+  recentTripsPublic: boolean;
+}) {
   if (!isSelf && trips.length === 0) return null;
 
   return (
@@ -34,6 +42,12 @@ export function ProfileRecentTripsSection({ trips, isSelf }: { trips: ProfileRec
           View all trips
         </Link>
       </div>
+
+      {isSelf && !recentTripsPublic ? (
+        <p className="mb-3 rounded-lg bg-neutral-100 px-3 py-2 text-xs text-neutral-600 dark:bg-white/5 dark:text-neutral-400">
+          Hidden on your public profile — only you can see this section.
+        </p>
+      ) : null}
 
       {trips.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-neutral-200 px-4 py-8 text-center text-sm text-neutral-500 dark:border-white/10">

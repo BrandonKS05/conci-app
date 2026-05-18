@@ -2139,7 +2139,7 @@ export function TripHostSetupDashboard({
             <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/80 px-3 py-2 dark:border-white/10 dark:bg-[color:var(--surface-container-low)]/40">
               <div className="flex items-center gap-3 px-3 py-1">
                 <span className="text-base" aria-hidden>
-                  âœ¨
+                  ✨
                 </span>
                 <p className="flex-1 text-sm text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)]">
                   Setup copilot or ask for recommendations…

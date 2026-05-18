@@ -43,6 +43,7 @@ export async function GET() {
     notifyVoteEmail: profile?.notify_vote_email ?? true,
     notifyDateLockedEmail: profile?.notify_date_locked_email ?? true,
     notifyNudgeReminders: profile?.notify_nudge_reminders ?? true,
+    recentTripsPublic: profile?.recent_trips_public !== false,
   });
 }
 
@@ -52,6 +53,7 @@ type PatchBody = {
   notifyVoteEmail?: boolean;
   notifyDateLockedEmail?: boolean;
   notifyNudgeReminders?: boolean;
+  recentTripsPublic?: boolean;
 };
 
 export async function PATCH(request: Request) {
@@ -79,7 +81,7 @@ export async function PATCH(request: Request) {
   const { data: existing } = await svc
     .from("profiles")
     .select(
-      "subscription_tier, stripe_customer_id, stripe_subscription_id, display_name, avatar_url, notify_vote_email, notify_date_locked_email, notify_nudge_reminders"
+      "subscription_tier, stripe_customer_id, stripe_subscription_id, display_name, avatar_url, notify_vote_email, notify_date_locked_email, notify_nudge_reminders, recent_trips_public"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -105,6 +107,7 @@ export async function PATCH(request: Request) {
     notify_vote_email: boolOr(existing?.notify_vote_email, true, body.notifyVoteEmail),
     notify_date_locked_email: boolOr(existing?.notify_date_locked_email, true, body.notifyDateLockedEmail),
     notify_nudge_reminders: boolOr(existing?.notify_nudge_reminders, true, body.notifyNudgeReminders),
+    recent_trips_public: boolOr(existing?.recent_trips_public, true, body.recentTripsPublic),
   };
 
   const { error: upErr } = await svc.from("profiles").upsert(nextRow, { onConflict: "id" });

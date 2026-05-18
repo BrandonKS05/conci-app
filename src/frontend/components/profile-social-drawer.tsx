@@ -122,7 +122,7 @@ function SocialUserRow({
                   : "border border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB]/10 dark:text-[#60A5FA]",
             ].join(" ")}
           >
-            {busy ? "â€¦" : following ? "Following" : user.followsYou ? "Follow back" : "Follow"}
+            {busy ? "…" : following ? "Following" : user.followsYou ? "Follow back" : "Follow"}
           </button>
         </div>
       ) : null}
@@ -231,7 +231,7 @@ export function ProfileSocialDrawer({
 
         <ul className="flex-1 overflow-y-auto px-4">
           {loading ? (
-            <li className="py-8 text-center text-sm text-[color:var(--on-surface-muted)]">Loadingâ€¦</li>
+            <li className="py-8 text-center text-sm text-[color:var(--on-surface-muted)]">Loading…</li>
           ) : error ? (
             <li className="py-8 text-center text-sm text-rose-600">{error}</li>
           ) : users.length === 0 ? (

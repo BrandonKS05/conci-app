@@ -24,6 +24,7 @@ type SettingsPayload = {
   notifyVoteEmail: boolean;
   notifyDateLockedEmail: boolean;
   notifyNudgeReminders: boolean;
+  recentTripsPublic: boolean;
 };
 
 function PlusIcon({ className }: { className?: string }) {
@@ -49,8 +50,11 @@ export function SettingsPageClient() {
   const [notifyVote, setNotifyVote] = useState(true);
   const [notifyDateLocked, setNotifyDateLocked] = useState(true);
   const [notifyNudge, setNotifyNudge] = useState(true);
+  const [recentTripsPublic, setRecentTripsPublic] = useState(true);
   const [notifySaving, setNotifySaving] = useState(false);
   const [notifyMsg, setNotifyMsg] = useState<string | null>(null);
+  const [privacySaving, setPrivacySaving] = useState(false);
+  const [privacyMsg, setPrivacyMsg] = useState<string | null>(null);
   const [subBusy, setSubBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -76,6 +80,7 @@ export function SettingsPageClient() {
       setNotifyVote(j.notifyVoteEmail);
       setNotifyDateLocked(j.notifyDateLockedEmail);
       setNotifyNudge(j.notifyNudgeReminders);
+      setRecentTripsPublic(j.recentTripsPublic !== false);
     } catch {
       setError("Network error.");
     } finally {
@@ -180,6 +185,30 @@ export function SettingsPageClient() {
       return;
     }
     setPwMsg("Check your email for a reset link.");
+  }
+
+  async function savePrivacy(e: React.FormEvent) {
+    e.preventDefault();
+    setPrivacyMsg(null);
+    setPrivacySaving(true);
+    try {
+      const r = await fetch("/api/me/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recentTripsPublic }),
+      });
+      if (!r.ok) {
+        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        setPrivacyMsg(typeof j.error === "string" ? j.error : "Save failed.");
+        return;
+      }
+      setPrivacyMsg(recentTripsPublic ? "Recently joined trips are public." : "Recently joined trips are private.");
+    } catch {
+      setPrivacyMsg("Save failed.");
+    } finally {
+      setPrivacySaving(false);
+    }
   }
 
   async function saveNotifications(e: React.FormEvent) {
@@ -416,6 +445,46 @@ export function SettingsPageClient() {
               </button>
             )}
           </div>
+        </section>
+
+        <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+          <h2 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Profile privacy</h2>
+          <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+            Control what others see on your public profile.
+          </p>
+          <form onSubmit={(e) => void savePrivacy(e)} className="mt-6 space-y-4">
+            <label className="flex cursor-pointer items-start justify-between gap-4">
+              <span className="text-sm text-[color:var(--on-surface)] dark:text-neutral-200">
+                <span className="font-medium">Recently joined trips</span>
+                <span className="mt-0.5 block text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+                  {recentTripsPublic ? "Public — shown on your profile" : "Private — hidden from visitors"}
+                </span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={recentTripsPublic}
+                onClick={() => setRecentTripsPublic((v) => !v)}
+                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                  recentTripsPublic ? "bg-[#2563EB]" : "bg-neutral-300 dark:bg-neutral-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+                    recentTripsPublic ? "left-[22px]" : "left-0.5"
+                  }`}
+                />
+              </button>
+            </label>
+            {privacyMsg ? (
+              <p className="text-sm text-[color:var(--sage)] dark:text-emerald-300" role="status">
+                {privacyMsg}
+              </p>
+            ) : null}
+            <button type="submit" disabled={privacySaving} className={`${primaryFormButtonClass} disabled:opacity-50`}>
+              {privacySaving ? "Saving…" : "Save privacy"}
+            </button>
+          </form>
         </section>
 
         <section className="rounded-3xl border border-[color:var(--hairline)] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">

@@ -1,18 +1,6 @@
 import type { UserProfilePayload } from "@/shared/social-profile";
 
-export const EXPERIENCE_CATEGORIES = [
-  "Food",
-  "Adventure",
-  "Culture",
-  "Nightlife",
-  "Nature",
-  "Wellness",
-] as const;
-
-export type ExperienceCategory = (typeof EXPERIENCE_CATEGORIES)[number];
-
 export type PriceRangeHotel = "$" | "$$" | "$$$";
-export type PriceRangeRestaurant = "$" | "$$" | "$$$" | "$$$$";
 
 export type ProfileHotel = {
   id: string;
@@ -24,24 +12,11 @@ export type ProfileHotel = {
   order: number;
 };
 
-export type ProfileExperience = {
+export type ProfileCity = {
   id: string;
-  name: string;
-  location: string;
-  score: number;
-  review: string;
-  category: ExperienceCategory;
-};
-
-export type ProfileRestaurant = {
-  id: string;
-  name: string;
-  neighborhood: string;
   city: string;
-  cuisine: string;
-  score: number;
+  country: string;
   note: string;
-  priceRange: PriceRangeRestaurant;
   order: number;
 };
 
@@ -60,19 +35,8 @@ export type FullUserProfilePayload = UserProfilePayload & {
   bannerUrl: string | null;
   visitCount: number;
   hotels: ProfileHotel[];
-  experiences: ProfileExperience[];
-  restaurants: ProfileRestaurant[];
+  cities: ProfileCity[];
   recentTrips: ProfileRecentTrip[];
+  /** When false, other users cannot see the recently joined trips section. */
+  recentTripsPublic: boolean;
 };
-
-export function scorePillClasses(score: number): string {
-  if (score >= 9) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
-  if (score >= 7) return "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200";
-  if (score >= 5) return "bg-orange-100 text-orange-900 dark:bg-orange-950/50 dark:text-orange-300";
-  return "bg-rose-100 text-rose-900 dark:bg-rose-950/50 dark:text-rose-300";
-}
-
-export function clampScore(score: number): number {
-  const n = Math.round(score * 2) / 2;
-  return Math.min(10, Math.max(1, n));
-}

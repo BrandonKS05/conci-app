@@ -2,8 +2,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchWikipediaThumbnailForQuery } from "@/backend/wikipedia-place-image";
 import { getUserProfile } from "@/backend/social-follow";
-import type { FullUserProfilePayload, ProfileExperience, ProfileHotel, ProfileRecentTrip, ProfileRestaurant } from "@/shared/user-profile-page";
-import { EXPERIENCE_CATEGORIES, clampScore } from "@/shared/user-profile-page";
+import type {
+  FullUserProfilePayload,
+  ProfileCity,
+  ProfileHotel,
+  ProfileRecentTrip,
+} from "@/shared/user-profile-page";
 import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { normalizePlan, type TripPlan } from "@/shared/trip-plan";
 
@@ -16,15 +20,15 @@ type ProfileExtrasRow = {
   location: string | null;
   banner_url: string | null;
   profile_hotels: unknown;
-  profile_experiences: unknown;
-  profile_restaurants: unknown;
+  profile_cities: unknown;
+  recent_trips_public: boolean | null;
 };
 
 function newId(): string {
   return crypto.randomUUID();
 }
 
-function parseHotels(raw: unknown): ProfileHotel[] {
+export function parseHotels(raw: unknown): ProfileHotel[] {
   if (!Array.isArray(raw)) return [];
   const out: ProfileHotel[] = [];
   for (const item of raw) {
@@ -34,8 +38,7 @@ function parseHotels(raw: unknown): ProfileHotel[] {
     if (!name) continue;
     const stars = typeof o.starRating === "number" ? Math.min(5, Math.max(1, Math.round(o.starRating))) : 3;
     const pr = o.priceRange;
-    const priceRange =
-      pr === "$" || pr === "$$" || pr === "$$$" ? pr : undefined;
+    const priceRange = pr === "$" || pr === "$$" || pr === "$$$" ? pr : undefined;
     out.push({
       id: typeof o.id === "string" ? o.id : newId(),
       name,
@@ -49,54 +52,23 @@ function parseHotels(raw: unknown): ProfileHotel[] {
   return out.sort((a, b) => a.order - b.order).slice(0, 6);
 }
 
-function parseExperiences(raw: unknown): ProfileExperience[] {
+export function parseCities(raw: unknown): ProfileCity[] {
   if (!Array.isArray(raw)) return [];
-  const out: ProfileExperience[] = [];
+  const out: ProfileCity[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (!name) continue;
-    const cat = typeof o.category === "string" ? o.category : "Food";
-    const category = (EXPERIENCE_CATEGORIES as readonly string[]).includes(cat)
-      ? (cat as ProfileExperience["category"])
-      : "Food";
+    const city = typeof o.city === "string" ? o.city.trim() : "";
+    if (!city) continue;
     out.push({
       id: typeof o.id === "string" ? o.id : newId(),
-      name,
-      location: typeof o.location === "string" ? o.location.trim() : "",
-      score: clampScore(typeof o.score === "number" ? o.score : 5),
-      review: typeof o.review === "string" ? o.review.trim().slice(0, 140) : "",
-      category,
-    });
-  }
-  return out.sort((a, b) => b.score - a.score);
-}
-
-function parseRestaurants(raw: unknown): ProfileRestaurant[] {
-  if (!Array.isArray(raw)) return [];
-  const out: ProfileRestaurant[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (!name) continue;
-    const pr = o.priceRange;
-    const priceRange =
-      pr === "$" || pr === "$$" || pr === "$$$" || pr === "$$$$" ? pr : "$$";
-    out.push({
-      id: typeof o.id === "string" ? o.id : newId(),
-      name,
-      neighborhood: typeof o.neighborhood === "string" ? o.neighborhood.trim() : "",
-      city: typeof o.city === "string" ? o.city.trim() : "",
-      cuisine: typeof o.cuisine === "string" ? o.cuisine.trim() : "",
-      score: clampScore(typeof o.score === "number" ? o.score : 5),
+      city,
+      country: typeof o.country === "string" ? o.country.trim() : "",
       note: typeof o.note === "string" ? o.note.trim().slice(0, 140) : "",
-      priceRange,
       order: typeof o.order === "number" ? o.order : out.length,
     });
   }
-  return out.sort((a, b) => b.score - a.score);
+  return out.sort((a, b) => a.order - b.order).slice(0, 24);
 }
 
 function datesLabelFromPlan(plan: TripPlan): string {
@@ -134,7 +106,6 @@ async function countVisits(svc: SupabaseClient, userId: string): Promise<number>
 
 async function fetchRecentTrips(svc: SupabaseClient, userId: string): Promise<ProfileRecentTrip[]> {
   const tripIds = new Set<string>();
-  const orderMap = new Map<string, string>();
 
   const { data: hosted } = await svc
     .from("trip_plans")
@@ -144,9 +115,7 @@ async function fetchRecentTrips(svc: SupabaseClient, userId: string): Promise<Pr
     .limit(12);
 
   for (const row of hosted ?? []) {
-    const id = row.id as string;
-    tripIds.add(id);
-    orderMap.set(id, (row.created_at as string) ?? "");
+    tripIds.add(row.id as string);
   }
 
   const { data: memberships } = await svc
@@ -213,7 +182,7 @@ export async function getFullUserProfile(
   const { data: row, error } = await svc
     .from("profiles")
     .select(
-      "id, display_name, avatar_url, handle, bio, location, banner_url, profile_hotels, profile_experiences, profile_restaurants"
+      "id, display_name, avatar_url, handle, bio, location, banner_url, profile_hotels, profile_cities, recent_trips_public"
     )
     .eq("id", profileUserId)
     .maybeSingle();
@@ -223,10 +192,15 @@ export async function getFullUserProfile(
   }
 
   const p = row as ProfileExtrasRow | null;
-  const [visitCount, recentTrips] = await Promise.all([
+  const isSelf = viewerId === profileUserId;
+  const recentTripsPublic = p?.recent_trips_public !== false;
+
+  const [visitCount, allRecentTrips] = await Promise.all([
     countVisits(svc, profileUserId),
     fetchRecentTrips(svc, profileUserId),
   ]);
+
+  const recentTrips = isSelf || recentTripsPublic ? allRecentTrips : [];
 
   return {
     ...social,
@@ -235,9 +209,9 @@ export async function getFullUserProfile(
     bannerUrl: p?.banner_url?.trim() || null,
     visitCount,
     hotels: parseHotels(p?.profile_hotels),
-    experiences: parseExperiences(p?.profile_experiences),
-    restaurants: parseRestaurants(p?.profile_restaurants),
+    cities: parseCities(p?.profile_cities),
     recentTrips,
+    recentTripsPublic,
   };
 }
 
@@ -249,8 +223,8 @@ export type ProfilePatchBody = {
   avatarUrl?: string | null;
   bannerUrl?: string | null;
   hotels?: ProfileHotel[];
-  experiences?: ProfileExperience[];
-  restaurants?: ProfileRestaurant[];
+  cities?: ProfileCity[];
+  recentTripsPublic?: boolean;
 };
 
 export async function updateUserProfile(
@@ -261,7 +235,7 @@ export async function updateUserProfile(
   const { data: existing } = await svc
     .from("profiles")
     .select(
-      "subscription_tier, stripe_customer_id, stripe_subscription_id, display_name, avatar_url, handle, bio, location, banner_url, profile_hotels, profile_experiences, profile_restaurants, notify_vote_email, notify_date_locked_email, notify_nudge_reminders"
+      "subscription_tier, stripe_customer_id, stripe_subscription_id, display_name, avatar_url, handle, bio, location, banner_url, profile_hotels, profile_cities, recent_trips_public, notify_vote_email, notify_date_locked_email, notify_nudge_reminders"
     )
     .eq("id", userId)
     .maybeSingle();
@@ -297,14 +271,12 @@ export async function updateUserProfile(
       body.bannerUrl !== undefined ? body.bannerUrl : (existing?.banner_url as string | null) ?? null,
     profile_hotels:
       body.hotels !== undefined ? parseHotels(body.hotels) : parseHotels(existing?.profile_hotels),
-    profile_experiences:
-      body.experiences !== undefined
-        ? parseExperiences(body.experiences)
-        : parseExperiences(existing?.profile_experiences),
-    profile_restaurants:
-      body.restaurants !== undefined
-        ? parseRestaurants(body.restaurants)
-        : parseRestaurants(existing?.profile_restaurants),
+    profile_cities:
+      body.cities !== undefined ? parseCities(body.cities) : parseCities(existing?.profile_cities),
+    recent_trips_public:
+      body.recentTripsPublic !== undefined
+        ? body.recentTripsPublic
+        : existing?.recent_trips_public !== false,
     notify_vote_email: existing?.notify_vote_email ?? true,
     notify_date_locked_email: existing?.notify_date_locked_email ?? true,
     notify_nudge_reminders: existing?.notify_nudge_reminders ?? true,

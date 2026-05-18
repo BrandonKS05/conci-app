@@ -80,7 +80,7 @@ export function ProfileHotelsSection({
               <path d="M4 16V6l6-3 6 3v10" strokeLinejoin="round" />
             </svg>
           </span>
-          <h2 className="font-display text-xl font-semibold text-neutral-900 dark:text-white">Top hotel recommendations</h2>
+          <h2 className="font-display text-xl font-semibold text-neutral-900 dark:text-white">Top visited hotels</h2>
         </div>
         {editMode && local.length < 6 ? (
           <button
@@ -89,7 +89,7 @@ export function ProfileHotelsSection({
             onClick={addHotel}
             className="inline-flex items-center gap-1 text-sm font-semibold text-[#2563EB] hover:underline"
           >
-            <span className="text-lg leading-none">+</span> Add a hotel
+            <span className="text-lg leading-none">+</span> Add visited hotel
           </button>
         ) : null}
       </div>
@@ -100,7 +100,7 @@ export function ProfileHotelsSection({
           onClick={addHotel}
           className="w-full rounded-2xl border border-dashed border-neutral-300 px-4 py-10 text-sm font-medium text-neutral-600 hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/15"
         >
-          Add your first hotel recommendation
+          Add your first visited hotel
         </button>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
