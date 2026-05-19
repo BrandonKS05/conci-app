@@ -702,6 +702,13 @@ export function TripHostSetupDayPage({
   const [copilotSearch, setCopilotSearch] = useState<
     Partial<Record<DayVoteCategory, { loading: boolean; results: PlacePreview[]; error: string | null }>>
   >({});
+
+  type AcSuggestion = { name: string; address: string; mapsUrl: string };
+  const [autoSuggest, setAutoSuggest] = useState<
+    Partial<Record<DayVoteCategory, { items: AcSuggestion[]; open: boolean }>>
+  >({});
+  const acTimerRef = useRef<Partial<Record<DayVoteCategory, ReturnType<typeof setTimeout>>>>({});
+
   const suppressRealtimeUntilRef = useRef(0);
 
   useEffect(() => {
@@ -1170,12 +1177,88 @@ export function TripHostSetupDayPage({
                 </p>
                 {canSuggest ? (
                   <div className="flex flex-col gap-2">
-                    <input
-                      value={draft.label}
-                      onChange={(e) => setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: e.target.value } }))}
-                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15 dark:border-white/10 dark:bg-dm-card dark:text-white"
-                      placeholder={`Name (e.g. Tasca do Chico)…`}
-                    />
+                    <div
+                      className="relative"
+                      onBlur={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                          setAutoSuggest((prev) => ({
+                            ...prev,
+                            [category]: { items: prev[category]?.items ?? [], open: false },
+                          }));
+                        }
+                      }}
+                    >
+                      <input
+                        value={draft.label}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSuggestDraft((prev) => ({ ...prev, [category]: { ...draft, label: val } }));
+                          clearTimeout(acTimerRef.current[category]);
+                          if (val.trim().length >= 2) {
+                            acTimerRef.current[category] = setTimeout(() => {
+                              void (async () => {
+                                const res = await fetch("/api/places/autocomplete", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ q: val.trim(), locationHint: plan.location ?? null }),
+                                });
+                                const j = (await res.json().catch(() => ({ suggestions: [] }))) as {
+                                  suggestions?: AcSuggestion[];
+                                };
+                                setAutoSuggest((prev) => ({
+                                  ...prev,
+                                  [category]: { items: j.suggestions ?? [], open: true },
+                                }));
+                              })();
+                            }, 300);
+                          } else {
+                            setAutoSuggest((prev) => ({
+                              ...prev,
+                              [category]: { items: [], open: false },
+                            }));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setAutoSuggest((prev) => ({
+                              ...prev,
+                              [category]: { items: prev[category]?.items ?? [], open: false },
+                            }));
+                          }
+                        }}
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15 dark:border-white/10 dark:bg-dm-card dark:text-white"
+                        placeholder="Name (e.g. Tasca do Chico)…"
+                        autoComplete="off"
+                      />
+                      {autoSuggest[category]?.open && (autoSuggest[category]?.items.length ?? 0) > 0 && (
+                        <ul className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-white/10 dark:bg-dm-card">
+                          {autoSuggest[category]!.items.map((item, i) => (
+                            <li key={i} className="border-b border-neutral-100 last:border-b-0 dark:border-white/5">
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setSuggestDraft((prev) => ({
+                                    ...prev,
+                                    [category]: { ...draft, label: item.name, href: item.mapsUrl },
+                                  }));
+                                  setAutoSuggest((prev) => ({
+                                    ...prev,
+                                    [category]: { items: [], open: false },
+                                  }));
+                                }}
+                                className="w-full px-3 py-2.5 text-left transition hover:bg-neutral-50 dark:hover:bg-white/[0.05]"
+                              >
+                                <p className="text-sm font-medium text-neutral-900 dark:text-white">{item.name}</p>
+                                {item.address && (
+                                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{item.address}</p>
+                                )}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <input
                         value={draft.href}
