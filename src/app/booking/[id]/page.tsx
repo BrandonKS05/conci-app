@@ -13,9 +13,30 @@ import {
   winningHotelPickFromCollab,
 } from "@/shared/collaboration";
 import { parseBookingTasks } from "@/shared/booking-tasks";
-import { normalizePlan } from "@/shared/trip-plan";
+import { normalizePlan, type HostHotelStay, type TripPlan } from "@/shared/trip-plan";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
+import type { HotelPick } from "@/shared/hotels";
+
+function stayToBookingHotel(stay: HostHotelStay): HotelPick {
+  return {
+    id: `host-stay-${stay.startIso}-${stay.endIso}-${stay.place.name}`,
+    name: stay.place.name,
+    area: stay.destinationCity || stay.place.address || "",
+    priceHint: stay.lodgingType ? stay.lodgingType[0]!.toUpperCase() + stay.lodgingType.slice(1) : "Host-selected stay",
+    ...(stay.place.rating != null ? { rating: `${stay.place.rating}` } : {}),
+    ...(stay.bookingUrl?.startsWith("http") ? { bookingUrl: stay.bookingUrl } : {}),
+  };
+}
+
+function hostSelectedBookingStay(plan: TripPlan): HotelPick | null {
+  const stays = plan.hostSetup?.hotelStays ?? [];
+  const withBookingUrl = stays.find((stay) => stay.userSelected && stay.bookingUrl?.startsWith("http"));
+  const anyWithBookingUrl = stays.find((stay) => stay.bookingUrl?.startsWith("http"));
+  const hostSelected = stays.find((stay) => stay.userSelected);
+  const chosen = withBookingUrl ?? anyWithBookingUrl ?? hostSelected ?? null;
+  return chosen ? stayToBookingHotel(chosen) : null;
+}
 
 export default async function BookingTripPage({
   params,
@@ -65,7 +86,7 @@ export default async function BookingTripPage({
   const plan = normalizePlan(data.plan);
   const collab = parseCollabState(data.collab_state);
   const classified = buildClassifiedDecisions(plan);
-  const hotel = winningHotelPickFromCollab(classified, collab);
+  const hotel = hostSelectedBookingStay(plan) ?? winningHotelPickFromCollab(classified, collab);
   const tasks = parseBookingTasks(data.booking_tasks);
 
   const canEdit = access.isHost;

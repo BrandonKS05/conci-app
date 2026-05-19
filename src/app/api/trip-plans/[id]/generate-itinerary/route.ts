@@ -581,6 +581,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (!access.isHost) {
+    return NextResponse.json({ error: "Only the trip host can regenerate the itinerary." }, { status: 403 });
+  }
 
   const { data: row, error: fetchErr } = await svc
     .from("trip_plans")

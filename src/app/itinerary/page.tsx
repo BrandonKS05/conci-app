@@ -1,4 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { notFound } from "next/navigation";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { GlassCard, Pill, SectionTitle } from "@/frontend/components/cards";
 import { ItineraryWorkspace } from "@/frontend/components/itinerary-workspace";
@@ -7,6 +8,10 @@ import { buildItineraryScreenData, getActiveItinerary } from "@/backend/itinerar
 export const dynamic = "force-dynamic";
 
 export default async function ItineraryPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   noStore();
 
   const itinerary = await getActiveItinerary();
@@ -47,4 +52,3 @@ export default async function ItineraryPage() {
     </SiteShell>
   );
 }
-

@@ -1,21 +1,16 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { JoinTripByCodeForm } from "@/frontend/components/join-trip-by-code-form";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 
 /**
- * Invite-code join — not linked from global nav. Open from Create a Trip only:
- * `/trip-parser` → "Join a Trip" uses `/join?from=create` (required for this page).
+ * Invite-code join. Direct invite URLs and Create-trip handoffs both land here.
  */
 export default async function JoinTripPage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; code?: string }>;
 }) {
-  const { from, code } = await searchParams;
-  if (from !== "create") {
-    redirect("/trip-parser");
-  }
+  const { code } = await searchParams;
 
   const initialCode = typeof code === "string" ? code : "";
 

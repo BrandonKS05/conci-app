@@ -5,12 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import { appendPackingListBlocks } from "@/shared/packing-list-import";
 
-type Props = { tripId: string; initialPlan: TripPlan };
+type Props = { tripId: string; initialPlan: TripPlan; isHost: boolean };
 
 const FILE_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,.txt,.md,.csv,.json,text/plain,application/json";
 
-export function TripHostPackingPage({ tripId, initialPlan }: Props) {
+export function TripHostPackingPage({ tripId, initialPlan, isHost }: Props) {
   const [plan, setPlan] = useState(initialPlan);
   const [text, setText] = useState(() => initialPlan.hostSetup?.packingList ?? "");
   const [busy, setBusy] = useState(false);
@@ -93,46 +93,64 @@ export function TripHostPackingPage({ tripId, initialPlan }: Props) {
       </Link>
       <h1 className="mt-4 text-2xl font-semibold text-[color:var(--on-surface)] dark:text-white">Packing list</h1>
       <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
-        {title} — list what the group should pack. You can edit this anytime before publishing.
+        {isHost
+          ? `${title} — list what the group should pack. You can edit this anytime before publishing.`
+          : `${title} — the host controls this shared packing list.`}
       </p>
 
-      <input
-        ref={fileRef}
-        type="file"
-        className="sr-only"
-        accept={FILE_ACCEPT}
-        onChange={(e) => void onFileChange(e)}
-      />
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={importBusy || busy}
-          onClick={onPickFile}
-          className="rounded-xl border border-zinc-400/60 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-        >
-          {importBusy ? "Reading file…" : "Upload file or photo"}
-        </button>
-        <span className="text-xs text-zinc-500 dark:text-zinc-500">
-          Text (.txt, .md, .csv) or an image of a list — items are merged into the box below.
-        </span>
-      </div>
+      {!isHost ? (
+        <div className="mt-5 rounded-2xl border border-[color:var(--hairline)] bg-white p-5 text-sm text-[color:var(--on-surface)] shadow-sm dark:border-white/10 dark:bg-dm-card dark:text-neutral-100">
+          {text.trim() ? (
+            <pre className="whitespace-pre-wrap font-sans leading-6">{text}</pre>
+          ) : (
+            <p className="text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+              No packing list has been shared yet.
+            </p>
+          )}
+        </div>
+      ) : null}
 
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={14}
-        placeholder="Rain jacket, chargers, sunscreen, comfortable shoes…"
-        className="mt-4 w-full resize-y rounded-2xl border border-[color:var(--hairline)] bg-white px-4 py-3 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:placeholder:text-zinc-500"
-      />
-      {err ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{err}</p> : null}
-      <button
-        type="button"
-        disabled={busy || importBusy}
-        onClick={() => void save()}
-        className="mt-4 rounded-xl border border-zinc-500/35 bg-zinc-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
-      >
-        {busy ? "Saving…" : "Save packing list"}
-      </button>
+      {!isHost ? null : (
+        <>
+          <input
+            ref={fileRef}
+            type="file"
+            className="sr-only"
+            accept={FILE_ACCEPT}
+            onChange={(e) => void onFileChange(e)}
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={importBusy || busy}
+              onClick={onPickFile}
+              className="rounded-xl border border-zinc-400/60 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+            >
+              {importBusy ? "Reading file…" : "Upload file or photo"}
+            </button>
+            <span className="text-xs text-zinc-500 dark:text-zinc-500">
+              Text (.txt, .md, .csv) or an image of a list — items are merged into the box below.
+            </span>
+          </div>
+
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={14}
+            placeholder="Rain jacket, chargers, sunscreen, comfortable shoes…"
+            className="mt-4 w-full resize-y rounded-2xl border border-[color:var(--hairline)] bg-white px-4 py-3 text-sm text-[color:var(--on-surface)] outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/10 dark:bg-dm-card dark:text-neutral-100 dark:placeholder:text-zinc-500"
+          />
+          {err ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{err}</p> : null}
+          <button
+            type="button"
+            disabled={busy || importBusy}
+            onClick={() => void save()}
+            className="mt-4 rounded-xl border border-zinc-500/35 bg-zinc-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 dark:border-zinc-500/40 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+          >
+            {busy ? "Saving…" : "Save packing list"}
+          </button>
+        </>
+      )}
     </div>
   );
 }

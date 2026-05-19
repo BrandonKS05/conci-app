@@ -72,7 +72,18 @@ export type HostActivityPin = {
   recommendedByConci?: boolean;
 };
 
-export type HostLodgingType = "hotel" | "airbnb";
+export type HostLodgingType = "hotel" | "airbnb" | "villa" | "hostel" | "resort" | "other";
+
+export function parseHostLodgingType(raw: unknown): HostLodgingType | undefined {
+  return raw === "hotel" ||
+    raw === "airbnb" ||
+    raw === "villa" ||
+    raw === "hostel" ||
+    raw === "resort" ||
+    raw === "other"
+    ? raw
+    : undefined;
+}
 
 /** Optional fields saved on a lodging segment (multi-city / booking links). */
 export type HostLodgingStayMeta = {
@@ -335,9 +346,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       const guestCount = typeof o.guestCount === "number" && Number.isFinite(o.guestCount) ? o.guestCount : undefined;
       const roomCount = typeof o.roomCount === "number" && Number.isFinite(o.roomCount) ? o.roomCount : undefined;
       const userSelected = o.userSelected === true;
-      const lodgingTypeRaw = o.lodgingType;
-      const lodgingType =
-        lodgingTypeRaw === "hotel" || lodgingTypeRaw === "airbnb" ? lodgingTypeRaw : undefined;
+      const lodgingType = parseHostLodgingType(o.lodgingType);
       if (startIso <= endIso) {
         list.push({
           startIso,
@@ -1315,9 +1324,10 @@ export function upsertLodgingActivitiesInGeneratedItinerary(
     activities: d.activities.filter(
       (a) =>
         !(
+          d.dateIso >= stayStartIso &&
+          d.dateIso <= stayEndIso &&
           a.category === "lodging" &&
-          (a.title.startsWith("Check-in") || a.title.startsWith("Check-out")) &&
-          (hotelName.trim() === "" || a.title.includes(hotelName.trim()))
+          (a.title.startsWith("Check-in") || a.title.startsWith("Check-out"))
         )
     ),
   }));

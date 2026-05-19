@@ -43,6 +43,7 @@ export function BookingChecklist({
   const hotelUrl =
     hotel?.bookingUrl ||
     `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`;
+  const hasSpecificHotelLink = Boolean(hotel?.bookingUrl);
 
   const flightsUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights to ${city}`)}`;
   const diningUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`restaurants ${city}`)}`;
@@ -84,11 +85,11 @@ export function BookingChecklist({
   }[] = [
     {
       key: "hotel",
-      title: "Hotel",
+      title: "Stay",
       description: hotel
-        ? `Winner: ${hotel.name}${hotel.priceHint ? ` · ${hotel.priceHint}` : ""}`
+        ? `${hasSpecificHotelLink ? "Selected stay" : "Stay"}: ${hotel.name}${hotel.priceHint ? ` · ${hotel.priceHint}` : ""}`
         : "Book your stay for the voted dates.",
-      actionLabel: "Book now",
+      actionLabel: hasSpecificHotelLink ? "Open stay link" : "Book now",
       href: hotelUrl,
       external: true,
     },

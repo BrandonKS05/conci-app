@@ -17,17 +17,31 @@ import {
   type HostLodgingType,
   type TripPlan,
 } from "@/shared/trip-plan";
+import type { PlaceSpotlight } from "@/shared/place-preview";
 
 type StayTab = "all" | "hotels" | "homes";
 type SortKey = "recommended" | "price_low" | "price_high" | "rating";
 
 const POPULAR_FILTERS = [
-  { id: "downtown", label: "Downtown" },
   { id: "breakfast", label: "Breakfast included" },
-  { id: "shuttle", label: "Airport shuttle included" },
-  { id: "hotel", label: "Hotel" },
-  { id: "pay_later", label: "Reserve now, pay later" },
 ] as const;
+
+type ManualStayDraft = {
+  name: string;
+  lodgingType: HostLodgingType;
+  address: string;
+  bookingUrl: string;
+  notes: string;
+};
+
+const MANUAL_STAY_TYPE_OPTIONS: { value: HostLodgingType; label: string }[] = [
+  { value: "hotel", label: "Hotel" },
+  { value: "airbnb", label: "Airbnb / home" },
+  { value: "villa", label: "Villa" },
+  { value: "hostel", label: "Hostel" },
+  { value: "resort", label: "Resort" },
+  { value: "other", label: "Other stay" },
+];
 
 function formatSearchDateRange(checkIn: string, checkOut: string): string {
   const fmt = (iso: string) => {
@@ -82,27 +96,11 @@ function AmenityIcon({ kind }: { kind: MockHotelAmenityIcon }) {
 }
 
 function HotelCardImage({ hotel }: { hotel: MockHotelBrowseResult }) {
-  const [savedHeart, setSavedHeart] = useState(false);
-
-  return (
-    <LodgingCardPhoto hotel={hotel} savedHeart={savedHeart} setSavedHeart={setSavedHeart} />
-  );
-}
-
-function LodgingCardPhoto({
-  hotel,
-  savedHeart,
-  setSavedHeart,
-}: {
-  hotel: MockHotelBrowseResult;
-  savedHeart: boolean;
-  setSavedHeart: (v: boolean) => void;
-}) {
   return (
     <div className="relative w-full shrink-0 sm:w-[200px]">
       {hotel.imageUrl ? (
         <div className="relative aspect-[16/10] w-full bg-neutral-100 sm:aspect-auto sm:h-[168px] dark:bg-neutral-800">
-          <Image src={hotel.imageUrl} alt={hotel.name} fill className="object-cover" sizes="200px" />
+          <Image src={hotel.imageUrl} alt={hotel.name} fill className="object-cover" sizes="200px" unoptimized />
         </div>
       ) : (
         <LodgingCardPhotoGradient hotel={hotel} />
@@ -112,22 +110,6 @@ function LodgingCardPhoto({
           VIP Access
         </span>
       ) : null}
-      <button
-        type="button"
-        aria-label={savedHeart ? "Remove from saved" : "Save property"}
-        onClick={() => setSavedHeart(!savedHeart)}
-        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-sm transition hover:bg-white"
-      >
-        <svg
-          className={`h-4 w-4 ${savedHeart ? "fill-rose-500 text-rose-500" : "fill-none text-neutral-700"}`}
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden
-        >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-      </button>
       {hotel.isAd ? (
         <span className="absolute bottom-2 left-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
           Ad
@@ -174,9 +156,6 @@ function HotelCardDetails({
           </p>
         ) : null}
         <p className="text-sm leading-relaxed text-neutral-500">{hotel.description}</p>
-        {hotel.reserveNowPayLater ? (
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Reserve now, pay later</p>
-        ) : null}
         {hotel.urgencyText ? <p className="text-sm font-medium text-rose-600">{hotel.urgencyText}</p> : null}
         <button
           type="button"
@@ -251,20 +230,26 @@ export function TripHostLodgingPage(props: {
   const [loading, setLoading] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchDetail, setSearchDetail] = useState<string | null>(null);
-  const [searchMeta, setSearchMeta] = useState<LodgingSearchApiResponse["meta"] | null>(null);
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [propertyNameQuery, setPropertyNameQuery] = useState("");
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [manualStay, setManualStay] = useState<ManualStayDraft>({
+    name: "",
+    lodgingType: props.initialLodgingType,
+    address: "",
+    bookingUrl: "",
+    notes: "",
+  });
+  const [manualError, setManualError] = useState<string | null>(null);
 
   const runSearch = useCallback(async () => {
     const dest = destination.trim();
     setLoading(true);
     setSearchError(null);
     setSearchDetail(null);
-    setSearchMeta(null);
 
     if (dest.length < 2) {
       setSearchError(
@@ -312,8 +297,6 @@ export function TripHostLodgingPage(props: {
         detail: raw.detail,
       });
 
-      setSearchMeta(raw.meta ?? null);
-
       if (!res.ok) {
         setSearchError(raw.error || `Search failed (${res.status}).`);
         setSearchDetail(raw.detail ?? null);
@@ -328,9 +311,7 @@ export function TripHostLodgingPage(props: {
         setSearchError(raw.error || "No properties returned for this search.");
         setSearchDetail(
           raw.detail ??
-            (raw.meta
-              ? `RapidAPI returned ${raw.meta.rawHotelCount} raw result(s); ${raw.meta.mappedHotelCount} mapped. Try different dates or a larger city.`
-              : "Try a different destination or date range.")
+            "Try a different destination or date range, or add the stay manually."
         );
       }
     } catch (e) {
@@ -364,7 +345,6 @@ export function TripHostLodgingPage(props: {
     const min = Number.isFinite(minParsed) ? minParsed : 0;
     const max = Number.isFinite(maxParsed) ? maxParsed : Infinity;
     rows = rows.filter((r) => r.nightlyUsd >= min && r.nightlyUsd <= max);
-    if (selectedFilters.has("pay_later")) rows = rows.filter((r) => r.reserveNowPayLater);
     if (selectedFilters.has("breakfast")) rows = rows.filter((r) => r.dealHighlight?.toLowerCase().includes("breakfast"));
     switch (sortKey) {
       case "price_low":
@@ -453,6 +433,108 @@ export function TripHostLodgingPage(props: {
   const travelersLabel = `${guests} traveler${guests === 1 ? "" : "s"}, ${rooms} room${rooms === 1 ? "" : "s"}`;
   const dateLabel = formatSearchDateRange(checkIn, checkOut);
 
+  const commitManualStay = useCallback(async () => {
+    if (!props.isHost) return;
+    const name = manualStay.name.trim();
+    if (!name) {
+      setManualError("Add the stay name.");
+      return;
+    }
+
+    const bookingUrl = manualStay.bookingUrl.trim();
+    if (bookingUrl && !/^https?:\/\//i.test(bookingUrl)) {
+      setManualError("Use a full booking link that starts with http:// or https://.");
+      return;
+    }
+
+    setManualError(null);
+    setSelectingId("manual");
+    setSaveMessage(null);
+
+    const address = manualStay.address.trim();
+    const detail = [destination.trim(), address].filter(Boolean).join(" · ");
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      [name, address || destination.trim()].filter(Boolean).join(" ")
+    )}`;
+    const place: PlaceSpotlight = {
+      name,
+      mapsUrl,
+      spotlightCategory: "hotel",
+      ...(address ? { address } : {}),
+    };
+    const { hotelStays, hotel: hotelPlace } = applyHostLodgingSegment(
+      plan.hostSetup?.hotelStays,
+      props.tripRange.startIso,
+      props.tripRange.endIso,
+      checkIn,
+      checkOut,
+      place,
+      {
+        destinationCity: destination,
+        guestCount: guests,
+        roomCount: rooms,
+        userSelected: true,
+        lodgingType: manualStay.lodgingType,
+        bookingUrl: bookingUrl || undefined,
+        notes: manualStay.notes,
+      }
+    );
+    const gi = plan.generatedItinerary
+      ? upsertLodgingActivitiesInGeneratedItinerary(
+          plan.generatedItinerary,
+          checkIn,
+          checkOut,
+          name,
+          detail || name,
+          bookingUrl || undefined
+        )
+      : undefined;
+
+    try {
+      const res = await fetch(`/api/trip-plans/${props.tripId}/host-setup`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostSetup: { hotelStays, hotel: hotelPlace },
+          ...(gi !== undefined ? { generatedItinerary: gi } : {}),
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { plan?: TripPlan; error?: string };
+      if (!res.ok) {
+        setManualError(j.error || "Could not save stay.");
+        return;
+      }
+      if (j.plan) setPlan(j.plan);
+      setSaveMessage(`Added ${name} to your trip.`);
+      setManualStay({
+        name: "",
+        lodgingType: props.initialLodgingType,
+        address: "",
+        bookingUrl: "",
+        notes: "",
+      });
+      setTimeout(() => router.push(`/trip/${props.tripId}/setup#sec-lodging`), 1200);
+    } catch {
+      setManualError("Could not save stay.");
+    } finally {
+      setSelectingId(null);
+    }
+  }, [
+    checkIn,
+    checkOut,
+    destination,
+    guests,
+    manualStay,
+    plan,
+    props.initialLodgingType,
+    props.isHost,
+    props.tripId,
+    props.tripRange,
+    rooms,
+    router,
+  ]);
+
   return (
     <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
       <AppTopNav />
@@ -479,6 +561,17 @@ export function TripHostLodgingPage(props: {
           onSearch={() => void runSearch()}
         />
 
+        {props.isHost ? (
+          <ManualStayCard
+            draft={manualStay}
+            setDraft={setManualStay}
+            dateLabel={dateLabel}
+            busy={selectingId === "manual"}
+            error={manualError}
+            onSave={() => void commitManualStay()}
+          />
+        ) : null}
+
         {saveMessage ? (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             {saveMessage}
@@ -504,8 +597,6 @@ export function TripHostLodgingPage(props: {
               <SearchErrorBanner
                 error={searchError}
                 detail={searchDetail}
-                meta={searchMeta}
-                destination={destination.trim()}
               />
             ) : null}
             {loading ? (
@@ -538,6 +629,108 @@ export function TripHostLodgingPage(props: {
   );
 }
 
+function ManualStayCard({
+  draft,
+  setDraft,
+  dateLabel,
+  busy,
+  error,
+  onSave,
+}: {
+  draft: ManualStayDraft;
+  setDraft: (next: ManualStayDraft) => void;
+  dateLabel: string;
+  busy: boolean;
+  error: string | null;
+  onSave: () => void;
+}) {
+  const update = <K extends keyof ManualStayDraft,>(key: K, value: ManualStayDraft[K]) => {
+    setDraft({ ...draft, [key]: value });
+  };
+
+  return (
+    <section className="mt-4 rounded-2xl border border-[color:var(--hairline)] bg-white p-4 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-[#1a1a1a]">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
+            Add a stay manually
+          </h2>
+          <p className="mt-1 text-sm text-[color:var(--on-surface-muted)]">
+            {dateLabel} · for Airbnb, villas, hostels, resorts, or anything you found elsewhere.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSave}
+          className="mt-3 rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:opacity-50 sm:mt-0"
+        >
+          {busy ? "Saving..." : "Add manual stay"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Stay name</span>
+          <input
+            value={draft.name}
+            onChange={(e) => update("name", e.target.value)}
+            placeholder="e.g. Casa Luna Airbnb"
+            className="mt-1 w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Stay type</span>
+          <select
+            value={draft.lodgingType}
+            onChange={(e) => update("lodgingType", e.target.value as HostLodgingType)}
+            className="mt-1 w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
+          >
+            {MANUAL_STAY_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Neighborhood or address</span>
+          <input
+            value={draft.address}
+            onChange={(e) => update("address", e.target.value)}
+            placeholder="e.g. Roma Norte, Mexico City"
+            className="mt-1 w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Booking link</span>
+          <input
+            value={draft.bookingUrl}
+            onChange={(e) => update("bookingUrl", e.target.value)}
+            placeholder="https://..."
+            className="mt-1 w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
+          />
+        </label>
+      </div>
+      <label className="mt-3 block">
+        <span className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Notes</span>
+        <textarea
+          rows={2}
+          value={draft.notes}
+          onChange={(e) => update("notes", e.target.value)}
+          placeholder="Room setup, deposit deadline, cancellation notes..."
+          className="mt-1 w-full resize-y rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-sm outline-none focus:border-[#2563EB] dark:border-white/15 dark:bg-[#141414]"
+        />
+      </label>
+      {error ? (
+        <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function LodgingResultsSkeleton() {
   return (
     <ul className="space-y-4" aria-busy="true" aria-label="Loading results">
@@ -558,27 +751,14 @@ function LodgingResultsSkeleton() {
 function SearchErrorBanner({
   error,
   detail,
-  meta,
-  destination,
 }: {
   error: string;
   detail: string | null;
-  meta: LodgingSearchApiResponse["meta"] | null;
-  destination: string;
 }) {
   return (
     <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950" role="alert">
       <p className="font-semibold">{error}</p>
       {detail ? <p className="mt-1 leading-relaxed text-rose-900">{detail}</p> : null}
-      {meta ? (
-        <p className="mt-2 text-xs text-rose-800/90">
-          Search: &quot;{meta.destinationQuery || destination}&quot; · dest_id {meta.destId ?? "—"} ·{" "}
-          {meta.rawHotelCount} raw / {meta.mappedHotelCount} mapped
-        </p>
-      ) : null}
-      <p className="mt-2 text-xs text-rose-800/80">
-        Open DevTools (F12) → Console and look for <code className="rounded bg-rose-100 px-1">[lodging-search]</code> logs.
-      </p>
     </div>
   );
 }
@@ -696,15 +876,6 @@ function LeftSidebar(props: {
 }) {
   return (
     <aside className="hidden w-full shrink-0 space-y-4 lg:block lg:w-[240px]">
-      <div className="overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white dark:border-white/10 dark:bg-[#1a1a1a]">
-        <div className="relative h-24 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-100 dark:from-sky-950/40 dark:via-indigo-950/30 dark:to-violet-950/20">
-          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle at 30% 60%, #2563EB 2px, transparent 2px), radial-gradient(circle at 70% 40%, #2563EB 2px, transparent 2px)", backgroundSize: "24px 24px" }} />
-        </div>
-        <button type="button" className="w-full px-3 py-2.5 text-left text-sm font-medium text-[#2563EB] hover:underline dark:text-[#60A5FA]">
-          View on map
-        </button>
-      </div>
-
       <div className="rounded-2xl border border-[color:var(--hairline)] bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
         <label className="text-xs font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">Search by name</label>
         <div className="relative mt-1.5">

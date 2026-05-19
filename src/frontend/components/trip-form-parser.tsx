@@ -107,11 +107,11 @@ async function imageFileToDataUrl(file: File, maxEdge = 1280, quality = 0.75): P
 
 type Phase = "input" | "parsing" | "form" | "saving";
 
-export function TripFormParser() {
+export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("input");
-  const [freeText, setFreeText] = useState("");
+  const [freeText, setFreeText] = useState(initialPrompt);
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [form, setForm] = useState<FormData>({

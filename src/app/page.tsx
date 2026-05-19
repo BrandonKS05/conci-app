@@ -293,6 +293,7 @@ export default function HomePage() {
                 direction="up"
                 className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-[color:var(--hairline)] bg-gradient-to-b from-[color:var(--surface-container-lowest)] to-[color:var(--surface)] p-10 transition-all hover:-translate-y-1 hover:shadow-2xl dark:border-white/10 dark:from-[#1a1a1a] dark:to-[#121212]"
               >
+                <Link href={path.href} className="absolute inset-0 z-20" aria-label={path.cta} />
                 <div className="absolute inset-0 bg-gradient-to-tr from-[color:var(--sage)]/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 <div className="relative z-10 flex flex-col h-full">
                   <span className="label-caps mb-6 text-[10px] tracking-[0.2em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">

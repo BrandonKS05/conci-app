@@ -177,7 +177,12 @@ const HOST_CALENDAR_HOTEL_EDGE_LABEL: Record<HostHotelCalendarEdge, string> = {
 };
 
 function lodgingTypeBadgeLabel(type: HostLodgingType | undefined): string {
-  return type === "airbnb" ? "Airbnb" : "Hotel";
+  if (type === "airbnb") return "Airbnb";
+  if (type === "villa") return "Villa";
+  if (type === "hostel") return "Hostel";
+  if (type === "resort") return "Resort";
+  if (type === "other") return "Stay";
+  return "Hotel";
 }
 
 function StayCardHeroImage({

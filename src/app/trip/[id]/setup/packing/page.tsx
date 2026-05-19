@@ -61,7 +61,7 @@ export default async function TripHostPackingSetupPage({
 
   return (
     <div className="min-h-screen bg-slate-50 py-6 text-[color:var(--on-surface)] dark:bg-dm-page dark:text-neutral-100 sm:py-8">
-      <TripHostPackingPage tripId={id} initialPlan={plan} />
+      <TripHostPackingPage tripId={id} initialPlan={plan} isHost={access.isHost} />
     </div>
   );
 }

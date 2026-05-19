@@ -8,6 +8,10 @@ export default async function RecommendationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   const { id } = await params;
   const recommendation = getRecommendationById(id);
 
@@ -89,4 +93,3 @@ function Detail({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

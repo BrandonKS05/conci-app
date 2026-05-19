@@ -257,6 +257,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   let nextPlan: TripPlan = plan;
+  if (planPatch !== undefined && !access.isHost) {
+    planPatch = undefined;
+    assistantText =
+      "I can help collect suggestions, but only the trip host can change the saved trip details. Send this to the host from the preferences area if you want it applied.";
+  }
+
   if (planPatch !== undefined && planPatch !== null && typeof planPatch === "object" && !Array.isArray(planPatch)) {
     const keys = Object.keys(planPatch as object);
     if (keys.length > 0) {

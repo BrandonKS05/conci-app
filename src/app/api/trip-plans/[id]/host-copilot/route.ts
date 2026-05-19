@@ -455,6 +455,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!access) {
     return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
+  if (!access.isHost) {
+    return NextResponse.json({ error: "Only the trip host can edit the itinerary with Copilot." }, { status: 403 });
+  }
 
   const { data: row, error } = await svc
     .from("trip_plans")

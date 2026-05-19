@@ -116,8 +116,14 @@ async function fetchMostRecentActiveTrip(): Promise<ActiveTripCardData | null> {
   };
 }
 
-export default async function TripParserPage() {
+export default async function TripParserPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   noStore();
+  const { q } = await searchParams;
+  const initialPrompt = typeof q === "string" ? q : "";
   let activeTrip: ActiveTripCardData | null = null;
   try {
     activeTrip = await fetchMostRecentActiveTrip();
@@ -129,7 +135,7 @@ export default async function TripParserPage() {
     <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
       <AppTopNav />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6 sm:pt-12">
-        <TripFormParser />
+        <TripFormParser initialPrompt={initialPrompt} />
         <section
           aria-label="Quick actions"
           className="mt-12 grid gap-5 sm:grid-cols-2"
@@ -141,4 +147,3 @@ export default async function TripParserPage() {
     </div>
   );
 }
-

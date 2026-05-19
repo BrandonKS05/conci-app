@@ -50,6 +50,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (!access) {
     return NextResponse.json({ error: "You don't have access to this trip." }, { status: 403 });
   }
+  if (!access.isHost) {
+    return NextResponse.json({ error: "Only the trip host can update trip setup." }, { status: 403 });
+  }
 
   let body: {
     hostSetup?: HostSetupPatch;

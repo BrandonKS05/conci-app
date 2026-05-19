@@ -58,10 +58,14 @@ export async function middleware(request: NextRequest) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
-    // Build a clean `next` value: keep the destination path and only safe
-    // navigational params (e.g. `from`). Drop anything that could be sensitive
-    // or noisy when echoed in the address bar (invite codes, OAuth bits, etc.).
-    const SAFE_NEXT_PARAMS = new Set(["from", "tab"]);
+    // Build a clean `next` value: keep only params needed to resume the
+    // product flow after auth. OAuth tokens and other noisy params are dropped.
+    const SAFE_NEXT_PARAMS =
+      path === "/join"
+        ? new Set(["from", "code"])
+        : path.startsWith("/trip-parser")
+          ? new Set(["q"])
+          : new Set(["from", "tab"]);
     const safeQuery = new URLSearchParams();
     for (const [k, v] of request.nextUrl.searchParams.entries()) {
       if (SAFE_NEXT_PARAMS.has(k)) safeQuery.append(k, v);

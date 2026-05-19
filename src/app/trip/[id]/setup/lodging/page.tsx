@@ -3,7 +3,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { TripHostLodgingPage } from "@/frontend/components/trip-host-lodging-page";
-import { hostHasConcreteTripRange, normalizePlan, type HostLodgingType } from "@/shared/trip-plan";
+import { hostHasConcreteTripRange, normalizePlan, parseHostLodgingType, type HostLodgingType } from "@/shared/trip-plan";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
 
@@ -46,7 +46,7 @@ export default async function TripHostLodgingSetupPage({
 
   const q = await searchParams;
   const lodgingRaw = asSingle(q.lodgingType).trim().toLowerCase();
-  const lodgingType: HostLodgingType = lodgingRaw === "airbnb" ? "airbnb" : "hotel";
+  const lodgingType: HostLodgingType = parseHostLodgingType(lodgingRaw) ?? "hotel";
   const primaryCity = plan.location?.split(",")[0]?.trim() || plan.title?.trim() || "Trip";
 
   return (

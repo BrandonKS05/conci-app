@@ -6,7 +6,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import type { LodgingSearchApiResponse } from "@/shared/lodging-search";
-import type { HostLodgingType } from "@/shared/trip-plan";
+import { parseHostLodgingType, type HostLodgingType } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
 export const runtime = "nodejs";
@@ -49,7 +49,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const guests = Math.max(1, Number(url.searchParams.get("guests")) || 2);
   const rooms = Math.max(1, Number(url.searchParams.get("rooms")) || 1);
   const lodgingRaw = asSingle(url.searchParams.get("lodgingType")).toLowerCase();
-  const lodgingType: HostLodgingType = lodgingRaw === "airbnb" ? "airbnb" : "hotel";
+  const parsedLodgingType = parseHostLodgingType(lodgingRaw);
+  const lodgingType: HostLodgingType =
+    parsedLodgingType && parsedLodgingType !== "villa" && parsedLodgingType !== "hostel" && parsedLodgingType !== "other"
+      ? parsedLodgingType
+      : "hotel";
 
   console.info("[lodging/search] incoming request", {
     tripId: id,
@@ -100,9 +104,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (!isRapidApiHotelsConfigured()) {
     return NextResponse.json(
       {
-        error: "RapidAPI is not configured.",
-        detail:
-          "Add RAPIDAPI_KEY to .env.local at the project root, subscribe to booking-com15 on RapidAPI, then restart npm run dev.",
+        error: "Lodging search is temporarily unavailable.",
+        detail: "Add a manual stay for now, or try search again later.",
         hotels: [],
       } satisfies LodgingSearchApiResponse,
       { status: 503 }
@@ -139,8 +142,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     if (hotels.length === 0) {
       return NextResponse.json(
         {
-          error: "No hotels returned.",
-          detail: `RapidAPI returned ${rows.length} raw row(s) for "${destinationQuery}" but none could be mapped. Try different dates or a larger city.`,
+          error: "No stays matched this search.",
+          detail: "Try different dates, a larger nearby city, or add the stay manually.",
           hotels: [],
           meta: {
             destinationQuery,
