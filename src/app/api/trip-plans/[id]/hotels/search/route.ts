@@ -146,16 +146,20 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   try {
     hotels = await searchHotelsForTrip(plan);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Hotel search failed.";
+    const raw = e instanceof Error ? e.message : "Hotel search failed.";
     const stack = e instanceof Error ? e.stack : undefined;
     console.error("[hotels/search] searchHotelsForTrip threw", {
       tripId: id,
       decisionKey,
-      errorMessageFull: msg,
+      errorMessageFull: raw,
       stack,
       rapidApiKeyDiagnostics: keyDiag,
     });
-    return NextResponse.json({ error: msg }, { status: 502 });
+    const isApiSubscriptionError = raw.includes("403") || raw.includes("not subscribed") || raw.includes("401");
+    const userMsg = isApiSubscriptionError
+      ? "Hotel search is temporarily unavailable."
+      : "Hotel search failed — try again.";
+    return NextResponse.json({ error: userMsg }, { status: 502 });
   }
 
   const collab = collabForDates;

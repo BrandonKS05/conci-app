@@ -166,10 +166,17 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       },
     } satisfies LodgingSearchApiResponse);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Hotel search failed.";
-    console.error("[lodging/search] failed", { tripId: id, errorMessage: msg });
+    const raw = e instanceof Error ? e.message : "Hotel search failed.";
+    console.error("[lodging/search] failed", { tripId: id, errorMessage: raw });
+    const isApiSubscriptionError = raw.includes("403") || raw.includes("not subscribed") || raw.includes("401");
+    const userMsg = isApiSubscriptionError
+      ? "Hotel search is temporarily unavailable. Add your stay manually for now."
+      : "Search failed — try again or add your stay manually.";
+    const detail = isApiSubscriptionError
+      ? "The hotel search integration is not active. You can still add any stay using the manual form above."
+      : undefined;
     return NextResponse.json(
-      { error: msg, hotels: [] } satisfies LodgingSearchApiResponse,
+      { error: userMsg, ...(detail ? { detail } : {}), hotels: [] } satisfies LodgingSearchApiResponse,
       { status: 502 }
     );
   }
