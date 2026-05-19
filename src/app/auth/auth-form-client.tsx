@@ -82,6 +82,9 @@ export function AuthFormClient() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [signupNotice, setSignupNotice] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotWorking, setForgotWorking] = useState(false);
 
   const clearFieldErrors = useCallback(() => {
     setError(null);
@@ -89,6 +92,19 @@ export function AuthFormClient() {
     setPasswordError(null);
     setConfirmError(null);
   }, []);
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseClient();
+    if (!supabase) { setError("Supabase is not configured."); return; }
+    clearFieldErrors();
+    setForgotWorking(true);
+    const redirectTo = `${oauthRedirectOrigin()}/auth/reset-password`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    setForgotWorking(false);
+    if (resetError) { setError(resetError.message); return; }
+    setForgotSent(true);
+  }
 
   const applyMappedError = useCallback((mapped: { field?: "email" | "password" | "confirm"; message: string }) => {
     if (mapped.field === "email") setEmailError(mapped.message);
@@ -224,7 +240,41 @@ export function AuthFormClient() {
           </div>
         </div>
 
-        {signupNotice ? (
+        {forgotMode ? (
+          forgotSent ? (
+            <div className="rounded-2xl border border-[color:var(--sage)]/35 bg-[color:var(--sage-soft)]/25 px-4 py-3 text-center text-sm text-[color:var(--on-surface)] dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200" role="status">
+              Check your email for a password reset link.
+            </div>
+          ) : (
+            <form onSubmit={(e) => void handleForgotPassword(e)} className="space-y-4" noValidate>
+              <div>
+                <label htmlFor="auth-reset-email" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  Email
+                </label>
+                <input
+                  id="auth-reset-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={forgotWorking}
+                  placeholder="you@example.com"
+                  className={inputClass}
+                />
+              </div>
+              {error ? <p className="text-center text-sm text-[#a8443c] dark:text-rose-400" role="alert">{error}</p> : null}
+              <button type="submit" disabled={forgotWorking} className={`w-full ${primaryFormButtonClass} disabled:opacity-50`}>
+                {forgotWorking ? "Sending…" : "Send reset link"}
+              </button>
+              <p className="text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+                <button type="button" onClick={() => { setForgotMode(false); clearFieldErrors(); }} className="font-semibold underline-offset-2 hover:underline">
+                  Back to sign in
+                </button>
+              </p>
+            </form>
+          )
+        ) : signupNotice ? (
           <div
             className="rounded-2xl border border-[color:var(--sage)]/35 bg-[color:var(--sage-soft)]/25 px-4 py-3 text-center text-sm text-[color:var(--on-surface)] dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200"
             role="status"
@@ -274,6 +324,17 @@ export function AuthFormClient() {
                 </p>
               ) : null}
             </div>
+            {mode === "signin" ? (
+              <p className="text-right text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setForgotSent(false); clearFieldErrors(); }}
+                  className="text-[color:var(--on-surface-muted)] underline-offset-2 hover:text-[color:var(--on-surface)] hover:underline dark:text-neutral-500 dark:hover:text-neutral-300"
+                >
+                  Forgot password?
+                </button>
+              </p>
+            ) : null}
             {mode === "signup" ? (
               <div>
                 <label htmlFor="auth-confirm" className="text-sm font-medium text-[color:var(--on-surface-variant)] dark:text-neutral-300">
@@ -313,7 +374,7 @@ export function AuthFormClient() {
           </form>
         )}
 
-        {!signupNotice ? (
+        {!forgotMode && !signupNotice ? (
           <p className="mt-6 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             {mode === "signin" ? (
               <>
@@ -339,7 +400,7 @@ export function AuthFormClient() {
               </>
             )}
           </p>
-        ) : (
+        ) : signupNotice ? (
           <p className="mt-6 text-center text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
             Wrong email?{" "}
             <button
@@ -353,7 +414,7 @@ export function AuthFormClient() {
               Try again
             </button>
           </p>
-        )}
+        ) : null}
       </div>
       <p className="mt-6 text-center text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         <Link href="/" className="font-medium text-[color:var(--on-surface)] hover:text-[color:var(--sage)] hover:underline dark:text-indigo-400">
