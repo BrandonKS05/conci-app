@@ -278,8 +278,19 @@ function mapBookingHotelRow(
   };
 }
 
-async function bookingSearchDestination(query: string): Promise<string | null> {
-  const body = await rapidGet("/api/v1/hotels/searchDestination", { query });
+async function bookingSearchDestination(
+  query: string,
+  opts?: { checkIn?: string; checkOut?: string; adults?: number }
+): Promise<string | null> {
+  const body = await rapidGet("/api/v1/hotels/searchDestination", {
+    query,
+    checkin_date: opts?.checkIn,
+    checkout_date: opts?.checkOut,
+    adults_number: opts?.adults !== undefined ? String(opts.adults) : undefined,
+    units: "metric",
+    locale: "en-us",
+    currency: "USD",
+  });
   return extractDestIdFromDestinationSearch(body, query.trim());
 }
 
@@ -296,9 +307,11 @@ async function bookingSearchHotels(
     arrival_date: checkIn,
     departure_date: checkOut,
     adults,
-    currency_code: "USD",
     room_qty: roomQty,
+    currency_code: "USD",
     languagecode: "en-us",
+    units: "metric",
+    temperature_unit: "c",
   });
   const rows = extractHotelsArray(body);
   console.info(`${LOG_PREFIX} searchHotels parsed`, {
@@ -337,13 +350,13 @@ export async function searchHotelsForTrip(plan: TripPlan): Promise<HotelPick[]> 
     throw new Error("Add a clearer city or location on the plan to search hotels.");
   }
 
-  const destId = await bookingSearchDestination(city);
+  const { checkIn, checkOut } = inferStayDates(plan);
+  const adults = adultsFromPlan(plan);
+
+  const destId = await bookingSearchDestination(city, { checkIn, checkOut, adults });
   if (!destId) {
     throw new Error(`No destination found for “${city}”. Try a larger nearby city.`);
   }
-
-  const { checkIn, checkOut } = inferStayDates(plan);
-  const adults = adultsFromPlan(plan);
 
   const rows = await bookingSearchHotels(destId, checkIn, checkOut, adults);
 
@@ -406,13 +419,17 @@ export async function searchHotelsForLodging(
     throw new Error('Enter a full destination (e.g. "Los Angeles, CA") — at least 2 characters.');
   }
 
-  const destId = await bookingSearchDestination(destinationQuery);
+  const adults = Math.min(9, Math.max(1, params.adults));
+  const rooms = Math.min(8, Math.max(1, params.rooms));
+
+  const destId = await bookingSearchDestination(destinationQuery, {
+    checkIn: params.checkIn,
+    checkOut: params.checkOut,
+    adults,
+  });
   if (!destId) {
     throw new Error(`No destination found for "${destinationQuery}". Try a full city name.`);
   }
-
-  const adults = Math.min(9, Math.max(1, params.adults));
-  const rooms = Math.min(8, Math.max(1, params.rooms));
 
   const rows = await bookingSearchHotels(destId, params.checkIn, params.checkOut, adults, rooms);
 
