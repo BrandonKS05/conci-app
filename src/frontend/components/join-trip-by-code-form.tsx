@@ -17,6 +17,10 @@ export function JoinTripByCodeForm({ initialCode = "" }: { initialCode?: string 
   const onSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
+      if (!code.trim()) {
+        setError("Enter an invite code.");
+        return;
+      }
       setError(null);
       setBusy(true);
       try {
