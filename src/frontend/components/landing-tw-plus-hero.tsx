@@ -42,10 +42,10 @@ export function LandingTwPlusHero() {
               href="/join?from=create"
               className="label-caps hidden text-[#444748] transition hover:text-[#1c1c17] dark:text-[#9c9a96] dark:hover:text-[#ebe9e4] sm:inline"
             >
-              Join a trip
+              Join with a code
             </Link>
             <Link href="/join?from=create" className={`${primaryNavPillClass} sm:hidden`}>
-              <span>Join trip</span>
+              <span>Join with a code</span>
             </Link>
             <div className="hidden lg:block">
               <UserMenu />
