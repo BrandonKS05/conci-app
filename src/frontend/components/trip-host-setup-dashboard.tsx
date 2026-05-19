@@ -1932,7 +1932,6 @@ export function TripHostSetupDashboard({
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const tripDayRole = tripCalendarDayRole(cellIso, effectiveHighlightRange);
                     const hotelCalendarRows = hotelStayRowsForCalendarDay(hostSetup.hotelStays, cellIso);
-                    const dayLabel = formatPinDayLabel(cellIso);
                     const mealPinsForCell = (hostSetup.restaurantPins ?? []).filter(
                       (p) => p.dateIso === cellIso && p.kept
                     );
@@ -1971,29 +1970,9 @@ export function TripHostSetupDashboard({
                       );
                       const lodgingPinKey = `stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`;
                       calendarCellEntries.push(
-                        canEditAsHost ? (
-                          <button
-                            key={lodgingPinKey}
-                            type="button"
-                            title="Change lodging for this stay"
-                            onClick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              openLodgingModal({
-                                checkIn: hotelForDay.startIso,
-                                checkOut: hotelForDay.endIso,
-                                destination: hotelForDay.destinationCity?.trim() || undefined,
-                                lodgingType: hotelForDay.lodgingType ?? "hotel",
-                              });
-                            }}
-                            className={["min-w-0 w-full cursor-pointer text-left", calendarPinShellClass(pem)].join(" ")}
-                          >
-                            {lodgingPinBody}
-                          </button>
-                        ) : (
-                          <div key={lodgingPinKey} className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}>
-                            {lodgingPinBody}
-                          </div>
-                        )
+                        <div key={lodgingPinKey} className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}>
+                          {lodgingPinBody}
+                        </div>
                       );
                     }
                     for (const p of mealPinsForCell) {
@@ -2003,18 +1982,12 @@ export function TripHostSetupDashboard({
                         ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
                         : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
                       calendarCellEntries.push(
-                        <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
+                        <div key={p.place.mapsUrl} className="relative min-w-0 w-full">
+                          <div
                             className={[
-                              "w-full text-left transition",
+                              "w-full text-left",
                               calendarPinShellClass(pem),
-                              pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
                             ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
-                            }}
                           >
                             <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
@@ -2029,25 +2002,7 @@ export function TripHostSetupDashboard({
                                 Meal
                               </span>
                             </div>
-                          </button>
-                          {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.place.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "meal",
-                                  dateIso: p.dateIso,
-                                  mapsUrl: p.place.mapsUrl,
-                                  title: `"${p.place.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
-                          ) : null}
+                          </div>
                         </div>
                       );
                     }
@@ -2070,22 +2025,12 @@ export function TripHostSetupDashboard({
                           ? "Departure"
                           : "Activity";
                       calendarCellEntries.push(
-                        <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
+                        <div key={p.experience.bookingUrl} className="relative min-w-0 w-full">
+                          <div
                             className={[
-                              "w-full text-left transition",
+                              "w-full text-left",
                               calendarPinShellClass(pem),
-                              pem ? "" : "hover:bg-white/50 dark:hover:bg-white/[0.04]",
                             ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({
-                                kind: "activity",
-                                experience: p.experience,
-                                dateLabel: dayLabel,
-                              });
-                            }}
                           >
                             <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
                               <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
@@ -2100,31 +2045,15 @@ export function TripHostSetupDashboard({
                                 {pinEyebrow}
                               </span>
                             </div>
-                          </button>
-                          {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.experience.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "activity",
-                                  dateIso: p.dateIso,
-                                  bookingUrl: p.experience.bookingUrl,
-                                  title: `"${p.experience.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
-                          ) : null}
+                          </div>
                         </div>
                       );
                     }
 
                     const visibleCalendarEntries = calendarCellEntries.slice(0, CALENDAR_CELL_MAX_VISIBLE_ITEMS);
                     const calendarMoreCount = Math.max(0, calendarCellEntries.length - CALENDAR_CELL_MAX_VISIBLE_ITEMS);
+                    const showDayEditOverlay =
+                      canEditAsHost && datePickMode === "day" && Boolean(tripDayIsoSet?.has(cellIso));
 
                     return (
                       <div
@@ -2186,6 +2115,32 @@ export function TripHostSetupDashboard({
                             </p>
                           ) : null}
                         </div>
+
+                        {showDayEditOverlay ? (
+                          <div className="pointer-events-none absolute inset-0 z-20 hidden flex-col items-center justify-center gap-3 opacity-0 transition-opacity duration-200 group-hover/cell:pointer-events-auto group-hover/cell:opacity-100 group-focus-within/cell:pointer-events-auto group-focus-within/cell:opacity-100 md:flex">
+                            <div
+                              className="absolute inset-0 bg-white/65 backdrop-blur-[4px] dark:bg-neutral-950/55 dark:backdrop-blur-sm"
+                              aria-hidden
+                            />
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              className="relative z-[1] pointer-events-auto rounded-full bg-[#1c1c17] px-4 py-2 text-xs font-semibold text-[color:var(--surface)] shadow-md transition hover:bg-[#2a2a26] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/60 dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white dark:focus-visible:ring-[color:var(--sage-soft)]/70"
+                              onMouseDown={(e) => {
+                                /** Avoid outer cell receiving focus-ring from click chaining */
+                                e.stopPropagation();
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDayIso(cellIso);
+                                router.push(`/trip/${tripId}/setup/day?date=${encodeURIComponent(cellIso)}`);
+                              }}
+                            >
+                              Edit day
+                            </button>
+                          </div>
+                        ) : null}
+
                         {(() => {
                           const others = peersByCellIso.get(cellIso);
                           const p0 = others?.[0];
