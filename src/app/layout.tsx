@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
@@ -16,7 +16,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: “Conci · AI for group trips”,
+  title: "Conci · AI for group trips",
   description:
     "Conci: everyone’s personal “Executive” assistant for group trips — paste a text, link, or screenshot and turn messy chats into a shareable plan.",
 };

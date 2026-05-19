@@ -2,6 +2,7 @@
 
 import { ElDialog, ElDialogPanel } from "@tailwindplus/elements/react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { UserMenu } from "@/frontend/components/user-menu";
 import { primaryNavPillClass } from "@/frontend/ui/primary-action";
 import { LandingGlobe } from "@/frontend/components/landing-globe";
@@ -19,6 +20,17 @@ const heroOutlinePillClass =
   "inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] px-10 py-5 text-base font-medium tracking-wide text-[color:var(--on-surface)] transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:px-12 sm:py-5 sm:text-lg dark:border-white/15 dark:text-[color:var(--on-surface)] dark:hover:bg-white/5";
 
 export function LandingTwPlusHero() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    const onToggle = () => setMenuOpen(el.open);
+    el.addEventListener("toggle", onToggle);
+    return () => el.removeEventListener("toggle", onToggle);
+  }, []);
+
   return (
     <>
       <header className="absolute inset-x-0 top-0 z-50">
@@ -55,6 +67,8 @@ export function LandingTwPlusHero() {
                 type="button"
                 command="show-modal"
                 commandfor="mobile-menu"
+                aria-expanded={menuOpen}
+                aria-controls="mobile-menu"
                 className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700 dark:text-gray-200"
               >
                 <span className="sr-only">Open main menu</span>
@@ -73,7 +87,7 @@ export function LandingTwPlusHero() {
           </div>
         </nav>
         <ElDialog>
-          <dialog id="mobile-menu" className="backdrop:bg-transparent lg:hidden">
+          <dialog ref={dialogRef} id="mobile-menu" className="backdrop:bg-transparent lg:hidden">
             <div tabIndex={0} className="fixed inset-0 focus:outline-none">
               <ElDialogPanel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto border-l border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-6 dark:border-white/10 dark:bg-dm-card sm:max-w-sm sm:shadow-[var(--shadow-ambient-lg)]">
                 <div className="flex items-center justify-between">
