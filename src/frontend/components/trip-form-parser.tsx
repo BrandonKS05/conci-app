@@ -190,6 +190,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
   }, [freeText, images]);
 
   const skipToForm = useCallback(() => {
+    setError(null);
     setPhase("form");
   }, []);
 
