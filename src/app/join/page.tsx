@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { JoinTripByCodeForm } from "@/frontend/components/join-trip-by-code-form";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
+
+export const metadata: Metadata = {
+  title: "Join a Trip · Conci",
+};
 
 /**
  * Invite-code join. Direct invite URLs and Create-trip handoffs both land here.

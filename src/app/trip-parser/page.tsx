@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
 import { TripFormParser } from "@/frontend/components/trip-form-parser";
+
+export const metadata: Metadata = {
+  title: "Plan a Trip · Conci",
+};
 import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
 import {
   TripParserActiveTripCard,

@@ -16,7 +16,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Conci — Everyone’s Personal “Executive” Assistant",
+  title: “Conci · AI for group trips”,
   description:
     "Conci: everyone’s personal “Executive” assistant for group trips — paste a text, link, or screenshot and turn messy chats into a shareable plan.",
 };
