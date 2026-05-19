@@ -105,11 +105,17 @@ function PricingContent() {
           <h1 className="font-display text-3xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
             Simple pricing
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
-            Testing mode: every tier is <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">$0/mo</span>{" "}
-            in the UI. Trip creation is open to all signed-in users — subscription billing is bypassed until we turn the
-            gate back on.
-          </p>
+          {process.env.NODE_ENV === "development" ? (
+            <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+              Testing mode: every tier is <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">$0/mo</span>{" "}
+              in the UI. Trip creation is open to all signed-in users — subscription billing is bypassed until we turn the
+              gate back on.
+            </p>
+          ) : (
+            <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+              Choose the plan that fits your group. Start free, upgrade when you&apos;re ready.
+            </p>
+          )}
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
