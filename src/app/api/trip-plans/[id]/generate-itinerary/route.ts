@@ -23,6 +23,7 @@ import {
   type HostHotelStay,
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
+import { enrichItineraryWithVenues } from "@/backend/itinerary-venue-enrichment";
 
 const ITINERARY_SYSTEM_PROMPT = `You are a travel itinerary planner. Given trip details, generate a realistic day-by-day itinerary with estimated costs.
 
@@ -47,9 +48,27 @@ Return ONLY valid JSON matching this schema:
 }
 
 Rules:
+
+BUDGET ENFORCEMENT (critical):
+- The user prompt contains a HARD BUDGET CONSTRAINT section with exact daily allocation. You MUST respect it.
+- Before finalizing output, mentally sum ALL estimatedCostPp values across all days. The total MUST be within ±15% of the stated total budget.
+- If no explicit budget is given, assume moderate ($150-250/day/person).
+- Tier guide for venue selection:
+  * "budget": hostels/Airbnb shared, street food, food trucks, free attractions, public transit, happy hours
+  * "moderate": mid-range hotels, casual restaurants ($15-40/meal), paid attractions ($10-50), rideshare
+  * "splurge": luxury hotels, fine dining ($50-150/meal), premium experiences ($100+), private transfers
+- Lodging cost should only appear on Day 1 (total nightly rate x nights) or split evenly across days.
+- Each activity's estimatedCostPp MUST be realistic for the stated tier and destination. Do NOT inflate or undercount.
+- If you cannot fit desired activities within budget, prioritize free/cheap alternatives that still match the vibe.
+
+VIBE ENFORCEMENT (critical):
+- The user prompt may contain a VIBE CONSTRAINT section. Follow it strictly.
+- At least 30-40% of non-transport/lodging activities MUST match the stated vibe(s).
+- If multiple vibes are given, distribute activities roughly evenly across them.
+- Do NOT default to generic sightseeing if a specific vibe is requested.
+
+GENERAL RULES:
 - Generate one day per trip day. If dates are vague (e.g. "late June", "3 days"), infer a reasonable number of days (default 3-4 for weekends, 5-7 for "a week").
-- Respect the budget: if budget is "budget-friendly" or low per-person, use hostels, street food, free attractions. If "splurge" or high budget, use luxury hotels, fine dining, premium experiences.
-- Match the vibe: "party" = nightlife and bars; "chill" = beaches and spas; "culture" = museums and historical sites; "outdoors" = hikes and nature.
 - If pace preference is provided: "packed" = 4-6 activities/day; "relaxed" = 2-3 activities with free-time blocks between.
 - If interests are specified, weight activities heavily toward those categories.
 - Include realistic cost estimates in USD per person. Use null only if you genuinely cannot estimate.
@@ -59,7 +78,7 @@ Rules:
 - estimatedDayCostPp should be the sum of all non-null activity costs for that day.
 - Be specific to the destination: use real neighborhood names, landmark references, and local cuisine.
 - For the first day, include arrival/check-in. For the last day, include checkout/departure.
-- Lodging cost should only appear on Day 1 (total nightly rate x nights) or split evenly across days.
+- If pinned restaurants or activities are marked "MUST include" in the user prompt, incorporate them into the appropriate day.
 
 Example (abbreviated) for a 2-day budget trip to Austin with "outdoors" vibe:
 {"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Arrive at Austin-Bergstrom","description":"Grab bags, take city bus downtown (~30 min).","category":"transport","estimatedCostPp":2},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to HI Austin Hostel","description":"Dorm bed in SoCo area, walking distance to food.","category":"lodging","estimatedCostPp":45},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":18}],"estimatedDayCostPp":82},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent a kayak at the rowing dock for 2 hours.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Depart Austin","description":"Bus back to airport for evening flight.","category":"transport","estimatedCostPp":2}],"estimatedDayCostPp":40}]}`;
@@ -275,6 +294,136 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
   return { restaurantPins, activityPins, hotelStays, dayVoting };
 }
 
+// --- Budget parsing ---
+
+type BudgetBreakdown = {
+  dailyPp: number;
+  totalPp: number;
+  days: number;
+  tier: "budget" | "moderate" | "splurge";
+  allocation: { lodging: number; food: number; activities: number; transport: number };
+};
+
+const TIER_DEFAULTS: Record<string, { daily: number; tier: BudgetBreakdown["tier"] }> = {
+  "budget-friendly": { daily: 80, tier: "budget" },
+  budget: { daily: 80, tier: "budget" },
+  cheap: { daily: 80, tier: "budget" },
+  backpacker: { daily: 60, tier: "budget" },
+  moderate: { daily: 200, tier: "moderate" },
+  mid: { daily: 200, tier: "moderate" },
+  "mid-range": { daily: 200, tier: "moderate" },
+  comfort: { daily: 250, tier: "moderate" },
+  splurge: { daily: 500, tier: "splurge" },
+  luxury: { daily: 600, tier: "splurge" },
+  "high-end": { daily: 550, tier: "splurge" },
+  premium: { daily: 500, tier: "splurge" },
+  baller: { daily: 700, tier: "splurge" },
+};
+
+function inferTripDayCount(plan: TripPlan): number {
+  const y0 = new Date().getFullYear();
+  const tr = plan.hostSetup?.tripRange ?? tripRangeBestEffortFromPlanDates(plan, y0);
+  if (tr?.startIso && tr.endIso) {
+    const days = enumerateLocalIsoDays(tr.startIso, tr.endIso);
+    if (days.length > 0) return days.length;
+  }
+  const dateStr = plan.dates.options.join(" ").toLowerCase();
+  const weekMatch = dateStr.match(/(\d+)\s*week/);
+  if (weekMatch) return parseInt(weekMatch[1]!, 10) * 7;
+  const dayMatch = dateStr.match(/(\d+)\s*day/);
+  if (dayMatch) return parseInt(dayMatch[1]!, 10);
+  return 4;
+}
+
+function parseBudgetToDaily(plan: TripPlan): BudgetBreakdown | null {
+  const days = inferTripDayCount(plan);
+  const budgetStr = (plan.budget.perPerson || plan.budget.tier || "").trim().toLowerCase();
+
+  if (!budgetStr) return null;
+
+  let dailyPp: number | null = null;
+  let tier: BudgetBreakdown["tier"] = "moderate";
+
+  const perDayMatch = budgetStr.match(/\$?\s*([\d,]+)\s*\/?\s*(per\s*)?day/);
+  if (perDayMatch) {
+    dailyPp = parseFloat(perDayMatch[1]!.replace(/,/g, ""));
+  }
+
+  if (dailyPp == null) {
+    const totalMatch = budgetStr.match(/\$?\s*([\d,]+)/);
+    if (totalMatch) {
+      const total = parseFloat(totalMatch[1]!.replace(/,/g, ""));
+      if (total > 0) {
+        dailyPp = total > 50 * days ? total / days : total;
+      }
+    }
+  }
+
+  if (dailyPp == null) {
+    for (const [keyword, config] of Object.entries(TIER_DEFAULTS)) {
+      if (budgetStr.includes(keyword)) {
+        dailyPp = config.daily;
+        tier = config.tier;
+        break;
+      }
+    }
+  }
+
+  if (dailyPp == null) return null;
+
+  if (dailyPp <= 100) tier = "budget";
+  else if (dailyPp <= 300) tier = "moderate";
+  else tier = "splurge";
+
+  const allocPcts = tier === "budget"
+    ? { lodging: 0.35, food: 0.35, activities: 0.20, transport: 0.10 }
+    : tier === "splurge"
+    ? { lodging: 0.45, food: 0.25, activities: 0.25, transport: 0.05 }
+    : { lodging: 0.40, food: 0.30, activities: 0.25, transport: 0.05 };
+
+  return {
+    dailyPp: Math.round(dailyPp),
+    totalPp: Math.round(dailyPp * days),
+    days,
+    tier,
+    allocation: {
+      lodging: Math.round(dailyPp * allocPcts.lodging),
+      food: Math.round(dailyPp * allocPcts.food),
+      activities: Math.round(dailyPp * allocPcts.activities),
+      transport: Math.round(dailyPp * allocPcts.transport),
+    },
+  };
+}
+
+// --- Vibe distribution ---
+
+const VIBE_ACTIVITY_EXAMPLES: Record<string, string> = {
+  party: "bars, clubs, rooftop lounges, pub crawls, live music venues, beach parties",
+  chill: "beaches, spas, pools, scenic walks, sunset spots, hammock time, yoga",
+  culture: "museums, historical sites, galleries, temples, local markets, guided tours",
+  outdoors: "hikes, kayaking, snorkeling, surfing, biking, national parks, zip-lining",
+  foodie: "food tours, local markets, cooking classes, street food crawls, tasting menus, wine/beer tastings",
+  adventure: "bungee jumping, paragliding, scuba diving, rock climbing, ATV tours, white-water rafting",
+  romantic: "couples spa, sunset dinner, private tours, rooftop dining, scenic boat rides, wine tasting",
+  luxury: "private transfers, five-star dining, VIP experiences, yacht charters, premium suites",
+};
+
+function buildVibeConstraint(vibes: string[]): string {
+  if (vibes.length === 0) return "";
+  const lines: string[] = [];
+  const weight = Math.max(30, Math.round(70 / vibes.length));
+  lines.push(`\nVIBE CONSTRAINT: At least ${weight}% of non-transport/lodging activities must match the trip vibe.`);
+  for (const v of vibes) {
+    const lower = v.toLowerCase();
+    const examples = VIBE_ACTIVITY_EXAMPLES[lower];
+    if (examples) {
+      lines.push(`- "${v}" activities include: ${examples}`);
+    }
+  }
+  lines.push("Prioritize these activity types over generic sightseeing.");
+  return lines.join("\n");
+}
+
 function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): string {
   const lines: string[] = [];
 
@@ -288,13 +437,30 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
   const headcount = plan.people.count ?? (plan.people.names.length || 2);
   lines.push(`Group size: ${headcount} people`);
 
-  if (plan.budget.tier || plan.budget.perPerson) {
+  // Budget: compute and inject hard constraints
+  const budget = parseBudgetToDaily(plan);
+  if (budget) {
+    lines.push("");
+    lines.push("=== HARD BUDGET CONSTRAINT ===");
+    lines.push(`Daily budget: $${budget.dailyPp}/person/day ($${budget.totalPp} total per person \u00f7 ${budget.days} days)`);
+    lines.push(`Tier: ${budget.tier}`);
+    lines.push(`Daily allocation per person:`);
+    lines.push(`  - Lodging: ~$${budget.allocation.lodging}/night`);
+    lines.push(`  - Food (all meals): ~$${budget.allocation.food}/day`);
+    lines.push(`  - Activities: ~$${budget.allocation.activities}/day`);
+    lines.push(`  - Transport: ~$${budget.allocation.transport}/day`);
+    lines.push(`Your total across ALL days MUST stay within \u00b115% of $${budget.totalPp}/person.`);
+    lines.push(`Each individual activity cost must be realistic for the "${budget.tier}" tier.`);
+    lines.push("=== END BUDGET CONSTRAINT ===");
+    lines.push("");
+  } else if (plan.budget.tier || plan.budget.perPerson) {
     const budgetParts = [plan.budget.tier, plan.budget.perPerson].filter(Boolean);
     lines.push(`Budget: ${budgetParts.join(" \u2014 ")}`);
   }
 
+  // Vibe: inject weighted activity distribution
   if (plan.vibe.length > 0) {
-    lines.push(`Vibe: ${plan.vibe.join(", ")}`);
+    lines.push(buildVibeConstraint(plan.vibe));
   }
 
   if (plan.hostSetup?.tripRange) {
@@ -307,12 +473,12 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
 
   const pins = plan.hostSetup?.restaurantPins?.filter((p) => p.kept) ?? [];
   if (pins.length > 0) {
-    lines.push(`Pinned restaurants: ${pins.map((p) => `${p.place.name} (${p.dateIso})`).join(", ")}`);
+    lines.push(`Pinned restaurants (MUST include): ${pins.map((p) => `${p.place.name} (${p.dateIso})`).join(", ")}`);
   }
 
   const actPins = plan.hostSetup?.activityPins?.filter((p) => p.kept) ?? [];
   if (actPins.length > 0) {
-    lines.push(`Pinned activities: ${actPins.map((p) => `${p.experience.name} (${p.dateIso})`).join(", ")}`);
+    lines.push(`Pinned activities (MUST include): ${actPins.map((p) => `${p.experience.name} (${p.dateIso})`).join(", ")}`);
   }
 
   if (seedText?.trim()) {
@@ -481,10 +647,85 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const parsed = safeParseJson(outputText);
-  const itinerary = validateItineraryOutput(parsed);
+  let itinerary = validateItineraryOutput(parsed);
 
   if (!itinerary) {
     return NextResponse.json({ error: "Failed to parse itinerary from AI response" }, { status: 502 });
+  }
+
+  // Step 1.5: Budget compliance check + repair re-prompt (max 1 retry)
+  const budget = parseBudgetToDaily(plan);
+  if (budget && itinerary.totalEstimatePp != null) {
+    const overshoot = itinerary.totalEstimatePp / budget.totalPp;
+    if (overshoot > 1.20) {
+      console.log(`[generate-itinerary] Budget overshoot: $${itinerary.totalEstimatePp} vs target $${budget.totalPp} (${Math.round(overshoot * 100)}%). Attempting repair.`);
+      const topCosts = itinerary.days
+        .flatMap((d) => d.activities)
+        .filter((a) => a.estimatedCostPp != null && a.estimatedCostPp > 0)
+        .sort((a, b) => (b.estimatedCostPp ?? 0) - (a.estimatedCostPp ?? 0))
+        .slice(0, 5)
+        .map((a) => `${a.title} ($${a.estimatedCostPp})`)
+        .join(", ");
+
+      const repairPrompt = `Your previous plan costs $${itinerary.totalEstimatePp}/person but the hard budget is $${budget.totalPp}/person (${budget.days} days at $${budget.dailyPp}/day). You are ${Math.round((overshoot - 1) * 100)}% over budget.\n\nMost expensive items: ${topCosts}\n\nReduce costs by swapping expensive venues for cheaper ${budget.tier}-tier alternatives until the total is within $${budget.totalPp} ±15%. Keep the same day structure and vibe. Return the corrected full JSON.`;
+
+      try {
+        const repairRes = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            temperature: 0.4,
+            input: [
+              { role: "system", content: ITINERARY_SYSTEM_PROMPT },
+              { role: "user", content: userPrompt },
+              { role: "assistant", content: outputText },
+              { role: "user", content: repairPrompt },
+            ],
+            text: { format: { type: "json_object" } },
+          }),
+        });
+
+        if (repairRes.ok) {
+          const repairPayload = await repairRes.json();
+          const repairText = extractOpenAiResponsesOutputText(repairPayload);
+          const repairParsed = safeParseJson(repairText);
+          const repairedItinerary = validateItineraryOutput(repairParsed);
+          if (repairedItinerary && repairedItinerary.totalEstimatePp != null) {
+            const newOvershoot = repairedItinerary.totalEstimatePp / budget.totalPp;
+            if (newOvershoot <= 1.20) {
+              console.log(`[generate-itinerary] Repair successful: $${repairedItinerary.totalEstimatePp} (${Math.round(newOvershoot * 100)}% of budget)`);
+              itinerary = repairedItinerary;
+            } else {
+              console.warn(`[generate-itinerary] Repair still over budget ($${repairedItinerary.totalEstimatePp}), using anyway as it's closer.`);
+              if (repairedItinerary.totalEstimatePp < itinerary.totalEstimatePp) {
+                itinerary = repairedItinerary;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[generate-itinerary] Budget repair failed (non-fatal):", (e as Error)?.message);
+      }
+    }
+  }
+
+  // Step 2: Enrich activities with real venue data from SerpAPI
+  if (plan.location?.trim()) {
+    try {
+      const enriched = await enrichItineraryWithVenues(
+        itinerary,
+        plan.location.trim(),
+        budget?.tier ?? "moderate",
+        plan.vibe
+      );
+      console.log(`[generate-itinerary] Venues verified: ${enriched.venuesVerified}/${enriched.venuesTotal}`);
+    } catch (e) {
+      console.warn("[generate-itinerary] Venue enrichment failed (non-fatal):", (e as Error)?.message);
+    }
   }
 
   const headcount = plan.people.count ?? (plan.people.names.length || 2);
