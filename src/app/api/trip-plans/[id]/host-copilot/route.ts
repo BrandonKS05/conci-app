@@ -746,7 +746,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   let uiRaw: Record<string, unknown> | undefined;
   let autoPinRequest: AutoPinRestaurantReq | undefined;
   let autoBookHotelRequest: AutoBookHotelReq | undefined;
-  let itineraryEdits: ItineraryEditAction[] = [];
+  const itineraryEdits: ItineraryEditAction[] = [];
   let autoSearchRequest: AutoSearchAction | undefined;
 
   const hs = plan.hostSetup;
@@ -765,7 +765,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   // Build itinerary summary for context
   let itinerarySummary = "Generated itinerary: none";
   if (plan.generatedItinerary?.days?.length) {
-    const dayLines = plan.generatedItinerary.days.map((d, i) => {
+    const dayLines = plan.generatedItinerary.days.map((d) => {
       const acts = d.activities.map((a, ai) =>
         `    [${ai}] ${a.time} | ${a.title} (${a.category}, $${a.estimatedCostPp ?? "?"}pp)`
       ).join("\n");
