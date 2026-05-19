@@ -274,12 +274,12 @@ export function TripFormParser() {
   // --- PHASE: INPUT (screenshots + text) ---
   if (phase === "input" || phase === "parsing") {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-4">
+      <div className="mx-auto w-full max-w-2xl space-y-5">
         <header>
-          <h1 className="font-display text-2xl font-semibold text-slate-900 dark:text-[#ebe9e4] sm:text-3xl">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-[#ebe9e4] sm:text-4xl">
             Plan a trip
           </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
+          <p className="mt-2 text-sm font-light text-slate-400 dark:text-neutral-500">
             Paste screenshots of group chats, type details, or both. We&apos;ll extract everything and let you confirm.
           </p>
         </header>
@@ -287,22 +287,23 @@ export function TripFormParser() {
         {/* Image upload area */}
         <div>
           <div
-            className="group relative flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/60 px-6 py-8 transition-all duration-200 hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/[0.04]"
+            className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-5 transition-all duration-200 hover:border-dashed hover:border-slate-400 hover:bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); void handleImageUpload(e.dataTransfer.files); }}
           >
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80 transition-all duration-200 group-hover:shadow-md group-hover:ring-indigo-200 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-indigo-500/30">
-              <svg className="h-5 w-5 text-slate-400 transition-colors duration-200 group-hover:text-indigo-500 dark:text-neutral-500 dark:group-hover:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
+            <svg className="h-4 w-4 shrink-0 text-slate-400 transition-colors duration-200 group-hover:text-slate-600 dark:text-neutral-500 dark:group-hover:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <div>
+              <p className="text-sm text-slate-600 dark:text-neutral-400">
+                Drop screenshots here or{" "}
+                <span className="font-medium text-indigo-600 underline underline-offset-2 dark:text-indigo-400">click to upload</span>
+              </p>
+              <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-600">
+                Group chats, inspo pics, travel plans — up to 3 images
+              </p>
             </div>
-            <p className="text-sm font-medium text-slate-600 transition-colors duration-200 group-hover:text-indigo-600 dark:text-neutral-400 dark:group-hover:text-indigo-400">
-              Drop screenshots here or <span className="underline underline-offset-2">click to upload</span>
-            </p>
-            <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">
-              Group chats, inspo pics, travel plans — up to 3 images
-            </p>
           </div>
           <input
             ref={fileInputRef}
@@ -319,7 +320,7 @@ export function TripFormParser() {
           <div className="flex gap-3">
             {images.map((url, i) => (
               <div key={i} className="relative">
-                <img src={url} alt={`Upload ${i + 1}`} className="h-20 w-20 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-white/10" />
+                <img src={url} alt={`Upload ${i + 1}`} className="h-20 w-20 rounded-[16px] object-cover ring-1 ring-slate-200 dark:ring-white/10" />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
@@ -338,21 +339,21 @@ export function TripFormParser() {
           onChange={(e) => setFreeText(e.target.value)}
           rows={6}
           placeholder={"Paste your group chat, type trip details, or describe what you want...\n\ne.g. \"Miami trip Aug 30 – Sep 2, 4 people, flying from LAX, budget $200/day each\""}
-          className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400/80 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/10"
+          className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400/70 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-white/[0.02] dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white/20 dark:focus:ring-white/5"
         />
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="space-y-3">
           <button
             type="button"
             onClick={parseInput}
             disabled={phase === "parsing"}
-            className="flex-1 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-indigo-500 hover:shadow-md disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            className="w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-indigo-500 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {phase === "parsing" ? (
               <span className="flex items-center justify-center gap-2">
@@ -363,13 +364,15 @@ export function TripFormParser() {
               "Parse & continue"
             )}
           </button>
-          <button
-            type="button"
-            onClick={skipToForm}
-            className="rounded-2xl border border-slate-200 px-5 py-3.5 text-sm font-medium text-slate-500 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-300"
-          >
-            Skip — fill in manually
-          </button>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={skipToForm}
+              className="text-sm text-slate-400 transition-colors duration-150 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+            >
+              Skip — fill in manually
+            </button>
+          </div>
         </div>
       </div>
     );

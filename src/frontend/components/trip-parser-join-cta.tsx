@@ -24,18 +24,18 @@ export function TripParserJoinCta() {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex h-full flex-col gap-5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-6 shadow-[var(--shadow-ambient-sm)] transition focus-within:border-[color:var(--sage)]/55 hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a]/90"
+      className="flex h-full flex-col gap-5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-6 shadow-[var(--shadow-ambient-sm)] transition focus-within:border-[color:var(--sage)]/40 hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a]/90"
     >
-      <span className="inline-flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-        <CollaborateIcon className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+        <CollaborateIcon className="h-3 w-3" />
         Collaborate
       </span>
 
       <div className="flex-1">
-        <h3 className="font-display text-2xl font-semibold leading-[1.1] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[1.6rem]">
+        <h3 className="font-display text-2xl font-bold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[1.6rem]">
           Join a Trip
         </h3>
-        <p className="mt-1.5 text-sm text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
+        <p className="mt-1.5 text-sm font-light text-[color:var(--on-surface-muted)] dark:text-[#9c9a96]">
           Have an invite code from your host? Drop it in to hop into the workspace.
         </p>
       </div>
@@ -50,12 +50,12 @@ export function TripParserJoinCta() {
             autoComplete="off"
             placeholder="Enter Invite Code"
             maxLength={12}
-            className="w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/60 px-4 py-3 text-sm text-[color:var(--on-surface)] outline-none transition placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)]/60 focus:bg-[color:var(--surface-container-lowest)] focus:ring-1 focus:ring-[color:var(--sage)]/30 dark:border-white/10 dark:bg-[#222]/80 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
+            className="w-full rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)]/60 px-4 py-3 text-sm text-[color:var(--on-surface)] outline-none transition placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)]/50 focus:bg-[color:var(--surface-container-lowest)] focus:ring-1 focus:ring-[color:var(--sage)]/20 dark:border-white/10 dark:bg-[#222]/80 dark:text-[#ebe9e4] dark:placeholder:text-[#6b6965]"
           />
         </label>
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-2 text-sm font-medium text-[color:var(--on-surface)] transition hover:border-[color:var(--on-surface)] hover:bg-[color:var(--surface-container-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/40 dark:border-white/15 dark:bg-[#222] dark:text-[#ebe9e4] dark:hover:bg-[#2a2a2a]"
+          className="w-full rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-2.5 text-sm font-medium text-[color:var(--on-surface)] transition hover:border-[color:var(--on-surface)]/30 hover:bg-[color:var(--surface-container-low)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/30 dark:border-white/15 dark:bg-[#222] dark:text-[#ebe9e4] dark:hover:bg-[#2a2a2a]"
         >
           Connect
         </button>

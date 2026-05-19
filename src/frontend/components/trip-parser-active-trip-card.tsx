@@ -19,27 +19,27 @@ export function TripParserActiveTripCard({ data }: { data: ActiveTripCardData | 
   return (
     <Link
       href={`/trip/${data.tripId}/setup`}
-      className="group relative flex h-full flex-col gap-5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-6 shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--sage)]/45 hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a]/90"
+      className="group relative flex h-full flex-col gap-5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-6 shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--sage)]/40 hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a]/90"
       aria-label={`Open ${data.title}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-          <MapPinSparkleIcon className="h-3.5 w-3.5" />
+        <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+          <MapPinSparkleIcon className="h-3 w-3" />
           Active
         </span>
         {data.statusChip ? (
-          <span className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--on-surface-variant)] dark:border-white/10 dark:bg-white/5 dark:text-[#c4c2be]">
+          <span className="rounded-md bg-[color:var(--surface-container)] px-2.5 py-0.5 text-[11px] font-semibold tracking-tight text-[color:var(--on-surface)] dark:bg-white/8 dark:text-[#ebe9e4]">
             {data.statusChip}
           </span>
         ) : null}
       </div>
 
       <div className="flex-1">
-        <h3 className="font-display text-2xl font-semibold leading-[1.1] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[1.6rem]">
+        <h3 className="font-display text-2xl font-bold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[1.6rem]">
           {data.title}
         </h3>
         {data.datesLabel ? (
-          <p className="mt-1.5 text-sm text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
+          <p className="mt-1.5 text-sm font-light text-[color:var(--on-surface-muted)] dark:text-[#9c9a96]">
             {data.datesLabel}
           </p>
         ) : null}
@@ -60,8 +60,8 @@ export function TripParserActiveTripCard({ data }: { data: ActiveTripCardData | 
         ) : (
           <span />
         )}
-        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-[color:var(--on-surface)] transition group-hover:border-[color:var(--sage)] group-hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-[#252525] dark:text-[#ebe9e4]">
-          <ArrowRightIcon className="h-4 w-4" />
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-[color:var(--on-surface)] transition group-hover:border-[color:var(--sage)]/40 group-hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-[#252525] dark:text-[#ebe9e4]">
+          <ArrowRightIcon className="h-3.5 w-3.5" />
         </span>
       </div>
     </Link>
