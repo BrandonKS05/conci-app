@@ -813,7 +813,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-4o",
+          temperature: 0.3,
           input: [
             { role: "system", content: buildCopilotSystem(year, focusDateIso) },
             { role: "user", content: contextBlock },
@@ -1069,6 +1070,32 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
   }
 
+  // Fallback: if user asked about budget/cost and model didn't emit itinerary edits, do it server-side
+  if (
+    itineraryEdits.length === 0 &&
+    nextPlan.generatedItinerary?.days?.length &&
+    /\b(budget|cost|expensive|cheap|afford|within|under|reduce|cut|lower|save|fit)\b/i.test(message)
+  ) {
+    const budgetMatch = message.match(/\$\s*([\d,]+)/);
+    if (budgetMatch) {
+      const targetTotal = parseFloat(budgetMatch[1]!.replace(/,/g, ""));
+      const currentTotal = nextPlan.generatedItinerary.totalEstimatePp ?? 0;
+      if (targetTotal > 0 && currentTotal > 0 && currentTotal > targetTotal * 1.1) {
+        const days = nextPlan.generatedItinerary.days;
+        const targetDaily = targetTotal / days.length;
+        for (const day of days) {
+          if ((day.estimatedDayCostPp ?? 0) > targetDaily * 1.2) {
+            itineraryEdits.push({
+              action: "adjustCosts",
+              dayDateIso: day.dateIso,
+              budgetTarget: Math.round(targetDaily),
+            });
+          }
+        }
+      }
+    }
+  }
+
   // Apply itinerary edits
   let itineraryApplied = false;
   if (itineraryEdits.length > 0) {
@@ -1076,6 +1103,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (result.applied > 0) {
       nextPlan = result.plan;
       itineraryApplied = true;
+      if (!assistantText.includes("adjusted") && !assistantText.includes("scaled") && !assistantText.includes("reduced")) {
+        assistantText = `${assistantText}\n\nDone — I've adjusted the itinerary costs to fit your budget.`.trim();
+      }
     }
   }
 

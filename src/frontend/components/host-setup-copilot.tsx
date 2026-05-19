@@ -12,6 +12,30 @@ export type HostCopilotUiHint = {
 
 type Msg = { role: "user" | "assistant"; text: string };
 
+const COPILOT_INTRO: Msg = {
+  role: "assistant",
+  text: "Ask me to change trip dates, budget, group size, add a hotel (say whole trip or which nights), pin a restaurant on a day, or jump to a section \u2014 I\u2019ll update your draft when I can.",
+};
+
+function loadChatHistory(tripId: string): Msg[] {
+  if (typeof window === "undefined") return [COPILOT_INTRO];
+  try {
+    const raw = sessionStorage.getItem(`copilot-chat:${tripId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [COPILOT_INTRO];
+}
+
+function saveChatHistory(tripId: string, messages: Msg[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(`copilot-chat:${tripId}`, JSON.stringify(messages));
+  } catch {}
+}
+
 const MARGIN = 16;
 const MIN_W = 280;
 const MIN_H = 220;
@@ -71,12 +95,7 @@ export function HostSetupCopilot({
   calendarSectionSelector = "#sec-dates",
 }: Props) {
   const embedded = layout === "embedded";
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      text: "Ask me to change trip dates, budget, group size, add a hotel (say whole trip or which nights), pin a restaurant on a day, or jump to a section — I’ll update your draft when I can.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>(() => loadChatHistory(tripId));
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -88,6 +107,10 @@ export function HostSetupCopilot({
     width: number;
     height: number;
   } | null>(null);
+
+  useEffect(() => {
+    saveChatHistory(tripId, messages);
+  }, [tripId, messages]);
 
   const endRef = useRef<HTMLDivElement>(null);
   const boundsRef = useRef(bounds);
