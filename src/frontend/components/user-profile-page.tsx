@@ -146,20 +146,25 @@ export function UserProfilePageClient({ userId }: { userId: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#141414]">
+      <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
         <AppTopNav />
-        <main className="mx-auto max-w-2xl px-4 py-12 text-sm text-neutral-500">Loading profile…</main>
+        <main className="mx-auto max-w-2xl px-4 py-12 text-sm text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
+          Loading profile…
+        </main>
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#141414]">
+      <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
         <AppTopNav />
         <main className="mx-auto max-w-2xl px-4 py-12">
-          <p className="text-sm text-rose-600">{error ?? "Profile not found."}</p>
-          <Link href="/my-trips" className="mt-4 inline-block text-sm font-semibold text-[#2563EB]">
+          <p className="text-sm text-rose-600 dark:text-rose-300">{error ?? "Profile not found."}</p>
+          <Link
+            href="/my-trips"
+            className="mt-4 inline-block text-sm font-semibold text-[color:var(--sage)] hover:underline dark:text-[color:var(--sage-soft)]"
+          >
             Back to trips
           </Link>
         </main>
@@ -168,11 +173,11 @@ export function UserProfilePageClient({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 dark:bg-[#141414] dark:text-[#ebe9e4]">
+    <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
       <AppTopNav />
       <main className="mx-auto max-w-2xl px-4 pb-8 pt-8 sm:px-6">
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white sm:text-[2.75rem]">
-          @{profile.handle}
+        <h1 className="font-display text-[2.75rem] font-semibold leading-[0.98] tracking-[-0.035em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-[3.25rem]">
+          <span className="italic">@{profile.handle}</span>
         </h1>
 
         <div className="mt-6">
@@ -200,7 +205,9 @@ export function UserProfilePageClient({ userId }: { userId: string }) {
           />
         </div>
 
-        {saveBusy ? <p className="mt-2 text-center text-xs text-neutral-400">Saving…</p> : null}
+        {saveBusy ? (
+          <p className="mt-2 text-center text-xs text-[color:var(--on-surface-muted)] dark:text-[#6b6965]">Saving…</p>
+        ) : null}
 
         <ProfileRecentTripsSection
           trips={profile.recentTrips}

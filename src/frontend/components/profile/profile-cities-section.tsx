@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { ProfileCity } from "@/shared/user-profile-page";
+import {
+  ProfileSectionLabel,
+  profileCardClass,
+  profilePillButtonClass,
+} from "@/frontend/components/profile/profile-section-label";
+
+const profileInputClass =
+  "w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2 text-sm text-[color:var(--on-surface)] dark:border-white/10 dark:bg-[#222]/80 dark:text-[#ebe9e4]";
 
 export function ProfileCitiesSection({
   cities,
@@ -63,21 +71,13 @@ export function ProfileCitiesSection({
   return (
     <section className="mt-10 pb-4">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
-            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="1.5">
-              <path d="M10 17s-6-4.35-6-9a6 6 0 1112 0c0 4.65-6 9-6 9z" />
-              <circle cx="10" cy="8" r="2" />
-            </svg>
-          </span>
-          <h2 className="font-display text-xl font-semibold text-neutral-900 dark:text-white">Cities you&apos;ve been to</h2>
-        </div>
+        <ProfileSectionLabel>Cities you&apos;ve been to</ProfileSectionLabel>
         {editMode && local.length < 24 ? (
           <button
             type="button"
             disabled={busy}
             onClick={addCity}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-[#2563EB] hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--sage)] hover:underline dark:text-[color:var(--sage-soft)]"
           >
             <span className="text-lg leading-none">+</span> Add a city
           </button>
@@ -88,19 +88,16 @@ export function ProfileCitiesSection({
         <button
           type="button"
           onClick={addCity}
-          className="w-full rounded-2xl border border-dashed border-neutral-300 px-4 py-10 text-sm font-medium text-neutral-600 hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/15"
+          className={`w-full border-dashed px-4 py-10 text-sm font-medium text-[color:var(--on-surface-variant)] transition hover:border-[color:var(--sage)]/55 hover:text-[color:var(--sage)] dark:text-[#9c9a96] dark:hover:text-[color:var(--sage-soft)] ${profileCardClass}`}
         >
           Add your first city
         </button>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {local.map((c, idx) => (
-            <li
-              key={c.id}
-              className="relative rounded-2xl border border-neutral-200 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]"
-            >
+            <li key={c.id} className={`relative p-4 ${profileCardClass}`}>
               {editMode ? (
-                <div className="absolute right-3 top-3 flex gap-2 text-xs text-neutral-400">
+                <div className="absolute right-3 top-3 flex gap-2 text-xs text-[color:var(--on-surface-muted)] dark:text-[#6b6965]">
                   <button type="button" onClick={() => move(idx, -1)} aria-label="Move up">
                     ↑
                   </button>
@@ -109,16 +106,22 @@ export function ProfileCitiesSection({
                   </button>
                   <button
                     type="button"
-                    className="text-rose-600"
+                    className="text-rose-600 dark:text-rose-400"
                     onClick={() => void persist(local.filter((x) => x.id !== c.id))}
                   >
                     ×
                   </button>
                 </div>
               ) : null}
-              <h3 className="pr-16 font-semibold text-neutral-900 dark:text-white">{c.city}</h3>
-              {c.country ? <p className="mt-0.5 text-sm text-neutral-500">{c.country}</p> : null}
-              {c.note ? <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">&ldquo;{c.note}&rdquo;</p> : null}
+              <h3 className="pr-16 font-display text-lg font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
+                {c.city}
+              </h3>
+              {c.country ? (
+                <p className="mt-0.5 text-sm text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">{c.country}</p>
+              ) : null}
+              {c.note ? (
+                <p className="mt-2 text-sm text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">&ldquo;{c.note}&rdquo;</p>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -127,37 +130,37 @@ export function ProfileCitiesSection({
       {draft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setDraft(null)} aria-label="Close" />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-[#1a1a1a]">
-            <h3 className="font-display text-lg font-semibold">Add city</h3>
+          <div className={`relative w-full max-w-md p-6 ${profileCardClass}`}>
+            <h3 className="font-display text-lg font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">Add city</h3>
             <div className="mt-4 space-y-3">
               <input
-                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-black/20"
+                className={profileInputClass}
                 placeholder="City"
                 value={draft.city ?? ""}
                 onChange={(e) => setDraft({ ...draft, city: e.target.value })}
               />
               <input
-                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-black/20"
+                className={profileInputClass}
                 placeholder="Country / region"
                 value={draft.country ?? ""}
                 onChange={(e) => setDraft({ ...draft, country: e.target.value })}
               />
               <input
-                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-black/20"
+                className={profileInputClass}
                 placeholder="Short note (optional)"
                 value={draft.note ?? ""}
                 onChange={(e) => setDraft({ ...draft, note: e.target.value })}
               />
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => setDraft(null)} className="rounded-lg px-4 py-2 text-sm">
+              <button type="button" onClick={() => setDraft(null)} className={profilePillButtonClass}>
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void saveDraft()}
-                className="rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-full bg-[color:var(--sage)] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4ed8]"
               >
                 Save
               </button>
