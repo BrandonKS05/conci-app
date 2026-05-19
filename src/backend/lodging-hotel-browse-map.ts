@@ -86,12 +86,19 @@ export function mapBookingRowToLodgingBrowse(
   const reviewWord = typeof nested.reviewScoreWord === "string" ? nested.reviewScoreWord : undefined;
   const reviewCount = num(nested.review_nr ?? nested.review_count ?? nested.reviewCount ?? raw.review_nr);
 
-  const pb = raw.priceBreakdown as Record<string, unknown> | undefined;
-  const gross = pb?.grossPrice as Record<string, unknown> | undefined;
+  // Price can live at raw.priceBreakdown OR nested inside property.priceBreakdown
+  const pb = (raw.priceBreakdown ?? nested.priceBreakdown) as Record<string, unknown> | undefined;
+  const gross = (pb?.grossPrice ?? pb?.allInclusivePrice) as Record<string, unknown> | undefined;
+  const excluded = pb?.excludedPrice as Record<string, unknown> | undefined;
   const priceVal =
     gross?.value ??
     gross?.amount ??
-    (typeof nested.minTotalPrice === "number" ? nested.minTotalPrice : raw.price_display);
+    excluded?.value ??
+    excluded?.amount ??
+    nested.minTotalPrice ??
+    raw.price_display ??
+    nested.price ??
+    raw.composite_price_breakdown;
 
   const nights = nightsBetween(ctx.checkIn, ctx.checkOut);
   const totalUsd = Math.round(num(priceVal));

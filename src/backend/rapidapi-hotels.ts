@@ -227,12 +227,16 @@ function mapBookingHotelRow(
   if (label) ratingParts.push(label);
   const rating = ratingParts.length ? ratingParts.join(" · ") : undefined;
 
-  const pb = raw.priceBreakdown as Record<string, unknown> | undefined;
-  const gross = pb?.grossPrice as Record<string, unknown> | undefined;
+  const pb = (raw.priceBreakdown ?? nested.priceBreakdown) as Record<string, unknown> | undefined;
+  const gross = (pb?.grossPrice ?? pb?.allInclusivePrice) as Record<string, unknown> | undefined;
+  const excluded = pb?.excludedPrice as Record<string, unknown> | undefined;
   const priceVal =
     gross?.value ??
     gross?.amount ??
-    (typeof nested.minTotalPrice === "number" ? nested.minTotalPrice : raw.price_display);
+    excluded?.value ??
+    excluded?.amount ??
+    nested.minTotalPrice ??
+    raw.price_display;
   let nights = 2;
   const tIn = new Date(`${checkIn}T12:00:00Z`).getTime();
   const tOut = new Date(`${checkOut}T12:00:00Z`).getTime();
