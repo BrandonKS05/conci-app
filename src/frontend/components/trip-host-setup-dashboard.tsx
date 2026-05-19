@@ -430,10 +430,10 @@ function tripCalendarDayRole(
 function tripCalendarCellSurfaceClass(role: TripCalendarDayRole): string {
   if (!role) return "";
   if (role === "arrival") {
-    return "bg-sky-50/95 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50";
+    return "bg-sky-500/[0.08] ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/[0.14] dark:ring-sky-500/50";
   }
   if (role === "departure") {
-    return "bg-violet-50/95 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-950/40 dark:ring-violet-500/50";
+    return "bg-violet-500/[0.08] ring-2 ring-inset ring-violet-400/60 dark:bg-violet-500/[0.14] dark:ring-violet-500/50";
   }
   return "bg-[#2563EB]/[0.08] ring-2 ring-inset ring-[#2563EB]/35 dark:bg-[#2563EB]/[0.14] dark:ring-[#60A5FA]/40";
 }
@@ -491,7 +491,7 @@ function TripCalendarLegend({
       {singleDay ? (
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="h-4 w-5 shrink-0 rounded-sm bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50"
+            className="h-4 w-5 shrink-0 rounded-sm bg-sky-500/15 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/25 dark:ring-sky-500/50"
             aria-hidden
           />
           Trip day
@@ -500,7 +500,7 @@ function TripCalendarLegend({
         <>
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="h-4 w-5 shrink-0 rounded-sm bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/40 dark:ring-sky-500/50"
+              className="h-4 w-5 shrink-0 rounded-sm bg-sky-500/15 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/25 dark:ring-sky-500/50"
               aria-hidden
             />
             Arrival
@@ -514,7 +514,7 @@ function TripCalendarLegend({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="h-4 w-5 shrink-0 rounded-sm bg-violet-50 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-950/40 dark:ring-violet-500/50"
+              className="h-4 w-5 shrink-0 rounded-sm bg-violet-500/15 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-500/25 dark:ring-violet-500/50"
               aria-hidden
             />
             Departure
@@ -2147,7 +2147,6 @@ export function TripHostSetupDashboard({
                           tripDayRole
                             ? tripCalendarCellSurfaceClass(tripDayRole)
                             : "bg-transparent hover:bg-[color:var(--surface-container-low)]/35 dark:hover:bg-white/[0.03]",
-                          tripDayRole ? "hover:brightness-[0.98] dark:hover:brightness-110" : "",
                           parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
                             ? "!ring-2 !ring-amber-400 ring-inset dark:!ring-amber-400/70"
                             : "",
