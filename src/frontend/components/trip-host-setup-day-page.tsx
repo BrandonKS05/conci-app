@@ -11,6 +11,7 @@ import {
   type DayVoteCategory,
   type DayVoteOption,
 } from "@/shared/day-collaboration";
+import type { PlacePreview } from "@/shared/place-preview";
 import { formatLocalIsoDate } from "@/shared/date-option-parse";
 import { estimateHostDaySpendUsd } from "@/shared/host-day-spend-estimate";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
@@ -698,6 +699,9 @@ export function TripHostSetupDayPage({
   const [suggestDraft, setSuggestDraft] = useState<
     Partial<Record<DayVoteCategory, { label: string; detail: string; href: string }>>
   >({});
+  const [copilotSearch, setCopilotSearch] = useState<
+    Partial<Record<DayVoteCategory, { loading: boolean; results: PlacePreview[]; error: string | null }>>
+  >({});
   const suppressRealtimeUntilRef = useRef(0);
 
   useEffect(() => {
@@ -1200,15 +1204,95 @@ export function TripHostSetupDayPage({
                 <div className="mt-4 border-t border-neutral-100 pt-4 dark:border-white/5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setDreamText(`Find some more ${dayCategoryTitle(category).toLowerCase()} options for ${dateIso}`);
-                      dreamTextareaRef.current?.focus();
-                      dreamTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    disabled={copilotSearch[category]?.loading}
+                    onClick={async () => {
+                      const query = draft.label.trim();
+                      if (!query) return;
+                      const locationHint = plan.location ?? null;
+                      setCopilotSearch((prev) => ({
+                        ...prev,
+                        [category]: { loading: true, results: [], error: null },
+                      }));
+                      try {
+                        const res = await fetch("/api/places/maps-search", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ q: query, locationHint, limit: 5 }),
+                        });
+                        const j = (await res.json().catch(() => ({}))) as { places?: PlacePreview[] };
+                        const places = Array.isArray(j.places) ? j.places : [];
+                        setCopilotSearch((prev) => ({
+                          ...prev,
+                          [category]: {
+                            loading: false,
+                            results: places,
+                            error: places.length === 0 ? "No results found. Try a different name or location." : null,
+                          },
+                        }));
+                      } catch {
+                        setCopilotSearch((prev) => ({
+                          ...prev,
+                          [category]: { loading: false, results: [], error: "Search failed. Check your connection." },
+                        }));
+                      }
                     }}
-                    className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#2563EB] hover:opacity-80 dark:text-[#60A5FA]"
+                    className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#2563EB] hover:opacity-80 disabled:opacity-50 dark:text-[#60A5FA]"
                   >
-                    <span className="text-lg">✧</span> Search alternatives with Copilot
+                    {copilotSearch[category]?.loading ? (
+                      <>
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#2563EB]/30 border-t-[#2563EB] dark:border-[#60A5FA]/30 dark:border-t-[#60A5FA]" />
+                        Searching…
+                      </>
+                    ) : (
+                      <><span className="text-lg">✧</span> Search alternatives with Copilot</>
+                    )}
                   </button>
+
+                  {/* Copilot search results */}
+                  {(() => {
+                    const cs = copilotSearch[category];
+                    if (!cs || cs.loading) return null;
+                    if (cs.error) {
+                      return (
+                        <p className="mt-3 text-xs text-red-500 dark:text-red-400">{cs.error}</p>
+                      );
+                    }
+                    if (cs.results.length === 0) return null;
+                    return (
+                      <ul className="mt-3 space-y-2">
+                        {cs.results.map((place, i) => (
+                          <li key={i}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSuggestDraft((prev) => ({
+                                  ...prev,
+                                  [category]: {
+                                    ...(prev[category] ?? { label: "", detail: "", href: "" }),
+                                    label: place.name,
+                                    href: place.mapsUrl,
+                                  },
+                                }));
+                                setCopilotSearch((prev) => ({ ...prev, [category]: { loading: false, results: [], error: null } }));
+                              }}
+                              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-left transition hover:border-[#2563EB]/40 hover:bg-blue-50/40 dark:border-white/10 dark:bg-dm-card dark:hover:border-[#60A5FA]/30 dark:hover:bg-white/[0.05]"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="text-sm font-semibold text-neutral-900 dark:text-white">{place.name}</span>
+                                {place.rating != null && (
+                                  <span className="shrink-0 text-xs font-semibold text-amber-500">★ {place.rating.toFixed(1)}</span>
+                                )}
+                              </div>
+                              {place.address && (
+                                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{place.address}</p>
+                              )}
+                              <p className="mt-1 text-[10px] font-medium text-[#2563EB] dark:text-[#60A5FA]">Tap to fill ↑</p>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
                 </div>
               </div>
 
