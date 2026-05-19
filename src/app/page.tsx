@@ -369,6 +369,18 @@ export default function HomePage() {
             >
               Join with a code
             </Link>
+            <Link
+              href="/privacy"
+              className="underline-offset-2 hover:underline hover:text-[color:var(--on-surface)] dark:hover:text-neutral-300"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="underline-offset-2 hover:underline hover:text-[color:var(--on-surface)] dark:hover:text-neutral-300"
+            >
+              Terms of Service
+            </Link>
           </div>
           <p>© {new Date().getFullYear()} Conci</p>
         </div>
