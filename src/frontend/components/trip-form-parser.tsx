@@ -8,6 +8,7 @@ import { planHasUsableTripTiming } from "@/shared/trip-plan";
 type FormData = {
   tripName: string;
   destination: string;
+  needsFlight: boolean;
   departureCity: string;
   dateStart: string;
   dateEnd: string;
@@ -68,7 +69,12 @@ function buildSeedText(form: FormData): string {
   const lines: string[] = [];
   lines.push(`Trip: ${form.tripName || form.destination}`);
   if (form.destination) lines.push(`Destination: ${form.destination}`);
-  if (form.departureCity) lines.push(`Departing from: ${form.departureCity}`);
+  if (form.needsFlight && form.departureCity) {
+    lines.push(`Departing from: ${form.departureCity} (needs flight)`);
+  } else if (form.departureCity) {
+    lines.push(`Departing from: ${form.departureCity}`);
+  }
+  if (!form.needsFlight) lines.push(`Transport: driving/local (no flight needed)`);
   if (form.dateStart) lines.push(`Dates: ${formatDateRange(form.dateStart, form.dateEnd)}`);
   if (form.people) lines.push(`People: ${form.people}`);
   if (form.budget) lines.push(`Budget: ${form.budget}`);
@@ -117,6 +123,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
   const [form, setForm] = useState<FormData>({
     tripName: "",
     destination: "",
+    needsFlight: true,
     departureCity: "",
     dateStart: "",
     dateEnd: "",
@@ -173,6 +180,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
       setForm({
         tripName: parsed.title || "",
         destination: parsed.location || "",
+        needsFlight: Boolean(parsed.departureCity),
         departureCity: parsed.departureCity || "",
         dateStart: extractIsoDate(parsed.dates?.options?.[0], "start") || "",
         dateEnd: extractIsoDate(parsed.dates?.options?.[0], "end") || "",
@@ -420,15 +428,41 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Where are you leaving from?
+            Do you need a flight?
           </label>
-          <input
-            type="text"
-            value={form.departureCity}
-            onChange={(e) => updateField("departureCity", e.target.value)}
-            placeholder="e.g. Los Angeles, LAX, NYC"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, needsFlight: true }))}
+              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                form.needsFlight
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400 dark:hover:border-white/20"
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, needsFlight: false, departureCity: "" }))}
+              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                !form.needsFlight
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400 dark:hover:border-white/20"
+              }`}
+            >
+              No (driving/local)
+            </button>
+          </div>
+          {form.needsFlight && (
+            <input
+              type="text"
+              value={form.departureCity}
+              onChange={(e) => updateField("departureCity", e.target.value)}
+              placeholder="Where are you flying from? e.g. Los Angeles, LAX, NYC"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

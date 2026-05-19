@@ -72,7 +72,8 @@ GENERAL RULES:
 - If pace preference is provided: "packed" = 4-6 activities/day; "relaxed" = 2-3 activities with free-time blocks between.
 - If interests are specified, weight activities heavily toward those categories.
 - Include realistic cost estimates in USD per person. Use null only if you genuinely cannot estimate.
-- Include transport (airport transfers, getting around), meals (2-3 per day), activities, and lodging (first day check-in).
+- Include transport (flights if FLIGHT REQUIRED is stated, airport transfers, getting around), meals (2-3 per day), activities, and lodging (first day check-in).
+- If FLIGHT REQUIRED: add an outbound flight on Day 1 and return flight on the last day with realistic airfare estimates (use average economy prices for that route). Category must be "transport".
 - Keep descriptions concise and actionable.
 - Do NOT include bookingUrl — leave it out or set null.
 - estimatedDayCostPp should be the sum of all non-null activity costs for that day.
@@ -428,7 +429,13 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
   const lines: string[] = [];
 
   lines.push(`Destination: ${plan.location || "not specified"}`);
-  if (plan.departureCity) lines.push(`Departing from: ${plan.departureCity}`);
+  if (plan.departureCity) {
+    const needsFlight = seedText?.includes("(needs flight)") || !seedText?.includes("no flight needed");
+    lines.push(`Departing from: ${plan.departureCity}`);
+    if (needsFlight) {
+      lines.push(`FLIGHT REQUIRED: Include a flight from ${plan.departureCity} to ${plan.location || "destination"} on Day 1 (category: "transport") with realistic estimated airfare per person. Include return flight on the last day.`);
+    }
+  }
 
   if (plan.dates.options.length > 0) {
     lines.push(`Dates: ${plan.dates.options.join(", ")}`);
