@@ -494,6 +494,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
               <button
                 key={v}
                 type="button"
+                aria-pressed={selectedVibes.includes(v)}
                 onClick={() => toggleVibe(v)}
                 className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                   selectedVibes.includes(v)
@@ -529,6 +530,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
               <button
                 key={p}
                 type="button"
+                aria-pressed={form.pace === p}
                 onClick={() => updateField("pace", form.pace === p ? "" : p)}
                 className={`rounded-full border px-3.5 py-1.5 text-sm font-medium capitalize transition ${
                   form.pace === p
