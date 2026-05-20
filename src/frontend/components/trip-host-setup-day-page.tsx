@@ -129,12 +129,14 @@ function DaySpendEstimateBar({
   hotelUsd,
   mealsUsd,
   activitiesUsd,
+  transportUsd,
   estimatedTotalUsd,
 }: {
   baselineGroupUsd: number | null;
   hotelUsd: number;
   mealsUsd: number;
   activitiesUsd: number;
+  transportUsd: number;
   estimatedTotalUsd: number;
 }) {
   const baseline = baselineGroupUsd;
@@ -1105,6 +1107,7 @@ export function TripHostSetupDayPage({
               hotelUsd={spendBreakdown.hotelUsd}
               mealsUsd={spendBreakdown.mealsUsd}
               activitiesUsd={spendBreakdown.activitiesUsd}
+              transportUsd={spendBreakdown.transportUsd}
               estimatedTotalUsd={spendBreakdown.estimatedTotalUsd}
             />
           ) : (

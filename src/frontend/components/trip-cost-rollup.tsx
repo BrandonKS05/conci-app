@@ -89,7 +89,11 @@ export function TripCostRollup({
     plan.people.count ?? (plan.people.names?.length ? plan.people.names.length : 0);
   const headcount = Math.max(1, fromPlan > 0 ? fromPlan : 2);
 
+  // Prefer AI-generated itinerary estimate over raw budget text
+  const aiEstimatePp = plan.generatedItinerary?.totalEstimatePp ?? null;
+
   const perPersonFromBudget =
+    aiEstimatePp ??
     firstUsdAmountFromText(plan.budget.perPerson) ??
     tierMidTripBudgetPerPersonUsd(plan.budget.tier);
 
@@ -98,9 +102,12 @@ export function TripCostRollup({
     .filter((n): n is number => n != null);
   const lowFlightPp = flightAmounts.length ? Math.min(...flightAmounts) : null;
 
+  // If AI estimate already includes transport, don't double-count flights
+  const flightAddon = aiEstimatePp != null ? 0 : (lowFlightPp ?? 0);
+
   const perPersonTotalUsd =
     perPersonFromBudget != null
-      ? perPersonFromBudget + (lowFlightPp ?? 0)
+      ? perPersonFromBudget + flightAddon
       : lowFlightPp;
 
   const estimatedTotalUsd =

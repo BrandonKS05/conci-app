@@ -2,12 +2,13 @@ import {
   enumerateLocalIsoDays,
   type HostActivityExperience,
   type HostHotelStay,
+  type ItineraryDay,
   type TripPlan,
 } from "@/shared/trip-plan";
 
-const DEFAULT_MEAL_PER_PERSON_USD = 52;
+const DEFAULT_MEAL_PER_PERSON_USD = 25;
 const HOTEL_SHARE_OF_DAY = 0.42;
-const FALLBACK_DAY_PER_PERSON_USD = 220;
+const FALLBACK_DAY_PER_PERSON_USD = 150;
 
 function firstMoneyAmountUsd(s: string): number | null {
   const m = s.match(/\$?\s*([\d,]+(?:\.\d{1,2})?)/);
@@ -67,11 +68,13 @@ export type HostDaySpendBreakdown = {
   hotelUsd: number;
   mealsUsd: number;
   activitiesUsd: number;
+  transportUsd: number;
   estimatedTotalUsd: number;
 };
 
 /**
  * Educated guess for pinned items vs trip budget spread across days.
+ * Prefers AI-generated itinerary costs when available.
  */
 export function estimateHostDaySpendUsd(
   plan: TripPlan,
@@ -86,6 +89,12 @@ export function estimateHostDaySpendUsd(
   const tripDayCount = Math.max(1, tripDays.length);
   const baseline = dayBudgetBaselineGroupUsd(plan, tripDayCount);
   const hc = tripHeadcount(plan);
+
+  // Try to use AI-generated itinerary costs for this day (most accurate source)
+  const itinDay = findItineraryDay(plan, dateIso);
+  if (itinDay) {
+    return estimateFromItinerary(itinDay, hc, baseline);
+  }
 
   const fallbackBaseline = FALLBACK_DAY_PER_PERSON_USD * hc;
   const effectiveBaseline = baseline ?? fallbackBaseline;
@@ -103,7 +112,7 @@ export function estimateHostDaySpendUsd(
   for (const row of activities) {
     const pp = parseExperiencePricePerPersonUsd(row.experience.pricePerPerson);
     if (pp != null) activitiesUsd += pp * hc;
-    else activitiesUsd += Math.max(35, effectiveBaseline * 0.12);
+    else activitiesUsd += Math.max(20, effectiveBaseline * 0.08);
   }
   activitiesUsd = Math.round(activitiesUsd * 100) / 100;
 
@@ -114,6 +123,60 @@ export function estimateHostDaySpendUsd(
     hotelUsd,
     mealsUsd,
     activitiesUsd,
+    transportUsd: 0,
+    estimatedTotalUsd,
+  };
+}
+
+function findItineraryDay(plan: TripPlan, dateIso: string): ItineraryDay | null {
+  const days = plan.generatedItinerary?.days;
+  if (!days?.length) return null;
+  return days.find((d) => d.dateIso === dateIso) ?? null;
+}
+
+function estimateFromItinerary(
+  day: ItineraryDay,
+  headcount: number,
+  baselineGroup: number | null
+): HostDaySpendBreakdown {
+  let hotelUsd = 0;
+  let mealsUsd = 0;
+  let activitiesUsd = 0;
+  let transportUsd = 0;
+
+  for (const act of day.activities) {
+    const costPp = act.estimatedCostPp ?? 0;
+    const costGroup = costPp * headcount;
+
+    switch (act.category) {
+      case "lodging":
+        hotelUsd += costGroup;
+        break;
+      case "food":
+        mealsUsd += costGroup;
+        break;
+      case "activity":
+      case "free-time":
+        activitiesUsd += costGroup;
+        break;
+      case "transport":
+        transportUsd += costGroup;
+        break;
+    }
+  }
+
+  hotelUsd = Math.round(hotelUsd * 100) / 100;
+  mealsUsd = Math.round(mealsUsd * 100) / 100;
+  activitiesUsd = Math.round(activitiesUsd * 100) / 100;
+  transportUsd = Math.round(transportUsd * 100) / 100;
+  const estimatedTotalUsd = Math.round((hotelUsd + mealsUsd + activitiesUsd + transportUsd) * 100) / 100;
+
+  return {
+    baselineGroupUsd: baselineGroup,
+    hotelUsd,
+    mealsUsd,
+    activitiesUsd,
+    transportUsd,
     estimatedTotalUsd,
   };
 }

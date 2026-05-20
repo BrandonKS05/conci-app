@@ -18,6 +18,8 @@ import {
   parseLocalIsoDate,
   planRecordWithDatesSyncedToTripRange,
   safeParseJson,
+  type ItineraryActivity,
+  type ItineraryDay,
   type HostActivityExperience,
   type HostActivityPin,
   type HostRestaurantPin,
@@ -145,57 +147,104 @@ function coerceActivityPinsFromParsed(
   return pins.length ? pins : undefined;
 }
 
-const buildCopilotSystem = (year: number, focusDateIso?: string | null) => `You are the host's setup copilot for a Conci trip. The trip may still be drafting or already shared with travelers; the host can change calendar pins, budgets, vibes, hotels, meals, or activities anytime.
+const buildCopilotSystem = (year: number, focusDateIso?: string | null) => `You are the host's setup copilot for a Conci trip. The trip may still be drafting or already shared with travelers; the host can change calendar pins, budgets, vibes, hotels, meals, activities, and the day-by-day itinerary anytime.
 
 **Trip dates (critical):** The only source of truth for "which calendar days exist" is **Host trip range** and **Trip calendar days** in the user message. If those are set, **ignore** older months or date ranges mentioned in "Planner dates slot" — that field is from the first chat parse and is often stale after the host moves the trip on the calendar. Never assign meal pins or reservations to ISO dates outside **Trip calendar days**.
 ${
   focusDateIso
-    ? `\n**Day-focused session:** The host is editing **${focusDateIso}** ONLY unless they clearly ask about another calendar day inside the trip window. Prefer **autoPinRestaurant** with \`dateIso\`="${focusDateIso}". For **autoBookHotel**, use **fullTrip: true** OR \`stayStartIso\`/\`stayEndIso\` covering **${focusDateIso}** when they want a hotel — never omit scope. If you populate **hostSetupPatch.restaurantPins** or **activityPins**, every pin's \`dateIso\` should be ${focusDateIso} unless the host named a different trip day explicitly.\n`
+    ? `\n**Day-focused session:** The host is editing **${focusDateIso}** ONLY unless they clearly ask about another calendar day inside the trip window. Prefer **autoPinRestaurant** with \`dateIso\`="${focusDateIso}". For **autoBookHotel**, use **fullTrip: true** OR \`stayStartIso\`/\`stayEndIso\` covering **${focusDateIso}** when they want a hotel — never omit scope. For **itineraryEdits**, use \`dayDateIso\`="${focusDateIso}" unless the host names a different day.\n`
     : ""
 }
 
 Return ONLY valid JSON (no markdown) with this exact shape:
 {
-  "assistantText": "1-4 short, friendly sentences. Say what you changed or that you're only giving guidance.",
+  "assistantText": "1-4 short, friendly sentences. Say what you changed.",
   "hostSetupPatch": { },
   "planPatch": { },
   "ui": { },
   "autoPinRestaurant": null,
-  "autoBookHotel": null
+  "autoBookHotel": null,
+  "itineraryEdits": [],
+  "autoSearch": null
 }
 
-**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** and they (or you) have nailed down **scope**. The server runs Google Maps (SerpAPI) search and saves the top result (not an OTA checkout).
+**CRITICAL: When the host asks you to change something, you MUST output the structured data to make it happen. Do NOT just give advice. If they say "change X" or "add X" or "switch X", you MUST populate the relevant action field (itineraryEdits, autoBookHotel, autoPinRestaurant, autoSearch, hostSetupPatch, or planPatch). Only give advice-only responses if they literally ask "what do you think" or "any suggestions".**
+
+**itineraryEdits** (array, optional): Use to modify the day-by-day itinerary. Each edit is an object with:
+  - **action**: one of "replaceActivity" | "addActivity" | "removeActivity" | "rewriteDay" | "adjustCosts" | "addTransport"
+  - **dayDateIso**: the ISO date of the day to edit (MUST be in Trip calendar days)
+  - For **replaceActivity**: set \`activityIndex\` (0-based position in that day's activities array) and \`newActivity\` with the replacement fields (title, description, category, estimatedCostPp, time).
+  - For **addActivity**: set \`newActivity\` with at minimum { title, category, estimatedCostPp }.
+  - For **removeActivity**: set \`activityIndex\` to remove.
+  - For **rewriteDay**: set \`newDayActivities\` (full array of activities for that day) and optional \`dayLabel\`.
+  - For **adjustCosts**: set \`budgetTarget\` (target daily total pp) — costs will be scaled proportionally.
+  - For **addTransport**: set \`transportDetail\` with { from, to, mode, estimatedCostPp } — e.g. { "from": "Miami", "to": "Key West", "mode": "Bus", "estimatedCostPp": 35 }.
+
+  Use itineraryEdits for: switching activities, adjusting costs to fit budget, adding inter-city transport, changing the plan for a day, making it multi-city.
+
+**autoSearch** (optional): Use when the host asks to find something specific. The server will search Google Maps and apply the result.
+  - Shape: { "type": "hotel"|"restaurant"|"activity"|"transport", "query": "search terms", "constraints": "optional extra context", "dateIso": "YYYY-MM-DD if day-specific", "stayStartIso": "for hotels", "stayEndIso": "for hotels" }
+  - **query** should be specific: include location qualifiers, budget hints, and requirements.
+    - For "hotel near the beach": query = "beachfront hotel [destination]"
+    - For "cheap flights for 7 people": query = "budget airline [origin] to [destination]" (add context in constraints)
+    - For "all-inclusive resort": query = "all inclusive resort [destination]"
+    - For "Italian restaurant on the 16th": query = "Italian restaurant [destination]", dateIso = "2026-07-16"
+  - **constraints** (optional): extra context like "for 7 people", "under $100/night", "near downtown", "all-inclusive"
+
+**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** and they (or you) have nailed down **scope**. The server runs Google Maps (SerpAPI) search and saves the top result.
   - You MUST set one of:
     - **fullTrip**: true — stay covers the entire **Host trip range** (first night through last night).
     - **stayStartIso** AND **stayEndIso** (YYYY-MM-DD, within **Trip calendar days**, inclusive) — specific check-in through check-out range.
-  - **searchHint** (optional): style/neighborhood, e.g. "boutique hotel", "near beach".
-  - If they have not said whole trip vs which nights, ask in **assistantText** and leave **autoBookHotel** null.
+  - **searchHint** (optional): style/neighborhood/requirements, e.g. "boutique hotel near beach", "all-inclusive resort", "budget hostel downtown".
+  - For multi-city trips: use separate autoSearch calls with different stayStartIso/stayEndIso ranges for each city segment.
 
-**autoPinRestaurant** (optional): Use when the host asks to add/set a **restaurant reservation or dinner** on a **specific trip day** (e.g. "reservation on July 16th", "dinner on the 16th"). The server will call Google Places near the trip destination and pin the top result — do **not** tell them to do it manually.
-  - Shape: { "dateIso": "YYYY-MM-DD", "searchHint": "dinner" } — \`dateIso\` must be one of **Trip calendar days** in the user message. Omit or set \`null\` for all other requests.
-  - \`searchHint\` optional: e.g. "dinner", "Italian", "seafood"; default short phrase for Places text search.
+**autoPinRestaurant** (optional): Use when the host asks to add/set a **restaurant reservation or dinner** on a **specific trip day**.
+  - Shape: { "dateIso": "YYYY-MM-DD", "searchHint": "dinner" } — \`dateIso\` must be one of **Trip calendar days**.
+  - \`searchHint\` optional: e.g. "Italian dinner", "seafood", "cheap street food", "fine dining".
 
 Rules:
-- **assistantText** is required. Be concise and actionable. When you set **autoPinRestaurant**, still write a short line (the app will confirm the pinned name after search).
-- **hostSetupPatch** (optional): only keys the host setup actually needs to change. Same schema as persisted host setup:
-  - **tripRange**: { "startIso": "YYYY-MM-DD", "endIso": "YYYY-MM-DD" } — use inclusive local dates. If the user gives month/day without year, assume calendar year ${year} unless they clearly mean another year.
-  - When you **change tripRange** to new dates, also set **restaurantPins**: [] and **activityPins**: [] so old day pins do not leak outside the new range.
-  - **hotel**: only set to null to clear in JSON; for a new stay use **autoBookHotel** (or the host picks manually in the app).
-  - **experiencesOutlined**: boolean when they say they skimmed / outlined experiences.
-  - You may populate **restaurantPins** /** **activityPins** as structured arrays ONLY when proposing concrete pinned restaurants/experiences; every \`dateIso\` MUST be inside **Trip calendar days** (validated server-side). Prefer **autoPinRestaurant** for a single top pick when unsure.
-- **planPatch** (optional): only top-level trip plan fields that should change. Same rules as trip card chat:
+- **assistantText** is required. Be concise and actionable. Confirm what you changed.
+- **hostSetupPatch** (optional): only keys the host setup actually needs to change:
+  - **tripRange**: { "startIso": "YYYY-MM-DD", "endIso": "YYYY-MM-DD" } — inclusive local dates. Assume year ${year} unless stated otherwise.
+  - When you **change tripRange**, also set **restaurantPins**: [] and **activityPins**: [] to clear old pins.
+  - **hotel**: only set to null to clear; for a new stay use **autoBookHotel** or **autoSearch** type=hotel.
+  - **experiencesOutlined**: boolean.
+  - You may populate **restaurantPins** / **activityPins** as structured arrays; every \`dateIso\` MUST be inside **Trip calendar days**.
+- **planPatch** (optional): top-level trip plan fields:
   - Allowed: title, location, departureCity, dates, people, budget, vibe, openDecisions, nextStep, confidence.
-  - **budget**: { "tier", "perPerson" } — e.g. "splurge", "mid-range", "budget-friendly" and/or strings like "~$150/person".
-  - **dates**: update **dates.options** with short human-readable ranges when they change length or timeframe (helps the rest of the app).
-  - Never include spotlights or itineraryLiveCuration. Omit **polls** unless the user explicitly asks for vote options between concrete choices.
-- **ui** (optional): guide the app UI.
-  - **scrollTo**: one of "dates" | "budget" — set when the user asks to jump somewhere or when your edits mainly concern that section. (Packing list is a separate page under the trip setup URL.)
-  - **suggestDatePickMode**: "range" when they should tap two days on the calendar; "day" when the trip range is already set and they should work day-by-day. If you set tripRange in hostSetupPatch, usually use "day" and **focusTripStartMonth**: true.
-  - **focusTripStartMonth**: true when you set tripRange so the calendar scrolls to that month.
+  - **budget**: { "tier", "perPerson" } — e.g. "splurge", "$150/person".
+  - Never include spotlights or itineraryLiveCuration.
+- **ui** (optional):
+  - **scrollTo**: "dates" | "budget"
+  - **suggestDatePickMode**: "range" | "day"
+  - **focusTripStartMonth**: true when you set tripRange.
 
-If the user only asks for advice with no data changes, use empty objects {} for hostSetupPatch and planPatch and still answer in assistantText.
+MULTI-CITY TRIPS:
+- When making a trip multi-city, use itineraryEdits to: (1) rewrite relevant days with the new city's activities, (2) add transport between cities via "addTransport", (3) use autoSearch type=hotel with stayStartIso/stayEndIso for each city segment.
+- Update planPatch.location to comma-separated cities if needed.
 
-Example: Host says "set a dinner reservation on July 16" and trip calendar includes 2026-07-16 → set \`autoPinRestaurant\`: { "dateIso": "2026-07-16", "searchHint": "dinner" } (year from trip calendar days).`;
+BUDGET ENFORCEMENT (CRITICAL — read carefully):
+- When asked to fit within budget or reduce costs, you MUST use itineraryEdits action="rewriteDay" on EVERY day that is over budget. Replace expensive activities and restaurants with cheaper alternatives that still fit the trip vibe and destination. Do NOT just use "adjustCosts" — that only changes numbers without changing venues. You must actually swap out expensive restaurants, activities, and lodging for budget-friendly ones.
+- ALSO set autoSearch type="hotel" with budget-appropriate terms (e.g. "budget hotel [destination]", "cheap hostel [destination]") so the lodging actually changes.
+- ALSO update planPatch.budget.perPerson to reflect the new budget target.
+- When asked about cheap/budget options: use autoSearch with budget-appropriate query terms ("cheap", "budget", "affordable").
+- NEVER just scale costs. The user expects actual venue/activity changes, not just lower numbers on the same plan.
+
+Example: Host says "this is too expensive, I want $1000 budget per person" and current itinerary totals $1800pp over 3 days in Cancún:
+→ itineraryEdits: [{ "action": "rewriteDay", "dayDateIso": "2026-08-01", "dayLabel": "Arrival & Beach", "newDayActivities": [{ "time": "Morning", "title": "Flight: LAX → Cancún", "category": "transport", "estimatedCostPp": 150 }, { "time": "Afternoon", "title": "Free beach time at Playa Delfines", "category": "activity", "estimatedCostPp": 0 }, { "time": "Lunch", "title": "Street tacos at Parque de las Palapas", "category": "food", "estimatedCostPp": 8 }, { "time": "Evening", "title": "Check in to hostel", "category": "lodging", "estimatedCostPp": 90 }, { "time": "Dinner", "title": "Ceviche at La Habichuela Sunset", "category": "food", "estimatedCostPp": 22 }] }, { "action": "rewriteDay", "dayDateIso": "2026-08-02", ... }, { "action": "rewriteDay", "dayDateIso": "2026-08-03", ... }]
++ autoSearch: { "type": "hotel", "query": "budget hotel Cancún near beach", "constraints": "under $60/night" }
++ planPatch: { "budget": { "perPerson": "$1000" } }
+
+Example: Host says "switch my Tuesday plans to beach activities" and Tuesday is 2026-07-15 with 4 activities:
+→ itineraryEdits: [{ "action": "rewriteDay", "dayDateIso": "2026-07-15", "dayLabel": "Beach Day", "newDayActivities": [{ "time": "Morning", "title": "Beach sunrise yoga", "category": "activity", "estimatedCostPp": 0 }, { "time": "Late Morning", "title": "Snorkeling at coral reef", "category": "activity", "estimatedCostPp": 45 }, { "time": "Lunch", "title": "Beach shack seafood", "category": "food", "estimatedCostPp": 18 }, { "time": "Afternoon", "title": "Jet ski rental", "category": "activity", "estimatedCostPp": 60 }, { "time": "Evening", "title": "Sunset beach dinner", "category": "food", "estimatedCostPp": 35 }] }]
+
+Example: Host says "add a hotel near the beach for the whole trip":
+→ autoSearch: { "type": "hotel", "query": "beachfront hotel [destination]", "constraints": "near the beach" }
+
+Example: Host says "make it a multi-city trip, add 2 days in Key West after Miami":
+→ itineraryEdits: [{ "action": "addTransport", "dayDateIso": "2026-07-18", "transportDetail": { "from": "Miami", "to": "Key West", "mode": "Drive/Bus", "estimatedCostPp": 35 } }, { "action": "rewriteDay", "dayDateIso": "2026-07-18", "dayLabel": "Key West Arrival", "newDayActivities": [...] }, { "action": "rewriteDay", "dayDateIso": "2026-07-19", "dayLabel": "Key West Exploration", "newDayActivities": [...] }]
++ autoSearch: { "type": "hotel", "query": "hotel Key West downtown", "stayStartIso": "2026-07-18", "stayEndIso": "2026-07-19" }
++ planPatch: { "location": "Miami, Key West" }`;
 
 type AutoPinRestaurantReq = { dateIso: string; searchHint?: string };
 
@@ -322,6 +371,218 @@ async function applyAutoPinRestaurant(
     hostSetup: mergedSetup,
   };
   return { plan: normalizePlan(planRecord), pinName: top.name, error: null };
+}
+
+// --- Itinerary edit actions ---
+
+type ItineraryEditAction = {
+  action: "replaceActivity" | "addActivity" | "removeActivity" | "rewriteDay" | "adjustCosts" | "addTransport";
+  dayDateIso?: string;
+  activityIndex?: number;
+  newActivity?: Partial<ItineraryActivity>;
+  newDayActivities?: Partial<ItineraryActivity>[];
+  dayLabel?: string;
+  budgetTarget?: number;
+  transportDetail?: { from: string; to: string; mode: string; estimatedCostPp: number | null };
+};
+
+type AutoSearchAction = {
+  type: "hotel" | "restaurant" | "activity" | "transport";
+  query: string;
+  constraints?: string;
+  dateIso?: string;
+  stayStartIso?: string;
+  stayEndIso?: string;
+};
+
+function applyItineraryEdits(plan: TripPlan, edits: ItineraryEditAction[]): { plan: TripPlan; applied: number } {
+  const itinerary = plan.generatedItinerary;
+  if (!itinerary?.days?.length) return { plan, applied: 0 };
+
+  let applied = 0;
+
+  for (const edit of edits) {
+    const dayIdx = itinerary.days.findIndex((d) => d.dateIso === edit.dayDateIso);
+
+    switch (edit.action) {
+      case "replaceActivity": {
+        if (dayIdx < 0 || edit.activityIndex == null || !edit.newActivity) break;
+        const day = itinerary.days[dayIdx]!;
+        if (edit.activityIndex < 0 || edit.activityIndex >= day.activities.length) break;
+        const existing = day.activities[edit.activityIndex]!;
+        day.activities[edit.activityIndex] = {
+          time: edit.newActivity.time ?? existing.time,
+          title: edit.newActivity.title ?? existing.title,
+          description: edit.newActivity.description ?? existing.description,
+          category: (edit.newActivity.category ?? existing.category) as ItineraryActivity["category"],
+          estimatedCostPp: edit.newActivity.estimatedCostPp !== undefined ? edit.newActivity.estimatedCostPp : existing.estimatedCostPp,
+          bookingUrl: edit.newActivity.bookingUrl ?? existing.bookingUrl,
+        };
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+      case "addActivity": {
+        if (dayIdx < 0 || !edit.newActivity?.title) break;
+        const day = itinerary.days[dayIdx]!;
+        day.activities.push({
+          time: edit.newActivity.time ?? "TBD",
+          title: edit.newActivity.title,
+          description: edit.newActivity.description ?? "",
+          category: (edit.newActivity.category ?? "activity") as ItineraryActivity["category"],
+          estimatedCostPp: edit.newActivity.estimatedCostPp ?? null,
+          bookingUrl: edit.newActivity.bookingUrl ?? null,
+        });
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+      case "removeActivity": {
+        if (dayIdx < 0 || edit.activityIndex == null) break;
+        const day = itinerary.days[dayIdx]!;
+        if (edit.activityIndex < 0 || edit.activityIndex >= day.activities.length) break;
+        day.activities.splice(edit.activityIndex, 1);
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+      case "rewriteDay": {
+        if (dayIdx < 0 || !edit.newDayActivities?.length) break;
+        const day = itinerary.days[dayIdx]!;
+        if (edit.dayLabel) day.label = edit.dayLabel;
+        day.activities = edit.newDayActivities.map((a) => ({
+          time: a.time ?? "TBD",
+          title: a.title ?? "Activity",
+          description: a.description ?? "",
+          category: (a.category ?? "activity") as ItineraryActivity["category"],
+          estimatedCostPp: a.estimatedCostPp ?? null,
+          bookingUrl: a.bookingUrl ?? null,
+        }));
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+      case "adjustCosts": {
+        if (dayIdx < 0 || !edit.budgetTarget) break;
+        const day = itinerary.days[dayIdx]!;
+        const currentTotal = day.activities.reduce((s, a) => s + (a.estimatedCostPp ?? 0), 0);
+        if (currentTotal <= 0) break;
+        const ratio = edit.budgetTarget / currentTotal;
+        for (const act of day.activities) {
+          if (act.estimatedCostPp != null && act.estimatedCostPp > 0) {
+            act.estimatedCostPp = Math.round(act.estimatedCostPp * ratio);
+          }
+        }
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+      case "addTransport": {
+        if (dayIdx < 0 || !edit.transportDetail) break;
+        const day = itinerary.days[dayIdx]!;
+        day.activities.push({
+          time: "TBD",
+          title: `${edit.transportDetail.mode} ${edit.transportDetail.from} → ${edit.transportDetail.to}`,
+          description: `${edit.transportDetail.mode} from ${edit.transportDetail.from} to ${edit.transportDetail.to}`,
+          category: "transport",
+          estimatedCostPp: edit.transportDetail.estimatedCostPp,
+          bookingUrl: null,
+        });
+        recalcDayCost(day);
+        applied++;
+        break;
+      }
+    }
+  }
+
+  if (applied > 0) {
+    itinerary.totalEstimatePp = itinerary.days.reduce((s, d) => s + (d.estimatedDayCostPp ?? 0), 0) || null;
+    const headcount = plan.people.count ?? (plan.people.names.length || 2);
+    itinerary.totalEstimateGroup = itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
+    itinerary.generatedAt = new Date().toISOString();
+  }
+
+  return { plan: { ...plan, generatedItinerary: itinerary }, applied };
+}
+
+function recalcDayCost(day: ItineraryDay): void {
+  day.estimatedDayCostPp = day.activities.reduce((s, a) => s + (a.estimatedCostPp ?? 0), 0) || null;
+}
+
+async function applyAutoSearch(
+  plan: TripPlan,
+  search: AutoSearchAction
+): Promise<{ plan: TripPlan; resultName: string | null; error: string | null }> {
+  const location = plan.location?.trim();
+  if (!location) return { plan, resultName: null, error: "Set a destination first." };
+
+  const results = await searchPlacesGoogleMaps(search.query, location, { limit: 3 });
+  const top = results[0];
+  if (!top) return { plan, resultName: null, error: `No results found for "${search.query}". Try different keywords.` };
+
+  switch (search.type) {
+    case "hotel": {
+      const tr = plan.hostSetup?.tripRange;
+      if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };
+      const startIso = search.stayStartIso || tr.startIso;
+      const endIso = search.stayEndIso || tr.endIso;
+      const place: PlaceSpotlight = { ...top, spotlightCategory: "hotel" };
+      const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tr.startIso, tr.endIso, startIso, endIso, place);
+      const hotelStays = tagLodgingStayAtRange(r.hotelStays, startIso, endIso, place.mapsUrl, {
+        userSelected: false,
+        recommendedByConci: true,
+      });
+      const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { hotelStays, hotel: r.hotel });
+      return {
+        plan: normalizePlan({ ...(plan as unknown as Record<string, unknown>), hostSetup: mergedSetup }),
+        resultName: top.name,
+        error: null,
+      };
+    }
+    case "restaurant": {
+      const tr = plan.hostSetup?.tripRange;
+      if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };
+      const dateIso = search.dateIso || tr.startIso;
+      if (!enumerateLocalIsoDays(tr.startIso, tr.endIso).includes(dateIso)) {
+        return { plan, resultName: null, error: "That date is outside your trip range." };
+      }
+      const place: PlaceSpotlight = { ...top, spotlightCategory: "restaurant" };
+      const others = [...(plan.hostSetup?.restaurantPins ?? [])].filter((p) => !(p.dateIso === dateIso && p.place.name === top.name));
+      others.push({ dateIso, place, kept: true });
+      const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { restaurantPins: others });
+      return {
+        plan: normalizePlan({ ...(plan as unknown as Record<string, unknown>), hostSetup: mergedSetup }),
+        resultName: top.name,
+        error: null,
+      };
+    }
+    case "activity": {
+      const tr = plan.hostSetup?.tripRange;
+      if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };
+      const dateIso = search.dateIso || tr.startIso;
+      if (!enumerateLocalIsoDays(tr.startIso, tr.endIso).includes(dateIso)) {
+        return { plan, resultName: null, error: "That date is outside your trip range." };
+      }
+      const exp: HostActivityExperience = {
+        name: top.name,
+        bookingUrl: top.mapsUrl,
+        pricePerPerson: top.priceRange || "",
+        rating: top.rating != null ? String(top.rating) : "",
+        duration: "",
+        coverPhotoUrl: top.photoUrl || null,
+      };
+      const others = [...(plan.hostSetup?.activityPins ?? [])].filter((p) => !(p.dateIso === dateIso && p.experience.name === top.name));
+      others.push({ dateIso, experience: exp, kept: true });
+      const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { activityPins: others });
+      return {
+        plan: normalizePlan({ ...(plan as unknown as Record<string, unknown>), hostSetup: mergedSetup }),
+        resultName: top.name,
+        error: null,
+      };
+    }
+    default:
+      return { plan, resultName: top.name, error: null };
+  }
 }
 
 const MONTH_NAMES_LONG = [
@@ -493,6 +754,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   let uiRaw: Record<string, unknown> | undefined;
   let autoPinRequest: AutoPinRestaurantReq | undefined;
   let autoBookHotelRequest: AutoBookHotelReq | undefined;
+  const itineraryEdits: ItineraryEditAction[] = [];
+  let autoSearchRequest: AutoSearchAction | undefined;
 
   const hs = plan.hostSetup;
   const tr = hs?.tripRange;
@@ -507,6 +770,24 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
   }
 
+  // Build itinerary summary for context
+  let itinerarySummary = "Generated itinerary: none";
+  if (plan.generatedItinerary?.days?.length) {
+    const dayLines = plan.generatedItinerary.days.map((d) => {
+      const acts = d.activities.map((a, ai) =>
+        `    [${ai}] ${a.time} | ${a.title} (${a.category}, $${a.estimatedCostPp ?? "?"}pp)`
+      ).join("\n");
+      return `  ${d.dateIso} "${d.label}" (day total: $${d.estimatedDayCostPp ?? "?"}pp):\n${acts}`;
+    });
+    itinerarySummary = `Generated itinerary (${plan.generatedItinerary.days.length} days, total $${plan.generatedItinerary.totalEstimatePp ?? "?"}pp):\n${dayLines.join("\n")}`;
+  }
+
+  // Build hotel stays summary
+  let hotelStaysSummary = "";
+  if (hs?.hotelStays?.length) {
+    hotelStaysSummary = `Hotel stays: ${hs.hotelStays.map((s) => `${s.place?.name ?? "unnamed"} (${(s as { startIso?: string }).startIso ?? "?"} to ${(s as { endIso?: string }).endIso ?? "?"})`).join(", ")}`;
+  }
+
   const contextBlock = [
     `Trip title: ${plan.title}`,
     `Destination: ${plan.location ?? ""}`,
@@ -516,11 +797,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     calendarDaysLine,
     `Budget tier: ${plan.budget.tier ?? ""} perPerson: ${plan.budget.perPerson ?? ""}`,
     `Vibe: ${plan.vibe.join(", ") || "none"}`,
+    `People: ${plan.people.count ?? (plan.people.names.length || "unknown")} travelers`,
     `Hotel saved: ${hs?.hotel?.name ?? "none"}`,
+    hotelStaysSummary,
     `Experiences outlined checkbox: ${hs?.experiencesOutlined === true ? "yes" : "no"}`,
     `Restaurant pins: ${(hs?.restaurantPins ?? []).length}`,
     `Activity pins: ${(hs?.activityPins ?? []).length}`,
-    `Planner dates slot (may be outdated after host changed calendar — use Host trip range first): ${(plan.dates?.options ?? []).join(" | ") || "none"}`,
+    `Planner dates slot (may be outdated — use Host trip range first): ${(plan.dates?.options ?? []).join(" | ") || "none"}`,
+    "",
+    itinerarySummary,
     "",
     `Host message:\n${message}`,
   ]
@@ -536,7 +821,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-4o",
+          temperature: 0.3,
           input: [
             { role: "system", content: buildCopilotSystem(year, focusDateIso) },
             { role: "user", content: contextBlock },
@@ -652,6 +938,73 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
                 stayEndIso: stayEndIso && /^\d{4}-\d{2}-\d{2}$/.test(stayEndIso) ? stayEndIso : undefined,
               };
             }
+
+            // Parse itineraryEdits
+            if (Array.isArray((parsed as Record<string, unknown>).itineraryEdits)) {
+              const rawEdits = (parsed as Record<string, unknown>).itineraryEdits as unknown[];
+              const validActions = new Set(["replaceActivity", "addActivity", "removeActivity", "rewriteDay", "adjustCosts", "addTransport"]);
+              for (const rawEdit of rawEdits) {
+                if (!rawEdit || typeof rawEdit !== "object") continue;
+                const e = rawEdit as Record<string, unknown>;
+                const action = typeof e.action === "string" ? e.action : "";
+                if (!validActions.has(action)) continue;
+                const dayDateIso = typeof e.dayDateIso === "string" ? e.dayDateIso.trim() : undefined;
+                const edit: ItineraryEditAction = { action: action as ItineraryEditAction["action"], dayDateIso };
+                if (typeof e.activityIndex === "number") edit.activityIndex = Math.floor(e.activityIndex);
+                if (e.newActivity && typeof e.newActivity === "object") {
+                  const na = e.newActivity as Record<string, unknown>;
+                  edit.newActivity = {
+                    ...(typeof na.time === "string" ? { time: na.time } : {}),
+                    ...(typeof na.title === "string" ? { title: na.title } : {}),
+                    ...(typeof na.description === "string" ? { description: na.description } : {}),
+                    ...(typeof na.category === "string" ? { category: na.category as ItineraryActivity["category"] } : {}),
+                    ...(typeof na.estimatedCostPp === "number" ? { estimatedCostPp: na.estimatedCostPp } : na.estimatedCostPp === null ? { estimatedCostPp: null } : {}),
+                  };
+                }
+                if (Array.isArray(e.newDayActivities)) {
+                  edit.newDayActivities = (e.newDayActivities as unknown[])
+                    .filter((a): a is Record<string, unknown> => !!a && typeof a === "object")
+                    .map((a) => ({
+                      ...(typeof a.time === "string" ? { time: a.time } : {}),
+                      ...(typeof a.title === "string" ? { title: a.title } : {}),
+                      ...(typeof a.description === "string" ? { description: a.description } : {}),
+                      ...(typeof a.category === "string" ? { category: a.category as ItineraryActivity["category"] } : {}),
+                      ...(typeof a.estimatedCostPp === "number" ? { estimatedCostPp: a.estimatedCostPp } : a.estimatedCostPp === null ? { estimatedCostPp: null } : {}),
+                    }));
+                }
+                if (typeof e.dayLabel === "string") edit.dayLabel = e.dayLabel;
+                if (typeof e.budgetTarget === "number") edit.budgetTarget = e.budgetTarget;
+                if (e.transportDetail && typeof e.transportDetail === "object") {
+                  const td = e.transportDetail as Record<string, unknown>;
+                  if (typeof td.from === "string" && typeof td.to === "string" && typeof td.mode === "string") {
+                    edit.transportDetail = {
+                      from: td.from,
+                      to: td.to,
+                      mode: td.mode,
+                      estimatedCostPp: typeof td.estimatedCostPp === "number" ? td.estimatedCostPp : null,
+                    };
+                  }
+                }
+                itineraryEdits.push(edit);
+              }
+            }
+
+            // Parse autoSearch
+            if ((parsed as Record<string, unknown>).autoSearch && typeof (parsed as Record<string, unknown>).autoSearch === "object" && !Array.isArray((parsed as Record<string, unknown>).autoSearch)) {
+              const as_ = (parsed as Record<string, unknown>).autoSearch as Record<string, unknown>;
+              const searchType = typeof as_.type === "string" ? as_.type : "";
+              const query = typeof as_.query === "string" ? as_.query.trim() : "";
+              if (["hotel", "restaurant", "activity", "transport"].includes(searchType) && query) {
+                autoSearchRequest = {
+                  type: searchType as AutoSearchAction["type"],
+                  query: query.slice(0, 200),
+                  constraints: typeof as_.constraints === "string" ? as_.constraints.trim().slice(0, 200) : undefined,
+                  dateIso: typeof as_.dateIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_.dateIso) ? as_.dateIso : undefined,
+                  stayStartIso: typeof as_.stayStartIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_.stayStartIso) ? as_.stayStartIso : undefined,
+                  stayEndIso: typeof as_.stayEndIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_.stayEndIso) ? as_.stayEndIso : undefined,
+                };
+              }
+            }
           } catch {
             assistantText = "I had trouble parsing that response. Try rephrasing in one short sentence.";
           }
@@ -725,9 +1078,148 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
   }
 
+  // Fallback: if user asked about budget/cost and model didn't emit itinerary rewrites, regenerate days server-side
+  if (
+    itineraryEdits.length === 0 &&
+    nextPlan.generatedItinerary?.days?.length &&
+    /\b(budget|cost|expensive|cheap|afford|within|under|reduce|cut|lower|save|fit)\b/i.test(message)
+  ) {
+    const budgetMatch = message.match(/\$\s*([\d,]+)/);
+    if (budgetMatch) {
+      const targetTotal = parseFloat(budgetMatch[1]!.replace(/,/g, ""));
+      const currentTotal = nextPlan.generatedItinerary.totalEstimatePp ?? 0;
+      if (targetTotal > 0 && currentTotal > 0 && currentTotal > targetTotal * 1.1) {
+        const days = nextPlan.generatedItinerary.days;
+        const targetDaily = Math.round(targetTotal / days.length);
+        const location = nextPlan.location?.trim() || "destination";
+
+        try {
+          const rewritePrompt = `You are rewriting a trip itinerary for ${location} to fit a STRICT budget of $${targetTotal} total per person ($${targetDaily}/day).
+
+Current itinerary costs $${currentTotal}pp total. You MUST replace expensive activities, restaurants, and lodging with REAL budget-friendly alternatives. Use free activities (beaches, parks, walking tours), cheap street food, budget hostels/hotels, and public transport.
+
+Current itinerary (JSON):
+${JSON.stringify(days.map((d) => ({ dateIso: d.dateIso, label: d.label, activities: d.activities })))}
+
+Rewrite ALL days to fit within $${targetDaily}/day per person. Return ONLY a JSON array of day objects with the same structure. Every activity must have realistic costs for budget travel in ${location}. Use real venue/neighborhood names, not generic placeholders.`;
+
+          const rewriteResp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              temperature: 0.5,
+              messages: [
+                { role: "system", content: "You rewrite trip itineraries to fit budget constraints. Output ONLY valid JSON (array of day objects). Keep the same dateIso values. Use real place names." },
+                { role: "user", content: rewritePrompt },
+              ],
+            }),
+          });
+
+          if (rewriteResp.ok) {
+            const rewriteJson = await rewriteResp.json();
+            const rewriteText = rewriteJson.choices?.[0]?.message?.content?.trim() || "";
+            const cleaned = rewriteText.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+            const rewrittenDays = safeParseJson(cleaned);
+            if (Array.isArray(rewrittenDays) && rewrittenDays.length > 0) {
+              for (const newDay of rewrittenDays) {
+                if (!newDay || typeof newDay !== "object" || !newDay.dateIso) continue;
+                const existingIdx = nextPlan.generatedItinerary!.days.findIndex((d) => d.dateIso === newDay.dateIso);
+                if (existingIdx < 0) continue;
+                if (Array.isArray(newDay.activities) && newDay.activities.length > 0) {
+                  itineraryEdits.push({
+                    action: "rewriteDay",
+                    dayDateIso: newDay.dateIso,
+                    dayLabel: typeof newDay.label === "string" ? newDay.label : undefined,
+                    newDayActivities: newDay.activities.map((a: Record<string, unknown>) => ({
+                      time: typeof a.time === "string" ? a.time : "TBD",
+                      title: typeof a.title === "string" ? a.title : "Activity",
+                      description: typeof a.description === "string" ? a.description : "",
+                      category: typeof a.category === "string" ? a.category : "activity",
+                      estimatedCostPp: typeof a.estimatedCostPp === "number" ? a.estimatedCostPp : null,
+                    })),
+                  });
+                }
+              }
+
+              // Also search for a budget hotel
+              if (!autoSearchRequest && location) {
+                autoSearchRequest = {
+                  type: "hotel",
+                  query: `budget hotel ${location}`,
+                  constraints: `under $${Math.round(targetDaily * 0.35)}/night per person`,
+                };
+              }
+
+              // Update budget in plan
+              nextPlan = {
+                ...nextPlan,
+                budget: { ...nextPlan.budget, perPerson: `$${targetTotal}` },
+              };
+            }
+          }
+        } catch (e) {
+          console.warn("[host-copilot] Budget rewrite fallback failed:", (e as Error)?.message);
+          // Fall through to adjustCosts as last resort
+          const targetDailyFallback = targetTotal / days.length;
+          for (const day of days) {
+            if ((day.estimatedDayCostPp ?? 0) > targetDailyFallback * 1.2) {
+              itineraryEdits.push({
+                action: "adjustCosts",
+                dayDateIso: day.dateIso,
+                budgetTarget: Math.round(targetDailyFallback),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Apply itinerary edits
+  let itineraryApplied = false;
+  if (itineraryEdits.length > 0) {
+    const result = applyItineraryEdits(nextPlan, itineraryEdits);
+    if (result.applied > 0) {
+      nextPlan = result.plan;
+      itineraryApplied = true;
+
+      // Recalculate totalEstimatePp after edits
+      if (nextPlan.generatedItinerary?.days?.length) {
+        nextPlan.generatedItinerary.totalEstimatePp = nextPlan.generatedItinerary.days.reduce(
+          (sum, d) => sum + (d.estimatedDayCostPp ?? 0), 0
+        );
+      }
+
+      if (!assistantText.includes("adjusted") && !assistantText.includes("rewritten") && !assistantText.includes("swapped") && !assistantText.includes("replaced")) {
+        const hasRewrites = itineraryEdits.some((e) => e.action === "rewriteDay");
+        if (hasRewrites) {
+          assistantText = `${assistantText}\n\nDone — I've rewritten the itinerary with budget-friendly restaurants, activities, and lodging to fit your budget.`.trim();
+        } else {
+          assistantText = `${assistantText}\n\nDone — I've adjusted the itinerary to fit your budget.`.trim();
+        }
+      }
+    }
+  }
+
+  // Apply auto search
+  let searchApplied = false;
+  if (autoSearchRequest) {
+    const res = await applyAutoSearch(nextPlan, autoSearchRequest);
+    if (res.resultName && !res.error) {
+      nextPlan = res.plan;
+      searchApplied = true;
+      assistantText = `${assistantText}\n\nFound and saved: ${res.resultName}.`.trim();
+    } else if (res.error) {
+      assistantText = `${assistantText}\n\n${res.error}`.trim();
+    }
+  }
+
   const changed =
     hotelApplied ||
     pinApplied ||
+    itineraryApplied ||
+    searchApplied ||
     (planPatch !== undefined && JSON.stringify(planPatch) !== "{}") ||
     (hostSetupPatch !== undefined && Object.keys(hostSetupPatch).length > 0);
 

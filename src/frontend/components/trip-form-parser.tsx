@@ -4,11 +4,13 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TripPlan } from "@/shared/trip-plan";
 import { planHasUsableTripTiming } from "@/shared/trip-plan";
+import { primaryFilledInteractive, primaryFocusRing } from "@/frontend/ui/primary-action";
 import { ItineraryGenerationLoading } from "@/frontend/components/itinerary-generation-loading";
 
 type FormData = {
   tripName: string;
   destination: string;
+  needsFlight: boolean;
   departureCity: string;
   dateStart: string;
   dateEnd: string;
@@ -69,7 +71,12 @@ function buildSeedText(form: FormData): string {
   const lines: string[] = [];
   lines.push(`Trip: ${form.tripName || form.destination}`);
   if (form.destination) lines.push(`Destination: ${form.destination}`);
-  if (form.departureCity) lines.push(`Departing from: ${form.departureCity}`);
+  if (form.needsFlight && form.departureCity) {
+    lines.push(`Departing from: ${form.departureCity} (needs flight)`);
+  } else if (form.departureCity) {
+    lines.push(`Departing from: ${form.departureCity}`);
+  }
+  if (!form.needsFlight) lines.push(`Transport: driving/local (no flight needed)`);
   if (form.dateStart) lines.push(`Dates: ${formatDateRange(form.dateStart, form.dateEnd)}`);
   if (form.people) lines.push(`People: ${form.people}`);
   if (form.budget) lines.push(`Budget: ${form.budget}`);
@@ -119,6 +126,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
   const [form, setForm] = useState<FormData>({
     tripName: "",
     destination: "",
+    needsFlight: true,
     departureCity: "",
     dateStart: "",
     dateEnd: "",
@@ -129,6 +137,11 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
     pace: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const [activeEdit, setActiveEdit] = useState<string | null>(null);
+  // Vibe picker: collapsed by default — show only selected tags in the expanded drawer
+  const [showAllVibes, setShowAllVibes] = useState(false);
+  // Tracks which field inside the Trip Profile expanded drawer is being inline-edited
+  const [dnaEditField, setDnaEditField] = useState<string | null>(null);
 
   const handleImageUpload = useCallback(async (files: FileList | null) => {
     if (!files) return;
@@ -175,15 +188,17 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
       setForm({
         tripName: parsed.title || "",
         destination: parsed.location || "",
+        needsFlight: Boolean(parsed.departureCity),
         departureCity: parsed.departureCity || "",
         dateStart: extractIsoDate(parsed.dates?.options?.[0], "start") || "",
         dateEnd: extractIsoDate(parsed.dates?.options?.[0], "end") || "",
         people: parsed.people?.count ? String(parsed.people.count) : "",
         budget: parsed.budget?.perPerson || parsed.budget?.tier || "",
-        vibe: Array.isArray(parsed.vibe) ? parsed.vibe.join(", ") : "",
+        vibe: Array.isArray(parsed.vibe) ? parsed.vibe.map((v: string) => v.toLowerCase()).join(", ") : "",
         interests: "",
         pace: "",
       });
+      setActiveEdit(null);
       setPhase("form");
     } catch {
       setError("Something went wrong parsing your input.");
@@ -193,6 +208,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
 
   const skipToForm = useCallback(() => {
     setError(null);
+    setActiveEdit(null);
     setPhase("form");
   }, []);
 
@@ -212,6 +228,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
 
   const handleSubmit = useCallback(async () => {
     setError(null);
+    setActiveEdit(null);
     if (!form.destination.trim()) {
       setError("Where are you going? Add a destination.");
       return;
@@ -271,7 +288,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
 
   const selectedVibes = form.vibe.split(",").map((v) => v.trim()).filter(Boolean);
 
-  // --- PHASE: GENERATING (full-screen animated loading) ---
+  // ─── PHASE: GENERATING ───────────────────────────────────────────────────────
   if (phase === "generating" && generatingTripId) {
     return (
       <ItineraryGenerationLoading
@@ -289,36 +306,36 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
     );
   }
 
-  // --- PHASE: INPUT (screenshots + text) ---
+  // ─── PHASE: INPUT ────────────────────────────────────────────────────────────
   if (phase === "input" || phase === "parsing") {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <header>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-[#ebe9e4] sm:text-4xl">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-4xl">
             Plan a trip
           </h1>
-          <p className="mt-2 text-sm font-light text-slate-400 dark:text-neutral-500">
+          <p className="mt-2 text-sm font-light text-[color:var(--on-surface-muted)] dark:text-neutral-500">
             Paste screenshots of group chats, type details, or both. We&apos;ll extract everything and let you confirm.
           </p>
         </header>
 
-        {/* Image upload area */}
+        {/* Image upload */}
         <div>
           <div
-            className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-5 transition-all duration-200 hover:border-dashed hover:border-slate-400 hover:bg-slate-50/50 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
+            className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-5 py-5 transition-all hover:border-dashed hover:border-[color:var(--sage)]/40 hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); void handleImageUpload(e.dataTransfer.files); }}
           >
-            <svg className="h-4 w-4 shrink-0 text-slate-400 transition-colors duration-200 group-hover:text-slate-600 dark:text-neutral-500 dark:group-hover:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 shrink-0 text-[color:var(--on-surface-muted)] transition-colors group-hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
             <div>
-              <p className="text-sm text-slate-600 dark:text-neutral-400">
+              <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
                 Drop screenshots here or{" "}
-                <span className="font-medium text-indigo-600 underline underline-offset-2 dark:text-indigo-400">click to upload</span>
+                <span className="font-medium text-[color:var(--sage)] underline underline-offset-2 dark:text-[color:var(--sage-soft)]">click to upload</span>
               </p>
-              <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-600">
+              <p className="mt-0.5 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-600">
                 Group chats, inspo pics, travel plans — up to 3 images
               </p>
             </div>
@@ -338,11 +355,11 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
           <div className="flex gap-3">
             {images.map((url, i) => (
               <div key={i} className="relative">
-                <img src={url} alt={`Upload ${i + 1}`} className="h-20 w-20 rounded-[16px] object-cover ring-1 ring-slate-200 dark:ring-white/10" />
+                <img src={url} alt={`Upload ${i + 1}`} className="h-20 w-20 rounded-[16px] object-cover ring-1 ring-[color:var(--hairline)] dark:ring-white/10" />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-xs text-white shadow-md transition hover:bg-red-500 dark:bg-neutral-600 dark:hover:bg-red-500"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--on-surface)] text-xs text-[color:var(--surface)] shadow-md transition hover:bg-red-500 dark:bg-neutral-600 dark:hover:bg-red-500"
                 >
                   &times;
                 </button>
@@ -357,7 +374,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
           onChange={(e) => setFreeText(e.target.value)}
           rows={6}
           placeholder={"Paste your group chat, type trip details, or describe what you want...\n\ne.g. \"Miami trip Aug 30 – Sep 2, 4 people, flying from LAX, budget $200/day each\""}
-          className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm leading-relaxed text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400/70 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-white/[0.02] dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white/20 dark:focus:ring-white/5"
+          className="w-full resize-none rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-3.5 text-sm leading-relaxed text-[color:var(--on-surface)] outline-none transition-all placeholder:text-[color:var(--on-surface-muted)]/70 focus:border-[color:var(--sage)]/50 focus:ring-2 focus:ring-[color:var(--sage)]/10 dark:border-white/10 dark:bg-white/[0.02] dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white/20 dark:focus:ring-white/5"
         />
 
         {error && (
@@ -371,12 +388,12 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
             type="button"
             onClick={parseInput}
             disabled={phase === "parsing"}
-            className="w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-indigo-500 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            className={`w-full rounded-xl px-6 py-3 text-sm ${primaryFilledInteractive} ${primaryFocusRing} disabled:opacity-50`}
           >
             {phase === "parsing" ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Parsing...
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                Parsing…
               </span>
             ) : (
               "Parse & continue"
@@ -386,7 +403,7 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
             <button
               type="button"
               onClick={skipToForm}
-              className="text-sm text-slate-400 transition-colors duration-150 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+              className="text-sm text-[color:var(--on-surface-muted)] transition-colors hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:hover:text-neutral-300"
             >
               Skip — fill in manually
             </button>
@@ -396,195 +413,432 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
     );
   }
 
-  // --- PHASE: FORM (pre-filled or manual) ---
+  // ─── PHASE: FORM / SAVING — Trip Blueprint ───────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
-      <header>
-        <h1 className="font-display text-2xl font-semibold text-slate-900 dark:text-[#ebe9e4] sm:text-3xl">
-          Confirm trip details
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
-          We extracted what we could. Fix anything that&apos;s wrong, fill in the gaps.
-        </p>
-      </header>
+    // Fixed overlay covers the sticky nav (z-30) giving a fully focused canvas
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-[color:var(--surface)] dark:bg-[#141414]">
+      {/* Blueprint micro-dot grid texture */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{
+          backgroundImage: "radial-gradient(circle, rgba(128,128,128,0.13) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+        }}
+      />
+      <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-40 sm:px-6 sm:pt-14">
+      {/* Eyebrow */}
+      <div className="mb-8 flex items-center justify-between">
+        <span className="label-caps inline-flex items-center gap-2 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-1.5 text-[color:var(--sage)] shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-[color:var(--sage-soft)]">
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+          Trip Blueprint
+        </span>
+        <button
+          type="button"
+          onClick={() => { setPhase("input"); setError(null); setActiveEdit(null); }}
+          className="group flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm font-medium text-[color:var(--on-surface-muted)] transition-colors hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-neutral-500 dark:hover:bg-white/5 dark:hover:text-neutral-300"
+        >
+          <svg className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          Edit prompt
+        </button>
+      </div>
 
-      <div className="space-y-5">
+      {/* Hero: Natural Language Typography */}
+      <div className="space-y-6 px-2">
+        {/* Title */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Trip name <span className="text-slate-400 dark:text-neutral-500">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={form.tripName}
-            onChange={(e) => updateField("tripName", e.target.value)}
-            placeholder="e.g. Miami Summer Trip"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
+           {activeEdit === "tripName" ? (
+             <input
+               autoFocus
+               type="text"
+               value={form.tripName}
+               onChange={(e) => updateField("tripName", e.target.value)}
+               onBlur={() => setActiveEdit(null)}
+               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+               placeholder="Name your trip..."
+               className="w-full bg-transparent font-display text-4xl sm:text-5xl font-semibold tracking-tight text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] dark:text-white dark:placeholder:text-neutral-600"
+             />
+           ) : (
+             <h1 
+               onClick={() => setActiveEdit("tripName")}
+               className="group cursor-text font-display text-4xl sm:text-5xl font-semibold tracking-tight text-[color:var(--on-surface)] transition-colors hover:text-[color:var(--sage)] dark:text-white relative inline-block"
+             >
+               {form.tripName || (form.destination ? `${form.destination} Trip` : "Your trip")}
+               <span className="absolute -right-6 top-2 opacity-0 transition-opacity group-hover:opacity-100 text-[color:var(--sage)] text-lg">
+                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+               </span>
+             </h1>
+           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Where are you going? <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={form.destination}
-            onChange={(e) => updateField("destination", e.target.value)}
-            placeholder="e.g. Miami, Barcelona, Tokyo"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
+        {/* Destination Statement */}
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-2xl sm:text-3xl font-light text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+           <span>We&apos;re going to</span>
+           {activeEdit === "destination" ? (
+              <input
+                autoFocus
+                type="text"
+                value={form.destination}
+                onChange={(e) => updateField("destination", e.target.value)}
+                onBlur={() => setActiveEdit(null)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                placeholder="Where to?"
+                className="w-auto min-w-[200px] max-w-full bg-transparent font-medium text-[color:var(--on-surface)] outline-none border-b border-[color:var(--sage)] dark:text-white"
+              />
+           ) : (
+             <span 
+               onClick={() => setActiveEdit("destination")}
+               className={`group cursor-text font-medium relative inline-block transition-colors ${form.destination ? 'text-[color:var(--on-surface)] dark:text-white' : 'text-[color:var(--on-surface-muted)]/50 underline decoration-dashed underline-offset-8'} hover:text-[color:var(--sage)]`}
+             >
+               {form.destination || "Add destination"}
+               <span className="absolute -right-6 top-1.5 opacity-0 transition-opacity group-hover:opacity-100 text-[color:var(--sage)] text-lg">
+                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+               </span>
+             </span>
+           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Where are you leaving from?
-          </label>
-          <input
-            type="text"
-            value={form.departureCity}
-            onChange={(e) => updateField("departureCity", e.target.value)}
-            placeholder="e.g. Los Angeles, LAX, NYC"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-        </div>
+        {/* Dates & Logistics Row */}
+        <div className="pt-6 flex flex-wrap items-center gap-3">
+          {/* Dates */}
+          <div className="relative">
+             <button 
+               type="button" 
+               onClick={() => setActiveEdit(activeEdit === "dates" ? null : "dates")}
+               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
+                 form.dateStart 
+                   ? "border-[color:var(--sage)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-[color:var(--sage-soft)]/50 dark:bg-white/5 dark:text-white" 
+                   : "border-[color:var(--sage)]/30 bg-[color:var(--sage)]/[0.04] text-[color:var(--on-surface-variant)] hover:border-[color:var(--sage)]/70 hover:bg-[color:var(--sage)]/[0.07] dark:border-[color:var(--sage-soft)]/20 dark:bg-[color:var(--sage)]/[0.04] dark:text-neutral-400"
+               }`}
+             >
+               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+               {form.dateStart ? formatDateRange(form.dateStart, form.dateEnd) : <>Set dates <span className="text-xs text-[color:var(--sage)] opacity-70 dark:text-[color:var(--sage-soft)]">✱</span></>}
+             </button>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-              Start date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={form.dateStart}
-              onChange={(e) => updateField("dateStart", e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
-            />
+             {/* Date Picker Popover */}
+             {activeEdit === "dates" && (
+               <div className="absolute top-full mt-3 z-50 left-0">
+                 <div className="rounded-3xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
+                   <div className="flex flex-col gap-4 mb-5">
+                     <div className="space-y-1">
+                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">Start Date</label>
+                       <input
+                         type="date"
+                         value={form.dateStart}
+                         onChange={(e) => updateField("dateStart", e.target.value)}
+                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
+                       />
+                     </div>
+                     <div className="flex justify-center text-[color:var(--on-surface-muted)]">
+                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">End Date</label>
+                       <input
+                         type="date"
+                         value={form.dateEnd}
+                         min={form.dateStart || undefined}
+                         onChange={(e) => updateField("dateEnd", e.target.value)}
+                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
+                       />
+                     </div>
+                   </div>
+                   <button 
+                     type="button" 
+                     onClick={() => setActiveEdit(null)}
+                     className="w-full rounded-xl bg-[color:var(--on-surface)] px-4 py-3 text-sm font-medium text-[color:var(--surface)] transition-colors hover:opacity-90 dark:bg-white dark:text-black"
+                   >
+                     Done
+                   </button>
+                 </div>
+               </div>
+             )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-              End date
-            </label>
-            <input
-              type="date"
-              value={form.dateEnd}
-              onChange={(e) => updateField("dateEnd", e.target.value)}
-              min={form.dateStart || undefined}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100"
-            />
+
+          {/* People */}
+          <div className="relative">
+             <button 
+               type="button" 
+               onClick={() => setActiveEdit(activeEdit === "people" ? null : "people")}
+               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
+                 form.people 
+                   ? "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white hover:border-[color:var(--sage)]" 
+                   : "border-dashed border-[color:var(--on-surface-muted)]/40 bg-transparent text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)] hover:text-[color:var(--on-surface-variant)]"
+               }`}
+             >
+               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+               {form.people ? `${form.people} ${Number(form.people) === 1 ? "person" : "people"}` : "Add people"}
+             </button>
+
+             {activeEdit === "people" && (
+               <div className="absolute top-full mt-3 z-50 left-0">
+                 <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--hairline)] bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
+                   <input
+                     autoFocus
+                     type="number"
+                     min={1}
+                     max={50}
+                     value={form.people}
+                     onChange={(e) => updateField("people", e.target.value)}
+                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                     className="w-20 rounded-xl border-none bg-[color:var(--surface-container-low)] px-3 py-2 text-center text-lg font-medium outline-none focus:ring-2 focus:ring-[color:var(--sage)] dark:bg-white/[0.04] dark:text-white"
+                   />
+                   <button type="button" onClick={() => setActiveEdit(null)} className="rounded-xl bg-[color:var(--sage)] p-2 text-white hover:bg-[color:var(--sage-soft)]">
+                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                   </button>
+                 </div>
+               </div>
+             )}
           </div>
-        </div>
+          
+          {/* Departure Flight toggle */}
+          <div className="relative">
+             <button 
+               type="button" 
+               onClick={() => setActiveEdit(activeEdit === "flight" ? null : "flight")}
+               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
+                 form.needsFlight || form.departureCity
+                   ? "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white hover:border-[color:var(--sage)]" 
+                   : "border-dashed border-[color:var(--on-surface-muted)]/40 bg-transparent text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)] hover:text-[color:var(--on-surface-variant)]"
+               }`}
+             >
+               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+               {form.needsFlight && form.departureCity ? `From ${form.departureCity}` : form.needsFlight ? "Needs flight" : "+ Add flight"}
+             </button>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            How many people?
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={form.people}
-            onChange={(e) => updateField("people", e.target.value)}
-            placeholder="e.g. 4"
-            className="mt-1 w-32 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Budget per person
-          </label>
-          <input
-            type="text"
-            value={form.budget}
-            onChange={(e) => updateField("budget", e.target.value)}
-            placeholder="e.g. $1500, budget-friendly, splurge"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Vibe
-          </label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {VIBE_OPTIONS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={selectedVibes.includes(v)}
-                onClick={() => toggleVibe(v)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                  selectedVibes.includes(v)
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400 dark:hover:border-white/20"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Must-do activities <span className="text-slate-400 dark:text-neutral-500">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={form.interests}
-            onChange={(e) => updateField("interests", e.target.value)}
-            placeholder="e.g. snorkeling, street food, nightlife, museums"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-neutral-300">
-            Pace
-          </label>
-          <div className="mt-2 flex gap-2">
-            {PACE_OPTIONS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                aria-pressed={form.pace === p}
-                onClick={() => updateField("pace", form.pace === p ? "" : p)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium capitalize transition ${
-                  form.pace === p
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-400 dark:hover:border-white/20"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+             {activeEdit === "flight" && (
+               <div className="absolute top-full mt-3 z-50 left-0 w-72">
+                 <div className="rounded-3xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
+                   <div className="flex items-center justify-between mb-5">
+                     <span className="text-sm font-medium text-[color:var(--on-surface)] dark:text-white">Need flights?</span>
+                     <button 
+                       type="button"
+                       onClick={() => setForm(prev => ({ ...prev, needsFlight: !prev.needsFlight, departureCity: prev.needsFlight ? "" : prev.departureCity }))}
+                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.needsFlight ? 'bg-[color:var(--sage)]' : 'bg-gray-200 dark:bg-white/10'}`}
+                     >
+                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.needsFlight ? 'translate-x-6' : 'translate-x-1'}`} />
+                     </button>
+                   </div>
+                   {form.needsFlight && (
+                     <div className="space-y-1.5">
+                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">Departure City</label>
+                       <input
+                         autoFocus
+                         type="text"
+                         value={form.departureCity}
+                         onChange={(e) => updateField("departureCity", e.target.value)}
+                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                         placeholder="City or airport code"
+                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                       />
+                     </div>
+                   )}
+                   <button 
+                     type="button" 
+                     onClick={() => setActiveEdit(null)}
+                     className="mt-5 w-full rounded-xl bg-[color:var(--on-surface)] px-4 py-3 text-sm font-medium text-[color:var(--surface)] transition-colors hover:opacity-90 dark:bg-white dark:text-black"
+                   >
+                     Done
+                   </button>
+                 </div>
+               </div>
+             )}
           </div>
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {/* Trip Profile */}
+      <div className="mt-16">
+        <div
+          className="rounded-3xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-6 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.10),0_10px_30px_-10px_rgba(0,0,0,0.05)] dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4),0_10px_30px_-10px_rgba(0,0,0,0.2)]"
+          style={{ transform: "perspective(1500px) rotateX(2deg) rotateY(-1deg)" }}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">Trip Profile</h2>
+            <button
+              type="button"
+              onClick={() => { setActiveEdit(activeEdit === "dna" ? null : "dna"); setDnaEditField(null); setShowAllVibes(false); }}
+              className="flex items-center gap-1 text-sm font-medium text-[color:var(--sage)] transition-colors hover:text-[color:var(--sage-soft)]"
+            >
+              {activeEdit === "dna" ? "Done tweaking" : "Tweak preferences"}
+              <svg className={`h-4 w-4 transition-transform ${activeEdit === "dna" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+          </div>
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={phase === "saving"}
-          className="flex-1 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-        >
-          {phase === "saving" ? "Creating trip..." : "Generate trip plan"}
-        </button>
-        <button
-          type="button"
-          onClick={() => { setPhase("input"); setError(null); }}
-          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
-        >
-          Back
-        </button>
+          {activeEdit === "dna" ? (
+            <div className="space-y-6 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+
+              {/* Budget — click-to-edit inline */}
+              <div className="cursor-text" onClick={() => setDnaEditField("budget")}>
+                <p className="label-caps mb-1 text-[color:var(--on-surface-muted)]">Budget</p>
+                {dnaEditField === "budget" ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={form.budget}
+                    onChange={(e) => updateField("budget", e.target.value)}
+                    onBlur={() => setDnaEditField(null)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setDnaEditField(null); } }}
+                    placeholder="e.g. $3,000 / person"
+                    className="w-full bg-transparent text-base text-[color:var(--on-surface)] outline-none placeholder:italic placeholder:text-[color:var(--on-surface-muted)]/50 dark:text-white"
+                  />
+                ) : (
+                  <p className="text-base text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                    {form.budget
+                      ? (form.budget.startsWith("$") ? form.budget : `$${form.budget}`)
+                      : <span className="italic text-[color:var(--on-surface-muted)]/50">tap to add…</span>}
+                  </p>
+                )}
+              </div>
+
+              {/* Vibe — selected only + expand trigger */}
+              <div>
+                <p className="label-caps mb-2 text-[color:var(--on-surface-muted)]">Vibe</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedVibes.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleVibe(v); }}
+                      className="rounded-full border border-[color:var(--sage)] bg-[color:var(--sage)]/10 px-4 py-1.5 text-sm font-medium capitalize text-[color:var(--sage)] transition-all dark:border-[color:var(--sage-soft)] dark:text-[color:var(--sage-soft)]"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  {showAllVibes &&
+                    VIBE_OPTIONS.filter((v) => !selectedVibes.includes(v)).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleVibe(v); }}
+                        className="rounded-full border border-[color:var(--hairline)] px-4 py-1.5 text-sm font-medium capitalize text-[color:var(--on-surface-muted)] transition-all hover:border-[color:var(--sage)]/40 dark:border-white/10 dark:text-neutral-400"
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setShowAllVibes((s) => !s); }}
+                    className="rounded-full border border-dashed border-[color:var(--on-surface-muted)]/30 px-3.5 py-1.5 text-sm text-[color:var(--on-surface-muted)] transition-colors hover:border-[color:var(--sage)]/50 hover:text-[color:var(--on-surface-variant)] dark:border-white/20 dark:text-neutral-500"
+                  >
+                    {showAllVibes ? "Less" : selectedVibes.length === 0 ? "+ Add vibe" : "+ More"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pace */}
+              <div>
+                <p className="label-caps mb-2 text-[color:var(--on-surface-muted)]">Pace</p>
+                <div className="flex gap-2">
+                  {PACE_OPTIONS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => updateField("pace", form.pace === p ? "" : p)}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium capitalize transition-all ${
+                        form.pace === p
+                          ? "border-[color:var(--sage)] bg-[color:var(--sage)]/10 text-[color:var(--sage)] dark:border-[color:var(--sage-soft)] dark:text-[color:var(--sage-soft)]"
+                          : "border-[color:var(--hairline)] text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)]/40 dark:border-white/10 dark:text-neutral-400"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Must-dos — borderless editorial textarea */}
+              <div>
+                <p className="label-caps mb-1 text-[color:var(--on-surface-muted)]">Must-dos</p>
+                <textarea
+                  rows={2}
+                  value={form.interests}
+                  onChange={(e) => updateField("interests", e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                  placeholder="Snorkeling, street food, nightlife, hidden gems…"
+                  className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[color:var(--on-surface)] outline-none placeholder:italic placeholder:text-[color:var(--on-surface-muted)]/50 dark:text-white dark:placeholder:text-neutral-600"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-x-6 gap-y-2.5 pt-2">
+              {form.budget && (
+                <span className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Budget</span>
+                  {form.budget.startsWith("$") ? form.budget : `$${form.budget}`}
+                </span>
+              )}
+              {selectedVibes.length > 0 && (
+                <span className="text-sm capitalize text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Vibe</span>
+                  {selectedVibes.join(", ")}
+                </span>
+              )}
+              {form.pace && (
+                <span className="text-sm capitalize text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Pace</span>
+                  {form.pace}
+                </span>
+              )}
+              {form.interests && (
+                <span className="max-w-[280px] truncate text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Must-dos</span>
+                  {form.interests}
+                </span>
+              )}
+              {!form.budget && selectedVibes.length === 0 && !form.pace && !form.interests && (
+                <span className="text-sm italic text-[color:var(--on-surface-muted)]">No preferences set — tap &apos;Tweak preferences&apos; to add.</span>
+              )}
+            </div>
+          )}
+        </div>{/* /trip-profile card */}
+      </div>{/* /trip-profile wrapper */}
+
+      </div>{/* /inner content */}
+
+      {/* Floating Action Bar — z-50 sits above the z-40 overlay */}
+      <div className="fixed bottom-6 left-0 right-0 z-50 mx-auto w-full max-w-3xl px-4 pointer-events-none">
+        <div className="pointer-events-auto overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] p-2 shadow-2xl dark:border-white/[0.08] dark:bg-[#1a1a18] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="px-4 flex-1 w-full text-center sm:text-left">
+            {error ? (
+              <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-red-600 dark:text-red-400 font-medium">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                {error}
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+                {!form.destination 
+                   ? "Where to? Add a destination." 
+                   : !form.dateStart 
+                     ? "When are you going? Set your dates." 
+                     : "Ready to plan your trip."}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={phase === "saving" || !form.destination || !form.dateStart}
+            className={`w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-medium transition-all ${
+              (!form.destination || !form.dateStart)
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-white/5 dark:text-gray-500"
+                : phase === "saving"
+                ? "bg-[color:var(--on-surface)] text-[color:var(--surface)] opacity-70 cursor-wait dark:bg-white dark:text-black"
+                : "bg-[color:var(--on-surface)] text-[color:var(--surface)] shadow-md hover:scale-[1.02] hover:shadow-lg dark:bg-white dark:text-black"
+            }`}
+          >
+            {phase === "saving" ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                Building…
+              </span>
+            ) : (
+              "Generate Itinerary →"
+            )}
+          </button>
+        </div>
       </div>
+
     </div>
   );
 }
