@@ -162,8 +162,13 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
     const actRows = (dayItin.activities ?? []).filter((a) => a.category === "activity" && a.title.trim()).slice(0, 2);
     // Don't pad with generic placeholders — only use real activities from the itinerary
 
-    const flightLabel = cleanLabel(`${departure} -> ${location} best-value flight option`, 140);
     const flightUrl = `https://www.google.com/travel/flights?hl=en&q=Flights%20from%20${slug(departure)}%20to%20${slug(location)}`;
+    // Pull actual flight info from the itinerary if available
+    const flightActivity = dayItin.activities.find((a) => a.category === "transport" && /^flight:/i.test(a.title));
+    const flightLabel = flightActivity
+      ? cleanLabel(flightActivity.title, 140)
+      : cleanLabel(`${departure} \u2192 ${location} flight`, 140);
+    const flightPrice = flightActivity?.estimatedCostPp;
 
     restaurantPins.push({
       dateIso,
@@ -195,15 +200,15 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
       });
     }
 
-    // Only add flight pin on first and last day
-    if (i === 0 || i === days.length - 1) {
+    // Only add flight pin on first and last day when there's a flight in the itinerary
+    if ((i === 0 || i === days.length - 1) && flightActivity) {
       activityPins.push({
         dateIso,
         experience: {
           name: flightLabel,
-          pricePerPerson: "",
+          pricePerPerson: flightPrice != null ? `~$${Math.round(flightPrice)} pp` : "",
           rating: "",
-          duration: "Best option",
+          duration: flightActivity.description || "Economy",
           bookingUrl: flightUrl,
           coverPhotoUrl: null,
         },
