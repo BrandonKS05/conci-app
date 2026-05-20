@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { LiveFlightCard } from "@/shared/trip-live-recommendations";
+import { hasUserSelectedLodging } from "@/shared/trip-plan";
 
 type Deposit = {
   id: string;
@@ -118,59 +119,130 @@ export function TripCostRollup({
       ? Math.max(0, estimatedTotalUsd - (fundUsd ?? 0))
       : null;
 
+  // Breakdown from itinerary for the expandable detail
+  const breakdown = useMemo(() => {
+    const days = plan.generatedItinerary?.days;
+    if (!days?.length) return null;
+    let lodgingPp = 0;
+    let transportPp = 0;
+    let foodPp = 0;
+    let activitiesPp = 0;
+    for (const day of days) {
+      for (const act of day.activities) {
+        const cost = act.estimatedCostPp ?? 0;
+        switch (act.category) {
+          case "lodging": lodgingPp += cost; break;
+          case "transport": transportPp += cost; break;
+          case "food": foodPp += cost; break;
+          default: activitiesPp += cost; break;
+        }
+      }
+    }
+    return { lodgingPp, transportPp, foodPp, activitiesPp };
+  }, [plan.generatedItinerary]);
+
+  const lodgingConfirmed = hasUserSelectedLodging(plan.hostSetup?.hotelStays);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
   return (
-    <div className="mb-5 grid grid-cols-2 gap-x-5 gap-y-4 border-b border-[color:var(--hairline)] pb-5 sm:grid-cols-4 sm:gap-x-8 dark:border-white/10">
-      <Stat
-        label="Estimated total"
-        value={estimatedTotalUsd != null ? formatCurrencyUsd(estimatedTotalUsd) : "—"}
-        helper={
-          estimatedTotalUsd != null
-            ? `for ${headcount} ${headcount === 1 ? "traveler" : "travelers"}`
-            : "Add budget on the trip to estimate"
-        }
-      />
-      <Stat
-        label="Per person"
-        value={
-          perPersonTotalUsd != null ? formatCurrencyUsd(perPersonTotalUsd) : "—"
-        }
-        helper={
-          lowFlightPp != null
-            ? `incl. ~${formatCurrencyUsd(lowFlightPp)} flight`
-            : perPersonFromBudget != null
-              ? "budget only — flights pending"
-              : "Set per-person budget"
-        }
-      />
-      <Stat
-        label="Trip fund"
-        value={fundUsd != null ? formatCurrencyUsd(fundUsd) : "—"}
-        helper={
-          fundUsd == null
-            ? "Loading…"
-            : fundDepositCount === 0
-              ? "No contributions yet"
-              : `${fundDepositCount} ${fundDepositCount === 1 ? "deposit" : "deposits"}`
-        }
-      />
-      <Stat
-        label="Still owed"
-        value={
-          owedUsd != null
-            ? owedUsd === 0
-              ? "Funded"
-              : formatCurrencyUsd(owedUsd)
-            : "—"
-        }
-        helper={
-          owedUsd == null
-            ? "Needs budget + fund to compute"
-            : owedUsd === 0
-              ? "Group fund covers the estimate"
-              : "Estimate minus current fund"
-        }
-        emphasize={owedUsd != null && owedUsd > 0}
-      />
+    <div className="mb-5 border-b border-[color:var(--hairline)] pb-5 dark:border-white/10">
+      <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4 sm:gap-x-8">
+        <Stat
+          label="Estimated total"
+          value={estimatedTotalUsd != null ? formatCurrencyUsd(estimatedTotalUsd) : "\u2014"}
+          helper={
+            estimatedTotalUsd != null
+              ? `for ${headcount} ${headcount === 1 ? "traveler" : "travelers"}`
+              : "Add budget on the trip to estimate"
+          }
+          onClick={breakdown ? () => setShowBreakdown(!showBreakdown) : undefined}
+        />
+        <Stat
+          label="Per person"
+          value={
+            perPersonTotalUsd != null ? formatCurrencyUsd(perPersonTotalUsd) : "\u2014"
+          }
+          helper={
+            lowFlightPp != null
+              ? `incl. ~${formatCurrencyUsd(lowFlightPp)} flight`
+              : perPersonFromBudget != null
+                ? "budget only \u2014 flights pending"
+                : "Set per-person budget"
+          }
+        />
+        <Stat
+          label="Trip fund"
+          value={fundUsd != null ? formatCurrencyUsd(fundUsd) : "\u2014"}
+          helper={
+            fundUsd == null
+              ? "Loading\u2026"
+              : fundDepositCount === 0
+                ? "No contributions yet"
+                : `${fundDepositCount} ${fundDepositCount === 1 ? "deposit" : "deposits"}`
+          }
+        />
+        <Stat
+          label="Still owed"
+          value={
+            owedUsd != null
+              ? owedUsd === 0
+                ? "Funded"
+                : formatCurrencyUsd(owedUsd)
+              : "\u2014"
+          }
+          helper={
+            owedUsd == null
+              ? "Needs budget + fund to compute"
+              : owedUsd === 0
+                ? "Group fund covers the estimate"
+                : "Estimate minus current fund"
+          }
+          emphasize={owedUsd != null && owedUsd > 0}
+        />
+      </div>
+
+      {showBreakdown && breakdown ? (
+        <div className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-white/10 dark:bg-white/5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Per-person breakdown</p>
+          <ul className="space-y-1 text-[12px] text-neutral-700 dark:text-neutral-300">
+            {breakdown.foodPp > 0 ? (
+              <li className="flex justify-between">
+                <span className="text-amber-800 dark:text-amber-200">Restaurants & food</span>
+                <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.foodPp)}</span>
+              </li>
+            ) : null}
+            {breakdown.activitiesPp > 0 ? (
+              <li className="flex justify-between">
+                <span className="text-pink-700 dark:text-pink-300">Experiences & activities</span>
+                <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.activitiesPp)}</span>
+              </li>
+            ) : null}
+            {breakdown.lodgingPp > 0 ? (
+              <li className="flex justify-between">
+                <span className="text-teal-700 dark:text-teal-300">
+                  Lodging {lodgingConfirmed ? "" : <span className="italic text-neutral-400">(estimated)</span>}
+                </span>
+                <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.lodgingPp)}</span>
+              </li>
+            ) : null}
+            {breakdown.transportPp > 0 ? (
+              <li className="flex justify-between">
+                <span className="text-blue-700 dark:text-blue-300">
+                  Flights & transport <span className="italic text-neutral-400">(estimated)</span>
+                </span>
+                <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.transportPp)}</span>
+              </li>
+            ) : null}
+            <li className="flex justify-between border-t border-neutral-200 pt-1 dark:border-white/10">
+              <span className="font-bold">Total per person</span>
+              <span className="tabular-nums font-bold">{formatCurrencyUsd(perPersonTotalUsd ?? 0)}</span>
+            </li>
+          </ul>
+          {!lodgingConfirmed && breakdown.lodgingPp > 0 ? (
+            <p className="mt-2 text-[10px] text-neutral-500">Lodging and flight estimates update once you confirm bookings.</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -180,16 +252,22 @@ function Stat({
   value,
   helper,
   emphasize = false,
+  onClick,
 }: {
   label: string;
   value: string;
   helper: string;
   emphasize?: boolean;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="min-w-0 flex flex-col gap-1">
+    <Wrapper
+      className={`min-w-0 flex flex-col gap-1 text-left ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+      onClick={onClick}
+    >
       <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-        {label}
+        {label} {onClick ? "▾" : ""}
       </span>
       <span
         className={[
@@ -204,6 +282,6 @@ function Stat({
       <span className="truncate text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {helper}
       </span>
-    </div>
+    </Wrapper>
   );
 }

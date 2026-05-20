@@ -126,10 +126,8 @@ function formatUsd(n: number): string {
 
 function DaySpendEstimateBar({
   baselineGroupUsd,
-  hotelUsd,
   mealsUsd,
   activitiesUsd,
-  transportUsd,
   estimatedTotalUsd,
 }: {
   baselineGroupUsd: number | null;
@@ -140,20 +138,20 @@ function DaySpendEstimateBar({
   estimatedTotalUsd: number;
 }) {
   const baseline = baselineGroupUsd;
-  const fillPct = baseline != null && baseline > 0 ? Math.min(100, (estimatedTotalUsd / baseline) * 100) : 100;
-  const over = baseline != null && baseline > 0 && estimatedTotalUsd > baseline;
+  const dayTotal = mealsUsd + activitiesUsd;
+  const fillPct = baseline != null && baseline > 0 ? Math.min(100, (dayTotal / baseline) * 100) : 100;
+  const over = baseline != null && baseline > 0 && dayTotal > baseline;
 
   const parts = [
-    { key: "h", usd: hotelUsd, className: "bg-teal-500 dark:bg-teal-600" },
     { key: "m", usd: mealsUsd, className: "bg-amber-400 dark:bg-amber-500" },
     { key: "a", usd: activitiesUsd, className: "bg-pink-500 dark:bg-pink-600" },
   ].filter((p) => p.usd > 0);
 
   return (
     <div className="mt-3 space-y-2">
-      {estimatedTotalUsd <= 0 ? (
+      {dayTotal <= 0 ? (
         <p className="font-sans text-xs text-neutral-500 dark:text-neutral-500">
-          Pin restaurants or experiences on this day to build an estimate. Lodging is managed on the trip calendar.
+          Pin restaurants or experiences on this day to build an estimate.
         </p>
       ) : (
         <div className="h-3 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/15">
@@ -168,15 +166,7 @@ function DaySpendEstimateBar({
         </div>
       )}
       <ul className="space-y-1 font-sans text-[11px] text-neutral-600 dark:text-neutral-400">
-        {estimatedTotalUsd <= 0 ? null : hotelUsd > 0 ? (
-          <li className="flex justify-between gap-2">
-            <span className="text-teal-700 dark:text-teal-300">Lodging (night share)</span>
-            <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
-              {formatUsd(hotelUsd)}
-            </span>
-          </li>
-        ) : null}
-        {estimatedTotalUsd <= 0 ? null : mealsUsd > 0 ? (
+        {mealsUsd > 0 ? (
           <li className="flex justify-between gap-2">
             <span className="text-amber-800 dark:text-amber-200">Restaurants (est.)</span>
             <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
@@ -184,7 +174,7 @@ function DaySpendEstimateBar({
             </span>
           </li>
         ) : null}
-        {estimatedTotalUsd <= 0 ? null : activitiesUsd > 0 ? (
+        {activitiesUsd > 0 ? (
           <li className="flex justify-between gap-2">
             <span className="text-pink-700 dark:text-pink-300">Experiences</span>
             <span className="tabular-nums font-semibold text-neutral-800 dark:text-neutral-200">
@@ -192,14 +182,16 @@ function DaySpendEstimateBar({
             </span>
           </li>
         ) : null}
-        {estimatedTotalUsd > 0 ? (
+
+        {dayTotal > 0 ? (
           <li className="flex justify-between gap-2 border-t border-neutral-200 pt-1.5 dark:border-white/10">
             <span className="font-bold text-neutral-800 dark:text-neutral-200">Estimated day total</span>
             <span className="tabular-nums font-bold text-neutral-950 dark:text-white">
-              {formatUsd(estimatedTotalUsd)}
+              {formatUsd(dayTotal)}
             </span>
           </li>
         ) : null}
+
         {baseline != null && baseline > 0 ? (
           <li className="flex justify-between gap-2">
             <span>Your trip budget / day (group)</span>
@@ -215,7 +207,7 @@ function DaySpendEstimateBar({
       </ul>
       {over ? (
         <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-          About {formatUsd(estimatedTotalUsd - baseline!)} over today&apos;s share — rough estimate only.
+          About {formatUsd(dayTotal - baseline!)} over today&apos;s share — rough estimate only.
         </p>
       ) : null}
       <p className="text-[10px] leading-snug text-neutral-500 dark:text-neutral-500">
