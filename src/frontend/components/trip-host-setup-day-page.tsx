@@ -23,6 +23,7 @@ import {
   type HostActivityPin,
   type TripPlan,
 } from "@/shared/trip-plan";
+import { DayItineraryMap, type DayMapStop } from "@/frontend/components/day-itinerary-map";
 
 type Props = {
   tripId: string;
@@ -966,6 +967,19 @@ export function TripHostSetupDayPage({
     return sortScheduleRows(rows);
   }, [plan.generatedItinerary, dateIso, meals, activities, dayVoting]);
 
+  // Derive map stops from the schedule — skip flights (airports, not local pins).
+  const mapStops = useMemo<DayMapStop[]>(
+    () =>
+      scheduleItems
+        .filter((row) => row.sub !== "Flight")
+        .map((row, idx) => ({
+          index: idx + 1,
+          label: row.label,
+          sub: row.sub,
+          mapsUrl: row.href,
+        })),
+    [scheduleItems]
+  );
 
   const prevIso = shiftIsoDay(dateIso, -1);
   const nextIso = shiftIsoDay(dateIso, 1);
@@ -1120,6 +1134,12 @@ export function TripHostSetupDayPage({
         <DayScheduleTimeline
           items={scheduleItems}
           subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
+        />
+
+        <DayItineraryMap
+          stops={mapStops}
+          locationHint={plan.location}
+          dateIso={dateIso}
         />
 
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
