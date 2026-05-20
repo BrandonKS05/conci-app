@@ -68,6 +68,7 @@ export type HostDaySpendBreakdown = {
   hotelUsd: number;
   mealsUsd: number;
   activitiesUsd: number;
+  transportUsd: number;
   estimatedTotalUsd: number;
 };
 
@@ -122,6 +123,7 @@ export function estimateHostDaySpendUsd(
     hotelUsd,
     mealsUsd,
     activitiesUsd,
+    transportUsd: 0,
     estimatedTotalUsd,
   };
 }
@@ -140,6 +142,7 @@ function estimateFromItinerary(
   let hotelUsd = 0;
   let mealsUsd = 0;
   let activitiesUsd = 0;
+  let transportUsd = 0;
 
   for (const act of day.activities) {
     const costPp = act.estimatedCostPp ?? 0;
@@ -157,7 +160,7 @@ function estimateFromItinerary(
         activitiesUsd += costGroup;
         break;
       case "transport":
-        activitiesUsd += costGroup;
+        transportUsd += costGroup;
         break;
     }
   }
@@ -165,13 +168,15 @@ function estimateFromItinerary(
   hotelUsd = Math.round(hotelUsd * 100) / 100;
   mealsUsd = Math.round(mealsUsd * 100) / 100;
   activitiesUsd = Math.round(activitiesUsd * 100) / 100;
-  const estimatedTotalUsd = Math.round((hotelUsd + mealsUsd + activitiesUsd) * 100) / 100;
+  transportUsd = Math.round(transportUsd * 100) / 100;
+  const estimatedTotalUsd = Math.round((hotelUsd + mealsUsd + activitiesUsd + transportUsd) * 100) / 100;
 
   return {
     baselineGroupUsd: baselineGroup,
     hotelUsd,
     mealsUsd,
     activitiesUsd,
+    transportUsd,
     estimatedTotalUsd,
   };
 }
