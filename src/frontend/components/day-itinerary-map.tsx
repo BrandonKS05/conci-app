@@ -38,10 +38,12 @@ interface GMapsApi {
   Marker: new (opts: object) => GMMarker;
   LatLngBounds: new () => GMBounds;
   Geocoder: new () => GMGeocoder;
+  event: { trigger(target: object, eventName: string): void };
 }
 declare global {
   interface Window {
     google?: { maps: GMapsApi };
+    gm_authFailure?: () => void;
   }
 }
 
@@ -54,12 +56,13 @@ function loadMapsScript(apiKey: string): Promise<void> {
   if (mapsLoadPromise) return mapsLoadPromise;
   mapsLoadPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    // v=weekly = latest stable channel
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {
       mapsLoadPromise = undefined;
-      reject(new Error("Google Maps failed to load — check your API key and domain restrictions."));
+      reject(new Error("Google Maps script failed to load. Check that the Maps JavaScript API is enabled for this key."));
     };
     document.head.appendChild(script);
   });
@@ -86,7 +89,7 @@ async function geocodeAddress(geocoder: GMGeocoder, address: string): Promise<La
   });
 }
 
-// ── Extract lat/lng embedded in a Google Maps URL ────────────────────────────
+// ── Extract lat/lng embedded in a Google Maps URL (@lat,lng,zoom) ────────────
 function parseLatLngFromMapsUrl(url: string): LatLng | null {
   const m = /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(url);
   if (!m) return null;
@@ -103,18 +106,16 @@ export function DayItineraryMap({
 }: {
   stops: DayMapStop[];
   locationHint: string | null;
-  /** Changing this value re-runs geocoding and re-pins markers for the new day. */
+  /** Changing this re-geocodes and re-pins for the new day. */
   dateIso: string;
 }) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GMMap | null>(null);
   const markersRef = useRef<GMMarker[]>([]);
+  // mapReady stays false until geocoding is done — loading overlay covers grey canvas
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // NEXT_PUBLIC_ prefix makes this available in the browser bundle.
-  // Replace YOUR_API_KEY with your real key in .env.local:
-  //   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_API_KEY
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
   useEffect(() => {
@@ -122,13 +123,24 @@ export function DayItineraryMap({
 
     let cancelled = false;
     setError(null);
+    setMapReady(false);
+
+    // gm_authFailure fires when the key is invalid or Maps JS API isn't enabled.
+    window.gm_authFailure = () => {
+      if (!cancelled) {
+        setError(
+          "Maps JavaScript API auth failed. Make sure the Maps JavaScript API (not just Places API) is enabled for this key in the Google Cloud Console, and that localhost is an allowed referrer."
+        );
+        setMapReady(true); // lift overlay so the error is readable above the grey canvas
+      }
+    };
 
     void (async () => {
       try {
         await loadMapsScript(apiKey);
         if (cancelled || !mapDivRef.current) return;
 
-        // Initialise map once; reuse across day navigations.
+        // Initialise the map instance once; reuse it across day navigations.
         if (!mapInstanceRef.current) {
           mapInstanceRef.current = new window.google!.maps.Map(mapDivRef.current, {
             zoom: 13,
@@ -136,14 +148,16 @@ export function DayItineraryMap({
             streetViewControl: false,
             fullscreenControl: false,
           });
-          setMapReady(true);
         }
 
-        // Clear previous day's markers.
+        // Clear the previous day's markers.
         for (const m of markersRef.current) m.setMap(null);
         markersRef.current = [];
 
-        if (stops.length === 0) return;
+        if (stops.length === 0) {
+          setMapReady(true);
+          return;
+        }
 
         const geocoder = new window.google!.maps.Geocoder();
         const bounds = new window.google!.maps.LatLngBounds();
@@ -154,10 +168,10 @@ export function DayItineraryMap({
 
           let ll: LatLng | null = null;
 
-          // 1. Try to extract coords from a Google Maps URL (@lat,lng).
+          // 1. Prefer coordinates embedded in a Google Maps URL.
           if (stop.mapsUrl) ll = parseLatLngFromMapsUrl(stop.mapsUrl);
 
-          // 2. Fall back to Geocoding API.
+          // 2. Fall back to the Geocoding API.
           if (!ll) {
             const query = locationHint ? `${stop.label}, ${locationHint}` : stop.label;
             ll = await geocodeAddress(geocoder, query);
@@ -181,17 +195,26 @@ export function DayItineraryMap({
           placed++;
         }
 
-        if (cancelled || placed === 0) return;
+        if (cancelled) return;
 
         if (placed > 1) {
           mapInstanceRef.current!.fitBounds(bounds);
-        } else {
+        } else if (placed === 1) {
           const c = bounds.getCenter();
           mapInstanceRef.current!.setCenter({ lat: c.lat(), lng: c.lng() });
           mapInstanceRef.current!.setZoom(15);
         }
+
+        // Trigger a resize so the map repaints correctly after the overlay lifts.
+        window.google!.maps.event.trigger(mapInstanceRef.current!, "resize");
+        if (placed > 1) mapInstanceRef.current!.fitBounds(bounds);
+
+        setMapReady(true);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Map failed to load.");
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Map failed to load.");
+          setMapReady(true);
+        }
       }
     })();
 
@@ -232,20 +255,24 @@ export function DayItineraryMap({
       </div>
 
       {error ? (
-        <p className="px-5 py-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>
+        <p className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-xs leading-relaxed text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
+          {error}
+        </p>
       ) : null}
 
       <div className="relative">
-        {/* Map container — always at full height so the SDK has a sized element to paint into. */}
+        {/* Always at full height so the SDK paints into a sized container. */}
         <div
           ref={mapDivRef}
-          className="h-80 w-full sm:h-96"
+          style={{ height: "360px" }}
+          className="w-full"
           aria-label="Day itinerary map"
         />
-        {/* Loading overlay — hidden once the map instance is ready. */}
+        {/* Spinner overlay — covers grey canvas until tiles + markers are ready. */}
         {!mapReady ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-dm-page/90 dark:text-neutral-500">
-            Loading map…
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-100 dark:bg-dm-page/95">
+            <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-neutral-300 border-t-[#2563EB] dark:border-white/20 dark:border-t-[#60A5FA]" />
+            <span className="text-xs text-neutral-400 dark:text-neutral-500">Placing pins…</span>
           </div>
         ) : null}
       </div>
