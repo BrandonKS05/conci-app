@@ -147,7 +147,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.6,
       input: [
         { role: "system", content: SYSTEM_PROMPT },

@@ -1107,7 +1107,7 @@ Rewrite ALL days to fit within $${targetDaily}/day per person. Return ONLY a JSO
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
             body: JSON.stringify({
-              model: "gpt-4o-mini",
+              model: "gpt-4o",
               temperature: 0.5,
               messages: [
                 { role: "system", content: "You rewrite trip itineraries to fit budget constraints. Output ONLY valid JSON (array of day objects). Keep the same dateIso values. Use real place names." },
