@@ -73,7 +73,7 @@ const ANIMATIONS = `
 function PlaneDot({ delay }: { delay: string }) {
   return (
     <span
-      className="inline-block h-1.5 w-1.5 rounded-full bg-neutral-500"
+      className="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
       style={{ animation: `itinDotPulse 1.4s ${delay} ease-in-out infinite` }}
     />
   );
@@ -174,7 +174,7 @@ export function ItineraryGenerationLoading({
       <style dangerouslySetInnerHTML={{ __html: ANIMATIONS }} />
 
       <div
-        className="fixed inset-0 z-[300] flex items-center justify-center overflow-auto bg-[#0f0f0f] px-5 py-10"
+        className="fixed inset-0 z-[300] flex items-center justify-center overflow-auto bg-white px-5 py-10"
         style={{
           transition: "opacity 0.6s ease-out",
           opacity: exiting ? 0 : 1,
@@ -190,16 +190,16 @@ export function ItineraryGenerationLoading({
         >
           {/* Header */}
           <div className="mb-7 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Building your trip
             </p>
-            <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-white sm:text-[1.75rem]">
+            <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.75rem]">
               {title}
             </h2>
           </div>
 
           {/* Travel animation stage */}
-          <div className="relative mb-7 h-28 overflow-hidden rounded-2xl border border-white/10 bg-[#141414]">
+          <div className="relative mb-7 h-28 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
             {/* Route SVG */}
             <svg
               viewBox="0 0 300 80"
@@ -208,8 +208,8 @@ export function ItineraryGenerationLoading({
               preserveAspectRatio="none"
             >
               {/* Faint grid lines */}
-              <line x1="0" y1="40" x2="300" y2="40" stroke="white" strokeOpacity="0.03" strokeWidth="1" />
-              <line x1="150" y1="0" x2="150" y2="80" stroke="white" strokeOpacity="0.03" strokeWidth="1" />
+              <line x1="0" y1="40" x2="300" y2="40" stroke="#0f172a" strokeOpacity="0.04" strokeWidth="1" />
+              <line x1="150" y1="0" x2="150" y2="80" stroke="#0f172a" strokeOpacity="0.04" strokeWidth="1" />
 
               {/* Animated route arc */}
               <path
@@ -266,7 +266,7 @@ export function ItineraryGenerationLoading({
           </div>
 
           {/* Progress bar */}
-          <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full rounded-full bg-teal-500"
               style={{
@@ -278,7 +278,7 @@ export function ItineraryGenerationLoading({
 
           {/* Stage label */}
           <div className="mb-7 flex items-center justify-between">
-            <p className="text-sm text-neutral-500">{stage}</p>
+            <p className="text-sm text-slate-400">{stage}</p>
             <span className="flex items-center gap-0.5">
               <PlaneDot delay="0s" />
               <PlaneDot delay="0.2s" />
@@ -295,8 +295,8 @@ export function ItineraryGenerationLoading({
                   key={key}
                   className="flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5"
                   style={{
-                    borderColor: done ? "rgba(20,184,166,0.3)" : "rgba(255,255,255,0.08)",
-                    backgroundColor: done ? "rgba(20,184,166,0.08)" : "transparent",
+                    borderColor: done ? "rgba(20,184,166,0.35)" : "rgba(15,23,42,0.08)",
+                    backgroundColor: done ? "rgba(20,184,166,0.06)" : "transparent",
                     transition: "border-color 0.35s ease, background-color 0.35s ease",
                   }}
                 >
@@ -305,7 +305,7 @@ export function ItineraryGenerationLoading({
                     className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
                     style={{
                       backgroundColor: done ? "#14b8a6" : "transparent",
-                      border: done ? "none" : "1.5px solid rgba(255,255,255,0.15)",
+                      border: done ? "none" : "1.5px solid rgba(15,23,42,0.15)",
                       color: done ? "#000" : "transparent",
                       animation: done ? "itinCheckIn 0.4s cubic-bezier(0.34,1.56,0.64,1)" : undefined,
                       transition: "background-color 0.25s ease, border 0.25s ease",
