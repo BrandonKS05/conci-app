@@ -887,18 +887,23 @@ export function TripHostSetupDayPage({
     if (genDay && genDay.activities.length > 0) {
       for (const act of genDay.activities) {
         if (act.category === "free-time") continue;
-        // Skip generic transport placeholders (no real flight data)
-        if (act.category === "transport" && /->|→|flight/i.test(act.title) && !act.bookingUrl) continue;
+        const isTransport = act.category === "transport";
+        const isFlight = isTransport && /flight/i.test(act.title);
+        const isInterCity = isTransport && /→|->|bus|train|drive|ferry/i.test(act.title);
+
+        let sub = "Activity";
+        if (act.category === "food") sub = "Restaurant";
+        else if (isFlight) sub = "Flight";
+        else if (isInterCity) sub = "Transport";
+        else if (isTransport) sub = "Transport";
+        else if (act.category === "lodging") sub = "Lodging";
+
         rows.push({
           key: `gen-${act.time}-${act.title}`,
           label: act.title,
-          sub:
-            act.category === "food" ? "Restaurant"
-            : act.category === "transport" ? "Transport"
-            : act.category === "lodging" ? "Lodging"
-            : "Activity",
+          sub,
           time: act.time || undefined,
-          href: act.bookingUrl || undefined,
+          href: act.bookingUrl || (isFlight ? `https://www.google.com/travel/flights?hl=en&q=${encodeURIComponent(act.title.replace(/^Flight:\s*/i, ""))}` : undefined),
           description: act.description || undefined,
           dotClass: CATEGORY_DOT[act.category] ?? "bg-neutral-300",
         });

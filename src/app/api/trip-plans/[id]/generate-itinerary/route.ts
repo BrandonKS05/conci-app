@@ -92,6 +92,10 @@ GENERAL RULES:
 - Be specific to the destination: use real neighborhood names, landmark references, and local cuisine.
 - For the first day, include arrival/check-in. For the last day, include checkout/departure.
 - If pinned restaurants or activities are marked "MUST include" in the user prompt, incorporate them into the appropriate day.
+- TRANSPORT ON CALENDAR: Always include transport activities so they show on the day's schedule:
+  * Airport transfers: "Uber/taxi to hotel" or "Train from airport to city center" with realistic cost.
+  * Inter-city travel: If the trip visits multiple cities/locations, include a transport activity on the travel day with title format "[Mode]: [CityA] → [CityB]" (e.g. "Train: Tokyo → Kyoto", "Drive: Miami → Key West"). Include duration and cost estimate in the description.
+  * Local transport only when notable (e.g. ferry ride, scenic train) — skip routine Uber rides between activities.
 
 Example (abbreviated) for a 2-day moderate trip from NYC to Austin, 4 people, "outdoors" vibe (FLIGHT REQUIRED):
 {"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Flight: New York City → Austin","description":"JFK → AUS, ~3.5 hrs. Economy round-trip ~$280 pp.","category":"transport","estimatedCostPp":140},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to SoCo Airbnb","description":"2BR apartment in SoCo area, $220/night total ÷ 4 people = $55 pp/night. 2 nights = $110 pp total.","category":"lodging","estimatedCostPp":110},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":22}],"estimatedDayCostPp":289},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent 2 tandem kayaks ($40 each) at the rowing dock for 2 hours. $80 ÷ 4 = $20 pp.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Uber XL to airport","description":"Shared Uber XL ~$35 total ÷ 4 = $9 pp.","category":"transport","estimatedCostPp":9},{"time":"Late Afternoon","title":"Flight: Austin → New York City","description":"AUS → JFK, ~3.5 hrs. Return leg of round-trip.","category":"transport","estimatedCostPp":140}],"estimatedDayCostPp":187}]}`;
@@ -516,7 +520,15 @@ function buildVibeConstraint(vibes: string[]): string {
 function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): string {
   const lines: string[] = [];
 
-  lines.push(`Destination: ${plan.location || "not specified"}`);
+  const locationStr = plan.location || "not specified";
+  lines.push(`Destination: ${locationStr}`);
+
+  // Multi-city detection
+  const cities = locationStr.split(/[,&+]/).map((s) => s.trim()).filter(Boolean);
+  if (cities.length > 1) {
+    lines.push(`MULTI-CITY TRIP: This trip visits ${cities.join(", ")}. You MUST include inter-city transport activities on the days the group travels between cities. Use title format "[Mode]: [CityA] → [CityB]" (e.g. "Train: Tokyo → Kyoto"). Split the itinerary roughly evenly across the cities unless the user specifies otherwise.`);
+  }
+
   if (plan.departureCity) {
     const needsFlight = seedText?.includes("(needs flight)") || !seedText?.includes("no flight needed");
     lines.push(`Departing from: ${plan.departureCity}`);
