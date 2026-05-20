@@ -316,7 +316,7 @@ export function ItineraryGenerationLoading({
                   <span
                     className="text-sm font-medium"
                     style={{
-                      color: done ? "#99f6e4" : "rgba(255,255,255,0.28)",
+                      color: done ? "#0d9488" : "#94a3b8",
                       transition: "color 0.35s ease",
                     }}
                   >
