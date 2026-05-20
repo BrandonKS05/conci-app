@@ -841,47 +841,32 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
   }
 
-  // Step 2: Enrich activities with real venue data from SerpAPI
-  if (plan.location?.trim()) {
-    try {
-      const enriched = await enrichItineraryWithVenues(
-        itinerary,
-        plan.location.trim(),
-        budget?.tier ?? "moderate",
-        plan.vibe
-      );
-      console.log(`[generate-itinerary] Venues verified: ${enriched.venuesVerified}/${enriched.venuesTotal}`);
-    } catch (e) {
-      console.warn("[generate-itinerary] Venue enrichment failed (non-fatal):", (e as Error)?.message);
-    }
-  }
-
   const headcount = plan.people.count ?? (plan.people.names.length || 2);
   itinerary.totalEstimateGroup =
     itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
 
   const generated = buildAutofillRecommendations(plan, itinerary);
 
-  // Try to replace generic AI hotel with a real SerpAPI result
-  if (!hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []) && plan.location?.trim()) {
-    try {
-      const realHotel = await searchAndSetHotel(plan, itinerary, plan.location.trim());
-      if (realHotel?.length) {
-        generated.hotelStays = realHotel;
-      }
-    } catch (e) {
-      console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message);
-    }
-  }
+  // Run all three SerpAPI enrichment steps in parallel — they are independent
+  if (plan.location?.trim()) {
+    const location = plan.location.trim();
+    await Promise.allSettled([
+      enrichItineraryWithVenues(itinerary, location, budget?.tier ?? "moderate", plan.vibe)
+        .then((r) => console.log(`[generate-itinerary] Venues verified: ${r.venuesVerified}/${r.venuesTotal}`))
+        .catch((e: unknown) => console.warn("[generate-itinerary] Venue enrichment failed (non-fatal):", (e as Error)?.message)),
 
-  // Enrich activity pins with real SerpAPI results
-  if (plan.location?.trim() && generated.activityPins.length > 0) {
-    try {
-      const enrichedPins = await enrichActivityPins(generated.activityPins, plan.location.trim());
-      generated.activityPins = enrichedPins;
-    } catch (e) {
-      console.warn("[generate-itinerary] Activity enrichment failed (non-fatal):", (e as Error)?.message);
-    }
+      (!hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? [])
+        ? searchAndSetHotel(plan, itinerary, location)
+            .then((realHotel) => { if (realHotel?.length) generated.hotelStays = realHotel; })
+            .catch((e: unknown) => console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message))
+        : Promise.resolve()),
+
+      (generated.activityPins.length > 0
+        ? enrichActivityPins(generated.activityPins, location)
+            .then((pins) => { generated.activityPins = pins; })
+            .catch((e: unknown) => console.warn("[generate-itinerary] Activity enrichment failed (non-fatal):", (e as Error)?.message))
+        : Promise.resolve()),
+    ]);
   }
 
   const mergedHotelStays = mergeAiHotelStaysPreservingUser(plan.hostSetup?.hotelStays, generated.hotelStays);

@@ -28,9 +28,6 @@ function sseChunk(payload: StreamPayload): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -71,9 +68,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
       try {
         emit({ type: "progress", stage: "Getting ready...", percent: 5, completed: [] });
-        await wait(250);
         emit({ type: "progress", stage: "Analyzing your trip details...", percent: 14, completed: [] });
-        await wait(350);
         emit({ type: "progress", stage: "Crafting your perfect itinerary...", percent: 22, completed: [] });
 
         // Slowly advance percent while the AI call is in flight
@@ -102,16 +97,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         const result = await generateRes.json() as { itinerary?: unknown; plan?: unknown };
 
         emit({ type: "progress", stage: "Reviewing lodging options...", percent: 70, completed: ["lodging"] });
-        await wait(500);
         emit({ type: "progress", stage: "Curating restaurant picks...", percent: 80, completed: ["lodging", "meals"] });
-        await wait(500);
         emit({ type: "progress", stage: "Scheduling activities...", percent: 88, completed: ["lodging", "meals", "activities"] });
-        await wait(500);
         emit({ type: "progress", stage: "Finalizing your budget...", percent: 94, completed: ["lodging", "meals", "activities", "budget"] });
-        await wait(400);
-        emit({ type: "progress", stage: "Almost there...", percent: 98, completed: ["lodging", "meals", "activities", "budget"] });
-        await wait(200);
-
         emit({ type: "complete", itinerary: result.itinerary, plan: result.plan });
         close();
       } catch (err) {
