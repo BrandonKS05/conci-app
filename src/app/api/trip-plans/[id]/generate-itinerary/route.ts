@@ -54,10 +54,10 @@ BUDGET ENFORCEMENT (critical):
 - Before finalizing output, mentally sum ALL estimatedCostPp values across all days. The total MUST be within ±15% of the stated total budget.
 - If no explicit budget is given, assume moderate ($150-250/day/person).
 - Tier guide for venue selection:
-  * "budget": hostels/Airbnb shared, street food, food trucks, free attractions, public transit, happy hours
-  * "moderate": mid-range hotels, casual restaurants ($15-40/meal), paid attractions ($10-50), rideshare
-  * "splurge": luxury hotels, fine dining ($50-150/meal), premium experiences ($100+), private transfers
-- Lodging cost should only appear on Day 1 (total nightly rate x nights) or split evenly across days.
+  * "budget": hostels/shared Airbnb ($20-60 pp/night), street food ($5-12/meal), free attractions, public transit
+  * "moderate": mid-range hotels/Airbnb ($50-120 pp/night after group split), casual restaurants ($15-40/meal), paid attractions ($10-50), rideshare
+  * "splurge": luxury hotels/villas ($150-400 pp/night after group split), fine dining ($50-150/meal), premium experiences ($100+), private transfers
+- Lodging cost: Put on Day 1 as (nightly rate for entire group's accommodation ÷ headcount × number of nights) OR split evenly across days. The key is: estimate what the actual room/rental costs, then divide by group size for estimatedCostPp.
 - Each activity's estimatedCostPp MUST be realistic for the stated tier and destination. Do NOT inflate or undercount.
 - If you cannot fit desired activities within budget, prioritize free/cheap alternatives that still match the vibe.
 
@@ -71,7 +71,14 @@ GENERAL RULES:
 - Generate one day per trip day. If dates are vague (e.g. "late June", "3 days"), infer a reasonable number of days (default 3-4 for weekends, 5-7 for "a week").
 - If pace preference is provided: "packed" = 4-6 activities/day; "relaxed" = 2-3 activities with free-time blocks between.
 - If interests are specified, weight activities heavily toward those categories.
-- Include realistic cost estimates in USD per person. Use null only if you genuinely cannot estimate.
+- All estimatedCostPp values are PER PERSON. For shared costs, divide by group size:
+  * LODGING: Calculate total nightly rate for enough rooms/space for the group, then divide by headcount. E.g. 6 people need 3 hotel rooms at $150/night = $450/night ÷ 6 = $75 pp. Or one Airbnb at $300/night ÷ 6 = $50 pp.
+  * TRANSPORT (non-flight): If shared (e.g. rental car, Uber XL, private van), divide total by group size. E.g. Uber XL to airport $45 ÷ 6 = $8 pp.
+  * FLIGHTS: Always per-person (each person buys their own ticket).
+  * FOOD: Per-person (each person pays for their own meal).
+  * ACTIVITIES: Per-person unless a group rate applies (e.g. private boat charter $600 ÷ 6 = $100 pp).
+  Use educated assumptions about room configurations: 2 people = 1 room, 3-4 people = 2 rooms or 1 large Airbnb, 5-6 people = 3 rooms or 1 large Airbnb, 7+ = multiple rooms or large vacation rental.
+- Use null only if you genuinely cannot estimate.
 - Include transport (flights if FLIGHT REQUIRED is stated, airport transfers, getting around), meals (2-3 per day), activities, and lodging (first day check-in).
 - If FLIGHT REQUIRED: You MUST add TWO flight activities:
   1. OUTBOUND on Day 1: title format "Flight: [DepartureCity] → [DestinationCity]" (e.g. "Flight: Los Angeles → Cancún"). In description include: the departure airport code and arrival airport code, approximate flight duration, and "Economy round-trip ~$XXX pp" with a realistic average fare for that route/season. Category: "transport". estimatedCostPp = ONE-WAY portion of a realistic round-trip fare (i.e. total RT / 2).
@@ -84,8 +91,8 @@ GENERAL RULES:
 - For the first day, include arrival/check-in. For the last day, include checkout/departure.
 - If pinned restaurants or activities are marked "MUST include" in the user prompt, incorporate them into the appropriate day.
 
-Example (abbreviated) for a 2-day budget trip from NYC to Austin with "outdoors" vibe (FLIGHT REQUIRED):
-{"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Flight: New York City → Austin","description":"JFK → AUS, ~3.5 hrs. Economy round-trip ~$280 pp.","category":"transport","estimatedCostPp":140},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to HI Austin Hostel","description":"Dorm bed in SoCo area, walking distance to food.","category":"lodging","estimatedCostPp":45},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":18}],"estimatedDayCostPp":220},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent a kayak at the rowing dock for 2 hours.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Flight: Austin → New York City","description":"AUS → JFK, ~3.5 hrs. Return leg of round-trip.","category":"transport","estimatedCostPp":140}],"estimatedDayCostPp":178}]}`;
+Example (abbreviated) for a 2-day moderate trip from NYC to Austin, 4 people, "outdoors" vibe (FLIGHT REQUIRED):
+{"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Flight: New York City → Austin","description":"JFK → AUS, ~3.5 hrs. Economy round-trip ~$280 pp.","category":"transport","estimatedCostPp":140},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to SoCo Airbnb","description":"2BR apartment in SoCo area, $220/night total ÷ 4 people = $55 pp/night. 2 nights = $110 pp total.","category":"lodging","estimatedCostPp":110},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":22}],"estimatedDayCostPp":289},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent 2 tandem kayaks ($40 each) at the rowing dock for 2 hours. $80 ÷ 4 = $20 pp.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Uber XL to airport","description":"Shared Uber XL ~$35 total ÷ 4 = $9 pp.","category":"transport","estimatedCostPp":9},{"time":"Late Afternoon","title":"Flight: Austin → New York City","description":"AUS → JFK, ~3.5 hrs. Return leg of round-trip.","category":"transport","estimatedCostPp":140}],"estimatedDayCostPp":187}]}`;
 
 function cleanLabel(v: string, max = 140): string {
   return v.replace(/\s+/g, " ").trim().slice(0, max);
@@ -476,6 +483,18 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
   const headcount = plan.people.count ?? (plan.people.names.length || 2);
   lines.push(`Group size: ${headcount} people`);
 
+  // Lodging assumptions based on group size
+  if (headcount <= 2) {
+    lines.push(`Lodging assumption: 1 hotel room or small Airbnb. Divide nightly rate by ${headcount}.`);
+  } else if (headcount <= 4) {
+    lines.push(`Lodging assumption: 2 hotel rooms OR 1 large Airbnb (2-3 bedrooms). Divide total nightly cost by ${headcount}.`);
+  } else if (headcount <= 6) {
+    lines.push(`Lodging assumption: 3 hotel rooms OR 1 large Airbnb/vacation rental (3+ bedrooms). Divide total nightly cost by ${headcount}.`);
+  } else {
+    lines.push(`Lodging assumption: ${Math.ceil(headcount / 2)} hotel rooms OR large vacation rental. Divide total nightly cost by ${headcount}.`);
+  }
+  lines.push(`Transport assumption: Shared rides/transfers split by ${headcount}. Flights are per-person.`);
+
   // Budget: compute and inject hard constraints
   const budget = parseBudgetToDaily(plan);
   if (budget) {
@@ -483,13 +502,14 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
     lines.push("=== HARD BUDGET CONSTRAINT ===");
     lines.push(`Daily budget: $${budget.dailyPp}/person/day ($${budget.totalPp} total per person \u00f7 ${budget.days} days)`);
     lines.push(`Tier: ${budget.tier}`);
-    lines.push(`Daily allocation per person:`);
-    lines.push(`  - Lodging: ~$${budget.allocation.lodging}/night`);
-    lines.push(`  - Food (all meals): ~$${budget.allocation.food}/day`);
-    lines.push(`  - Activities: ~$${budget.allocation.activities}/day`);
-    lines.push(`  - Transport: ~$${budget.allocation.transport}/day`);
+    lines.push(`Daily allocation per person (already divided by group of ${headcount}):`);
+    lines.push(`  - Lodging: ~$${budget.allocation.lodging}/night/person (= total room cost ÷ ${headcount})`);
+    lines.push(`  - Food (all meals): ~$${budget.allocation.food}/day/person`);
+    lines.push(`  - Activities: ~$${budget.allocation.activities}/day/person`);
+    lines.push(`  - Transport: ~$${budget.allocation.transport}/day/person (shared rides split by ${headcount})`);
     lines.push(`Your total across ALL days MUST stay within \u00b115% of $${budget.totalPp}/person.`);
-    lines.push(`Each individual activity cost must be realistic for the "${budget.tier}" tier.`);
+    lines.push(`Each individual activity cost must be realistic for the "${budget.tier}" tier in the destination.`);
+    lines.push(`Remember: lodging estimatedCostPp = total nightly rate for the group's rooms/rental ÷ ${headcount}.`);
     lines.push("=== END BUDGET CONSTRAINT ===");
     lines.push("");
   } else if (plan.budget.tier || plan.budget.perPerson) {
