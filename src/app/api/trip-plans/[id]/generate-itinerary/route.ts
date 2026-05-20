@@ -69,7 +69,9 @@ VIBE ENFORCEMENT (critical):
 
 GENERAL RULES:
 - Generate one day per trip day. If dates are vague (e.g. "late June", "3 days"), infer a reasonable number of days (default 3-4 for weekends, 5-7 for "a week").
-- If pace preference is provided: "packed" = 4-6 activities/day; "relaxed" = 2-3 activities with free-time blocks between.
+- MINIMUM ACTIVITIES PER DAY: Every day MUST have at least 5 activities (including meals, transport, and lodging). No day should feel empty. Even "relaxed" days need at least: breakfast, 1 activity, lunch, 1 activity or free-time-with-suggestion, dinner.
+- If pace preference is provided: "packed" = 6-8 activities/day; "relaxed" = 5-6 activities with free-time blocks between; default = 5-7 activities/day.
+- NO REPEATING: Never repeat the same activity, restaurant, or attraction across different days. Each day must have unique venues and experiences. The only exceptions are lodging (same hotel each night) and daily transport (airport transfers on first/last day).
 - If interests are specified, weight activities heavily toward those categories.
 - All estimatedCostPp values are PER PERSON. For shared costs, divide by group size:
   * LODGING: Calculate total nightly rate for enough rooms/space for the group, then divide by headcount. E.g. 6 people need 3 hotel rooms at $150/night = $450/night ÷ 6 = $75 pp. Or one Airbnb at $300/night ÷ 6 = $50 pp.
@@ -566,6 +568,10 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
 
   if (plan.hostSetup?.tripRange) {
     lines.push(`Confirmed date range: ${plan.hostSetup.tripRange.startIso} to ${plan.hostSetup.tripRange.endIso}`);
+    const tripDays = enumerateLocalIsoDays(plan.hostSetup.tripRange.startIso, plan.hostSetup.tripRange.endIso);
+    if (tripDays.length > 0) {
+      lines.push(`You MUST generate exactly ${tripDays.length} days with dateIso values: ${tripDays.join(", ")}. Do NOT generate fewer days.`);
+    }
   }
 
   if (plan.hostSetup?.hotel) {
