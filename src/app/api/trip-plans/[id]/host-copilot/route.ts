@@ -223,9 +223,17 @@ MULTI-CITY TRIPS:
 - When making a trip multi-city, use itineraryEdits to: (1) rewrite relevant days with the new city's activities, (2) add transport between cities via "addTransport", (3) use autoSearch type=hotel with stayStartIso/stayEndIso for each city segment.
 - Update planPatch.location to comma-separated cities if needed.
 
-BUDGET ENFORCEMENT:
-- When asked to fit within budget or reduce costs: use itineraryEdits action="adjustCosts" with the target daily budget, OR rewrite expensive days with cheaper alternatives.
+BUDGET ENFORCEMENT (CRITICAL — read carefully):
+- When asked to fit within budget or reduce costs, you MUST use itineraryEdits action="rewriteDay" on EVERY day that is over budget. Replace expensive activities and restaurants with cheaper alternatives that still fit the trip vibe and destination. Do NOT just use "adjustCosts" — that only changes numbers without changing venues. You must actually swap out expensive restaurants, activities, and lodging for budget-friendly ones.
+- ALSO set autoSearch type="hotel" with budget-appropriate terms (e.g. "budget hotel [destination]", "cheap hostel [destination]") so the lodging actually changes.
+- ALSO update planPatch.budget.perPerson to reflect the new budget target.
 - When asked about cheap/budget options: use autoSearch with budget-appropriate query terms ("cheap", "budget", "affordable").
+- NEVER just scale costs. The user expects actual venue/activity changes, not just lower numbers on the same plan.
+
+Example: Host says "this is too expensive, I want $1000 budget per person" and current itinerary totals $1800pp over 3 days in Cancún:
+→ itineraryEdits: [{ "action": "rewriteDay", "dayDateIso": "2026-08-01", "dayLabel": "Arrival & Beach", "newDayActivities": [{ "time": "Morning", "title": "Flight: LAX → Cancún", "category": "transport", "estimatedCostPp": 150 }, { "time": "Afternoon", "title": "Free beach time at Playa Delfines", "category": "activity", "estimatedCostPp": 0 }, { "time": "Lunch", "title": "Street tacos at Parque de las Palapas", "category": "food", "estimatedCostPp": 8 }, { "time": "Evening", "title": "Check in to hostel", "category": "lodging", "estimatedCostPp": 90 }, { "time": "Dinner", "title": "Ceviche at La Habichuela Sunset", "category": "food", "estimatedCostPp": 22 }] }, { "action": "rewriteDay", "dayDateIso": "2026-08-02", ... }, { "action": "rewriteDay", "dayDateIso": "2026-08-03", ... }]
++ autoSearch: { "type": "hotel", "query": "budget hotel Cancún near beach", "constraints": "under $60/night" }
++ planPatch: { "budget": { "perPerson": "$1000" } }
 
 Example: Host says "switch my Tuesday plans to beach activities" and Tuesday is 2026-07-15 with 4 activities:
 → itineraryEdits: [{ "action": "rewriteDay", "dayDateIso": "2026-07-15", "dayLabel": "Beach Day", "newDayActivities": [{ "time": "Morning", "title": "Beach sunrise yoga", "category": "activity", "estimatedCostPp": 0 }, { "time": "Late Morning", "title": "Snorkeling at coral reef", "category": "activity", "estimatedCostPp": 45 }, { "time": "Lunch", "title": "Beach shack seafood", "category": "food", "estimatedCostPp": 18 }, { "time": "Afternoon", "title": "Jet ski rental", "category": "activity", "estimatedCostPp": 60 }, { "time": "Evening", "title": "Sunset beach dinner", "category": "food", "estimatedCostPp": 35 }] }]
@@ -1070,7 +1078,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
   }
 
-  // Fallback: if user asked about budget/cost and model didn't emit itinerary edits, do it server-side
+  // Fallback: if user asked about budget/cost and model didn't emit itinerary rewrites, regenerate days server-side
   if (
     itineraryEdits.length === 0 &&
     nextPlan.generatedItinerary?.days?.length &&
@@ -1082,14 +1090,86 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       const currentTotal = nextPlan.generatedItinerary.totalEstimatePp ?? 0;
       if (targetTotal > 0 && currentTotal > 0 && currentTotal > targetTotal * 1.1) {
         const days = nextPlan.generatedItinerary.days;
-        const targetDaily = targetTotal / days.length;
-        for (const day of days) {
-          if ((day.estimatedDayCostPp ?? 0) > targetDaily * 1.2) {
-            itineraryEdits.push({
-              action: "adjustCosts",
-              dayDateIso: day.dateIso,
-              budgetTarget: Math.round(targetDaily),
-            });
+        const targetDaily = Math.round(targetTotal / days.length);
+        const location = nextPlan.location?.trim() || "destination";
+
+        try {
+          const rewritePrompt = `You are rewriting a trip itinerary for ${location} to fit a STRICT budget of $${targetTotal} total per person ($${targetDaily}/day).
+
+Current itinerary costs $${currentTotal}pp total. You MUST replace expensive activities, restaurants, and lodging with REAL budget-friendly alternatives. Use free activities (beaches, parks, walking tours), cheap street food, budget hostels/hotels, and public transport.
+
+Current itinerary (JSON):
+${JSON.stringify(days.map((d) => ({ dateIso: d.dateIso, label: d.label, activities: d.activities })))}
+
+Rewrite ALL days to fit within $${targetDaily}/day per person. Return ONLY a JSON array of day objects with the same structure. Every activity must have realistic costs for budget travel in ${location}. Use real venue/neighborhood names, not generic placeholders.`;
+
+          const rewriteResp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              temperature: 0.5,
+              messages: [
+                { role: "system", content: "You rewrite trip itineraries to fit budget constraints. Output ONLY valid JSON (array of day objects). Keep the same dateIso values. Use real place names." },
+                { role: "user", content: rewritePrompt },
+              ],
+            }),
+          });
+
+          if (rewriteResp.ok) {
+            const rewriteJson = await rewriteResp.json();
+            const rewriteText = rewriteJson.choices?.[0]?.message?.content?.trim() || "";
+            const cleaned = rewriteText.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+            const rewrittenDays = safeParseJson(cleaned);
+            if (Array.isArray(rewrittenDays) && rewrittenDays.length > 0) {
+              for (const newDay of rewrittenDays) {
+                if (!newDay || typeof newDay !== "object" || !newDay.dateIso) continue;
+                const existingIdx = nextPlan.generatedItinerary!.days.findIndex((d) => d.dateIso === newDay.dateIso);
+                if (existingIdx < 0) continue;
+                if (Array.isArray(newDay.activities) && newDay.activities.length > 0) {
+                  itineraryEdits.push({
+                    action: "rewriteDay",
+                    dayDateIso: newDay.dateIso,
+                    dayLabel: typeof newDay.label === "string" ? newDay.label : undefined,
+                    newDayActivities: newDay.activities.map((a: Record<string, unknown>) => ({
+                      time: typeof a.time === "string" ? a.time : "TBD",
+                      title: typeof a.title === "string" ? a.title : "Activity",
+                      description: typeof a.description === "string" ? a.description : "",
+                      category: typeof a.category === "string" ? a.category : "activity",
+                      estimatedCostPp: typeof a.estimatedCostPp === "number" ? a.estimatedCostPp : null,
+                    })),
+                  });
+                }
+              }
+
+              // Also search for a budget hotel
+              if (!autoSearchRequest && location) {
+                autoSearchRequest = {
+                  type: "hotel",
+                  query: `budget hotel ${location}`,
+                  constraints: `under $${Math.round(targetDaily * 0.35)}/night per person`,
+                };
+              }
+
+              // Update budget in plan
+              nextPlan = {
+                ...nextPlan,
+                budget: { ...nextPlan.budget, perPerson: `$${targetTotal}` },
+              };
+            }
+          }
+        } catch (e) {
+          console.warn("[host-copilot] Budget rewrite fallback failed:", (e as Error)?.message);
+          // Fall through to adjustCosts as last resort
+          const targetDailyFallback = targetTotal / days.length;
+          for (const day of days) {
+            if ((day.estimatedDayCostPp ?? 0) > targetDailyFallback * 1.2) {
+              itineraryEdits.push({
+                action: "adjustCosts",
+                dayDateIso: day.dateIso,
+                budgetTarget: Math.round(targetDailyFallback),
+              });
+            }
           }
         }
       }
@@ -1103,8 +1183,21 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (result.applied > 0) {
       nextPlan = result.plan;
       itineraryApplied = true;
-      if (!assistantText.includes("adjusted") && !assistantText.includes("scaled") && !assistantText.includes("reduced")) {
-        assistantText = `${assistantText}\n\nDone — I've adjusted the itinerary costs to fit your budget.`.trim();
+
+      // Recalculate totalEstimatePp after edits
+      if (nextPlan.generatedItinerary?.days?.length) {
+        nextPlan.generatedItinerary.totalEstimatePp = nextPlan.generatedItinerary.days.reduce(
+          (sum, d) => sum + (d.estimatedDayCostPp ?? 0), 0
+        );
+      }
+
+      if (!assistantText.includes("adjusted") && !assistantText.includes("rewritten") && !assistantText.includes("swapped") && !assistantText.includes("replaced")) {
+        const hasRewrites = itineraryEdits.some((e) => e.action === "rewriteDay");
+        if (hasRewrites) {
+          assistantText = `${assistantText}\n\nDone — I've rewritten the itinerary with budget-friendly restaurants, activities, and lodging to fit your budget.`.trim();
+        } else {
+          assistantText = `${assistantText}\n\nDone — I've adjusted the itinerary to fit your budget.`.trim();
+        }
       }
     }
   }
