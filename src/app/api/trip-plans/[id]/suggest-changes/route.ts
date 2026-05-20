@@ -3,7 +3,7 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
-import { normalizePlan, safeParseJson, type TripPlan } from "@/shared/trip-plan";
+import { normalizePlan, safeParseJson, type MemberRecommendation, type TripPlan } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 
 export type SuggestedChange = {
@@ -175,9 +175,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Failed to parse suggestions" }, { status: 502 });
   }
 
-  const validCategories = new Set(["activity", "food", "lodging", "timing", "budget", "vibe", "other"]);
+  const validCategories = new Set(["activity", "food", "lodging", "timing", "budget", "vibe", "transport", "other"]);
   const validImpacts = new Set(["low", "medium", "high"]);
 
+  const now = new Date().toISOString();
   const suggestions: SuggestedChange[] = parsed.suggestions
     .filter((s): s is SuggestedChange =>
       typeof s === "object" &&
@@ -198,6 +199,42 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         ? s.impact
         : "medium") as SuggestedChange["impact"],
     }));
+
+  // Save recommendations to the plan internally
+  if (suggestions.length > 0) {
+    const newRecs: MemberRecommendation[] = suggestions.map((s) => ({
+      id: `rec-${Date.now()}-${s.id}`,
+      memberName: s.memberName,
+      memberUserId: user.id,
+      category: s.category as MemberRecommendation["category"],
+      summary: s.summary,
+      detail: s.detail,
+      impact: s.impact,
+      status: "pending" as const,
+      createdAt: now,
+    }));
+
+    const existingRecs = plan.memberRecommendations ?? [];
+    // Remove old pending recs from same user (replace with fresh ones)
+    const filtered = existingRecs.filter(
+      (r) => r.memberUserId !== user.id || r.status !== "pending"
+    );
+    const updatedRecs = [...filtered, ...newRecs].slice(-50); // Keep max 50
+
+    const updatedPlan = { ...plan, memberRecommendations: updatedRecs };
+
+    const { error: upErr } = await svc
+      .from("trip_plans")
+      .update({
+        plan: updatedPlan as unknown as Record<string, unknown>,
+        updated_at: now,
+      })
+      .eq("id", id);
+
+    if (upErr) {
+      console.error("[suggest-changes] Failed to save recommendations:", upErr.message);
+    }
+  }
 
   return NextResponse.json({ suggestions });
 }

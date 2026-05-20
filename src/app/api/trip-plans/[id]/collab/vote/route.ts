@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { fetchTripPlanRowForCollab } from "@/backend/trip-plan-collab-fetch";
+import { generateMemberRecommendations } from "@/backend/member-recommendations";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
+import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { migrateVoterVoteKeys } from "@/shared/collab-vote-keys";
 import {
@@ -13,6 +15,7 @@ import {
   BUDGET_POLL_DECISION_KEY,
   TRANSPORT_POLL_DECISION_KEY,
   VENUE_POLL_DECISION_KEY,
+  VIBE_POLL_DECISION_KEY,
   buildClassifiedDecisions,
   collaborationQuorum,
   parseCollabState,
@@ -249,6 +252,28 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (upErr) {
     console.error("[collab vote]", upErr);
     return NextResponse.json({ error: "Could not save vote" }, { status: 500 });
+  }
+
+  // When a member writes in a vibe/preference, generate AI recommendations in the background
+  if (body.decisionKey === VIBE_POLL_DECISION_KEY && body.kind === "pick") {
+    const rawVote = typeof body.option === "string" ? body.option.trim() : "";
+    if (rawVote && rawVote.length > 3) {
+      void (async () => {
+        try {
+          const displayName = await fetchAuthUserDisplayLabel(svc, user.id);
+          await generateMemberRecommendations({
+            tripId: id,
+            userId: user.id,
+            memberName: displayName,
+            preferences: rawVote,
+            plan,
+            svc,
+          });
+        } catch (err) {
+          console.warn("[collab vote] background recommendation generation failed:", err);
+        }
+      })();
+    }
   }
 
   return NextResponse.json({ ok: true as const, collab });

@@ -168,8 +168,22 @@ export type TripPlan = {
   itineraryLiveCuration?: ItineraryLiveCuration;
   /** AI-generated day-by-day itinerary with cost estimates. */
   generatedItinerary?: GeneratedItinerary;
+  /** AI-generated recommended changes based on member preferences. Stored internally for host review. */
+  memberRecommendations?: MemberRecommendation[];
   nextStep: string | null;
   confidence: number;
+};
+
+export type MemberRecommendation = {
+  id: string;
+  memberName: string;
+  memberUserId: string;
+  category: "activity" | "food" | "lodging" | "timing" | "budget" | "vibe" | "transport" | "other";
+  summary: string;
+  detail: string;
+  impact: "low" | "medium" | "high";
+  status: "pending" | "applied" | "dismissed";
+  createdAt: string;
 };
 
 export const POLL_MAX_OPTIONS = 3;
@@ -936,6 +950,9 @@ export function normalizePlan(value: unknown): TripPlan {
     hostSetup: parseHostSetup(plan.hostSetup),
     ...(plan.generatedItinerary && typeof plan.generatedItinerary === "object"
       ? { generatedItinerary: plan.generatedItinerary as GeneratedItinerary }
+      : {}),
+    ...(Array.isArray(plan.memberRecommendations)
+      ? { memberRecommendations: plan.memberRecommendations as MemberRecommendation[] }
       : {}),
     nextStep: typeof plan.nextStep === "string" ? plan.nextStep : null,
     confidence: typeof plan.confidence === "number" ? Math.max(0, Math.min(1, plan.confidence)) : 0,

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
+import { generateMemberRecommendations } from "@/backend/member-recommendations";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
-import { parseCollabState } from "@/shared/collaboration";
+import { parseCollabState, VIBE_POLL_DECISION_KEY } from "@/shared/collaboration";
 import { parseDayVoteState, type DayVoteStateByDate, type DayVoteCategoryState } from "@/shared/day-collaboration";
 import {
   enumerateLocalIsoDays,
@@ -908,6 +909,49 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     console.error("[generate-itinerary] DB update error:", upErr);
     return NextResponse.json({ error: "Failed to save itinerary" }, { status: 500 });
   }
+
+  // After itinerary generation, trigger recommendation generation for all members with preferences
+  void (async () => {
+    try {
+      const vibeDecision = nextCollab.decisions?.[VIBE_POLL_DECISION_KEY];
+      const vibeVotes = vibeDecision?.votes ?? {};
+      const submissions = (collab.adjustmentSubmissions ?? []).filter((s) => s.status === "pending");
+
+      type MemberPref = { userId: string; name: string; text: string };
+      const prefs: MemberPref[] = [];
+
+      for (const [voterId, val] of Object.entries(vibeVotes)) {
+        if (typeof val === "string" && val.trim().length > 3) {
+          prefs.push({ userId: voterId, name: voterId, text: val.trim() });
+        }
+      }
+      for (const sub of submissions) {
+        const existing = prefs.find((p) => p.userId === sub.authorUserId);
+        if (existing) {
+          existing.text += "; " + sub.text.trim();
+          if (!existing.name || existing.name === existing.userId) existing.name = sub.authorDisplayName;
+        } else {
+          prefs.push({ userId: sub.authorUserId, name: sub.authorDisplayName, text: sub.text.trim() });
+        }
+      }
+
+      const finalPlan = normalizePlan(updatedPlan);
+      await Promise.allSettled(
+        prefs.map((p) =>
+          generateMemberRecommendations({
+            tripId: id,
+            userId: p.userId,
+            memberName: p.name,
+            preferences: p.text,
+            plan: finalPlan,
+            svc,
+          })
+        )
+      );
+    } catch (err) {
+      console.warn("[generate-itinerary] background recommendation generation failed:", err);
+    }
+  })();
 
   return NextResponse.json({ itinerary, plan: updatedPlan });
 }

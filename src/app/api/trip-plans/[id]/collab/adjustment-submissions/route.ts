@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { generateConciSuggestionProposal } from "@/backend/conci-suggestion-proposal";
+import { generateMemberRecommendations } from "@/backend/member-recommendations";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
 import { fetchTripPlanRowForCollab } from "@/backend/trip-plan-collab-fetch";
@@ -105,6 +106,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     console.error("[adjustment-submissions POST]", upErr.message);
     return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
+
+  // Fire-and-forget: generate AI recommendations based on this member's preference
+  const plan = normalizePlan(row.plan);
+  void generateMemberRecommendations({
+    tripId: id,
+    userId: user.id,
+    memberName: displayName,
+    preferences: text,
+    plan,
+    svc,
+  }).catch((err) => {
+    console.warn("[adjustment-submissions] background recommendation generation failed:", err);
+  });
 
   return NextResponse.json({ ok: true as const, submission: nextSubmission });
 }
