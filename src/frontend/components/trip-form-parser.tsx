@@ -73,6 +73,22 @@ function formatDateRange(start: string, end: string): string {
   return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
+function parseDateParts(dateStr: string): { day: string; month: string; year: string } {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return {
+    day: String(d.getDate()),
+    month: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    year: String(d.getFullYear()),
+  };
+}
+
+function tripNightCount(start: string, end: string): number {
+  if (!start) return 0;
+  const s = new Date(`${start}T12:00:00`);
+  const e = end ? new Date(`${end}T12:00:00`) : s;
+  return Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
+}
+
 function buildPlanFromForm(form: FormData): TripPlan {
   const dateRange = formatDateRange(form.dateStart, form.dateEnd);
   const vibes = form.vibe.split(",").map((v) => v.trim()).filter(Boolean);
@@ -172,10 +188,6 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
   });
   const [error, setError] = useState<string | null>(null);
   const [activeEdit, setActiveEdit] = useState<string | null>(null);
-  // Vibe picker: collapsed by default — show only selected tags in the expanded drawer
-  const [showAllVibes, setShowAllVibes] = useState(false);
-  // Tracks which field inside the Trip Profile expanded drawer is being inline-edited
-  const [dnaEditField, setDnaEditField] = useState<string | null>(null);
 
   const handleImageUpload = useCallback(async (files: FileList | null) => {
     if (!files) return;
@@ -359,432 +371,365 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
     );
   }
 
-  // ─── PHASE: FORM / SAVING — Trip Blueprint ───────────────────────────────────────
+  // ─── PHASE: FORM / SAVING — Boarding Pass ───────────────────────────────────────
+  const departParts = form.dateStart ? parseDateParts(form.dateStart) : null;
+  const returnParts = (form.dateEnd || form.dateStart) ? parseDateParts(form.dateEnd || form.dateStart) : null;
+  const nights = tripNightCount(form.dateStart, form.dateEnd);
+  const isReady = Boolean(form.destination.trim() && form.dateStart.trim());
+
   return (
-    // Fixed overlay covers the sticky nav (z-30) giving a fully focused canvas
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-[color:var(--surface)] dark:bg-[#141414]">
-      {/* Blueprint micro-dot grid texture */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          backgroundImage: "radial-gradient(circle, rgba(128,128,128,0.13) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
-      <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-40 sm:px-6 sm:pt-14">
-      {/* Eyebrow */}
-      <div className="mb-8 flex items-center justify-between">
-        <span className="label-caps inline-flex items-center gap-2 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-1.5 text-[color:var(--sage)] shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-[color:var(--sage-soft)]">
-          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-          Trip Blueprint
-        </span>
-        <button
-          type="button"
-          onClick={() => { setPhase("input"); setError(null); setActiveEdit(null); }}
-          className="group flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-sm font-medium text-[color:var(--on-surface-muted)] transition-colors hover:bg-[color:var(--surface-container-low)] hover:text-[color:var(--on-surface)] dark:text-neutral-500 dark:hover:bg-white/5 dark:hover:text-neutral-300"
-        >
-          <svg className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Edit prompt
-        </button>
-      </div>
-
-      {/* Hero: Natural Language Typography */}
-      <div className="space-y-6 px-2">
-        {/* Title */}
-        <div>
-           {activeEdit === "tripName" ? (
-             <input
-               autoFocus
-               type="text"
-               value={form.tripName}
-               onChange={(e) => updateField("tripName", e.target.value)}
-               onBlur={() => setActiveEdit(null)}
-               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
-               placeholder="Name your trip..."
-               className="w-full bg-transparent font-display text-4xl sm:text-5xl font-semibold tracking-tight text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)] dark:text-white dark:placeholder:text-neutral-600"
-             />
-           ) : (
-             <h1 
-               onClick={() => setActiveEdit("tripName")}
-               className="group cursor-text font-display text-4xl sm:text-5xl font-semibold tracking-tight text-[color:var(--on-surface)] transition-colors hover:text-[color:var(--sage)] dark:text-white relative inline-block"
-             >
-               {form.tripName || (form.destination ? `${form.destination} Trip` : "Your trip")}
-               <span className="absolute -right-6 top-2 opacity-0 transition-opacity group-hover:opacity-100 text-[color:var(--sage)] text-lg">
-                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-               </span>
-             </h1>
-           )}
-        </div>
-
-        {/* Destination Statement */}
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-2xl sm:text-3xl font-light text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-           <span>We&apos;re going to</span>
-           {activeEdit === "destination" ? (
-              <input
-                autoFocus
-                type="text"
-                value={form.destination}
-                onChange={(e) => updateField("destination", e.target.value)}
+    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: "#f4f7fc" }}>
+      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+        {/* ── TICKET CARD ── */}
+        <div className="relative rounded-2xl bg-white shadow-[0_30px_60px_-20px_rgba(37,99,235,0.18),0_8px_18px_-8px_rgba(15,23,42,0.08)]">
+          {/* Perforation notches */}
+          <div aria-hidden className="absolute -left-2.5 z-10 rounded-full" style={{ top: "57%", width: 20, height: 20, background: "#f4f7fc", transform: "translateY(-50%)" }} />
+          <div aria-hidden className="absolute -right-2.5 z-10 rounded-full" style={{ top: "57%", width: 20, height: 20, background: "#f4f7fc", transform: "translateY(-50%)" }} />
+          {/* HEADER STRIP */}
+          <div className="flex items-center justify-between rounded-t-2xl px-6 py-3" style={{ background: "var(--sage)" }}>
+            <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">
+              <svg className="h-3.5 w-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+              </svg>
+              <span className="font-display text-[15px] font-bold tracking-normal">Conci</span>
+              <span className="opacity-60">· Boarding pass</span>
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">No. 047</span>
+              <button
+                type="button"
+                onClick={() => { setPhase("input"); setError(null); setActiveEdit(null); }}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition-colors"
+                style={{ background: "rgba(255,255,255,0.15)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.25)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.15)"; }}
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Edit prompt
+              </button>
+            </div>
+          </div>
+          {/* BODY */}
+          <div className="px-8 pb-8 pt-6">
+            {/* Required eyebrow */}
+            <div className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.24em]">
+              <span style={{ color: "var(--sage)" }}>Required <span style={{ color: "var(--sage)" }}>*</span></span>
+              <span style={{ color: "var(--on-surface-muted)" }}>Tap any field to edit</span>
+            </div>
+            {/* TITLE */}
+            {activeEdit === "tripName" ? (
+              <input autoFocus type="text" value={form.tripName}
+                onChange={(e) => updateField("tripName", e.target.value)}
                 onBlur={() => setActiveEdit(null)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
-                placeholder="Where to?"
-                className="w-auto min-w-[200px] max-w-full bg-transparent font-medium text-[color:var(--on-surface)] outline-none border-b border-[color:var(--sage)] dark:text-white"
+                placeholder="Trip name…"
+                className="mb-1 w-full bg-transparent font-display text-[50px] font-bold leading-tight tracking-tight text-[color:var(--on-surface)] outline-none placeholder:text-[color:var(--on-surface-muted)]/40 sm:text-[56px]"
               />
-           ) : (
-             <span 
-               onClick={() => setActiveEdit("destination")}
-               className={`group cursor-text font-medium relative inline-block transition-colors ${form.destination ? 'text-[color:var(--on-surface)] dark:text-white' : 'text-[color:var(--on-surface-muted)]/50 underline decoration-dashed underline-offset-8'} hover:text-[color:var(--sage)]`}
-             >
-               {form.destination || "Add destination"}
-               <span className="absolute -right-6 top-1.5 opacity-0 transition-opacity group-hover:opacity-100 text-[color:var(--sage)] text-lg">
-                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-               </span>
-             </span>
-           )}
-        </div>
-
-        {/* Dates & Logistics Row */}
-        <div className="pt-6 flex flex-wrap items-center gap-3">
-          {/* Dates */}
-          <div className="relative">
-             <button 
-               type="button" 
-               onClick={() => setActiveEdit(activeEdit === "dates" ? null : "dates")}
-               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
-                 form.dateStart 
-                   ? "border-[color:var(--sage)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-[color:var(--sage-soft)]/50 dark:bg-white/5 dark:text-white" 
-                   : "border-[color:var(--sage)]/30 bg-[color:var(--sage)]/[0.04] text-[color:var(--on-surface-variant)] hover:border-[color:var(--sage)]/70 hover:bg-[color:var(--sage)]/[0.07] dark:border-[color:var(--sage-soft)]/20 dark:bg-[color:var(--sage)]/[0.04] dark:text-neutral-400"
-               }`}
-             >
-               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-               {form.dateStart ? formatDateRange(form.dateStart, form.dateEnd) : <>Set dates <span className="text-xs text-[color:var(--sage)] opacity-70 dark:text-[color:var(--sage-soft)]">✱</span></>}
-             </button>
-
-             {/* Date Picker Popover */}
-             {activeEdit === "dates" && (
-               <div className="absolute top-full mt-3 z-50 left-0">
-                 <div className="rounded-3xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
-                   <div className="flex flex-col gap-4 mb-5">
-                     <div className="space-y-1">
-                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">Start Date</label>
-                       <input
-                         type="date"
-                         value={form.dateStart}
-                         onChange={(e) => updateField("dateStart", e.target.value)}
-                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
-                       />
-                     </div>
-                     <div className="flex justify-center text-[color:var(--on-surface-muted)]">
-                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                     </div>
-                     <div className="space-y-1">
-                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">End Date</label>
-                       <input
-                         type="date"
-                         value={form.dateEnd}
-                         min={form.dateStart || undefined}
-                         onChange={(e) => updateField("dateEnd", e.target.value)}
-                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
-                       />
-                     </div>
-                   </div>
-                   <button 
-                     type="button" 
-                     onClick={() => setActiveEdit(null)}
-                     className="w-full rounded-xl bg-[color:var(--on-surface)] px-4 py-3 text-sm font-medium text-[color:var(--surface)] transition-colors hover:opacity-90 dark:bg-white dark:text-black"
-                   >
-                     Done
-                   </button>
-                 </div>
-               </div>
-             )}
-          </div>
-
-          {/* People */}
-          <div className="relative">
-             <button 
-               type="button" 
-               onClick={() => setActiveEdit(activeEdit === "people" ? null : "people")}
-               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
-                 form.people 
-                   ? "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white hover:border-[color:var(--sage)]" 
-                   : "border-dashed border-[color:var(--on-surface-muted)]/40 bg-transparent text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)] hover:text-[color:var(--on-surface-variant)]"
-               }`}
-             >
-               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-               {form.people ? `${form.people} ${Number(form.people) === 1 ? "person" : "people"}` : "Add people"}
-             </button>
-
-             {activeEdit === "people" && (
-               <div className="absolute top-full mt-3 z-50 left-0">
-                 <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--hairline)] bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
-                   <input
-                     autoFocus
-                     type="number"
-                     min={1}
-                     max={50}
-                     value={form.people}
-                     onChange={(e) => updateField("people", e.target.value)}
-                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
-                     className="w-20 rounded-xl border-none bg-[color:var(--surface-container-low)] px-3 py-2 text-center text-lg font-medium outline-none focus:ring-2 focus:ring-[color:var(--sage)] dark:bg-white/[0.04] dark:text-white"
-                   />
-                   <button type="button" onClick={() => setActiveEdit(null)} className="rounded-xl bg-[color:var(--sage)] p-2 text-white hover:bg-[color:var(--sage-soft)]">
-                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                   </button>
-                 </div>
-               </div>
-             )}
-          </div>
-          
-          {/* Departure Flight toggle */}
-          <div className="relative">
-             <button 
-               type="button" 
-               onClick={() => setActiveEdit(activeEdit === "flight" ? null : "flight")}
-               className={`group flex items-center gap-2 rounded-2xl border px-4 py-2 text-lg font-medium transition-all ${
-                 form.needsFlight || form.departureCity
-                   ? "border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white hover:border-[color:var(--sage)]" 
-                   : "border-dashed border-[color:var(--on-surface-muted)]/40 bg-transparent text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)] hover:text-[color:var(--on-surface-variant)]"
-               }`}
-             >
-               <svg className="h-5 w-5 opacity-70 group-hover:text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-               {form.needsFlight && form.departureCity ? `From ${form.departureCity}` : form.needsFlight ? "Needs flight" : "+ Add flight"}
-             </button>
-
-             {activeEdit === "flight" && (
-               <div className="absolute top-full mt-3 z-50 left-0 w-72">
-                 <div className="rounded-3xl border border-[color:var(--hairline)] bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#1a1a18]">
-                   <div className="flex items-center justify-between mb-5">
-                     <span className="text-sm font-medium text-[color:var(--on-surface)] dark:text-white">Need flights?</span>
-                     <button 
-                       type="button"
-                       onClick={() => setForm(prev => ({ ...prev, needsFlight: !prev.needsFlight, departureCity: prev.needsFlight ? "" : prev.departureCity }))}
-                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.needsFlight ? 'bg-[color:var(--sage)]' : 'bg-gray-200 dark:bg-white/10'}`}
-                     >
-                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.needsFlight ? 'translate-x-6' : 'translate-x-1'}`} />
-                     </button>
-                   </div>
-                   {form.needsFlight && (
-                     <div className="space-y-1.5">
-                       <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)]">Departure City</label>
-                       <input
-                         autoFocus
-                         type="text"
-                         value={form.departureCity}
-                         onChange={(e) => updateField("departureCity", e.target.value)}
-                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
-                         placeholder="City or airport code"
-                         className="block w-full rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[color:var(--sage)] dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
-                       />
-                     </div>
-                   )}
-                   <button 
-                     type="button" 
-                     onClick={() => setActiveEdit(null)}
-                     className="mt-5 w-full rounded-xl bg-[color:var(--on-surface)] px-4 py-3 text-sm font-medium text-[color:var(--surface)] transition-colors hover:opacity-90 dark:bg-white dark:text-black"
-                   >
-                     Done
-                   </button>
-                 </div>
-               </div>
-             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Trip Profile */}
-      <div className="mt-16">
-        <div
-          className="rounded-3xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-6 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.10),0_10px_30px_-10px_rgba(0,0,0,0.05)] dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4),0_10px_30px_-10px_rgba(0,0,0,0.2)]"
-          style={{ transform: "perspective(1500px) rotateX(2deg) rotateY(-1deg)" }}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">Trip Profile</h2>
-            <button
-              type="button"
-              onClick={() => { setActiveEdit(activeEdit === "dna" ? null : "dna"); setDnaEditField(null); setShowAllVibes(false); }}
-              className="flex items-center gap-1 text-sm font-medium text-[color:var(--sage)] transition-colors hover:text-[color:var(--sage-soft)]"
-            >
-              {activeEdit === "dna" ? "Done tweaking" : "Tweak preferences"}
-              <svg className={`h-4 w-4 transition-transform ${activeEdit === "dna" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-          </div>
-
-          {activeEdit === "dna" ? (
-            <div className="space-y-6 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-
-              {/* Budget — click-to-edit inline */}
-              <div className="cursor-text" onClick={() => setDnaEditField("budget")}>
-                <p className="label-caps mb-1 text-[color:var(--on-surface-muted)]">Budget</p>
-                {dnaEditField === "budget" ? (
-                  <input
-                    autoFocus
-                    type="text"
-                    value={form.budget}
-                    onChange={(e) => updateField("budget", e.target.value)}
-                    onBlur={() => setDnaEditField(null)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setDnaEditField(null); } }}
-                    placeholder="e.g. $3,000 / person"
-                    className="w-full bg-transparent text-base text-[color:var(--on-surface)] outline-none placeholder:italic placeholder:text-[color:var(--on-surface-muted)]/50 dark:text-white"
-                  />
-                ) : (
-                  <p className="text-base text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-                    {form.budget
-                      ? (form.budget.startsWith("$") ? form.budget : `$${form.budget}`)
-                      : <span className="italic text-[color:var(--on-surface-muted)]/50">tap to add…</span>}
-                  </p>
-                )}
+            ) : (
+              <h1 onClick={() => setActiveEdit("tripName")}
+                className="mb-1 cursor-text font-display text-[50px] font-bold leading-tight tracking-tight text-[color:var(--on-surface)] transition-colors hover:text-[color:var(--sage)] sm:text-[56px]">
+                {form.tripName || (form.destination ? `${form.destination} Trip` : "Your trip")}
+              </h1>
+            )}
+            {/* DESTINATION SUBTITLE */}
+            <div className="mb-6 flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.22em]">
+              {activeEdit === "destination" ? (
+                <input autoFocus type="text" value={form.destination}
+                  onChange={(e) => updateField("destination", e.target.value)}
+                  onBlur={() => setActiveEdit(null)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                  placeholder="Destination"
+                  className="bg-transparent text-[13px] font-bold uppercase tracking-[0.22em] text-[color:var(--on-surface)] outline-none border-b border-[color:var(--sage)] placeholder:text-[color:var(--on-surface-muted)]/40"
+                />
+              ) : (
+                <span onClick={() => setActiveEdit("destination")}
+                  className="cursor-text transition-colors hover:text-[color:var(--sage)]"
+                  style={{ color: form.destination ? "var(--on-surface)" : "var(--on-surface-muted)" }}>
+                  {form.destination ? form.destination.toUpperCase() : "ADD DESTINATION"}
+                </span>
+              )}
+              <span style={{ color: "var(--sage)" }}>*</span>
+              {nights > 0 && (
+                <>
+                  <span style={{ color: "var(--on-surface-muted)", opacity: 0.4 }}>·</span>
+                  <span style={{ color: "var(--on-surface-muted)" }}>{nights} {nights === 1 ? "Night" : "Nights"}</span>
+                </>
+              )}
+            </div>
+            {/* BIG DATE BLOCK */}
+            <div className="mb-2 cursor-pointer rounded-xl px-6 py-5 transition-colors"
+              style={{ background: "color-mix(in srgb, var(--sage) 7%, white)" }}
+              onClick={() => setActiveEdit(activeEdit === "dates" ? null : "dates")}>
+              <div className="grid grid-cols-[1fr_40px_1fr] items-center">
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Depart</p>
+                  {departParts ? (
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-display text-[38px] font-semibold leading-none tracking-tight text-[color:var(--on-surface)]">{departParts.day}</span>
+                      <div>
+                        <div className="text-base font-bold leading-none" style={{ color: "var(--sage)" }}>{departParts.month}</div>
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)]">{departParts.year}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/30">—</span>
+                  )}
+                </div>
+                <div className="flex justify-center">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "var(--sage)" }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </div>
+                <div className="text-right">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Return</p>
+                  {returnParts ? (
+                    <div className="flex items-baseline justify-end gap-2">
+                      <div className="text-right">
+                        <div className="text-base font-bold leading-none" style={{ color: "var(--sage)" }}>{returnParts.month}</div>
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)]">{returnParts.year}</div>
+                      </div>
+                      <span className="font-display text-[38px] font-semibold leading-none tracking-tight text-[color:var(--on-surface)]">{returnParts.day}</span>
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/30">—</span>
+                  )}
+                </div>
               </div>
-
-              {/* Vibe — selected only + expand trigger */}
-              <div>
-                <p className="label-caps mb-2 text-[color:var(--on-surface-muted)]">Vibe</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedVibes.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleVibe(v); }}
-                      className="rounded-full border border-[color:var(--sage)] bg-[color:var(--sage)]/10 px-4 py-1.5 text-sm font-medium capitalize text-[color:var(--sage)] transition-all dark:border-[color:var(--sage-soft)] dark:text-[color:var(--sage-soft)]"
-                    >
+              {activeEdit === "dates" && (
+                <div className="mt-5 border-t pt-5"
+                  style={{ borderColor: "color-mix(in srgb, var(--sage) 20%, transparent)" }}
+                  onClick={(e) => e.stopPropagation()}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>Start date</label>
+                      <input autoFocus type="date" value={form.dateStart}
+                        onChange={(e) => updateField("dateStart", e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); } }}
+                        className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
+                        style={{ borderColor: "var(--hairline)" }} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>End date</label>
+                      <input type="date" value={form.dateEnd} min={form.dateStart || undefined}
+                        onChange={(e) => updateField("dateEnd", e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); } }}
+                        className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
+                        style={{ borderColor: "var(--hairline)" }} />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <button type="button" onClick={() => setActiveEdit(null)}
+                      className="rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                      style={{ background: "var(--sage)" }}>Done</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="mb-6 text-right text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--sage)" }}>* Required</p>
+            {/* PERFORATED DIVIDER */}
+            <div className="mb-6" aria-hidden>
+              <div className="h-px w-full" style={{ background: "var(--hairline)" }} />
+              <div className="my-1.5 flex gap-[3px] overflow-hidden">
+                {Array.from({ length: 72 }).map((_, i) => (
+                  <div key={i} className="h-[1.5px] flex-1 rounded-full" style={{ background: "var(--hairline)", maxWidth: 7 }} />
+                ))}
+              </div>
+              <div className="h-px w-full" style={{ background: "var(--hairline)" }} />
+            </div>
+            {/* OPTIONAL EYEBROW */}
+            <div className="mb-5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: "var(--on-surface-muted)" }}>
+              <span>Optional</span>
+              <span>Tap to fill or skip</span>
+            </div>
+            {/* OPTIONAL ROWS */}
+            <div className="space-y-4">
+              {/* FLIGHT */}
+              <div className="grid items-start gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="pt-1.5 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Flight</span>
+                <div className="flex flex-col gap-2">
+                  <div className="inline-flex rounded-full p-0.5" style={{ border: "1px solid var(--hairline-strong)", background: "white" }}>
+                    <button type="button"
+                      onClick={() => { setForm((prev) => ({ ...prev, needsFlight: true })); setActiveEdit("flightCity"); }}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors"
+                      style={form.needsFlight ? { background: "var(--sage)", color: "white" } : { color: "var(--on-surface-muted)" }}>
+                      {form.departureCity ? `Flying from ${form.departureCity}` : "Flying from…"}
+                    </button>
+                    <button type="button"
+                      onClick={() => { setForm((prev) => ({ ...prev, needsFlight: false, departureCity: "" })); setActiveEdit(null); }}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors"
+                      style={!form.needsFlight ? { background: "var(--sage)", color: "white" } : { color: "var(--on-surface-muted)" }}>
+                      No flight
+                    </button>
+                    <button type="button"
+                      onClick={() => { setForm((prev) => ({ ...prev, needsFlight: false, departureCity: "" })); setActiveEdit(null); }}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.14em] transition-colors"
+                      style={{ color: "rgba(100,116,139,0.55)", fontStyle: "italic" }}>
+                      Skip
+                    </button>
+                  </div>
+                  {form.needsFlight && activeEdit === "flightCity" && (
+                    <input autoFocus type="text" value={form.departureCity}
+                      onChange={(e) => updateField("departureCity", e.target.value)}
+                      onBlur={() => setActiveEdit(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                      placeholder="City or airport code…"
+                      className="rounded-lg border px-3 py-1.5 text-sm outline-none transition-colors"
+                      style={{ borderColor: "var(--sage)", background: "white" }} />
+                  )}
+                </div>
+              </div>
+              {/* TRAVELERS */}
+              <div className="grid items-start gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="pt-1.5 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Travelers</span>
+                <div className="flex flex-col gap-2">
+                  <div className="inline-flex rounded-full p-0.5" style={{ border: "1px solid var(--hairline-strong)", background: "white" }}>
+                    <button type="button" onClick={() => setActiveEdit(activeEdit === "travelers" ? null : "travelers")}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors"
+                      style={form.people ? { background: "var(--sage)", color: "white" } : { color: "var(--on-surface-muted)" }}>
+                      {form.people ? `${form.people} ${Number(form.people) === 1 ? "Traveler" : "Travelers"}` : "Set count"}
+                    </button>
+                    <button type="button" onClick={() => { updateField("people", ""); setActiveEdit(null); }}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.14em] transition-colors"
+                      style={{ color: "rgba(100,116,139,0.55)", fontStyle: "italic" }}>Skip</button>
+                  </div>
+                  {activeEdit === "travelers" && (
+                    <input autoFocus type="number" min={1} max={50} value={form.people}
+                      onChange={(e) => updateField("people", e.target.value)}
+                      onBlur={() => setActiveEdit(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                      placeholder="How many?"
+                      className="rounded-lg border px-3 py-1.5 text-sm outline-none transition-colors"
+                      style={{ borderColor: "var(--sage)", background: "white" }} />
+                  )}
+                </div>
+              </div>
+              {/* BUDGET */}
+              <div className="grid items-start gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="pt-1.5 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Budget</span>
+                <div className="flex flex-col gap-2">
+                  <div className="inline-flex rounded-full p-0.5" style={{ border: "1px solid var(--hairline-strong)", background: "white" }}>
+                    <button type="button" onClick={() => setActiveEdit(activeEdit === "budget" ? null : "budget")}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors"
+                      style={form.budget ? { background: "var(--sage)", color: "white" } : { color: "var(--on-surface-muted)" }}>
+                      {form.budget ? `${form.budget.startsWith("$") ? "" : "$"}${form.budget} / head` : "Set budget"}
+                    </button>
+                    <button type="button" onClick={() => { updateField("budget", ""); setActiveEdit(null); }}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.14em] transition-colors"
+                      style={{ color: "rgba(100,116,139,0.55)", fontStyle: "italic" }}>Skip</button>
+                  </div>
+                  {activeEdit === "budget" && (
+                    <input autoFocus type="text" value={form.budget}
+                      onChange={(e) => updateField("budget", e.target.value)}
+                      onBlur={() => setActiveEdit(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setActiveEdit(null); } }}
+                      placeholder="e.g. 3,000"
+                      className="rounded-lg border px-3 py-1.5 text-sm outline-none transition-colors"
+                      style={{ borderColor: "var(--sage)", background: "white" }} />
+                  )}
+                </div>
+              </div>
+              {/* VIBES */}
+              <div className="grid gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="pt-1 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Vibes</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {VIBE_OPTIONS.map((v) => (
+                    <button key={v} type="button" onClick={() => toggleVibe(v)}
+                      className="rounded-full border px-3 py-1 text-[11px] font-semibold capitalize transition-all"
+                      style={selectedVibes.includes(v)
+                        ? { borderColor: "var(--sage)", background: "color-mix(in srgb, var(--sage) 12%, white)", color: "var(--sage)" }
+                        : { borderColor: "var(--hairline-strong)", background: "white", color: "var(--on-surface-muted)" }}>
                       {v}
                     </button>
                   ))}
-                  {showAllVibes &&
-                    VIBE_OPTIONS.filter((v) => !selectedVibes.includes(v)).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleVibe(v); }}
-                        className="rounded-full border border-[color:var(--hairline)] px-4 py-1.5 text-sm font-medium capitalize text-[color:var(--on-surface-muted)] transition-all hover:border-[color:var(--sage)]/40 dark:border-white/10 dark:text-neutral-400"
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowAllVibes((s) => !s); }}
-                    className="rounded-full border border-dashed border-[color:var(--on-surface-muted)]/30 px-3.5 py-1.5 text-sm text-[color:var(--on-surface-muted)] transition-colors hover:border-[color:var(--sage)]/50 hover:text-[color:var(--on-surface-variant)] dark:border-white/20 dark:text-neutral-500"
-                  >
-                    {showAllVibes ? "Less" : selectedVibes.length === 0 ? "+ Add vibe" : "+ More"}
-                  </button>
                 </div>
               </div>
-
-              {/* Pace */}
-              <div>
-                <p className="label-caps mb-2 text-[color:var(--on-surface-muted)]">Pace</p>
-                <div className="flex gap-2">
+              {/* PACE */}
+              <div className="grid items-center gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Pace</span>
+                <div className="inline-flex rounded-full p-0.5" style={{ border: "1px solid var(--hairline-strong)", background: "white" }}>
                   {PACE_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => updateField("pace", form.pace === p ? "" : p)}
-                      className={`rounded-full border px-4 py-1.5 text-sm font-medium capitalize transition-all ${
-                        form.pace === p
-                          ? "border-[color:var(--sage)] bg-[color:var(--sage)]/10 text-[color:var(--sage)] dark:border-[color:var(--sage-soft)] dark:text-[color:var(--sage-soft)]"
-                          : "border-[color:var(--hairline)] text-[color:var(--on-surface-muted)] hover:border-[color:var(--sage)]/40 dark:border-white/10 dark:text-neutral-400"
-                      }`}
-                    >
+                    <button key={p} type="button" onClick={() => updateField("pace", form.pace === p ? "" : p)}
+                      className="rounded-full px-3 py-1 text-[11px] font-semibold capitalize transition-colors"
+                      style={form.pace === p ? { background: "var(--sage)", color: "white" } : { color: "var(--on-surface-muted)" }}>
                       {p}
                     </button>
                   ))}
+                  <button type="button" onClick={() => updateField("pace", "")}
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.14em] transition-colors"
+                    style={{ color: "rgba(100,116,139,0.55)", fontStyle: "italic" }}>Skip</button>
                 </div>
               </div>
-
-              {/* Must-dos — borderless editorial textarea */}
-              <div>
-                <p className="label-caps mb-1 text-[color:var(--on-surface-muted)]">Must-dos</p>
-                <textarea
-                  rows={2}
-                  value={form.interests}
-                  onChange={(e) => updateField("interests", e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-                  placeholder="Snorkeling, street food, nightlife, hidden gems…"
-                  className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[color:var(--on-surface)] outline-none placeholder:italic placeholder:text-[color:var(--on-surface-muted)]/50 dark:text-white dark:placeholder:text-neutral-600"
-                />
+              {/* NOTES */}
+              <div className="grid gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
+                <span className="pt-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Notes</span>
+                <div className="cursor-text rounded-lg px-3 py-2 transition-colors"
+                  style={{ border: "1px dashed", borderColor: (form.interests || activeEdit === "notes") ? "var(--sage)" : "color-mix(in srgb, var(--sage) 45%, transparent)", minHeight: 68, background: "white" }}
+                  onClick={() => { if (activeEdit !== "notes") setActiveEdit("notes"); }}>
+                  {activeEdit === "notes" ? (
+                    <textarea autoFocus rows={3} value={form.interests}
+                      onChange={(e) => updateField("interests", e.target.value)}
+                      onBlur={() => setActiveEdit(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                      className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[color:var(--on-surface)] outline-none" />
+                  ) : form.interests ? (
+                    <p className="font-display text-sm italic leading-relaxed" style={{ color: "var(--on-surface-variant)" }}>
+                      &ldquo;{form.interests}&rdquo;
+                    </p>
+                  ) : (
+                    <p className="text-sm" style={{ color: "color-mix(in srgb, var(--sage) 55%, rgba(100,116,139,0.4))" }}>
+                      + Tap to add… or leave blank
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-wrap gap-x-6 gap-y-2.5 pt-2">
-              {form.budget && (
-                <span className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Budget</span>
-                  {form.budget.startsWith("$") ? form.budget : `$${form.budget}`}
-                </span>
-              )}
-              {selectedVibes.length > 0 && (
-                <span className="text-sm capitalize text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Vibe</span>
-                  {selectedVibes.join(", ")}
-                </span>
-              )}
-              {form.pace && (
-                <span className="text-sm capitalize text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Pace</span>
-                  {form.pace}
-                </span>
-              )}
-              {form.interests && (
-                <span className="max-w-[280px] truncate text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
-                  <span className="label-caps mr-1.5 text-[color:var(--on-surface-muted)]">Must-dos</span>
-                  {form.interests}
-                </span>
-              )}
-              {!form.budget && selectedVibes.length === 0 && !form.pace && !form.interests && (
-                <span className="text-sm italic text-[color:var(--on-surface-muted)]">No preferences set — tap &apos;Tweak preferences&apos; to add.</span>
-              )}
-            </div>
-          )}
-        </div>{/* /trip-profile card */}
-      </div>{/* /trip-profile wrapper */}
-
-      </div>{/* /inner content */}
-
-      {/* Floating Action Bar — z-50 sits above the z-40 overlay */}
-      <div className="fixed bottom-6 left-0 right-0 z-50 mx-auto w-full max-w-3xl px-4 pointer-events-none">
-        <div className="pointer-events-auto overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] p-2 shadow-2xl dark:border-white/[0.08] dark:bg-[#1a1a18] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="px-4 flex-1 w-full text-center sm:text-left">
-            {error ? (
-              <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-red-600 dark:text-red-400 font-medium">
-                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            {error && (
+              <div className="mt-5 flex items-center gap-2 text-sm text-red-600">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
                 {error}
               </div>
-            ) : (
-              <p className="text-sm font-medium text-[color:var(--on-surface-muted)] dark:text-neutral-400">
-                {!form.destination 
-                   ? "Where to? Add a destination." 
-                   : !form.dateStart 
-                     ? "When are you going? Set your dates." 
-                     : "Ready to plan your trip."}
-              </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={phase === "saving" || !form.destination || !form.dateStart}
-            className={`w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm font-medium transition-all ${
-              (!form.destination || !form.dateStart)
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-white/5 dark:text-gray-500"
-                : phase === "saving"
-                ? "bg-[color:var(--on-surface)] text-[color:var(--surface)] opacity-70 cursor-wait dark:bg-white dark:text-black"
-                : "bg-[color:var(--on-surface)] text-[color:var(--surface)] shadow-md hover:scale-[1.02] hover:shadow-lg dark:bg-white dark:text-black"
-            }`}
-          >
-            {phase === "saving" ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                Building…
-              </span>
-            ) : (
-              "Generate Itinerary →"
-            )}
-          </button>
+          {/* BOTTOM BAR */}
+          <div className="flex items-stretch overflow-hidden rounded-b-2xl">
+            <div className="flex-1 px-7 py-4" style={{ background: "var(--on-surface)" }}>
+              {isReady ? (
+                <>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/55">Ready</div>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-white">
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-400" aria-hidden />
+                    Required fields complete
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/55">Waiting</div>
+                  <div className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">
+                    {!form.destination.trim() ? "Add a destination" : "Add travel dates"}
+                  </div>
+                </>
+              )}
+            </div>
+            <button type="button" onClick={handleSubmit}
+              disabled={phase === "saving" || !isReady}
+              className="group flex items-center justify-center gap-3 px-8 text-[13px] font-bold uppercase tracking-[0.22em] text-white transition-all hover:tracking-[0.28em] disabled:opacity-50"
+              style={{ background: "var(--sage)", minWidth: 160 }}>
+              {phase === "saving" ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Building…
+                </span>
+              ) : (
+                <>Build trip<span aria-hidden className="transition-transform group-hover:translate-x-1">&#9656;</span></>
+              )}
+            </button>
+          </div>
         </div>
       </div>
-
     </div>
   );
 }
