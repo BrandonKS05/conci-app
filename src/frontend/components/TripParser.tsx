@@ -32,6 +32,7 @@ import {
   TripPlanBuildProgressOverlayDark,
   type TripParserBuildStep,
 } from "@/frontend/components/trip-plan-build-progress-overlay-dark";
+import { ItineraryGenerationLoading } from "@/frontend/components/itinerary-generation-loading";
 import { InlinePlacePreviewCards } from "@/frontend/components/inline-place-preview-cards";
 import { PlacePickCards } from "@/frontend/components/place-pick-cards";
 import type { PlacePreview, PlacePreviewBlock, PlaceSpotlight } from "@/shared/place-preview";
@@ -245,6 +246,7 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
   const [plan, setPlan] = useState<TripPlan | null>(null);
   /** Live phases while finalizing: AI -> save -> itinerary -> navigate. */
   const [tripBuildStep, setTripBuildStep] = useState<TripParserBuildStep | null>(null);
+  const [generatingTripId, setGeneratingTripId] = useState<string | null>(null);
   /** Fires if navigation does not complete within the safety window. */
   const [tripBuildWatchdogMessage, setTripBuildWatchdogMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -426,20 +428,10 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
           return false;
         }
         if (body.id) {
+          setGeneratingTripId(body.id);
           setTripBuildStep("generating");
-          const genController = new AbortController();
-          const genTimer = window.setTimeout(() => genController.abort(), 28_000);
-          try {
-            await fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
-              method: "POST",
-              credentials: "include",
-              signal: genController.signal,
-            }).catch(() => undefined);
-          } finally {
-            window.clearTimeout(genTimer);
-          }
-          setTripBuildStep("launching");
-          router.replace(`/trip/${body.id}/setup`);
+          // Generation is handled by ItineraryGenerationLoading via SSE.
+          // Navigation happens in its onComplete callback.
           return true;
         }
         setSaveError(
@@ -1048,7 +1040,22 @@ export default function TripParser({ anthropicApiKey }: { anthropicApiKey?: stri
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
-      {phase === "building" && tripBuildStep ? (
+      {phase === "building" && tripBuildStep === "generating" && generatingTripId ? (
+        <ItineraryGenerationLoading
+          tripId={generatingTripId}
+          tripTitle={plan?.title || seedMessage}
+          onComplete={() => {
+            setTripBuildStep("launching");
+            router.replace(`/trip/${generatingTripId}/setup`);
+          }}
+          onError={(message) => {
+            setTripBuildWatchdogMessage(message);
+            setTripBuildStep(null);
+            setGeneratingTripId(null);
+            setPhase("chat");
+          }}
+        />
+      ) : phase === "building" && tripBuildStep ? (
         <TripPlanBuildProgressOverlayDark
           step={tripBuildStep}
           tripTitle={plan?.title || seedMessage}

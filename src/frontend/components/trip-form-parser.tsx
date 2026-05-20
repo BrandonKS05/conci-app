@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TripPlan } from "@/shared/trip-plan";
 import { planHasUsableTripTiming } from "@/shared/trip-plan";
+import { ItineraryGenerationLoading } from "@/frontend/components/itinerary-generation-loading";
 
 type FormData = {
   tripName: string;
@@ -105,12 +106,13 @@ async function imageFileToDataUrl(file: File, maxEdge = 1280, quality = 0.75): P
   }
 }
 
-type Phase = "input" | "parsing" | "form" | "saving";
+type Phase = "input" | "parsing" | "form" | "saving" | "generating";
 
 export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("input");
+  const [generatingTripId, setGeneratingTripId] = useState<string | null>(null);
   const [freeText, setFreeText] = useState(initialPrompt);
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -258,11 +260,8 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
       }
 
       if (body.id) {
-        fetch(`/api/trip-plans/${body.id}/generate-itinerary`, {
-          method: "POST",
-          credentials: "include",
-        }).catch(() => {});
-        router.replace(`/trip/${body.id}/setup`);
+        setGeneratingTripId(body.id);
+        setPhase("generating");
       }
     } catch {
       setError("Network error. Check your connection.");
@@ -271,6 +270,24 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
   }, [form, router]);
 
   const selectedVibes = form.vibe.split(",").map((v) => v.trim()).filter(Boolean);
+
+  // --- PHASE: GENERATING (full-screen animated loading) ---
+  if (phase === "generating" && generatingTripId) {
+    return (
+      <ItineraryGenerationLoading
+        tripId={generatingTripId}
+        tripTitle={form.tripName || form.destination}
+        onComplete={() => {
+          router.replace(`/trip/${generatingTripId}/setup`);
+        }}
+        onError={(message) => {
+          setError(message);
+          setPhase("form");
+          setGeneratingTripId(null);
+        }}
+      />
+    );
+  }
 
   // --- PHASE: INPUT (screenshots + text) ---
   if (phase === "input" || phase === "parsing") {
