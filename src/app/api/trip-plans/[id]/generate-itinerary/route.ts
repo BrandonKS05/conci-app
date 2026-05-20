@@ -73,7 +73,10 @@ GENERAL RULES:
 - If interests are specified, weight activities heavily toward those categories.
 - Include realistic cost estimates in USD per person. Use null only if you genuinely cannot estimate.
 - Include transport (flights if FLIGHT REQUIRED is stated, airport transfers, getting around), meals (2-3 per day), activities, and lodging (first day check-in).
-- If FLIGHT REQUIRED: add an outbound flight on Day 1 and return flight on the last day with realistic airfare estimates (use average economy prices for that route). Category must be "transport".
+- If FLIGHT REQUIRED: You MUST add TWO flight activities:
+  1. OUTBOUND on Day 1: title format "Flight: [DepartureCity] → [DestinationCity]" (e.g. "Flight: Los Angeles → Cancún"). In description include: the departure airport code and arrival airport code, approximate flight duration, and "Economy round-trip ~$XXX pp" with a realistic average fare for that route/season. Category: "transport". estimatedCostPp = ONE-WAY portion of a realistic round-trip fare (i.e. total RT / 2).
+  2. RETURN on last day: title format "Flight: [DestinationCity] → [DepartureCity]". Same description format. Category: "transport". estimatedCostPp = the other half of the round-trip fare.
+  Use realistic current average economy fares: e.g. LAX→CUN ~$300 RT, JFK→LIS ~$600 RT, SFO→HNL ~$400 RT. Adjust for season and distance.
 - Keep descriptions concise and actionable.
 - Do NOT include bookingUrl — leave it out or set null.
 - estimatedDayCostPp should be the sum of all non-null activity costs for that day.
@@ -81,8 +84,8 @@ GENERAL RULES:
 - For the first day, include arrival/check-in. For the last day, include checkout/departure.
 - If pinned restaurants or activities are marked "MUST include" in the user prompt, incorporate them into the appropriate day.
 
-Example (abbreviated) for a 2-day budget trip to Austin with "outdoors" vibe:
-{"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Arrive at Austin-Bergstrom","description":"Grab bags, take city bus downtown (~30 min).","category":"transport","estimatedCostPp":2},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to HI Austin Hostel","description":"Dorm bed in SoCo area, walking distance to food.","category":"lodging","estimatedCostPp":45},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":18}],"estimatedDayCostPp":82},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent a kayak at the rowing dock for 2 hours.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Depart Austin","description":"Bus back to airport for evening flight.","category":"transport","estimatedCostPp":2}],"estimatedDayCostPp":40}]}`;
+Example (abbreviated) for a 2-day budget trip from NYC to Austin with "outdoors" vibe (FLIGHT REQUIRED):
+{"days":[{"dateIso":"Day 1","label":"Arrival & Nature","activities":[{"time":"Morning","title":"Flight: New York City → Austin","description":"JFK → AUS, ~3.5 hrs. Economy round-trip ~$280 pp.","category":"transport","estimatedCostPp":140},{"time":"Late Morning","title":"Barton Springs Pool","description":"Swim in the natural spring-fed pool in Zilker Park.","category":"activity","estimatedCostPp":5},{"time":"Lunch","title":"Tacos at Veracruz All Natural","description":"Migas tacos and agua fresca on the east side.","category":"food","estimatedCostPp":12},{"time":"Afternoon","title":"Greenbelt Hike","description":"3-mile loop on the Barton Creek Greenbelt trail.","category":"activity","estimatedCostPp":0},{"time":"Evening","title":"Check in to HI Austin Hostel","description":"Dorm bed in SoCo area, walking distance to food.","category":"lodging","estimatedCostPp":45},{"time":"Dinner","title":"BBQ at la Barbecue","description":"Brisket and sides from the famous East Austin trailer.","category":"food","estimatedCostPp":18}],"estimatedDayCostPp":220},{"dateIso":"Day 2","label":"Lake Day & Departure","activities":[{"time":"Morning","title":"Breakfast tacos at Jo's Coffee","description":"Classic SoCo spot with outdoor seating.","category":"food","estimatedCostPp":10},{"time":"Late Morning","title":"Kayak on Lady Bird Lake","description":"Rent a kayak at the rowing dock for 2 hours.","category":"activity","estimatedCostPp":20},{"time":"Lunch","title":"Picnic at Zilker","description":"Grab HEB sandwiches and relax on the great lawn.","category":"food","estimatedCostPp":8},{"time":"Afternoon","title":"Flight: Austin → New York City","description":"AUS → JFK, ~3.5 hrs. Return leg of round-trip.","category":"transport","estimatedCostPp":140}],"estimatedDayCostPp":178}]}`;
 
 function cleanLabel(v: string, max = 140): string {
   return v.replace(/\s+/g, " ").trim().slice(0, max);
@@ -116,15 +119,11 @@ function inferTripDays(plan: TripPlan, itinerary: GeneratedItinerary): string[] 
   return [];
 }
 
-function inferHomeBaseName(plan: TripPlan, itinerary: GeneratedItinerary): string {
+function inferHomeBaseName(plan: TripPlan): string {
   const userStay = plan.hostSetup?.hotelStays?.find(isUserSelectedLodgingStay);
   if (userStay?.place?.name?.trim()) return userStay.place.name.trim();
   const fromHost = plan.hostSetup?.hotel?.name?.trim();
   if (fromHost) return fromHost;
-  for (const d of itinerary.days) {
-    const lodg = d.activities.find((a) => a.category === "lodging" && a.title.trim());
-    if (lodg?.title?.trim()) return cleanLabel(lodg.title, 120);
-  }
   return `Recommended stay in ${plan.location?.trim() || "destination"}`;
 }
 
@@ -137,7 +136,7 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
   const days = inferTripDays(plan, itinerary);
   const location = plan.location?.trim() || "Destination";
   const departure = plan.departureCity?.trim() || "Origin";
-  const homeBase = inferHomeBaseName(plan, itinerary);
+  const homeBase = inferHomeBaseName(plan);
 
   const restaurantPins: HostRestaurantPin[] = [];
   const activityPins: HostActivityPin[] = [];
@@ -284,7 +283,7 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
             endIso: days[days.length - 1]!,
             place: {
               name: homeBase,
-              mapsUrl: mapsSearchUrl(`${homeBase} ${location}`),
+              mapsUrl: mapsSearchUrl(`hotel ${location}`),
               spotlightCategory: "hotel",
             },
             recommendedByConci: true,
@@ -293,6 +292,39 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
       : [];
 
   return { restaurantPins, activityPins, hotelStays, dayVoting };
+}
+
+async function searchAndSetHotel(
+  plan: TripPlan,
+  itinerary: GeneratedItinerary,
+  location: string
+): Promise<HostHotelStay[] | null> {
+  const { searchPlacesGoogleMaps } = await import("@/backend/serpapi-places");
+  const budgetHint = plan.budget?.tier?.toLowerCase() || "";
+  let query = `hotel ${location}`;
+  if (budgetHint.includes("budget") || budgetHint.includes("cheap")) query = `budget hotel ${location}`;
+  else if (budgetHint.includes("splurge") || budgetHint.includes("luxury")) query = `luxury hotel ${location}`;
+
+  const results = await searchPlacesGoogleMaps(query, location, { limit: 3 });
+  if (!results.length) return null;
+
+  const top = results[0]!;
+  const days = inferTripDays(plan, itinerary);
+  if (!days.length) return null;
+
+  return [{
+    startIso: days[0]!,
+    endIso: days[days.length - 1]!,
+    place: {
+      name: top.name,
+      mapsUrl: top.mapsUrl,
+      spotlightCategory: "hotel" as const,
+      rating: top.rating,
+      photoUrl: top.photoUrl,
+      address: top.address,
+    },
+    recommendedByConci: true,
+  }];
 }
 
 // --- Budget parsing ---
@@ -433,7 +465,7 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
     const needsFlight = seedText?.includes("(needs flight)") || !seedText?.includes("no flight needed");
     lines.push(`Departing from: ${plan.departureCity}`);
     if (needsFlight) {
-      lines.push(`FLIGHT REQUIRED: Include a flight from ${plan.departureCity} to ${plan.location || "destination"} on Day 1 (category: "transport") with realistic estimated airfare per person. Include return flight on the last day.`);
+      lines.push(`FLIGHT REQUIRED: Include outbound flight "${plan.departureCity} → ${plan.location || "destination"}" on Day 1 and return flight "${plan.location || "destination"} → ${plan.departureCity}" on last day. Use title format "Flight: CityA → CityB". In description include airport codes, ~duration, and fare estimate. Split round-trip cost evenly between the two flights.`);
     }
   }
 
@@ -743,6 +775,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
 
   const generated = buildAutofillRecommendations(plan, itinerary);
+
+  // Try to replace generic AI hotel with a real SerpAPI result
+  if (!hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []) && plan.location?.trim()) {
+    try {
+      const realHotel = await searchAndSetHotel(plan, itinerary, plan.location.trim());
+      if (realHotel?.length) {
+        generated.hotelStays = realHotel;
+      }
+    } catch (e) {
+      console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message);
+    }
+  }
+
   const mergedHotelStays = mergeAiHotelStaysPreservingUser(plan.hostSetup?.hotelStays, generated.hotelStays);
   const updatedPlan: TripPlan = {
     ...plan,
