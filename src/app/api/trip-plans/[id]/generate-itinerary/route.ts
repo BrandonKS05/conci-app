@@ -151,21 +151,15 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
 
   for (let i = 0; i < days.length; i += 1) {
     const dateIso = days[i]!;
-    const dayItin = itinerary.days[i] ?? itinerary.days[itinerary.days.length - 1];
-    const foodActs = (dayItin?.activities ?? []).filter((a) => a.category === "food" && a.title.trim());
+    const dayItin = i < itinerary.days.length ? itinerary.days[i] : undefined;
+    if (!dayItin) continue; // Don't repeat last day's content for extra calendar days
+
+    const foodActs = (dayItin.activities ?? []).filter((a) => a.category === "food" && a.title.trim());
     const lunch = cleanLabel(foodActs[0]?.title || `Lunch spot in ${location}`, 120);
     const dinner = cleanLabel(foodActs[1]?.title || `Dinner spot in ${location}`, 120);
-    const actRows = (dayItin?.activities ?? []).filter((a) => a.category === "activity" && a.title.trim()).slice(0, 2);
-    while (actRows.length < 2) {
-      const slot = actRows.length + 1;
-      actRows.push({
-        time: slot === 1 ? "Afternoon" : "Evening",
-        title: `Top ${slot === 1 ? "experience" : "activity"} in ${location}`,
-        description: `${dayItin?.label || "Curated for your trip vibe and budget."}`,
-        category: "activity",
-        estimatedCostPp: null,
-      });
-    }
+    const actRows = (dayItin.activities ?? []).filter((a) => a.category === "activity" && a.title.trim()).slice(0, 2);
+    // Don't pad with generic placeholders — only use real activities from the itinerary
+
     const flightLabel = cleanLabel(`${departure} -> ${location} best-value flight option`, 140);
     const flightUrl = `https://www.google.com/travel/flights?hl=en&q=Flights%20from%20${slug(departure)}%20to%20${slug(location)}`;
 
@@ -198,19 +192,23 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
         recommendedByConci: true,
       });
     }
-    activityPins.push({
-      dateIso,
-      experience: {
-        name: flightLabel,
-        pricePerPerson: "",
-        rating: "",
-        duration: "Best option",
-        bookingUrl: flightUrl,
-        coverPhotoUrl: null,
-      },
-      kept: true,
-      recommendedByConci: true,
-    });
+
+    // Only add flight pin on first and last day
+    if (i === 0 || i === days.length - 1) {
+      activityPins.push({
+        dateIso,
+        experience: {
+          name: flightLabel,
+          pricePerPerson: "",
+          rating: "",
+          duration: "Best option",
+          bookingUrl: flightUrl,
+          coverPhotoUrl: null,
+        },
+        kept: true,
+        recommendedByConci: true,
+      });
+    }
 
     const flightsState: DayVoteCategoryState = {
       options: [
@@ -332,6 +330,50 @@ async function searchAndSetHotel(
     },
     recommendedByConci: true,
   }];
+}
+
+// --- Activity enrichment via SerpAPI ---
+
+const MAX_ACTIVITY_SEARCHES = 8;
+
+async function enrichActivityPins(
+  pins: HostActivityPin[],
+  location: string
+): Promise<HostActivityPin[]> {
+  const { searchPlacesGoogleMaps } = await import("@/backend/serpapi-places");
+
+  // Skip flight pins and generic "Top activity/experience" pins
+  const isGenericOrFlight = (name: string) =>
+    /^(top (activity|experience)|.*best-value flight|.*->)/i.test(name);
+
+  const searchable = pins.filter(
+    (p) => p.experience?.name && !isGenericOrFlight(p.experience.name)
+  );
+
+  // Batch searches to avoid overloading API
+  const toSearch = searchable.slice(0, MAX_ACTIVITY_SEARCHES);
+  const results = await Promise.allSettled(
+    toSearch.map((pin) =>
+      searchPlacesGoogleMaps(`${pin.experience.name} ${location}`, location, { limit: 1 })
+    )
+  );
+
+  for (let i = 0; i < toSearch.length; i++) {
+    const result = results[i];
+    if (result?.status !== "fulfilled" || !result.value.length) continue;
+    const place = result.value[0]!;
+    const pin = toSearch[i]!;
+
+    pin.experience = {
+      ...pin.experience,
+      name: place.name,
+      rating: place.rating != null ? `${place.rating}★` : pin.experience.rating || "",
+      bookingUrl: place.mapsUrl,
+      coverPhotoUrl: place.photoUrl || pin.experience.coverPhotoUrl || null,
+    };
+  }
+
+  return pins;
 }
 
 // --- Budget parsing ---
@@ -805,6 +847,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
     } catch (e) {
       console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message);
+    }
+  }
+
+  // Enrich activity pins with real SerpAPI results
+  if (plan.location?.trim() && generated.activityPins.length > 0) {
+    try {
+      const enrichedPins = await enrichActivityPins(generated.activityPins, plan.location.trim());
+      generated.activityPins = enrichedPins;
+    } catch (e) {
+      console.warn("[generate-itinerary] Activity enrichment failed (non-fatal):", (e as Error)?.message);
     }
   }
 
