@@ -26,7 +26,7 @@ export function TripParserJoinCta() {
       onSubmit={onSubmit}
       className="flex h-full flex-col gap-5 rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-6 py-6 shadow-[var(--shadow-ambient-sm)] transition focus-within:border-[color:var(--sage)]/40 hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a]/90"
     >
-      <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+      <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
         <CollaborateIcon className="h-3 w-3" />
         Collaborate
       </span>

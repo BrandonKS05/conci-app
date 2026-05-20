@@ -1,11 +1,16 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import NextImage from "next/image";
 import type { TripPlan } from "@/shared/trip-plan";
 import { planHasUsableTripTiming } from "@/shared/trip-plan";
 import { primaryFilledInteractive, primaryFocusRing } from "@/frontend/ui/primary-action";
 import { ItineraryGenerationLoading } from "@/frontend/components/itinerary-generation-loading";
+import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
+import { TripParserActiveTripCard, type ActiveTripCardData } from "@/frontend/components/trip-parser-active-trip-card";
+import { TripCanvasBackdrop } from "@/frontend/components/trip-canvas-backdrop";
 
 type FormData = {
   tripName: string;
@@ -23,6 +28,35 @@ type FormData = {
 
 const VIBE_OPTIONS = ["chill", "party", "culture", "outdoors", "foodie", "adventure", "romantic", "luxury"] as const;
 const PACE_OPTIONS = ["packed", "relaxed", "balanced"] as const;
+
+const GHOST_PROMPTS: readonly string[] = [
+  "We’re planning a 4-day bachelor party in Austin with 8 guys: craft cocktails, BBQ crawl, a pool day, one big night out.",
+  "Taking a slow, luxury foodie escape to Kyoto this autumn: ryokan stays, omakase, temple walks at dawn.",
+  "Family of five doing 10 days in Costa Rica with surf lessons for the kids, a cloud-forest night, and two days of pure rest.",
+  "Long weekend in Lisbon with my partner in late February, looking for tile-walking neighborhoods, tinned fish, natural wine.",
+  "Five college friends, ten years out, want a barefoot week in the Greek islands: sailing day, sleepy tavernas, no agenda.",
+];
+
+const PRESETS: ReadonlyArray<{ title: string; subtitle: string; image: string; seed: string }> = [
+  {
+    title: "Tokyo & Kyoto",
+    subtitle: "10 days · Culture & Cuisine",
+    image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=2070&auto=format&fit=crop",
+    seed: "Plan a 10 day trip to Tokyo and Kyoto focusing on food and temples",
+  },
+  {
+    title: "Amalfi Coast",
+    subtitle: "7 days · Relaxation",
+    image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=2069&auto=format&fit=crop",
+    seed: "Plan a 7 day relaxing trip to the Amalfi Coast",
+  },
+  {
+    title: "Swiss Alps",
+    subtitle: "5 days · Adventure",
+    image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=2070&auto=format&fit=crop",
+    seed: "Plan a 5 day adventure trip to the Swiss Alps",
+  },
+];
 
 function generateId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -115,7 +149,7 @@ async function imageFileToDataUrl(file: File, maxEdge = 1280, quality = 0.75): P
 
 type Phase = "input" | "parsing" | "form" | "saving" | "generating";
 
-export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string }) {
+export function TripFormParser({ initialPrompt = "", activeTrip = null }: { initialPrompt?: string; activeTrip?: ActiveTripCardData | null }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("input");
@@ -309,107 +343,19 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
   // ─── PHASE: INPUT ────────────────────────────────────────────────────────────
   if (phase === "input" || phase === "parsing") {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-5">
-        <header>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[color:var(--on-surface)] dark:text-[#ebe9e4] sm:text-4xl">
-            Plan a trip
-          </h1>
-          <p className="mt-2 text-sm font-light text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-            Paste screenshots of group chats, type details, or both. We&apos;ll extract everything and let you confirm.
-          </p>
-        </header>
-
-        {/* Image upload */}
-        <div>
-          <div
-            className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-5 py-5 transition-all hover:border-dashed hover:border-[color:var(--sage)]/40 hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20 dark:hover:bg-white/[0.04]"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); void handleImageUpload(e.dataTransfer.files); }}
-          >
-            <svg className="h-4 w-4 shrink-0 text-[color:var(--on-surface-muted)] transition-colors group-hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            <div>
-              <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
-                Drop screenshots here or{" "}
-                <span className="font-medium text-[color:var(--sage)] underline underline-offset-2 dark:text-[color:var(--sage-soft)]">click to upload</span>
-              </p>
-              <p className="mt-0.5 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-600">
-                Group chats, inspo pics, travel plans — up to 3 images
-              </p>
-            </div>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => void handleImageUpload(e.target.files)}
-          />
-        </div>
-
-        {/* Image previews */}
-        {images.length > 0 && (
-          <div className="flex gap-3">
-            {images.map((url, i) => (
-              <div key={i} className="relative">
-                <img src={url} alt={`Upload ${i + 1}`} className="h-20 w-20 rounded-[16px] object-cover ring-1 ring-[color:var(--hairline)] dark:ring-white/10" />
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--on-surface)] text-xs text-[color:var(--surface)] shadow-md transition hover:bg-red-500 dark:bg-neutral-600 dark:hover:bg-red-500"
-                >
-                  &times;
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Free text */}
-        <textarea
-          value={freeText}
-          onChange={(e) => setFreeText(e.target.value)}
-          rows={6}
-          placeholder={"Paste your group chat, type trip details, or describe what you want...\n\ne.g. \"Miami trip Aug 30 – Sep 2, 4 people, flying from LAX, budget $200/day each\""}
-          className="w-full resize-none rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-3.5 text-sm leading-relaxed text-[color:var(--on-surface)] outline-none transition-all placeholder:text-[color:var(--on-surface-muted)]/70 focus:border-[color:var(--sage)]/50 focus:ring-2 focus:ring-[color:var(--sage)]/10 dark:border-white/10 dark:bg-white/[0.02] dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-white/20 dark:focus:ring-white/5"
-        />
-
-        {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={parseInput}
-            disabled={phase === "parsing"}
-            className={`w-full rounded-xl px-6 py-3 text-sm ${primaryFilledInteractive} ${primaryFocusRing} disabled:opacity-50`}
-          >
-            {phase === "parsing" ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                Parsing…
-              </span>
-            ) : (
-              "Parse & continue"
-            )}
-          </button>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={skipToForm}
-              className="text-sm text-[color:var(--on-surface-muted)] transition-colors hover:text-[color:var(--on-surface-variant)] dark:text-neutral-500 dark:hover:text-neutral-300"
-            >
-              Skip — fill in manually
-            </button>
-          </div>
-        </div>
-      </div>
+      <TripInputCanvas
+        phase={phase}
+        freeText={freeText}
+        setFreeText={setFreeText}
+        images={images}
+        removeImage={removeImage}
+        handleImageUpload={handleImageUpload}
+        fileInputRef={fileInputRef}
+        error={error}
+        parseInput={parseInput}
+        skipToForm={skipToForm}
+        activeTrip={activeTrip}
+      />
     );
   }
 
@@ -839,6 +785,279 @@ export function TripFormParser({ initialPrompt = "" }: { initialPrompt?: string 
         </div>
       </div>
 
+    </div>
+  );
+}
+
+type TripInputCanvasProps = {
+  phase: Phase;
+  freeText: string;
+  setFreeText: (s: string) => void;
+  images: string[];
+  removeImage: (idx: number) => void;
+  handleImageUpload: (files: FileList | null) => Promise<void>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  error: string | null;
+  parseInput: () => void;
+  skipToForm: () => void;
+  activeTrip: ActiveTripCardData | null;
+};
+
+function TripInputCanvas({
+  phase,
+  freeText,
+  setFreeText,
+  images,
+  removeImage,
+  handleImageUpload,
+  fileInputRef,
+  error,
+  parseInput,
+  skipToForm,
+  activeTrip,
+}: TripInputCanvasProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [ghostIndex, setGhostIndex] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const hasContent = freeText.length > 0;
+  const isComposing = isFocused || hasContent;
+  const isParsing = phase === "parsing";
+
+  useEffect(() => {
+    if (isComposing) return;
+    const id = window.setInterval(() => {
+      setGhostIndex((i) => (i + 1) % GHOST_PROMPTS.length);
+    }, 5200);
+    return () => window.clearInterval(id);
+  }, [isComposing]);
+
+  const selectPreset = useCallback((seed: string) => {
+    setFreeText(seed);
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+  }, [setFreeText]);
+
+  return (
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-white dark:bg-[#0a0a0a]">
+      <TripCanvasBackdrop />
+
+      {/* Top hairline */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color:var(--hairline-strong)] to-transparent" />
+
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 sm:px-10">
+        {/* Eyebrow */}
+        <div className="flex items-center justify-between pt-8 sm:pt-10">
+          <Link
+            href="/"
+            className="font-display text-2xl font-semibold tracking-[-0.01em] text-[color:var(--on-surface)] transition hover:opacity-75 dark:text-[#ebe9e4] sm:text-[1.7rem]"
+            aria-label="Conci home"
+          >
+            Conci
+          </Link>
+          <span className="label-caps text-[color:var(--on-surface-muted)]/70">Step 1/2 · Tell Us Anything</span>
+        </div>
+
+        {/* Input block — glides upward on focus/content */}
+        <div
+          className={`relative transition-[padding-top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isComposing ? "pt-10 sm:pt-14" : "pt-[14vh] sm:pt-[18vh]"
+          }`}
+        >
+          <p
+            className={`label-caps mb-5 transition-colors duration-500 ${
+              "text-[color:var(--sage)]"
+            }`}
+          >
+            {isComposing ? "Tell us about your trip" : "Type a little or a lot. Conci will do the rest."}
+          </p>
+
+          {/* Ghost cycling prompts + real textarea */}
+          <div className="relative">
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${
+                isComposing ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              {GHOST_PROMPTS.map((prompt, i) => (
+                <p
+                  key={i}
+                  className={`absolute inset-0 font-display text-[1.55rem] sm:text-[2rem] leading-snug tracking-tight transition-opacity duration-1000 ease-out ${
+                    i === ghostIndex ? "opacity-100" : "opacity-0"
+                  }`}
+                  style={{ color: "color-mix(in oklab, var(--sage) 24%, var(--on-surface-muted) 22%)" }}
+                >
+                  {prompt}
+                </p>
+              ))}
+            </div>
+
+            <textarea
+              ref={textareaRef}
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setIsDragging(false); void handleImageUpload(e.dataTransfer.files); }}
+              rows={isComposing ? 6 : 4}
+              aria-label="Describe your trip"
+              className="relative block w-full resize-none border-0 bg-transparent p-0 font-display text-[1.55rem] sm:text-[2rem] leading-snug tracking-tight text-[color:var(--on-surface)] outline-none transition-[height] duration-500 placeholder:text-transparent focus:outline-none focus:ring-0 dark:text-white"
+            />
+
+            {/* Focus hairline */}
+            <div
+              aria-hidden
+              className={`pointer-events-none mt-2 h-px origin-left bg-[color:var(--sage)]/50 transition-transform duration-700 ease-out ${
+                isComposing ? "scale-x-100" : "scale-x-0"
+              }`}
+            />
+
+            {/* Drag-over ring */}
+            {isDragging && (
+              <div className="pointer-events-none absolute inset-0 -m-3 rounded-3xl border-2 border-dashed border-[color:var(--sage)]/60 bg-[color:var(--sage)]/[0.04]" />
+            )}
+          </div>
+
+          {/* Action row */}
+          <div
+            className={`mt-8 transition-all duration-700 ease-out ${
+              isComposing ? "opacity-100 translate-y-0" : "opacity-60 translate-y-1"
+            }`}
+          >
+            {error && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              <button
+                type="button"
+                onClick={parseInput}
+                disabled={isParsing}
+                className={`rounded-full px-7 py-3 text-sm ${primaryFilledInteractive} ${primaryFocusRing} disabled:opacity-50`}
+              >
+                {isParsing ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                    Reading your idea…
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">Continue <span aria-hidden>→</span></span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={skipToForm}
+                className="text-sm text-[color:var(--on-surface-muted)] transition-colors hover:text-[color:var(--on-surface)] dark:hover:text-neutral-200"
+              >
+                Skip — fill in manually
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="ml-auto inline-flex items-center gap-2 text-sm text-[color:var(--on-surface-muted)] transition-colors hover:text-[color:var(--sage)]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                Add screenshots
+              </button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => void handleImageUpload(e.target.files)}
+            />
+
+            {images.length > 0 && (
+              <div className="mt-5 flex gap-3">
+                {images.map((url, i) => (
+                  <div key={i} className="relative">
+                    <img src={url} alt={`Upload ${i + 1}`} className="h-16 w-16 rounded-2xl object-cover ring-1 ring-[color:var(--hairline)] dark:ring-white/10" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      aria-label={`Remove image ${i + 1}`}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--on-surface)] text-xs text-[color:var(--surface)] shadow-md transition hover:bg-red-500 dark:bg-neutral-600 dark:hover:bg-red-500"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Cards + presets — fade out when composing ── */}
+        <div
+          className={`pb-16 transition-all duration-500 ease-out ${
+            isComposing
+              ? "pointer-events-none translate-y-2 opacity-0"
+              : "translate-y-0 opacity-100"
+          }`}
+          aria-hidden={isComposing}
+        >
+          {/* Hairline divider */}
+          <div aria-hidden className="my-10 h-px bg-[color:var(--hairline)]" />
+
+          {/* Collaborate + Active Trips row */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TripParserJoinCta />
+            <TripParserActiveTripCard data={activeTrip} />
+          </div>
+
+          {/* Preset photo cards */}
+          <div className="mt-8">
+            <p className="label-caps mb-4 text-[color:var(--sage)]">Or start from a sketch</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.title}
+                  type="button"
+                  onClick={() => selectPreset(preset.seed)}
+                  className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-neutral-900"
+                >
+                  <NextImage
+                    src={preset.image}
+                    alt={preset.title}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 33vw"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                  <div className="absolute bottom-0 left-0 p-4">
+                    <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/70">
+                      {preset.subtitle}
+                    </p>
+                    <h3 className="font-display text-base font-medium text-white">
+                      {preset.title}
+                    </h3>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

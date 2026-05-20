@@ -23,7 +23,7 @@ export function TripParserActiveTripCard({ data }: { data: ActiveTripCardData | 
       aria-label={`Open ${data.title}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+        <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
           <MapPinSparkleIcon className="h-3 w-3" />
           Active
         </span>

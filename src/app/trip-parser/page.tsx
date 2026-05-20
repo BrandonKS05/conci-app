@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
 import { TripFormParser } from "@/frontend/components/trip-form-parser";
+import type { ActiveTripCardData } from "@/frontend/components/trip-parser-active-trip-card";
 
 export const metadata: Metadata = {
   title: "Plan a Trip · Conci",
 };
-import { TripParserJoinCta } from "@/frontend/components/trip-parser-join-cta";
-import {
-  TripParserActiveTripCard,
-  type ActiveTripCardData,
-} from "@/frontend/components/trip-parser-active-trip-card";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { guaranteedPlanTitle, normalizePlan, type TripPlan } from "@/shared/trip-plan";
@@ -140,14 +136,7 @@ export default async function TripParserPage({
     <div className="min-h-screen bg-[color:var(--surface)] text-[color:var(--on-surface)] dark:bg-[#141414] dark:text-[#ebe9e4]">
       <AppTopNav />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6 sm:pt-12">
-        <TripFormParser initialPrompt={initialPrompt} />
-        <section
-          aria-label="Quick actions"
-          className="mt-12 grid gap-5 sm:grid-cols-2"
-        >
-          <TripParserJoinCta />
-          {activeTrip ? <TripParserActiveTripCard data={activeTrip} /> : null}
-        </section>
+        <TripFormParser initialPrompt={initialPrompt} activeTrip={activeTrip} />
       </main>
     </div>
   );
