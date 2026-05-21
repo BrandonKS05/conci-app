@@ -977,6 +977,8 @@ export function TripHostSetupDayPage({
           label: row.label,
           sub: row.sub,
           mapsUrl: row.href,
+          time: row.time,
+          description: row.description,
         })),
     [scheduleItems]
   );
@@ -1131,15 +1133,15 @@ export function TripHostSetupDayPage({
 
       <div className="mt-10 space-y-4">
 
-        <DayScheduleTimeline
-          items={scheduleItems}
-          subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
-        />
-
         <DayItineraryMap
           stops={mapStops}
           locationHint={plan.location}
           dateIso={dateIso}
+        />
+
+        <DayScheduleTimeline
+          items={scheduleItems}
+          subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
         />
 
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">

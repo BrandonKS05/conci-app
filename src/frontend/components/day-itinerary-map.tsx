@@ -7,6 +7,8 @@ export type DayMapStop = {
   label: string;
   sub: string;
   mapsUrl?: string;
+  time?: string;
+  description?: string;
 };
 
 type LatLng = { lat: number; lng: number };
@@ -19,6 +21,12 @@ interface GMMap {
 }
 interface GMMarker {
   setMap(m: GMMap | null): void;
+  addListener(event: string, handler: () => void): void;
+}
+interface GMInfoWindow {
+  open(map: GMMap, anchor: GMMarker): void;
+  close(): void;
+  setContent(content: string): void;
 }
 interface GMBounds {
   extend(ll: LatLng): void;
@@ -36,9 +44,13 @@ interface GMGeocoder {
 interface GMapsApi {
   Map: new (el: HTMLElement, opts: object) => GMMap;
   Marker: new (opts: object) => GMMarker;
+  InfoWindow: new (opts: { content?: string }) => GMInfoWindow;
   LatLngBounds: new () => GMBounds;
   Geocoder: new () => GMGeocoder;
-  event: { trigger(target: object, eventName: string): void };
+  event: {
+    trigger(target: object, eventName: string): void;
+    addListenerOnce(target: object, eventName: string, handler: () => void): void;
+  };
 }
 declare global {
   interface Window {
@@ -112,6 +124,8 @@ export function DayItineraryMap({
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GMMap | null>(null);
   const markersRef = useRef<GMMarker[]>([]);
+  // Single shared InfoWindow — closing the previous one before opening the next.
+  const infoWindowRef = useRef<GMInfoWindow | null>(null);
   // mapReady stays false until geocoding is done — loading overlay covers grey canvas
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +163,20 @@ export function DayItineraryMap({
             fullscreenControl: false,
           });
         }
+
+        // Watchdog: if tiles never render, the SDK loaded but tiles aren't being
+        // served — almost always billing not enabled / over quota on the GCP project.
+        let tilesLoaded = false;
+        window.google!.maps.event.addListenerOnce(mapInstanceRef.current, "tilesloaded", () => {
+          tilesLoaded = true;
+        });
+        window.setTimeout(() => {
+          if (!cancelled && !tilesLoaded) {
+            setError(
+              "Map tiles aren't loading. The Maps JavaScript API is reachable and the key authenticates, but no tiles are being served — this almost always means billing is not enabled on the Google Cloud project (or it's over quota). Open GCP → Billing and link an active billing account to the project."
+            );
+          }
+        }, 8000);
 
         // Clear the previous day's markers.
         for (const m of markersRef.current) m.setMap(null);
@@ -191,6 +219,25 @@ export function DayItineraryMap({
             },
             title: `${stop.index}. ${stop.label}`,
           });
+
+          // Build InfoWindow HTML for this stop.
+          const categoryLabel = stop.sub.toUpperCase();
+          const infoContent = [
+            `<div style="font-family:system-ui,sans-serif;max-width:220px;padding:2px 0">`,
+            `<div style="font-weight:700;font-size:14px;line-height:1.35;color:#111">${stop.index} · ${stop.label}</div>`,
+            `<div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#888;margin-top:5px">${categoryLabel}</div>`,
+            stop.time ? `<div style="font-size:12px;color:#555;margin-top:2px">${stop.time}</div>` : "",
+            stop.description ? `<div style="font-size:12px;color:#444;margin-top:6px;line-height:1.45">${stop.description}</div>` : "",
+            `</div>`,
+          ].join("");
+
+          marker.addListener("click", () => {
+            if (infoWindowRef.current) infoWindowRef.current.close();
+            const iw = new window.google!.maps.InfoWindow({ content: infoContent });
+            infoWindowRef.current = iw;
+            iw.open(mapInstanceRef.current!, marker);
+          });
+
           markersRef.current.push(marker);
           placed++;
         }
@@ -220,6 +267,7 @@ export function DayItineraryMap({
 
     return () => {
       cancelled = true;
+      infoWindowRef.current?.close();
     };
   }, [stops, locationHint, dateIso, apiKey]);
 
@@ -264,7 +312,7 @@ export function DayItineraryMap({
         {/* Always at full height so the SDK paints into a sized container. */}
         <div
           ref={mapDivRef}
-          style={{ height: "360px" }}
+          style={{ height: "400px" }}
           className="w-full"
           aria-label="Day itinerary map"
         />
