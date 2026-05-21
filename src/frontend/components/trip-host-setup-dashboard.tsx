@@ -1493,6 +1493,15 @@ export function TripHostSetupDashboard({
                   {tab.label}
                 </button>
               ))}
+              <Link
+                href={`/trip/${tripId}/itinerary`}
+                className="group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)]/80 hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
+                  <NavIcon id="dates" />
+                </span>
+                Trip Overview
+              </Link>
             </nav>
 
             <button
@@ -1504,15 +1513,6 @@ export function TripHostSetupDashboard({
               Invite friends
             </button>
 
-            <Link
-              href={`/trip/${tripId}/itinerary`}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90"
-            >
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0" aria-hidden>
-                <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
-              </svg>
-              Open Trip Overview
-            </Link>
       </div>
         </aside>
 
