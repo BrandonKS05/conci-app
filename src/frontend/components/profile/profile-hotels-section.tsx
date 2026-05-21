@@ -15,8 +15,8 @@ const profileInputClass =
 
 function RankBadge({ rank }: { rank: number }) {
   return (
-    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--sage)]/15 text-xs font-bold tabular-nums text-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]/15 dark:text-[color:var(--sage-soft)]">
-      {rank}
+    <span className="inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--sage)]/15 px-1.5 text-xs font-bold tabular-nums text-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]/15 dark:text-[color:var(--sage-soft)]">
+      {rank.toFixed(1)}
     </span>
   );
 }
@@ -28,28 +28,31 @@ function RankPicker({
   value: number;
   onChange: (n: number) => void;
 }) {
+  const [raw, setRaw] = useState(value.toFixed(1));
+
+  function commit(s: string) {
+    const n = parseFloat(s);
+    if (isNaN(n)) { setRaw(value.toFixed(1)); return; }
+    const clamped = Math.min(10, Math.max(1, Math.round(n * 10) / 10));
+    onChange(clamped);
+    setRaw(clamped.toFixed(1));
+  }
+
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
-        Your ranking (1 = best)
+        Your ranking (1 = best, 10 = worst)
       </p>
-      <div className="flex flex-wrap gap-1.5">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className={[
-              "h-8 w-8 rounded-full text-xs font-bold transition",
-              value === n
-                ? "bg-[color:var(--sage)] text-white"
-                : "border border-[color:var(--hairline)] text-[color:var(--on-surface-variant)] hover:border-[color:var(--sage)]/60 hover:text-[color:var(--sage)] dark:border-white/10 dark:text-[#9c9a96]",
-            ].join(" ")}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
+      <input
+        type="number"
+        min={1}
+        max={10}
+        step={0.1}
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        className="w-24 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] px-3 py-2 text-sm font-semibold text-[color:var(--on-surface)] tabular-nums dark:border-white/10 dark:bg-[#222]/80 dark:text-[#ebe9e4]"
+      />
     </div>
   );
 }
