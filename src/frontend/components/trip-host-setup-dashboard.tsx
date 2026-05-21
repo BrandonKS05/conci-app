@@ -58,7 +58,6 @@ import {
   type HostCopilotUiHint,
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
-import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
 import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-panel";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
@@ -68,7 +67,6 @@ import { VIBE_POLL_DECISION_KEY, type CollabStateV1 } from "@/shared/collaborati
 import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
-import { TripHostSetupSidebar } from "@/frontend/components/trip-host-setup-sidebar";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { MyPreferencesCard } from "@/frontend/components/my-preferences-card";
 import { TripCostRollup } from "@/frontend/components/trip-cost-rollup";
@@ -1506,17 +1504,15 @@ export function TripHostSetupDashboard({
               Invite friends
             </button>
 
-            {(plan.generatedItinerary?.days?.length ?? 0) > 0 && (
-              <Link
-                href={`/trip/${tripId}/itinerary`}
-                className="hidden w-full items-center justify-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90 lg:inline-flex"
-              >
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0" aria-hidden>
-                  <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
-                </svg>
-                View Itinerary
-              </Link>
-            )}
+            <Link
+              href={`/trip/${tripId}/itinerary`}
+              className="hidden w-full items-center justify-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90 lg:inline-flex"
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0" aria-hidden>
+                <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
+              </svg>
+              Open Trip Overview
+            </Link>
       </div>
         </aside>
 
@@ -2427,29 +2423,6 @@ export function TripHostSetupDashboard({
           />
         </section>
 
-        <section className="scroll-mt-28 border-t border-[color:var(--hairline)] pt-8 dark:border-white/10">
-          <TripHostSetupSidebar tripId={tripId} plan={plan} tripStatus={effectiveTripStatus} />
-        </section>
-
-        <section id="sec-itinerary" className="scroll-mt-28">
-          {plan.generatedItinerary ? (
-            <details className="group overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] dark:border-white/10 dark:bg-dm-card">
-              <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
-                <span className="text-base font-semibold text-[color:var(--on-surface)] dark:text-white">Full text itinerary</span>
-                <span className="mt-1 block text-sm font-normal leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-                  Optional long-form planner text. Pins and votes on the calendar are what guests see day by day.
-                </span>
-              </summary>
-              <div className="border-t border-[color:var(--hairline)] dark:border-[color:var(--hairline)]">
-                <GeneratedItineraryView
-                  tripId={tripId}
-                  initialItinerary={plan.generatedItinerary ?? null}
-                  headcount={plan.people.count ?? (plan.people.names.length || 2)}
-                />
-              </div>
-            </details>
-          ) : null}
-        </section>
 
           </>
           ) : null}
