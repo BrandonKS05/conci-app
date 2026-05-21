@@ -187,29 +187,35 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works - Apple Style Alternating */}
-      <section className="relative overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-32 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-40">
-        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 space-y-32 sm:space-y-48">
-          {steps.map((step, i) => (
-            <ScrollReveal key={step.title} direction={i % 2 === 0 ? "up" : "up"} className={`flex flex-col gap-12 lg:flex-row ${i % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:items-center`}>
-              <div className="flex-1 lg:py-16">
-                <span className="label-caps mb-6 text-sm tracking-[0.2em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-                  Step 0{i + 1}
-                </span>
-                <h3 className="font-display text-4xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-6xl">
-                  {step.title}
-                </h3>
-                <p className="mt-6 text-xl leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400 max-w-xl">
-                  {step.body}
-                </p>
-              </div>
-              <div className="flex-1 relative aspect-square w-full rounded-[3rem] bg-gradient-to-tr from-[color:var(--surface-container)] to-[color:var(--surface-container-lowest)] dark:from-[#151515] dark:to-[#1a1a1a] shadow-2xl border border-[color:var(--hairline)] dark:border-white/5 flex items-center justify-center overflow-hidden">
-                 {/* Beautiful abstract visual placeholder instead of text boxes */}
-                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage)_0%,transparent_50%)] opacity-10 dark:opacity-5 blur-3xl pointer-events-none" />
-                 <span className="font-display text-9xl font-semibold text-[color:var(--sage)]/20 dark:text-[color:var(--sage-soft)]/10 mix-blend-multiply dark:mix-blend-screen">0{i+1}</span>
-              </div>
-            </ScrollReveal>
-          ))}
+      {/* How it works — vertical, all three fit in one viewport */}
+      <section className="relative overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-16 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-20">
+        <div className="mx-auto max-w-3xl px-5 sm:px-6 lg:px-8">
+          <div className="divide-y divide-[color:var(--hairline)] dark:divide-white/5">
+            {steps.map((step, i) => (
+              <ScrollReveal key={step.title} delay={i * 0.08} direction="up"
+                className="flex items-center gap-8 py-8 sm:gap-12 sm:py-10">
+                {/* Number tile */}
+                <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-gradient-to-tr from-[color:var(--surface-container)] to-[color:var(--surface-container-lowest)] shadow-sm dark:border-white/5 dark:from-[#151515] dark:to-[#1a1a1a]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage)_0%,transparent_55%)] opacity-10 blur-2xl dark:opacity-5" />
+                  <span className="font-display text-3xl font-semibold mix-blend-multiply dark:mix-blend-screen" style={{ color: "color-mix(in srgb, var(--sage) 30%, transparent)" }}>
+                    0{i + 1}
+                  </span>
+                </div>
+                {/* Text */}
+                <div className="flex-1">
+                  <span className="label-caps mb-1.5 block text-[11px] tracking-[0.2em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                    Step 0{i + 1}
+                  </span>
+                  <h3 className="font-display text-xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-2xl">
+                    {step.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400 sm:text-base">
+                    {step.body}
+                  </p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
         </div>
       </section>
 
