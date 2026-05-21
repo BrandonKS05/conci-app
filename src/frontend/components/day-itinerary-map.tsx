@@ -290,8 +290,8 @@ export function DayItineraryMap({
 
   // ── Rendered map ──────────────────────────────────────────────────────────
   return (
-    <section className="overflow-hidden rounded-xl border border-neutral-900/12 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="border-b border-neutral-900/8 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
+    <section className="flex h-full flex-col overflow-hidden rounded-xl border border-neutral-900/12 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="shrink-0 border-b border-neutral-900/8 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
         <h2 className="font-sans text-[13px] font-black uppercase tracking-[0.08em] text-neutral-950 dark:text-white">
           Day map
         </h2>
@@ -303,17 +303,16 @@ export function DayItineraryMap({
       </div>
 
       {error ? (
-        <p className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-xs leading-relaxed text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
+        <p className="shrink-0 border-b border-rose-100 bg-rose-50 px-5 py-3 text-xs leading-relaxed text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
           {error}
         </p>
       ) : null}
 
-      <div className="relative">
-        {/* Always at full height so the SDK paints into a sized container. */}
+      <div className="relative min-h-0 flex-1">
+        {/* Fills the remaining card height so the map canvas always has a sized container. */}
         <div
           ref={mapDivRef}
-          style={{ height: "400px" }}
-          className="w-full"
+          className="h-full min-h-[300px] w-full"
           aria-label="Day itinerary map"
         />
         {/* Spinner overlay — covers grey canvas until tiles + markers are ready. */}

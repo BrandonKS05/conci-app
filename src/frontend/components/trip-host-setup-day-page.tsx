@@ -1020,124 +1020,104 @@ export function TripHostSetupDayPage({
         <span className="text-neutral-500 dark:text-neutral-400">{isHost ? "Host" : "Guest"} day view</span>
       </nav>
 
-      <header className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,220px)_1fr_minmax(0,280px)] lg:items-start">
-        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 dark:border-white/10 dark:bg-dm-card">
-          <p className="font-sans text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">{dest}</p>
-          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 dark:text-neutral-500">Lodging tonight</p>
-          <p className="mt-1.5 text-sm font-semibold text-neutral-900 dark:text-white">
-            {hotel ? hotel.place.name : <span className="text-neutral-400">TBD</span>}
-          </p>
-          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 dark:text-neutral-500">Main Plans</p>
-          <p className="mt-1.5 text-sm font-semibold text-neutral-900 dark:text-white">
-            {scheduleItems.length > 0 ? `${scheduleItems.length} stops` : <span className="text-neutral-400">TBD</span>}
-          </p>
-        </div>
-
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-[2.125rem] sm:leading-tight">
-            {formatted.dayIndexLabel ? `${formatted.dayIndexLabel}: ${formatted.line2}` : formatted.line2}
-          </h1>
-          <div className="mt-6 block rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card">
-            <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-bold text-neutral-900 dark:text-white">
-              What do you want to do?
-            </label>
-            <p className="mt-1.5 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-              Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
-              experience — we scope edits to{" "}
-              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
-            </p>
-            <textarea
-              id={`daydream-${dateIso}`}
-              ref={dreamTextareaRef}
-              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
-              rows={5}
-              value={dreamText}
-              onChange={(e) => setDreamText(e.target.value)}
-              disabled={dreamBusy}
-              className="mt-4 w-full resize-y rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:border-[#2563EB]/50 focus-visible:ring-2 focus-visible:ring-[#2563EB]/20 disabled:opacity-60 dark:border-white/10 dark:text-neutral-200 dark:placeholder:text-neutral-500"
-            />
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={dreamBusy || !dreamText.trim()}
-                onClick={() => void submitDayDream()}
-                className="rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-40"
-              >
-                {dreamBusy ? "Updating day…" : "Update day with Copilot"}
-              </button>
-            </div>
-            {dreamErr ? (
-              <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
-                {dreamErr}
-              </p>
-            ) : null}
-            {dreamReply ? (
-              <p className="mt-4 rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 px-3 py-3 text-sm text-neutral-900 dark:border-[#60A5FA]/20 dark:bg-[#2563EB]/10 dark:text-neutral-100">
-                {dreamReply}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 dark:border-white/10 dark:bg-dm-card">
-          <p className="text-center text-[10px] font-black uppercase tracking-[0.22em] text-neutral-500 dark:text-neutral-400">
-            Nearby days
-          </p>
-          <div className="mt-4 flex justify-center gap-5">
-            {prevIso ? (
-              <Link
-                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-300 bg-white text-lg font-bold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900 dark:border-white/20 dark:bg-transparent dark:text-neutral-300 dark:hover:border-white dark:hover:text-white"
-                aria-label="Previous day"
-              >
-                ‹
-              </Link>
-            ) : (
-              <span className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-300 dark:text-neutral-700">
-                ‹
-              </span>
-            )}
-            {nextIso ? (
-              <Link
-                href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-300 bg-white text-lg font-bold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900 dark:border-white/20 dark:bg-transparent dark:text-neutral-300 dark:hover:border-white dark:hover:text-white"
-                aria-label="Next day"
-              >
-                ›
-              </Link>
-            ) : (
-              <span className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-300 dark:text-neutral-700">
-                ›
-              </span>
-            )}
-          </div>
-          <p className="mt-8 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            Day spend estimate
-          </p>
-          {spendBreakdown ? (
-            <DaySpendEstimateBar
-              baselineGroupUsd={spendBreakdown.baselineGroupUsd}
-              hotelUsd={spendBreakdown.hotelUsd}
-              mealsUsd={spendBreakdown.mealsUsd}
-              activitiesUsd={spendBreakdown.activitiesUsd}
-              transportUsd={spendBreakdown.transportUsd}
-              estimatedTotalUsd={spendBreakdown.estimatedTotalUsd}
-            />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-neutral-950 dark:text-white sm:text-[2.125rem] sm:leading-tight">
+          {formatted.dayIndexLabel ? `${formatted.dayIndexLabel}: ${formatted.line2}` : formatted.line2}
+        </h1>
+        <div className="flex items-center gap-2">
+          {prevIso ? (
+            <Link
+              href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(prevIso)}`}
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-300 bg-white text-lg font-bold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900 dark:border-white/20 dark:bg-transparent dark:text-neutral-300 dark:hover:border-white dark:hover:text-white"
+              aria-label="Previous day"
+            >
+              ‹
+            </Link>
           ) : (
-            <p className="mt-3 font-sans text-xs leading-relaxed text-neutral-500 dark:text-neutral-500">
-              Save trip dates on the host calendar to see how this day lines up with your per-day budget.
-            </p>
+            <span className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-300 dark:text-neutral-700">
+              ‹
+            </span>
+          )}
+          {nextIso ? (
+            <Link
+              href={`/trip/${tripId}/setup/day?date=${encodeURIComponent(nextIso)}`}
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-300 bg-white text-lg font-bold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900 dark:border-white/20 dark:bg-transparent dark:text-neutral-300 dark:hover:border-white dark:hover:text-white"
+              aria-label="Next day"
+            >
+              ›
+            </Link>
+          ) : (
+            <span className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-300 dark:text-neutral-700">
+              ›
+            </span>
           )}
         </div>
-      </header>
+      </div>
 
-      <div className="mt-10 space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-stretch">
+        <div className="flex flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card">
+          <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-bold text-neutral-900 dark:text-white">
+            What do you want to do?
+          </label>
+          <p className="mt-1.5 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+            Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
+            experience — we scope edits to{" "}
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
+          </p>
+          <textarea
+            id={`daydream-${dateIso}`}
+            ref={dreamTextareaRef}
+            placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
+            rows={5}
+            value={dreamText}
+            onChange={(e) => setDreamText(e.target.value)}
+            disabled={dreamBusy}
+            className="mt-4 w-full resize-y rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:border-[#2563EB]/50 focus-visible:ring-2 focus-visible:ring-[#2563EB]/20 disabled:opacity-60 dark:border-white/10 dark:text-neutral-200 dark:placeholder:text-neutral-500"
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={dreamBusy || !dreamText.trim()}
+              onClick={() => void submitDayDream()}
+              className="rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-40"
+            >
+              {dreamBusy ? "Updating day…" : "Update day with Copilot"}
+            </button>
+          </div>
+          {dreamErr ? (
+            <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
+              {dreamErr}
+            </p>
+          ) : null}
+          {dreamReply ? (
+            <p className="mt-4 rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 px-3 py-3 text-sm text-neutral-900 dark:border-[#60A5FA]/20 dark:bg-[#2563EB]/10 dark:text-neutral-100">
+              {dreamReply}
+            </p>
+          ) : null}
+        </div>
 
         <DayItineraryMap
           stops={mapStops}
           locationHint={plan.location}
           dateIso={dateIso}
         />
+      </div>
+
+      {spendBreakdown ? (
+        <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Day spend estimate</p>
+          <DaySpendEstimateBar
+            baselineGroupUsd={spendBreakdown.baselineGroupUsd}
+            hotelUsd={spendBreakdown.hotelUsd}
+            mealsUsd={spendBreakdown.mealsUsd}
+            activitiesUsd={spendBreakdown.activitiesUsd}
+            transportUsd={spendBreakdown.transportUsd}
+            estimatedTotalUsd={spendBreakdown.estimatedTotalUsd}
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-4 space-y-4">
 
         <DayScheduleTimeline
           items={scheduleItems}
