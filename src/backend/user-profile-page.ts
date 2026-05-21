@@ -36,7 +36,8 @@ export function parseHotels(raw: unknown): ProfileHotel[] {
     const o = item as Record<string, unknown>;
     const name = typeof o.name === "string" ? o.name.trim() : "";
     if (!name) continue;
-    const stars = typeof o.starRating === "number" ? Math.min(5, Math.max(1, Math.round(o.starRating))) : 3;
+    const rawRating = typeof o.starRating === "number" ? o.starRating : 5;
+    const stars = Math.round(Math.min(10, Math.max(1, rawRating)) * 10) / 10;
     const pr = o.priceRange;
     const priceRange = pr === "$" || pr === "$$" || pr === "$$$" ? pr : undefined;
     out.push({
@@ -47,9 +48,10 @@ export function parseHotels(raw: unknown): ProfileHotel[] {
       note: typeof o.note === "string" ? o.note.trim().slice(0, 280) : "",
       priceRange,
       order: typeof o.order === "number" ? o.order : out.length,
+      photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
     });
   }
-  return out.sort((a, b) => a.order - b.order).slice(0, 6);
+  return out.sort((a, b) => a.order - b.order).slice(0, 10);
 }
 
 export function parseCities(raw: unknown): ProfileCity[] {
@@ -66,6 +68,7 @@ export function parseCities(raw: unknown): ProfileCity[] {
       country: typeof o.country === "string" ? o.country.trim() : "",
       note: typeof o.note === "string" ? o.note.trim().slice(0, 140) : "",
       order: typeof o.order === "number" ? o.order : out.length,
+      photoUrl: typeof o.photoUrl === "string" ? o.photoUrl : null,
     });
   }
   return out.sort((a, b) => a.order - b.order).slice(0, 24);
