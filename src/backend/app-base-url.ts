@@ -21,6 +21,11 @@ function isLoopbackOrigin(origin: string): boolean {
 export function appBaseUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (explicit) return stripTrailingSlash(explicit);
+  // VERCEL_PROJECT_PRODUCTION_URL = the project's primary production domain (respects custom
+  // domains). VERCEL_URL = deployment-specific URL (e.g. project-git-main-xxx.vercel.app) which
+  // is NOT the custom domain — never use it as a public-facing redirect target.
+  const vercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProd) return stripTrailingSlash(`https://${stripLeadingProtocol(vercelProd)}`);
   const vercel = process.env.VERCEL_URL?.trim();
   if (vercel) return stripTrailingSlash(`https://${stripLeadingProtocol(vercel)}`);
   return "http://localhost:3000";
@@ -54,14 +59,19 @@ export function publicOriginFromRequest(request: Request): string {
     return stripTrailingSlash(fromRequest);
   }
 
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) {
-    return stripTrailingSlash(`https://${stripLeadingProtocol(vercel)}`);
-  }
-
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (explicit && !isLoopbackOrigin(explicit)) {
     return stripTrailingSlash(explicit);
+  }
+
+  const vercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProd) {
+    return stripTrailingSlash(`https://${stripLeadingProtocol(vercelProd)}`);
+  }
+
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    return stripTrailingSlash(`https://${stripLeadingProtocol(vercel)}`);
   }
 
   if (fromRequest) return stripTrailingSlash(fromRequest);
