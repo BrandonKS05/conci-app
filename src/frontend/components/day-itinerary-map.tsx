@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 export type DayMapStop = {
   index: number;
@@ -28,6 +28,9 @@ interface GMInfoWindow {
   close(): void;
   setContent(content: string): void;
 }
+interface GMPolyline {
+  setMap(m: GMMap | null): void;
+}
 interface GMBounds {
   extend(ll: LatLng): void;
   getCenter(): { lat(): number; lng(): number };
@@ -45,6 +48,7 @@ interface GMapsApi {
   Map: new (el: HTMLElement, opts: object) => GMMap;
   Marker: new (opts: object) => GMMarker;
   InfoWindow: new (opts: { content?: string }) => GMInfoWindow;
+  Polyline: new (opts: object) => GMPolyline;
   LatLngBounds: new () => GMBounds;
   Geocoder: new () => GMGeocoder;
   event: {
@@ -110,6 +114,85 @@ function parseLatLngFromMapsUrl(url: string): LatLng | null {
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
+// ── Spread markers that would otherwise stack on top of each other ────────────
+// Positions within CLUSTER_DEG of each other are gathered into a group and
+// arranged evenly on a small circle so every pin stays individually clickable.
+// The original coordinates stored in the DB are never touched — only the display
+// positions passed to google.maps.Marker are adjusted.
+//
+// At city-overview zoom (12-14) the circle radius is sub-pixel so markers look
+// naturally co-located; zooming in to street level (16+) reveals the clean ring.
+const CLUSTER_DEG = 0.0002;  // ≈ 22 m — treat as "same spot"
+const SPREAD_DEG  = 0.00045; // ≈ 50 m — radius of the separation ring
+
+function spreadOverlapping(positions: LatLng[]): LatLng[] {
+  const result  = positions.map((p) => ({ ...p }));
+  const claimed = new Array<boolean>(positions.length).fill(false);
+
+  for (let i = 0; i < positions.length; i++) {
+    if (claimed[i]) continue;
+    // Build a cluster seeded by position[i].
+    const group: number[] = [i];
+    claimed[i] = true;
+    for (let j = i + 1; j < positions.length; j++) {
+      if (
+        !claimed[j] &&
+        Math.hypot(
+          positions[j].lat - positions[i].lat,
+          positions[j].lng - positions[i].lng
+        ) < CLUSTER_DEG
+      ) {
+        group.push(j);
+        claimed[j] = true;
+      }
+    }
+    if (group.length < 2) continue;
+
+    // Centroid of the cluster.
+    const cLat = group.reduce((s, k) => s + positions[k].lat, 0) / group.length;
+    const cLng = group.reduce((s, k) => s + positions[k].lng, 0) / group.length;
+
+    // Evenly distribute around a circle, starting at the top (north).
+    for (let g = 0; g < group.length; g++) {
+      const angle = (2 * Math.PI * g) / group.length - Math.PI / 2;
+      result[group[g]] = {
+        lat: cLat + SPREAD_DEG * Math.sin(angle),
+        lng: cLng + SPREAD_DEG * Math.cos(angle),
+      };
+    }
+  }
+  return result;
+}
+
+// ── Shared pin icon (used in the map strip and day-summary card) ─────────────
+export function DayStopPin({ n, size = 20 }: { n: number; size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 20 28"
+      width={size}
+      height={Math.round(size * 1.4)}
+      className="shrink-0"
+      aria-hidden
+    >
+      <path
+        d="M10,0C4.477,0,0,4.477,0,10c0,6.627,10,18,10,18S20,16.627,20,10C20,4.477,15.523,0,10,0z"
+        fill="#C2392B"
+      />
+      <text
+        x="10"
+        y="13"
+        textAnchor="middle"
+        fill="white"
+        fontSize={size <= 16 ? "7" : "9"}
+        fontWeight="700"
+        fontFamily="system-ui,sans-serif"
+      >
+        {n}
+      </text>
+    </svg>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export function DayItineraryMap({
   stops,
@@ -126,6 +209,7 @@ export function DayItineraryMap({
   const markersRef = useRef<GMMarker[]>([]);
   // Single shared InfoWindow — closing the previous one before opening the next.
   const infoWindowRef = useRef<GMInfoWindow | null>(null);
+  const polylineRef   = useRef<GMPolyline | null>(null);
   // mapReady stays false until geocoding is done — loading overlay covers grey canvas
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,9 +262,11 @@ export function DayItineraryMap({
           }
         }, 8000);
 
-        // Clear the previous day's markers.
+        // Clear the previous day's markers and route line.
         for (const m of markersRef.current) m.setMap(null);
         markersRef.current = [];
+        polylineRef.current?.setMap(null);
+        polylineRef.current = null;
 
         if (stops.length === 0) {
           setMapReady(true);
@@ -191,21 +277,30 @@ export function DayItineraryMap({
         const bounds = new window.google!.maps.LatLngBounds();
         let placed = 0;
 
+        // Phase 1 — resolve every stop to a lat/lng (URL parse → Geocoding API).
+        const geocoded: Array<{ stop: DayMapStop; ll: LatLng }> = [];
         for (const stop of stops) {
           if (cancelled) return;
-
           let ll: LatLng | null = null;
-
-          // 1. Prefer coordinates embedded in a Google Maps URL.
           if (stop.mapsUrl) ll = parseLatLngFromMapsUrl(stop.mapsUrl);
-
-          // 2. Fall back to the Geocoding API.
           if (!ll) {
             const query = locationHint ? `${stop.label}, ${locationHint}` : stop.label;
             ll = await geocodeAddress(geocoder, query);
           }
+          if (ll) geocoded.push({ stop, ll });
+        }
 
-          if (!ll || cancelled) continue;
+        if (cancelled) return;
+
+        // Phase 2 — nudge any co-located markers onto a small circle so they
+        // don't render as a single stacked blob.
+        const displayLLs = spreadOverlapping(geocoded.map((g) => g.ll));
+
+        // Phase 3 — place markers at their (possibly offset) display positions.
+        for (let i = 0; i < geocoded.length; i++) {
+          if (cancelled) return;
+          const { stop } = geocoded[i];
+          const ll = displayLLs[i];
 
           bounds.extend(ll);
           const marker = new window.google!.maps.Marker({
@@ -244,6 +339,18 @@ export function DayItineraryMap({
 
         if (cancelled) return;
 
+        // Draw a route line connecting stops in itinerary order.
+        if (placed > 1) {
+          polylineRef.current = new window.google!.maps.Polyline({
+            path: displayLLs,
+            geodesic: true,
+            strokeColor: "#C2392B",
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+            map: mapInstanceRef.current!,
+          });
+        }
+
         if (placed > 1) {
           mapInstanceRef.current!.fitBounds(bounds);
         } else if (placed === 1) {
@@ -268,6 +375,7 @@ export function DayItineraryMap({
     return () => {
       cancelled = true;
       infoWindowRef.current?.close();
+      polylineRef.current?.setMap(null);
     };
   }, [stops, locationHint, dateIso, apiKey]);
 
@@ -323,6 +431,27 @@ export function DayItineraryMap({
           </div>
         ) : null}
       </div>
+
+      {/* Stop-order strip — scrollable breadcrumb showing route sequence. */}
+      {stops.length > 0 && (
+        <div className="shrink-0 overflow-x-auto border-t border-neutral-900/8 dark:border-white/8">
+          <div className="flex min-w-max items-center gap-2 px-4 py-3">
+            {stops.map((stop, idx) => (
+              <Fragment key={stop.index}>
+                {idx > 0 && (
+                  <span className="shrink-0 text-[11px] text-neutral-300 dark:text-neutral-600">→</span>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <DayStopPin n={stop.index} size={16} />
+                  <span className="whitespace-nowrap text-[12px] font-medium text-neutral-700 dark:text-neutral-300">
+                    {stop.label}
+                  </span>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

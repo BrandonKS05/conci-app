@@ -23,7 +23,7 @@ import {
   type HostActivityPin,
   type TripPlan,
 } from "@/shared/trip-plan";
-import { DayItineraryMap, type DayMapStop } from "@/frontend/components/day-itinerary-map";
+import { DayItineraryMap, DayStopPin, type DayMapStop } from "@/frontend/components/day-itinerary-map";
 
 type Props = {
   tripId: string;
@@ -1055,45 +1055,88 @@ export function TripHostSetupDayPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-stretch">
-        <div className="flex flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card">
-          <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-bold text-neutral-900 dark:text-white">
-            What do you want to do?
-          </label>
-          <p className="mt-1.5 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-            Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
-            experience — we scope edits to{" "}
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
-          </p>
-          <textarea
-            id={`daydream-${dateIso}`}
-            ref={dreamTextareaRef}
-            placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
-            rows={5}
-            value={dreamText}
-            onChange={(e) => setDreamText(e.target.value)}
-            disabled={dreamBusy}
-            className="mt-4 w-full resize-y rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:border-[#2563EB]/50 focus-visible:ring-2 focus-visible:ring-[#2563EB]/20 disabled:opacity-60 dark:border-white/10 dark:text-neutral-200 dark:placeholder:text-neutral-500"
-          />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={dreamBusy || !dreamText.trim()}
-              onClick={() => void submitDayDream()}
-              className="rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-40"
-            >
-              {dreamBusy ? "Updating day…" : "Update day with Copilot"}
-            </button>
+        <div className="flex flex-col gap-4">
+          {/* ── Copilot card ── */}
+          <div className="flex flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card">
+            <label htmlFor={`daydream-${dateIso}`} className="font-sans text-sm font-bold text-neutral-900 dark:text-white">
+              What do you want to do?
+            </label>
+            <p className="mt-1.5 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+              Same Trip Copilot powers as on the calendar: ask to swap the hotel segment for this night, change dinner, pin an
+              experience — we scope edits to{" "}
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{dateIso}</span> when possible.
+            </p>
+            <textarea
+              id={`daydream-${dateIso}`}
+              ref={dreamTextareaRef}
+              placeholder={`e.g. Italian dinner instead of tacos · beach club this afternoon · different hotel nearer downtown…`}
+              rows={5}
+              value={dreamText}
+              onChange={(e) => setDreamText(e.target.value)}
+              disabled={dreamBusy}
+              className="mt-4 w-full resize-y rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus-visible:border-[#2563EB]/50 focus-visible:ring-2 focus-visible:ring-[#2563EB]/20 disabled:opacity-60 dark:border-white/10 dark:text-neutral-200 dark:placeholder:text-neutral-500"
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={dreamBusy || !dreamText.trim()}
+                onClick={() => void submitDayDream()}
+                className="rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:pointer-events-none disabled:opacity-40"
+              >
+                {dreamBusy ? "Updating day…" : "Update day with Copilot"}
+              </button>
+            </div>
+            {dreamErr ? (
+              <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
+                {dreamErr}
+              </p>
+            ) : null}
+            {dreamReply ? (
+              <p className="mt-4 rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 px-3 py-3 text-sm text-neutral-900 dark:border-[#60A5FA]/20 dark:bg-[#2563EB]/10 dark:text-neutral-100">
+                {dreamReply}
+              </p>
+            ) : null}
           </div>
-          {dreamErr ? (
-            <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
-              {dreamErr}
-            </p>
-          ) : null}
-          {dreamReply ? (
-            <p className="mt-4 rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 px-3 py-3 text-sm text-neutral-900 dark:border-[#60A5FA]/20 dark:bg-[#2563EB]/10 dark:text-neutral-100">
-              {dreamReply}
-            </p>
-          ) : null}
+
+          {/* ── Day Summary card ── */}
+          {mapStops.length > 0 && (
+            <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-dm-card">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">
+                  Day Summary
+                </p>
+                <p className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+                  {mapStops.length} stop{mapStops.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <ul className="mt-3 space-y-3">
+                {mapStops.map((stop) => (
+                  <li key={stop.index} className="flex items-start gap-3">
+                    <DayStopPin n={stop.index} size={20} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-neutral-900 dark:text-white">
+                        {stop.label}
+                      </p>
+                      {stop.description && (
+                        <p className="truncate text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+                          {stop.description}
+                        </p>
+                      )}
+                    </div>
+                    {stop.time && (
+                      <p className="shrink-0 tabular-nums text-[11px] text-neutral-400 dark:text-neutral-500">
+                        {stop.time}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500">
+                <span aria-hidden>ⓘ</span>
+                <span>Stops are ordered by itinerary</span>
+              </p>
+            </div>
+          )}
         </div>
 
         <DayItineraryMap
