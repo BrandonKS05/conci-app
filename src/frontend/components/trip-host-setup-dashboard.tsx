@@ -1506,7 +1506,7 @@ export function TripHostSetupDashboard({
 
             <Link
               href={`/trip/${tripId}/itinerary`}
-              className="hidden w-full items-center justify-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90 lg:inline-flex"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90"
             >
               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0" aria-hidden>
                 <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
