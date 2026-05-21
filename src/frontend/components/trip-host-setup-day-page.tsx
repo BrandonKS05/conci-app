@@ -1109,7 +1109,7 @@ export function TripHostSetupDayPage({
                   {mapStops.length} stop{mapStops.length === 1 ? "" : "s"}
                 </p>
               </div>
-              <ul className="mt-3 space-y-3">
+              <ul className="mt-3 max-h-[200px] space-y-3 overflow-y-auto">
                 {mapStops.map((stop) => (
                   <li key={stop.index} className="flex items-start gap-3">
                     <DayStopPin n={stop.index} size={20} />
