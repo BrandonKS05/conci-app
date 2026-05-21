@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import NextImage from "next/image";
 import type { TripPlan } from "@/shared/trip-plan";
 import { planHasUsableTripTiming } from "@/shared/trip-plan";
@@ -378,8 +378,10 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
   const isReady = Boolean(form.destination.trim() && form.dateStart.trim());
 
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: "#f4f7fc" }}>
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <div className="fixed inset-0 z-[60] overflow-y-auto" style={{ background: "#f4f7fc" }}>
+      <div className="mx-auto max-w-2xl px-4 pb-10 pt-20 sm:px-6">
+        {/* Step eyebrow — mirrors "Step 1/2 · Tell Us Anything" in input phase */}
+        <p className="label-caps mb-6 text-[color:var(--on-surface-muted)]/70">Step 2/2 · Ready for Liftoff?</p>
         {/* ── TICKET CARD ── */}
         <div className="relative rounded-2xl bg-white shadow-[0_30px_60px_-20px_rgba(37,99,235,0.18),0_8px_18px_-8px_rgba(15,23,42,0.08)]">
           {/* Perforation notches */}
@@ -395,7 +397,6 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
               <span className="opacity-60">· Boarding pass</span>
             </span>
             <div className="flex items-center gap-3">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">No. 047</span>
               <button
                 type="button"
                 onClick={() => { setPhase("input"); setError(null); setActiveEdit(null); }}
@@ -528,16 +529,8 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
               )}
             </div>
             <p className="mb-6 text-right text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--sage)" }}>* Required</p>
-            {/* PERFORATED DIVIDER */}
-            <div className="mb-6" aria-hidden>
-              <div className="h-px w-full" style={{ background: "var(--hairline)" }} />
-              <div className="my-1.5 flex gap-[3px] overflow-hidden">
-                {Array.from({ length: 72 }).map((_, i) => (
-                  <div key={i} className="h-[1.5px] flex-1 rounded-full" style={{ background: "var(--hairline)", maxWidth: 7 }} />
-                ))}
-              </div>
-              <div className="h-px w-full" style={{ background: "var(--hairline)" }} />
-            </div>
+            {/* DIVIDER */}
+            <div className="mb-6 border-t border-dashed" aria-hidden style={{ borderColor: "var(--hairline-strong)" }} />
             {/* OPTIONAL EYEBROW */}
             <div className="mb-5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: "var(--on-surface-muted)" }}>
               <span>Optional</span>
@@ -663,7 +656,7 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
               </div>
               {/* NOTES */}
               <div className="grid gap-3" style={{ gridTemplateColumns: "100px 1fr" }}>
-                <span className="pt-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Notes</span>
+                <span className="pt-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--on-surface-muted)" }}>Anything else?</span>
                 <div className="cursor-text rounded-lg px-3 py-2 transition-colors"
                   style={{ border: "1px dashed", borderColor: (form.interests || activeEdit === "notes") ? "var(--sage)" : "color-mix(in srgb, var(--sage) 45%, transparent)", minHeight: 68, background: "white" }}
                   onClick={() => { if (activeEdit !== "notes") setActiveEdit("notes"); }}>
@@ -765,6 +758,8 @@ function TripInputCanvas({
   const [isFocused, setIsFocused] = useState(false);
   const [ghostIndex, setGhostIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const hasContent = freeText.length > 0;
   const isComposing = isFocused || hasContent;
@@ -789,6 +784,15 @@ function TripInputCanvas({
   }, [setFreeText]);
 
   return (
+    <>
+      {/* Portal to document.body — lives in root stacking context so z-[55] actually beats the nav's z-50 */}
+      {mounted && createPortal(
+        <div
+          aria-hidden
+          className={`pointer-events-none fixed inset-x-0 top-0 z-[55] h-28 bg-white transition-opacity duration-500 ease-out dark:bg-[#0a0a0a] ${isComposing ? "opacity-100" : "opacity-0"}`}
+        />,
+        document.body
+      )}
     <div className="fixed inset-0 z-40 overflow-y-auto bg-white dark:bg-[#0a0a0a]">
       <TripCanvasBackdrop />
 
@@ -797,14 +801,7 @@ function TripInputCanvas({
 
       <div className="relative z-10 mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 sm:px-10">
         {/* Eyebrow */}
-        <div className="flex items-center justify-between pt-8 sm:pt-10">
-          <Link
-            href="/"
-            className="font-display text-2xl font-semibold tracking-[-0.01em] text-[color:var(--on-surface)] transition hover:opacity-75 dark:text-[#ebe9e4] sm:text-[1.7rem]"
-            aria-label="Conci home"
-          >
-            Conci
-          </Link>
+        <div className="flex items-center justify-end pt-20 sm:pt-20">
           <span className="label-caps text-[color:var(--on-surface-muted)]/70">Step 1/2 · Tell Us Anything</span>
         </div>
 
@@ -1004,6 +1001,7 @@ function TripInputCanvas({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
