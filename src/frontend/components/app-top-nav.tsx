@@ -9,7 +9,7 @@ export function AppTopNav() {
   const pathname = usePathname() ?? "";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/85 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-[#141414]/90 sm:px-8">
+    <header className="sticky top-0 z-50 border-b border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/85 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-[#141414]/90 sm:px-8">
       <div className="mx-auto flex max-w-6xl items-center gap-6">
         <Link
           href="/"
