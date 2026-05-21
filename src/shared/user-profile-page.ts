@@ -6,10 +6,12 @@ export type ProfileHotel = {
   id: string;
   name: string;
   location: string;
+  /** 1–10 personal ranking (stored in the `starRating` DB column). */
   starRating: number;
   note: string;
   priceRange?: PriceRangeHotel;
   order: number;
+  photoUrl?: string | null;
 };
 
 export type ProfileCity = {
@@ -18,6 +20,7 @@ export type ProfileCity = {
   country: string;
   note: string;
   order: number;
+  photoUrl?: string | null;
 };
 
 export type ProfileRecentTrip = {
