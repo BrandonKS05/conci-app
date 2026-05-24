@@ -88,8 +88,7 @@ const LEFT_RAIL_TABS: readonly {
 }[] = [
   { id: "overview", label: "Overview", navIconId: "overview" },
   { id: "transportation", label: "Transportation", navIconId: "flights" },
-  { id: "budget", label: "Budget", navIconId: "budget" },
-  { id: "fund", label: "Fund", navIconId: "fund" },
+  { id: "budget", label: "Budget & Fund", navIconId: "budget" },
   { id: "collaborate", label: "Collaborate", navIconId: "collaborate" },
   { id: "lodging", label: "Lodging", navIconId: "lodging" },
 ];
@@ -1540,7 +1539,7 @@ export function TripHostSetupDashboard({
     </div>
           </section>
 
-          {workspaceTab === "fund" ? (
+          {workspaceTab === "budget" ? (
           <div id="sec-fund" className="scroll-mt-28 space-y-5">
             <section className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
               <TripDepositTracker tripId={tripId} variant="flat" />

@@ -5,14 +5,13 @@
 export type TripWorkspaceTabId =
   | "overview"
   | "budget"
-  | "fund"
   | "collaborate"
   | "lodging"
   | "transportation";
 
 /** Section element ids (without #) → which main-column tab owns that block. */
 export const TRIP_WORKSPACE_SECTION_TO_TAB: Record<string, TripWorkspaceTabId> = {
-  "sec-fund": "fund",
+  "sec-fund": "budget",
   "sec-dates": "overview",
   "sec-setup-copilot": "overview",
   "sec-preferences-adjustments": "collaborate",
