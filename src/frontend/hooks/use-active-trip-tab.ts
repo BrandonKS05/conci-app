@@ -20,7 +20,7 @@ export const TRIP_WORKSPACE_SECTION_TO_TAB: Record<string, TripWorkspaceTabId> =
   "sec-budget": "budget",
   "sec-trip-chat": "overview",
   "sec-itinerary": "collaborate",
-  "sec-invite": "overview",
+  "sec-invite": "collaborate",
   "sec-flights": "transportation",
   "trip-live-flights": "transportation",
   "trip-card-chat": "overview",

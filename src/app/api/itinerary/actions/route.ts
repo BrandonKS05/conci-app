@@ -7,6 +7,9 @@ import { logItineraryDiagnostic } from "@/backend/itinerary-debug";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Legacy itinerary API is disabled." }, { status: 404 });
+  }
   try {
     const body = (await request.json().catch(() => ({}))) as MutateItineraryRequest;
     logItineraryDiagnostic("route.entry.mutate_itinerary", {

@@ -5,6 +5,22 @@ import type { TripPlan } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
 import type { BookingTaskKey, BookingTasksState } from "@/shared/booking-tasks";
 
+export type BookingChecklistLinks = {
+  flights?: { label: string; href: string } | null;
+  restaurant?: { label: string; href: string } | null;
+  activity?: { label: string; href: string } | null;
+};
+
+export type BookingChecklistStay = {
+  taskKey: BookingTaskKey;
+  name: string;
+  area?: string;
+  dateLabel?: string;
+  priceHint?: string;
+  href: string;
+  hasSpecificLink: boolean;
+};
+
 function cityQuery(plan: TripPlan): string {
   const loc = plan.location?.trim();
   if (loc) return loc.split(",")[0]?.trim() || loc;
@@ -27,12 +43,16 @@ export function BookingChecklist({
   tripId,
   plan,
   hotel,
+  stays,
+  links,
   initialTasks,
   canEdit,
 }: {
   tripId: string;
   plan: TripPlan;
   hotel: HotelPick | null;
+  stays?: BookingChecklistStay[];
+  links?: BookingChecklistLinks;
   initialTasks: BookingTasksState;
   canEdit: boolean;
 }) {
@@ -47,6 +67,34 @@ export function BookingChecklist({
 
   const flightsUrl = `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights to ${city}`)}`;
   const diningUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`restaurants ${city}`)}`;
+  const activityUrl = `https://www.google.com/search?q=${encodeURIComponent(`things to do ${city}`)}`;
+  const lodgingRows =
+    stays && stays.length > 0
+      ? stays.map((stay, index) => ({
+          key: stay.taskKey,
+          title: stays.length > 1 ? `Stay ${index + 1}` : "Stay",
+          description: [
+            stay.dateLabel,
+            stay.name,
+            stay.area,
+            stay.priceHint,
+          ].filter(Boolean).join(" · "),
+          actionLabel: stay.hasSpecificLink ? "Open stay link" : "Search stay",
+          href: stay.href,
+          external: true,
+        }))
+      : [
+          {
+            key: "hotel" as BookingTaskKey,
+            title: "Stay",
+            description: hotel
+              ? `${hasSpecificHotelLink ? "Selected stay" : "Stay"}: ${hotel.name}${hotel.priceHint ? ` · ${hotel.priceHint}` : ""}`
+              : "Book your stay for the voted dates.",
+            actionLabel: hasSpecificHotelLink ? "Open stay link" : "Book now",
+            href: hotelUrl,
+            external: true,
+          },
+        ];
 
   const toggle = useCallback(
     async (task: BookingTaskKey, nextBooked: boolean) => {
@@ -83,30 +131,35 @@ export function BookingChecklist({
     href: string;
     external: boolean;
   }[] = [
-    {
-      key: "hotel",
-      title: "Stay",
-      description: hotel
-        ? `${hasSpecificHotelLink ? "Selected stay" : "Stay"}: ${hotel.name}${hotel.priceHint ? ` · ${hotel.priceHint}` : ""}`
-        : "Book your stay for the voted dates.",
-      actionLabel: hasSpecificHotelLink ? "Open stay link" : "Book now",
-      href: hotelUrl,
-      external: true,
-    },
+    ...lodgingRows,
     {
       key: "flights",
       title: "Flights",
-      description: "Search routes to your destination.",
-      actionLabel: "Search flights",
-      href: flightsUrl,
+      description: links?.flights
+        ? `Selected flight: ${links.flights.label}`
+        : "Search routes to your destination.",
+      actionLabel: links?.flights ? "Open flight link" : "Search flights",
+      href: links?.flights?.href ?? flightsUrl,
       external: true,
     },
     {
       key: "restaurant",
       title: "Restaurant reservation",
-      description: "Find a table for the group.",
-      actionLabel: "Find restaurants",
-      href: diningUrl,
+      description: links?.restaurant
+        ? `Selected restaurant: ${links.restaurant.label}`
+        : "Find a table for the group.",
+      actionLabel: links?.restaurant ? "Open restaurant link" : "Find restaurants",
+      href: links?.restaurant?.href ?? diningUrl,
+      external: true,
+    },
+    {
+      key: "activity",
+      title: "Experience or activity",
+      description: links?.activity
+        ? `Selected activity: ${links.activity.label}`
+        : "Find an activity booking link for the group.",
+      actionLabel: links?.activity ? "Open activity link" : "Find activities",
+      href: links?.activity?.href ?? activityUrl,
       external: true,
     },
   ];
@@ -121,7 +174,7 @@ export function BookingChecklist({
 
       <ul className="space-y-4">
         {rows.map((row) => {
-          const t = tasks[row.key];
+          const t = tasks[row.key] ?? (String(row.key).startsWith("hotel:") ? tasks.hotel : undefined);
           const booked = t?.booked === true;
           return (
             <li

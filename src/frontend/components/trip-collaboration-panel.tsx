@@ -47,6 +47,7 @@ import {
   normalizePlan,
   tripLiveRecommendationsContextFingerprint,
   tripRangeBestEffortFromPlanDates,
+  type MemberRecommendation,
   type TripPlan,
 } from "@/shared/trip-plan";
 import type { HotelPick } from "@/shared/hotels";
@@ -640,6 +641,7 @@ export function TripCollaborationPanel({
       <div className="space-y-3">
         <ActivityVibePollCard
           tripId={tripId}
+          plan={plan}
           isTripOwner={isTripOwner}
           adjustmentSubmissions={collab.adjustmentSubmissions}
           viewerUserId={viewerUserId ?? null}
@@ -1195,8 +1197,93 @@ function DatesLockedGate({ active, children }: { active: boolean; children: Reac
   );
 }
 
+type AdjustmentCategory =
+  | "dates"
+  | "budget"
+  | "lodging"
+  | "food"
+  | "activities"
+  | "pace"
+  | "transport"
+  | "constraints"
+  | "other";
+
+const ADJUSTMENT_CATEGORY_LABELS: Record<AdjustmentCategory, string> = {
+  dates: "Dates",
+  budget: "Budget",
+  lodging: "Lodging",
+  food: "Food",
+  activities: "Activities",
+  pace: "Pace",
+  transport: "Transport",
+  constraints: "Constraints",
+  other: "Other",
+};
+
+const ADJUSTMENT_CATEGORY_ORDER: AdjustmentCategory[] = [
+  "dates",
+  "budget",
+  "lodging",
+  "food",
+  "activities",
+  "pace",
+  "transport",
+  "constraints",
+  "other",
+];
+
+function inferAdjustmentCategory(submission: AdjustmentSubmissionV1): AdjustmentCategory {
+  const text = `${submission.conciProposal?.summary ?? ""}\n${submission.text}`.toLowerCase();
+  if (/\b(date|dates|timing|weekend|weekday|arrive|arrival|depart|departure|leave|late|early|june|july|august|fall|spring|winter|summer)\b/.test(text)) return "dates";
+  if (/\b(budget|cost|price|cheap|cheaper|expensive|spend|under|\$|afford|owed|pay)\b/.test(text)) return "budget";
+  if (/\b(hotel|lodging|stay|airbnb|hostel|villa|resort|room|bed|neighborhood|walkable)\b/.test(text)) return "lodging";
+  if (/\b(food|restaurant|dinner|lunch|breakfast|allergy|allergies|vegetarian|vegan|gluten|shellfish|dietary)\b/.test(text)) return "food";
+  if (/\b(activity|activities|experience|tour|beach|museum|hike|nightlife|music|club|show)\b/.test(text)) return "activities";
+  if (/\b(pace|chill|packed|relaxed|slow|busy|rest|downtime|anchor plan)\b/.test(text)) return "pace";
+  if (/\b(flight|train|drive|car|uber|taxi|transfer|transport|airport)\b/.test(text)) return "transport";
+  if (/\b(constraint|accessibility|wheelchair|hard stop|must|cannot|can't|kid|work|meeting)\b/.test(text)) return "constraints";
+  return "other";
+}
+
+function groupAdjustmentSubmissions(rows: AdjustmentSubmissionV1[]): Array<{
+  category: AdjustmentCategory;
+  label: string;
+  rows: AdjustmentSubmissionV1[];
+}> {
+  const grouped = new Map<AdjustmentCategory, AdjustmentSubmissionV1[]>();
+  for (const row of rows) {
+    const category = inferAdjustmentCategory(row);
+    grouped.set(category, [...(grouped.get(category) ?? []), row]);
+  }
+  return ADJUSTMENT_CATEGORY_ORDER
+    .map((category) => ({
+      category,
+      label: ADJUSTMENT_CATEGORY_LABELS[category],
+      rows: grouped.get(category) ?? [],
+    }))
+    .filter((group) => group.rows.length > 0);
+}
+
+const MEMBER_RECOMMENDATION_CATEGORY_LABELS: Record<MemberRecommendation["category"], string> = {
+  activity: "Activity",
+  food: "Food",
+  lodging: "Lodging",
+  timing: "Timing",
+  budget: "Budget",
+  vibe: "Vibe",
+  transport: "Transport",
+  other: "Other",
+};
+
+function impactLabel(impact: MemberRecommendation["impact"]): string {
+  if (impact === "high") return "Bigger move";
+  if (impact === "medium") return "Medium lift";
+  return "Quick tweak";
+}
+
 export function ActivityVibePollCard({
   tripId,
+  plan,
   isTripOwner,
   adjustmentSubmissions,
   viewerUserId,
@@ -1204,6 +1291,7 @@ export function ActivityVibePollCard({
   onPlanUpdated,
 }: {
   tripId: string;
+  plan: TripPlan;
   isTripOwner: boolean;
   adjustmentSubmissions?: AdjustmentSubmissionV1[];
   viewerUserId?: string | null;
@@ -1218,6 +1306,11 @@ export function ActivityVibePollCard({
   const rows = [...(adjustmentSubmissions ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const pending = rows.filter((r) => r.status === "pending");
   const archives = rows.filter((r) => r.status !== "pending").slice(0, 15);
+  const pendingGroups = groupAdjustmentSubmissions(pending);
+  const pendingRecommendations = [...(plan.memberRecommendations ?? [])]
+    .filter((r) => r.status === "pending")
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const hideLegacyHostSuggestions = isTripOwner && pendingRecommendations.length > 0;
 
   const submitSuggestion = useCallback(async () => {
     const t = draft.trim();
@@ -1303,28 +1396,92 @@ export function ActivityVibePollCard({
     [isTripOwner, onPlanUpdated, reloadCollab, tripId]
   );
 
+  const resolveRecommendation = useCallback(
+    async (recommendationId: string, action: "dismiss" | "mark_applied") => {
+      if (!isTripOwner) return;
+      setActionBusyId(`rec:${recommendationId}`);
+      setUiErr(null);
+      try {
+        const res = await fetch(`/api/trip-plans/${tripId}/member-recommendations`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recommendationId, action }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
+        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not update recommendation.");
+        if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+      } catch (e) {
+        setUiErr(e instanceof Error ? e.message : "Recommendation update failed.");
+      } finally {
+        setActionBusyId(null);
+      }
+    },
+    [isTripOwner, onPlanUpdated, tripId]
+  );
+
+  const applyRecommendationWithCopilot = useCallback(
+    async (recommendation: MemberRecommendation) => {
+      if (!isTripOwner || recommendation.status !== "pending") return;
+      setActionBusyId(`rec:${recommendation.id}`);
+      setUiErr(null);
+      try {
+        const category = MEMBER_RECOMMENDATION_CATEGORY_LABELS[recommendation.category];
+        const msg = `Conci recommended this change based on ${recommendation.memberName}'s preferences:\n\nCategory: ${category}\nImpact: ${recommendation.impact}\nSummary: ${recommendation.summary}\nDetail: ${recommendation.detail}\n\nApply this in the smallest clean way that improves the live trip plan. Update the calendar, lodging, restaurants, activities, transport, budget, or vibe only where it clearly helps.`;
+        const res = await fetch(`/api/trip-plans/${tripId}/host-copilot`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
+        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Copilot could not apply that.");
+
+        const patch = await fetch(`/api/trip-plans/${tripId}/member-recommendations`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recommendationId: recommendation.id, action: "mark_applied" }),
+        });
+        const pj = (await patch.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
+        if (!patch.ok) throw new Error(typeof pj.error === "string" ? pj.error : "Saved plan but could not mark recommendation applied.");
+        if (pj.plan) onPlanUpdated?.(normalizePlan(pj.plan));
+        else if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+      } catch (e) {
+        setUiErr(e instanceof Error ? e.message : "Apply failed.");
+      } finally {
+        setActionBusyId(null);
+      }
+    },
+    [isTripOwner, onPlanUpdated, tripId]
+  );
+
   return (
     <section className="rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
-      <textarea
-        rows={4}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
-        maxLength={2000}
-        disabled={submitBusy}
-        className="w-full resize-y rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
-      />
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{draft.trim().length} / 2000</span>
-        <button
-          type="button"
-          disabled={submitBusy || draft.trim().length < 1}
-          onClick={() => void submitSuggestion()}
-          className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
-        >
-          {submitBusy ? "Conci is preparing…" : "Submit suggestion"}
-        </button>
-      </div>
+      {!isTripOwner ? (
+        <>
+          <textarea
+            rows={4}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="e.g. more chill nights · budget-friendly dinners · tweak hotel area…"
+            maxLength={2000}
+            disabled={submitBusy}
+            className="w-full resize-y rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-2 text-sm text-[color:var(--on-surface)] placeholder:text-[color:var(--on-surface-muted)] focus:border-[color:var(--sage)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sage)]/40 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{draft.trim().length} / 2000</span>
+            <button
+              type="button"
+              disabled={submitBusy || draft.trim().length < 1}
+              onClick={() => void submitSuggestion()}
+              className={`rounded-lg px-4 py-2 text-sm disabled:opacity-40 ${primaryFilledInteractive}`}
+            >
+              {submitBusy ? "Conci is preparing…" : "Submit suggestion"}
+            </button>
+          </div>
+        </>
+      ) : null}
 
       {uiErr ? (
         <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/35 dark:text-rose-100">
@@ -1332,73 +1489,166 @@ export function ActivityVibePollCard({
         </p>
       ) : null}
 
-      <div className="mt-6 border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-          Suggestions
-        </p>
-        {!pending.length && !archives.length ? (
-          <p className="mt-2 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">Nothing here yet.</p>
-        ) : null}
-        {pending.length ? (
-          <ul className="mt-3 space-y-3">
-            {pending.map((row) => {
-              const isMine = viewerUserId && row.authorUserId === viewerUserId;
-              const busyHere = actionBusyId === row.id;
-              const conciSummary = row.conciProposal?.summary?.trim();
-              return (
-                <li
-                  key={row.id}
-                  className="rounded-2xl border border-[#D9C9A8] bg-gradient-to-br from-[#FDF8F0] to-[#F5EDD8] p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E8603C]">
-                      Conci suggestion
-                    </p>
-                    <p className="text-xs text-[#7A7060]">
-                      {row.authorDisplayName}
-                      {isMine ? " · you" : null}
-                      <span>
-                        {" "}
-                        · {new Date(row.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+      {isTripOwner && pendingRecommendations.length ? (
+        <div>
+          <div className="rounded-2xl border border-[#D8E2FF] bg-[#F7FAFF] p-4 shadow-sm dark:border-blue-400/20 dark:bg-blue-950/15">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#2F66ED]">
+                  Conci recommendations
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                  Synthesized from guest preferences. Apply the ones that make the trip better.
+                </p>
+              </div>
+              <span className="rounded-full border border-[#BFD0FF] bg-white px-3 py-1 text-xs font-semibold text-[#2F66ED] dark:border-blue-400/25 dark:bg-blue-950/30 dark:text-blue-200">
+                {pendingRecommendations.length} pending
+              </span>
+            </div>
+
+            <ul className="mt-4 space-y-3">
+              {pendingRecommendations.map((recommendation) => {
+                const busyHere = actionBusyId === `rec:${recommendation.id}`;
+                return (
+                  <li
+                    key={recommendation.id}
+                    className="rounded-2xl border border-white bg-white p-4 shadow-[0_12px_30px_rgba(33,64,125,0.08)] dark:border-white/10 dark:bg-dm-card dark:shadow-none"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#EEF4FF] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#2F66ED] dark:bg-blue-400/10 dark:text-blue-200">
+                        {MEMBER_RECOMMENDATION_CATEGORY_LABELS[recommendation.category]}
                       </span>
+                      <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--on-surface-variant)] dark:bg-white/10 dark:text-neutral-300">
+                        {impactLabel(recommendation.impact)}
+                      </span>
+                      <span className="text-xs font-medium text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                        From {recommendation.memberName}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold leading-snug text-[color:var(--on-surface)] dark:text-neutral-100">
+                      {recommendation.summary}
                     </p>
-                  </div>
-                  {conciSummary ? (
-                    <>
-                      <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{conciSummary}</p>
-                      <p className="mt-2 text-xs italic leading-relaxed text-[#7A7060]">
-                        {row.authorDisplayName} said: &ldquo;{row.text}&rdquo;
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-3 text-sm leading-relaxed text-[#4A3F30]">{row.text}</p>
-                  )}
-                  {isTripOwner ? (
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-300">
+                      {recommendation.detail}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={busyHere}
-                        onClick={() => void applyWithCopilot(row)}
-                        className="rounded-full bg-[#0B1929] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#162235] disabled:opacity-40"
+                        onClick={() => void applyRecommendationWithCopilot(recommendation)}
+                        className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40 ${primaryFilledInteractive}`}
                       >
-                        {busyHere ? "Working…" : "Accept change"}
+                        {busyHere ? "Applying…" : "Apply with AI"}
                       </button>
                       <button
                         type="button"
                         disabled={busyHere}
-                        onClick={() => void dismissSubmission(row.id)}
-                        className="rounded-full bg-[#EFE3CC] px-5 py-2 text-sm font-semibold text-[#4A3F30] transition hover:bg-[#D9C9A8] disabled:opacity-40"
+                        onClick={() => void resolveRecommendation(recommendation.id, "dismiss")}
+                        className="rounded-full border border-[color:var(--hairline)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--on-surface-variant)] transition hover:bg-neutral-50 disabled:opacity-40 dark:border-white/10 dark:bg-dm-card dark:text-neutral-300 dark:hover:bg-white/5"
                       >
-                        Keep original
+                        Dismiss
                       </button>
                     </div>
-                  ) : (
-                    <p className="mt-3 text-xs text-[#7A7060]">Waiting for the trip owner to review.</p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
+      {!hideLegacyHostSuggestions || archives.length ? (
+      <div className="mt-6 border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+          {isTripOwner ? "Guest notes" : "Suggestions"}
+        </p>
+        {(!pending.length || hideLegacyHostSuggestions) && !archives.length ? (
+          <p className="mt-2 text-sm text-[color:var(--on-surface-muted)] dark:text-neutral-500">Nothing here yet.</p>
+        ) : null}
+        {!hideLegacyHostSuggestions && pendingGroups.length ? (
+          <div className="mt-3 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {pendingGroups.map((group) => (
+                <span
+                  key={group.category}
+                  className="rounded-full border border-[#D8E2FF] bg-[#F7FAFF] px-3 py-1 text-[11px] font-semibold text-[#2F66ED] dark:border-blue-400/20 dark:bg-blue-950/15 dark:text-blue-200"
+                >
+                  {group.label}: {group.rows.length}
+                </span>
+              ))}
+            </div>
+            {pendingGroups.map((group) => (
+              <div key={group.category} className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                  {group.label}
+                </p>
+                <ul className="space-y-3">
+                  {group.rows.map((row) => {
+                    const isMine = viewerUserId && row.authorUserId === viewerUserId;
+                    const busyHere = actionBusyId === row.id;
+                    const conciSummary = row.conciProposal?.summary?.trim();
+                    return (
+                      <li
+                        key={row.id}
+                        className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-5 shadow-sm dark:border-white/10 dark:bg-dm-page"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#2F66ED]">
+                              Host review
+                            </p>
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[color:var(--on-surface-variant)] dark:bg-white/10 dark:text-neutral-300">
+                              Affects: {group.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                            {row.authorDisplayName}
+                            {isMine ? " · you" : null}
+                            <span>
+                              {" "}
+                              · {new Date(row.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                            </span>
+                          </p>
+                        </div>
+                        {conciSummary ? (
+                          <>
+                            <p className="mt-3 text-sm leading-relaxed text-[color:var(--on-surface)] dark:text-neutral-100">{conciSummary}</p>
+                            <p className="mt-2 text-xs italic leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                              {row.authorDisplayName} said: &ldquo;{row.text}&rdquo;
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[color:var(--on-surface)] dark:text-neutral-100">{row.text}</p>
+                        )}
+                        {isTripOwner ? (
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              disabled={busyHere}
+                              onClick={() => void applyWithCopilot(row)}
+                              className={`rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-40 ${primaryFilledInteractive}`}
+                            >
+                              {busyHere ? "Working…" : "Approve & apply (AI)"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyHere}
+                              onClick={() => void dismissSubmission(row.id)}
+                              className="rounded-full border border-[color:var(--hairline)] bg-white px-5 py-2 text-sm font-semibold text-[color:var(--on-surface-variant)] transition hover:bg-neutral-50 disabled:opacity-40 dark:border-white/10 dark:bg-dm-card dark:text-neutral-300 dark:hover:bg-white/5"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">Waiting for the trip owner to review.</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         ) : null}
 
       {archives.length ? (
@@ -1419,6 +1669,7 @@ export function ActivityVibePollCard({
         </details>
       ) : null}
       </div>
+      ) : null}
     </section>
   );
 }
@@ -2021,6 +2272,7 @@ function DecisionCard({
       return (
         <ActivityVibePollCard
           tripId={tripId}
+          plan={plan}
           isTripOwner={isTripOwner}
           adjustmentSubmissions={adjustmentSubmissions}
           viewerUserId={viewerUserId ?? null}

@@ -51,13 +51,16 @@ export function TripCostRollup({
   tripId,
   plan,
   flights,
+  showContributions = false,
 }: {
   tripId: string;
   plan: TripPlan;
   flights: LiveFlightCard[];
+  showContributions?: boolean;
 }) {
   const [fundUsd, setFundUsd] = useState<number | null>(null);
   const [fundDepositCount, setFundDepositCount] = useState<number>(0);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
 
   const fetchFund = useCallback(async () => {
     try {
@@ -67,7 +70,9 @@ export function TripCostRollup({
       if (!r.ok) return;
       const data = (await r.json()) as { deposits: Deposit[]; total_cents: number };
       setFundUsd(data.total_cents / 100);
-      setFundDepositCount(Array.isArray(data.deposits) ? data.deposits.length : 0);
+      const rows = Array.isArray(data.deposits) ? data.deposits : [];
+      setDeposits(rows);
+      setFundDepositCount(rows.length);
     } catch {
       // Swallow — placeholder rendering covers fetch failures.
     }
@@ -118,6 +123,19 @@ export function TripCostRollup({
     estimatedTotalUsd != null
       ? Math.max(0, estimatedTotalUsd - (fundUsd ?? 0))
       : null;
+  const owedPerPersonUsd = owedUsd != null ? owedUsd / headcount : null;
+
+  const contributorRows = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const deposit of deposits) {
+      if (["failed", "canceled", "cancelled"].includes(deposit.status.toLowerCase())) continue;
+      const label = deposit.contributor_name?.trim() || "Traveler";
+      totals.set(label, (totals.get(label) ?? 0) + deposit.amount_cents / 100);
+    }
+    return [...totals.entries()]
+      .map(([name, amountUsd]) => ({ name, amountUsd }))
+      .sort((a, b) => b.amountUsd - a.amountUsd);
+  }, [deposits]);
 
   // Breakdown from itinerary for the expandable detail
   const breakdown = useMemo(() => {
@@ -241,6 +259,37 @@ export function TripCostRollup({
           {!lodgingConfirmed && breakdown.lodgingPp > 0 ? (
             <p className="mt-2 text-[10px] text-neutral-500">Lodging and flight estimates update once you confirm bookings.</p>
           ) : null}
+        </div>
+      ) : null}
+
+      {showContributions && (contributorRows.length > 0 || owedPerPersonUsd != null) ? (
+        <div className="mt-4 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-3 dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+              Contributions
+            </p>
+            {owedPerPersonUsd != null ? (
+              <p className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                {owedPerPersonUsd === 0
+                  ? "No estimated balance remaining"
+                  : `About ${formatCurrencyUsd(owedPerPersonUsd)} still owed per traveler`}
+              </p>
+            ) : null}
+          </div>
+          {contributorRows.length ? (
+            <ul className="mt-2 grid gap-2 text-xs text-[color:var(--on-surface-variant)] dark:text-neutral-300 sm:grid-cols-2">
+              {contributorRows.slice(0, 6).map((row) => (
+                <li key={row.name} className="flex justify-between gap-3 rounded-md bg-white px-2 py-1.5 dark:bg-dm-card">
+                  <span className="truncate">{row.name}</span>
+                  <span className="shrink-0 tabular-nums font-semibold">{formatCurrencyUsd(row.amountUsd)} paid</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+              No traveler payments recorded yet.
+            </p>
+          )}
         </div>
       ) : null}
     </div>

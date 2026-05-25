@@ -44,6 +44,14 @@ function effectiveTripRange(plan: TripPlan): { startIso: string; endIso: string 
 
 type DayRow = { icon: string; label: string; sub?: string };
 
+function transportIcon(title: string): string {
+  const t = title.toLowerCase();
+  if (/\b(flight|fly|airport|plane)\b/.test(t)) return "✈️";
+  if (/\b(train|rail)\b/.test(t)) return "🚆";
+  if (/\b(car|drive|uber|taxi|transfer|shuttle)\b/.test(t)) return "🚗";
+  return "🧭";
+}
+
 function buildDayRows(
   plan: TripPlan,
   iso: string,
@@ -63,6 +71,15 @@ function buildDayRows(
     rows.push({ icon: "🏨", label: hotelName, sub: "Lodging" });
   }
 
+  const generatedTransport =
+    plan.generatedItinerary?.days
+      .find((day) => day.dateIso === iso)
+      ?.activities.filter((activity) => activity.category === "transport" && activity.title.trim()) ?? [];
+  for (const activity of generatedTransport) {
+    const meta = [activity.time, activity.description].filter(Boolean).join(" · ");
+    rows.push({ icon: transportIcon(activity.title), label: activity.title.trim(), sub: meta ? `Transport · ${meta}` : "Transport" });
+  }
+
   const restaurants =
     plan.hostSetup?.restaurantPins?.filter((p) => p.kept && p.dateIso === iso && p.place?.name?.trim()) ?? [];
   for (const p of restaurants) {
@@ -72,7 +89,12 @@ function buildDayRows(
   const activities =
     plan.hostSetup?.activityPins?.filter((p) => p.kept && p.dateIso === iso && p.experience?.name?.trim()) ?? [];
   for (const p of activities) {
-    rows.push({ icon: "🎯", label: p.experience.name.trim(), sub: "Activity" });
+    const isFlight = /\bflight (out|back)\b/i.test(p.experience.name);
+    rows.push({
+      icon: isFlight ? "✈️" : "🎯",
+      label: p.experience.name.trim(),
+      sub: isFlight ? `Transport${p.experience.duration ? ` · ${p.experience.duration}` : ""}` : "Activity",
+    });
   }
 
   for (const label of liveByDay.get(iso) ?? []) {

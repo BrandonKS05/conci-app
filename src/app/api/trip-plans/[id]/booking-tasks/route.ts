@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { fetchAuthUserDisplayLabel } from "@/backend/trip-member-names";
-import type { BookingTaskKey } from "@/shared/booking-tasks";
-import { parseBookingTasks } from "@/shared/booking-tasks";
+import { isBookingTaskKey, parseBookingTasks } from "@/shared/booking-tasks";
 import { parseTripPlanStatus } from "@/shared/trip-status";
 import { isUuid } from "@/shared/is-uuid";
-
-const TASKS: BookingTaskKey[] = ["hotel", "flights", "restaurant"];
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -28,10 +25,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     task?: string;
     booked?: boolean;
   };
-  const task = body.task as BookingTaskKey | undefined;
+  const task = typeof body.task === "string" ? body.task : "";
   const booked = body.booked === true;
-  if (!task || !TASKS.includes(task)) {
-    return NextResponse.json({ error: "Invalid task (use hotel, flights, or restaurant)." }, { status: 400 });
+  if (!isBookingTaskKey(task)) {
+    return NextResponse.json({ error: "Invalid task (use hotel, hotel:<stay>, flights, restaurant, or activity)." }, { status: 400 });
   }
 
   const svc = getSupabaseServiceRoleClient();

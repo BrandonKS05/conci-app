@@ -19,6 +19,7 @@ type FormData = {
   departureCity: string;
   dateStart: string;
   dateEnd: string;
+  roughTiming: string;
   people: string;
   budget: string;
   vibe: string;
@@ -91,6 +92,7 @@ function tripNightCount(start: string, end: string): number {
 
 function buildPlanFromForm(form: FormData): TripPlan {
   const dateRange = formatDateRange(form.dateStart, form.dateEnd);
+  const roughTiming = form.roughTiming.trim();
   const vibes = form.vibe.split(",").map((v) => v.trim()).filter(Boolean);
   const count = parseInt(form.people, 10);
 
@@ -100,7 +102,7 @@ function buildPlanFromForm(form: FormData): TripPlan {
     departureCity: form.departureCity.trim() || null,
     dates: {
       confirmed: Boolean(form.dateStart),
-      options: dateRange ? [dateRange] : [],
+      options: dateRange ? [dateRange] : roughTiming ? [roughTiming] : [],
     },
     people: {
       count: Number.isFinite(count) && count > 0 ? count : null,
@@ -128,6 +130,7 @@ function buildSeedText(form: FormData): string {
   }
   if (!form.needsFlight) lines.push(`Transport: driving/local (no flight needed)`);
   if (form.dateStart) lines.push(`Dates: ${formatDateRange(form.dateStart, form.dateEnd)}`);
+  else if (form.roughTiming.trim()) lines.push(`Rough timing: ${form.roughTiming.trim()}`);
   if (form.people) lines.push(`People: ${form.people}`);
   if (form.budget) lines.push(`Budget: ${form.budget}`);
   if (form.vibe) lines.push(`Vibe: ${form.vibe}`);
@@ -170,6 +173,8 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("input");
   const [generatingTripId, setGeneratingTripId] = useState<string | null>(null);
+  const [savedTripId, setSavedTripId] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [freeText, setFreeText] = useState(initialPrompt);
   const [images, setImages] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -180,6 +185,7 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
     departureCity: "",
     dateStart: "",
     dateEnd: "",
+    roughTiming: "",
     people: "",
     budget: "",
     vibe: "",
@@ -231,13 +237,17 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
       }
 
       const parsed = JSON.parse(body.outputText || "{}");
+      const firstDateOption = typeof parsed.dates?.options?.[0] === "string" ? parsed.dates.options[0] : "";
+      const parsedStart = extractIsoDate(firstDateOption, "start") || "";
+      const parsedEnd = extractIsoDate(firstDateOption, "end") || "";
       setForm({
         tripName: parsed.title || "",
         destination: parsed.location || "",
         needsFlight: Boolean(parsed.departureCity),
         departureCity: parsed.departureCity || "",
-        dateStart: extractIsoDate(parsed.dates?.options?.[0], "start") || "",
-        dateEnd: extractIsoDate(parsed.dates?.options?.[0], "end") || "",
+        dateStart: parsedStart,
+        dateEnd: parsedEnd,
+        roughTiming: !parsedStart && firstDateOption ? firstDateOption : "",
         people: parsed.people?.count ? String(parsed.people.count) : "",
         budget: parsed.budget?.perPerson || parsed.budget?.tier || "",
         vibe: Array.isArray(parsed.vibe) ? parsed.vibe.map((v: string) => v.toLowerCase()).join(", ") : "",
@@ -274,13 +284,14 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
 
   const handleSubmit = useCallback(async () => {
     setError(null);
+    setGenerationError(null);
     setActiveEdit(null);
     if (!form.destination.trim()) {
       setError("Where are you going? Add a destination.");
       return;
     }
-    if (!form.dateStart.trim()) {
-      setError("When is the trip? Add at least a start date.");
+    if (!form.dateStart.trim() && !form.roughTiming.trim()) {
+      setError("When is the trip? Add exact dates or a rough window like late June.");
       return;
     }
 
@@ -323,6 +334,7 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
       }
 
       if (body.id) {
+        setSavedTripId(body.id);
         setGeneratingTripId(body.id);
         setPhase("generating");
       }
@@ -345,8 +357,8 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
         }}
         onError={(message) => {
           setError(message);
+          setGenerationError(message);
           setPhase("form");
-          setGeneratingTripId(null);
         }}
       />
     );
@@ -375,7 +387,8 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
   const departParts = form.dateStart ? parseDateParts(form.dateStart) : null;
   const returnParts = (form.dateEnd || form.dateStart) ? parseDateParts(form.dateEnd || form.dateStart) : null;
   const nights = tripNightCount(form.dateStart, form.dateEnd);
-  const isReady = Boolean(form.destination.trim() && form.dateStart.trim());
+  const hasTiming = Boolean(form.dateStart.trim() || form.roughTiming.trim());
+  const isReady = Boolean(form.destination.trim() && hasTiming);
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" style={{ background: "#f4f7fc" }}>
@@ -475,7 +488,9 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                       </div>
                     </div>
                   ) : (
-                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/30">—</span>
+                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/70">
+                      {form.roughTiming.trim() || "—"}
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-center">
@@ -494,7 +509,9 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                       <span className="font-display text-[38px] font-semibold leading-none tracking-tight text-[color:var(--on-surface)]">{returnParts.day}</span>
                     </div>
                   ) : (
-                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/30">—</span>
+                    <span className="text-2xl font-light text-[color:var(--on-surface-muted)]/30">
+                      {form.roughTiming.trim() ? "Flexible" : "—"}
+                    </span>
                   )}
                 </div>
               </div>
@@ -506,7 +523,10 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>Start date</label>
                       <input autoFocus type="date" value={form.dateStart}
-                        onChange={(e) => updateField("dateStart", e.target.value)}
+                        onChange={(e) => {
+                          updateField("dateStart", e.target.value);
+                          if (e.target.value) updateField("roughTiming", "");
+                        }}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); } }}
                         className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
                         style={{ borderColor: "var(--hairline)" }} />
@@ -519,6 +539,28 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                         className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
                         style={{ borderColor: "var(--hairline)" }} />
                     </div>
+                  </div>
+                  <div className="mt-4 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>
+                      Or rough timing
+                    </label>
+                    <input
+                      type="text"
+                      value={form.roughTiming}
+                      onChange={(e) => {
+                        updateField("roughTiming", e.target.value);
+                        if (e.target.value.trim()) {
+                          updateField("dateStart", "");
+                          updateField("dateEnd", "");
+                        }
+                      }}
+                      placeholder="late June · Labor Day weekend · 4 days this fall"
+                      className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+                      style={{ borderColor: "var(--hairline)" }}
+                    />
+                    <p className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>
+                      Rough timing is okay. The group can lock exact dates later.
+                    </p>
                   </div>
                   <div className="mt-3 flex justify-end">
                     <button type="button" onClick={() => setActiveEdit(null)}
@@ -679,11 +721,41 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
               </div>
             </div>
             {error && (
-              <div className="mt-5 flex items-center gap-2 text-sm text-red-600">
-                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                {error}
+              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  {error}
+                </div>
+                {generationError && (generatingTripId || savedTripId) ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = generatingTripId || savedTripId;
+                        if (!id) return;
+                        setError(null);
+                        setGenerationError(null);
+                        setGeneratingTripId(id);
+                        setPhase("generating");
+                      }}
+                      className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-800"
+                    >
+                      Retry itinerary
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = generatingTripId || savedTripId;
+                        if (id) router.replace(`/trip/${id}/setup`);
+                      }}
+                      className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-100"
+                    >
+                      Continue to saved trip
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -702,7 +774,7 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                 <>
                   <div className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/55">Waiting</div>
                   <div className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">
-                    {!form.destination.trim() ? "Add a destination" : "Add travel dates"}
+                    {!form.destination.trim() ? "Add a destination" : "Add dates or rough timing"}
                   </div>
                 </>
               )}

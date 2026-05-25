@@ -3,7 +3,15 @@
 import { useCallback, useState } from "react";
 import { formatInviteCodeDisplay } from "@/backend/invite-code";
 
-export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string; prominent?: boolean }) {
+export function InviteCodeRow({
+  rawCode,
+  prominent = false,
+  variant,
+}: {
+  rawCode: string;
+  prominent?: boolean;
+  variant?: "compact";
+}) {
   const display = formatInviteCodeDisplay(rawCode);
   const [copied, setCopied] = useState(false);
 
@@ -29,6 +37,31 @@ export function InviteCodeRow({ rawCode, prominent = false }: { rawCode: string;
       }
     }
   }, [display]);
+
+  if (variant === "compact") {
+    return (
+      <div className="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-3 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-elevated dark:shadow-none">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="label-caps text-[#2F66ED] dark:text-blue-200">Invite friends</p>
+            <p className="mt-1 font-display text-lg font-semibold tracking-[0.16em] text-[color:var(--on-surface)] dark:text-white">
+              {display}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void copy()}
+            className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4] dark:hover:bg-white/10"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+          Guests can join, vote, and add preferences.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

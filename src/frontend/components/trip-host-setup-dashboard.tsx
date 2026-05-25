@@ -70,7 +70,6 @@ import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
 import { MyPreferencesCard } from "@/frontend/components/my-preferences-card";
 import { TripCostRollup } from "@/frontend/components/trip-cost-rollup";
-import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
 import { useTripCalendarPresence } from "@/frontend/hooks/use-trip-calendar-presence";
 import {
@@ -1469,11 +1468,15 @@ export function TripHostSetupDashboard({
         </div>
             </div>
 
+            {resolvedInviteCode ? (
+              <InviteCodeRow rawCode={resolvedInviteCode} variant="compact" />
+            ) : null}
+
             <nav
               aria-label="Trip workspace sections"
               className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
             >
-              {LEFT_RAIL_TABS.filter((tab) => tab.id !== "budget" || canEditAsHost).map((tab) => (
+              {LEFT_RAIL_TABS.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -1503,14 +1506,16 @@ export function TripHostSetupDashboard({
               </Link>
             </nav>
 
-            <button
-              type="button"
-              onClick={scrollToInviteSection}
-              className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:mt-auto lg:inline-flex"
-            >
-              <NavIcon id="invite" />
-              Invite friends
-            </button>
+            {!resolvedInviteCode ? (
+              <button
+                type="button"
+                onClick={scrollToInviteSection}
+                className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:mt-auto lg:inline-flex"
+              >
+                <NavIcon id="invite" />
+                Invite friends
+              </button>
+            ) : null}
 
       </div>
         </aside>
@@ -1521,6 +1526,7 @@ export function TripHostSetupDashboard({
           onClick={onMainHashLinkClick}
           className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-1"
         >
+          {workspaceTab === "collaborate" ? (
           <section
             className="scroll-mt-28 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10"
             aria-label="Join this trip"
@@ -1538,76 +1544,25 @@ export function TripHostSetupDashboard({
               )}
     </div>
           </section>
+          ) : null}
 
           {workspaceTab === "budget" ? (
           <div id="sec-fund" className="scroll-mt-28 space-y-5">
-            <section className="flex flex-col gap-6 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
-              <TripDepositTracker tripId={tripId} variant="flat" />
-              <div className="ml-auto flex items-center gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center -space-x-2" aria-label="People on this calendar now">
-                    {peers.length === 0 ? (
-                      <span
-                        className="relative z-0 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-high)] text-sm font-display font-semibold text-[color:var(--on-surface)] ring-2 ring-[color:var(--surface)] dark:border-white/15 dark:bg-[#2a2a2a] dark:text-[#ebe9e4] dark:ring-dm-page"
-                        title="No one else on the calendar right now"
-                      >
-                        {tripIdentityInitial}
-                      </span>
-                    ) : (
-                      peers.slice(0, 5).map((p) => (
-                        <span
-                          key={p.userId}
-                          title={`${p.name} · here now`}
-                          className="relative z-[1] inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[11px] font-semibold text-white ring-2 ring-[color:var(--surface)] dark:border-white/15 dark:ring-dm-page"
-                          style={
-                            p.avatarUrl ? undefined : { backgroundColor: p.color, borderColor: "transparent" }
-                          }
-                        >
-                          {p.avatarUrl ? (
-                            <Image
-                              src={p.avatarUrl}
-                              alt=""
-                              width={36}
-                              height={36}
-                              className="h-full w-full object-cover"
-                              unoptimized
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            p.name.slice(0, 1).toUpperCase()
-                          )}
-                        </span>
-                      ))
-                    )}
-                    <button
-                      type="button"
-                      onClick={scrollToInviteSection}
-                      className="relative z-[2] flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] text-sm font-semibold text-[color:var(--on-surface)] ring-2 ring-[color:var(--surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/25 dark:bg-dm-page dark:text-[#ebe9e4] dark:ring-dm-page"
-                      aria-label="Invite people — jump to join code"
-                    >
-                      +
-                    </button>
-        </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                      {isHost ? "Trip owner" : "Trip member"}
-                    </span>
-                    <Link
-                      href="/settings"
-                      className="text-sm font-medium text-[color:var(--on-surface-muted)] underline-offset-2 hover:text-[color:var(--on-surface)] hover:underline dark:text-neutral-500 dark:hover:text-[#ebe9e4]"
-                    >
-                      Manage Settings
-                    </Link>
-                  </div>
-                </div>
+            <section className="flex flex-col gap-4 border-b border-[color:var(--hairline)] pb-6 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">Budget &amp; fund</p>
+                <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
+                  Money, contributions, and what is still owed
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                  Keep the overview clean. Use this tab for estimates, payment status, and budget edits.
+                </p>
               </div>
+              <TripContributeButton tripId={tripId} />
             </section>
 
             {/* Secondary fund actions + collapsible trip details */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <TripContributeButton tripId={tripId} />
-            </div>
             <details className="group min-w-0 flex-1 sm:flex-none">
               <summary className="label-caps cursor-pointer list-none rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-4 py-2 text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-[color:var(--surface-container-low)] dark:text-neutral-400 [&::-webkit-details-marker]:hidden">
                 <span className="inline-flex items-center gap-2">
@@ -1715,6 +1670,12 @@ export function TripHostSetupDashboard({
               </div>
             </details>
           </div>
+            <TripCostRollup
+              tripId={tripId}
+              plan={plan}
+              flights={liveData?.flights ?? []}
+              showContributions
+            />
           </div>
           ) : null}
 
@@ -1723,17 +1684,21 @@ export function TripHostSetupDashboard({
         <section id="sec-dates" className="scroll-mt-28">
           <div className="mb-5 flex flex-col gap-3">
             <div className="min-w-0">
-              <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
-                {!canEditTripWorkspace
-                  ? "This trip is finalized here — the calendar is for reference. Open the booking checklist for next steps."
-                  : datePickMode === "range"
-                  ? tripDisplayRange?.startIso && tripDisplayRange.endIso
+              {!canEditTripWorkspace ? (
+                <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                  This trip is finalized here — the calendar is for reference. Open the booking checklist for next steps.
+                </p>
+              ) : datePickMode === "range" ? (
+                <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                  {tripDisplayRange?.startIso && tripDisplayRange.endIso
                     ? `Change dates: tap two days (currently ${tripDisplayRange.startIso} → ${tripDisplayRange.endIso}). Confirming new dates clears meal and activity pins for the old range.`
-                    : "Tap two days to set your trip; days in range are highlighted below."
-                  : tripDisplayRange?.startIso && tripDisplayRange.endIso
-                      ? `${tripDisplayRange.startIso} → ${tripDisplayRange.endIso} — tap any trip day for the day editor (meals, activities). Manage lodging under Lodging in the left nav or tap a lodging row below. Use Add places for shortcuts. Everyone on the trip sees updates live.`
-                    : "Tap two days to set your trip."}
-              </p>
+                    : "Tap two days to set your trip; days in range are highlighted below."}
+                </p>
+              ) : !tripDisplayRange?.startIso || !tripDisplayRange.endIso ? (
+                <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--on-surface-variant)]">
+                  Tap two days to set your trip.
+                </p>
+              ) : null}
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
                 <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
               ) : null}
@@ -2320,7 +2285,7 @@ export function TripHostSetupDashboard({
           </>
           ) : null}
 
-          {workspaceTab === "budget" && canEditAsHost ? (
+          {workspaceTab === "budget" ? (
           <>
             {isHost ? (
           <section id="sec-budget" className="scroll-mt-28">
@@ -2383,29 +2348,29 @@ export function TripHostSetupDashboard({
             refreshSignal={collabRefreshSignal}
           />
         ) : null}
-        <section id="sec-preferences-adjustments" className="scroll-mt-28">
-          <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
-            Preferences &amp; adjustments
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-            {isHost
-              ? "Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline."
-              : "Vote in polls, share availability, and suggest changes below — the host applies what works for the group."}
-          </p>
-          <div className="mt-5">
-            <TripCollaborationPanel
-              tripId={tripId}
-              plan={plan}
-              tripStatus={effectiveTripStatus}
-              isHost={isHost}
-              variant="preferencesOnly"
-              collabRefreshSignal={collabRefreshSignal}
-              onPlanUpdated={setPlan}
-              viewerUserId={viewerUserId}
-              tripOwnerUserId={tripOwnerUserId}
-            />
-          </div>
-        </section>
+        {isHost ? (
+          <section id="sec-preferences-adjustments" className="scroll-mt-28">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white">
+              Preferences &amp; adjustments
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+              Guests type suggestions on the trip page; they queue here for you to run Trip Copilot or decline.
+            </p>
+            <div className="mt-5">
+              <TripCollaborationPanel
+                tripId={tripId}
+                plan={plan}
+                tripStatus={effectiveTripStatus}
+                isHost={isHost}
+                variant="preferencesOnly"
+                collabRefreshSignal={collabRefreshSignal}
+                onPlanUpdated={setPlan}
+                viewerUserId={viewerUserId}
+                tripOwnerUserId={tripOwnerUserId}
+              />
+            </div>
+          </section>
+        ) : null}
 
         <section id="sec-collab-sidebar" className="scroll-mt-28">
           <TripCollaborationPanel
