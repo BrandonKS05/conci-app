@@ -10,7 +10,10 @@
       "Bash(npm run *)",
       "Bash(xargs grep -l \"map\\\\|Map\")",
       "Bash(npm install *)",
-      "Bash(mkdir -p /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/search /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/book)"
+      "Bash(mkdir -p /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/search /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/book)",
+      "Bash(curl -s \"https://duffel.com/docs/api/overview/versioning\")",
+      "Bash(curl -s -o /dev/null -D - \"https://api.duffel.com/stays/search\" -H \"Duffel-Version: 2024-10-01\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s -o /dev/null -D - \"https://api.duffel.com/stays/search\" -H \"Duffel-Version: v2\" -H \"Content-Type: application/json\")"
     ]
   }
 }

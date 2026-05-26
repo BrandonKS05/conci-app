@@ -1,7 +1,7 @@
 import { getEnvTrimmed } from "@/backend/env-api-keys";
 
 const DUFFEL_BASE = "https://api.duffel.com";
-const DUFFEL_VERSION = "beta";
+const DUFFEL_VERSION = "v2";
 
 export function getDuffelAccessToken(): string | undefined {
   const t = getEnvTrimmed("DUFFEL_ACCESS_TOKEN");
