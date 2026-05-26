@@ -7,7 +7,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(git -C \"C:/Users/jinwo/conci-app\" add src/frontend/components/trip-form-parser.tsx)",
       "Bash(git -C \"C:/Users/jinwo/conci-app\" diff --name-only --diff-filter=U)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(xargs grep -l \"map\\\\|Map\")"
     ]
   }
 }

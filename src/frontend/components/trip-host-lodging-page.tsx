@@ -18,6 +18,7 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import type { PlaceSpotlight } from "@/shared/place-preview";
+import { DuffelLodgingBookingDrawer } from "@/frontend/components/duffel-lodging-booking-drawer";
 
 type StayTab = "all" | "hotels" | "homes";
 type SortKey = "recommended" | "price_low" | "price_high" | "rating";
@@ -244,6 +245,7 @@ export function TripHostLodgingPage(props: {
     notes: "",
   });
   const [manualError, setManualError] = useState<string | null>(null);
+  const [duffelDrawerOpen, setDuffelDrawerOpen] = useState(false);
 
   const runSearch = useCallback(async () => {
     const dest = destination.trim();
@@ -547,10 +549,27 @@ export function TripHostLodgingPage(props: {
           >
             ← Back to trip setup
           </Link>
-          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight dark:text-white sm:text-4xl">Find lodging</h1>
-          <p className="mt-1 text-sm text-[color:var(--on-surface-muted)]">
-            {destination.trim() || "Your trip"} · {dateLabel} · {travelersLabel}
-          </p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight dark:text-white sm:text-4xl">Find lodging</h1>
+              <p className="mt-1 text-sm text-[color:var(--on-surface-muted)]">
+                {destination.trim() || "Your trip"} · {dateLabel} · {travelersLabel}
+              </p>
+            </div>
+            {props.isHost && (
+              <button
+                type="button"
+                onClick={() => setDuffelDrawerOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-[#1c1c17] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+                Book with Conci
+              </button>
+            )}
+          </div>
         </div>
 
         <SearchBar
@@ -625,6 +644,24 @@ export function TripHostLodgingPage(props: {
           </main>
         </div>
       </div>
+
+      {props.isHost && (
+        <DuffelLodgingBookingDrawer
+          open={duffelDrawerOpen}
+          onClose={() => setDuffelDrawerOpen(false)}
+          tripId={props.tripId}
+          initialDestination={destination}
+          initialCheckIn={checkIn}
+          initialCheckOut={checkOut}
+          initialGuests={guests}
+          initialRooms={rooms}
+          onBookingComplete={() => {
+            setDuffelDrawerOpen(false);
+            setSaveMessage("Booking confirmed and saved to your trip.");
+            setTimeout(() => router.push(`/trip/${props.tripId}/setup#sec-lodging`), 2000);
+          }}
+        />
+      )}
     </div>
   );
 }

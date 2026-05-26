@@ -96,6 +96,8 @@ export type HostLodgingStayMeta = {
   roomCount?: number;
   /** Host picked this stay in the app (modal / calendar); refits must not replace it unless they ask AI to change lodging. */
   userSelected?: boolean;
+  /** Confirmed Duffel in-app booking record — present when booked via Conci (not an external link). */
+  duffelBooking?: import("@/shared/duffel-stays").DuffelBookingRecord;
 };
 
 /** Inclusive lodging segment (host may split stays across the trip). */
@@ -1314,6 +1316,7 @@ export function applyHostLodgingSegment(
         ...(meta.roomCount !== undefined ? { roomCount: meta.roomCount } : {}),
         ...(meta.userSelected === true ? { userSelected: true, recommendedByConci: false } : {}),
         ...(meta.lodgingType ? { lodgingType: meta.lodgingType } : {}),
+        ...(meta.duffelBooking ? { duffelBooking: meta.duffelBooking } : {}),
       };
     }
     return s;
