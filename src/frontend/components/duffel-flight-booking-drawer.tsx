@@ -86,6 +86,53 @@ function blankPassenger(): PassengerForm {
   return { given_name: "", family_name: "", born_on: "", email: "", phone_number: "", title: "mr", gender: "m" };
 }
 
+/** Normalize a phone number to E.164 format required by Duffel. */
+function normalizePhone(raw: string): string {
+  // Strip everything except digits and leading +
+  const stripped = raw.replace(/[\s\-().]/g, "");
+  if (stripped.startsWith("+")) return stripped;
+  // 10-digit US number → +1...
+  if (/^\d{10}$/.test(stripped)) return `+1${stripped}`;
+  // 11-digit starting with 1 → +1...
+  if (/^1\d{10}$/.test(stripped)) return `+${stripped}`;
+  // Best effort: prepend + so Duffel at least sees international format
+  return `+${stripped}`;
+}
+
+/** Returns true if the born_on date makes this passenger ≥18 years old. */
+function isAdult(born_on: string): boolean {
+  if (!born_on) return false;
+  const dob = new Date(`${born_on}T00:00:00`);
+  if (isNaN(dob.getTime())) return false;
+  const now = new Date();
+  const age = now.getFullYear() - dob.getFullYear() -
+    (now < new Date(now.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+  return age >= 18;
+}
+
+type PassengerFieldErrors = Partial<Record<keyof PassengerForm, string>>;
+
+function validatePassenger(p: PassengerForm): PassengerFieldErrors {
+  const errors: PassengerFieldErrors = {};
+  if (!p.given_name.trim()) errors.given_name = "Required";
+  if (!p.family_name.trim()) errors.family_name = "Required";
+  if (!p.email.trim() || !p.email.includes("@")) errors.email = "Valid email required";
+  if (!p.born_on) {
+    errors.born_on = "Required";
+  } else if (!isAdult(p.born_on)) {
+    errors.born_on = "Passenger must be 18 or older for an adult ticket";
+  }
+  if (!p.phone_number.trim()) {
+    errors.phone_number = "Required";
+  } else {
+    const normalized = normalizePhone(p.phone_number);
+    if (!/^\+\d{7,15}$/.test(normalized)) {
+      errors.phone_number = "Enter a valid international number, e.g. +14155550123";
+    }
+  }
+  return errors;
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function MockBadge() {
@@ -174,6 +221,7 @@ export function DuffelFlightBookingDrawer({
   const [error, setError] = useState<string | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<DuffelOffer | null>(null);
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
+  const [paxErrors, setPaxErrors] = useState<PassengerFieldErrors[]>([]);
   const [booking, setBooking] = useState<DuffelFlightBookingRecord | null>(null);
 
   const fetchOffers = useCallback(async () => {
@@ -210,12 +258,14 @@ export function DuffelFlightBookingDrawer({
     setSelectedOffer(null);
     setBooking(null);
     setError(null);
+    setPaxErrors([]);
     void fetchOffers();
   }, [fetchOffers]);
 
   const handleSelectOffer = useCallback((offer: DuffelOffer) => {
     setSelectedOffer(offer);
     setPassengers(Array.from({ length: offer.passengers.length }, blankPassenger));
+    setPaxErrors(Array.from({ length: offer.passengers.length }, () => ({})));
     setStep("passenger-details");
   }, []);
 
@@ -232,7 +282,7 @@ export function DuffelFlightBookingDrawer({
         family_name: p.family_name.trim(),
         born_on: p.born_on,
         email: p.email.trim(),
-        phone_number: p.phone_number.trim(),
+        phone_number: normalizePhone(p.phone_number),
       }));
 
       const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/book`, {
@@ -258,12 +308,15 @@ export function DuffelFlightBookingDrawer({
 
   function updatePassenger(i: number, field: keyof PassengerForm, value: string) {
     setPassengers((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)));
+    // Clear the error for this field as the user types
+    setPaxErrors((prev) => prev.map((e, idx) => idx === i ? { ...e, [field]: undefined } : e));
   }
 
-  function passengerFormValid(): boolean {
-    return passengers.every(
-      (p) => p.given_name.trim() && p.family_name.trim() && p.born_on && p.email.trim() && p.phone_number.trim()
-    );
+  function handleReviewBooking() {
+    const allErrors = passengers.map(validatePassenger);
+    setPaxErrors(allErrors);
+    if (allErrors.some((e) => Object.keys(e).length > 0)) return;
+    setStep("confirm");
   }
 
   // Trigger fetch when open transitions to true
@@ -392,63 +445,76 @@ export function DuffelFlightBookingDrawer({
               )}
 
               {/* Passenger forms */}
-              {passengers.map((p, i) => (
-                <div key={i}>
-                  {passengers.length > 1 && (
-                    <p className={`mb-3 ${labelCls}`}>Passenger {i + 1}</p>
-                  )}
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>First name</label>
-                        <input type="text" value={p.given_name} onChange={(e) => updatePassenger(i, "given_name", e.target.value)} placeholder="John" className={inputCls} />
+              {passengers.map((p, i) => {
+                const errs = paxErrors[i] ?? {};
+                const fieldErr = (f: keyof PassengerForm) =>
+                  errs[f] ? <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errs[f]}</p> : null;
+                const inputErrCls = (f: keyof PassengerForm) =>
+                  errs[f]
+                    ? inputCls.replace("border-[color:var(--hairline-strong)]", "border-red-400 dark:border-red-500")
+                    : inputCls;
+                return (
+                  <div key={i}>
+                    {passengers.length > 1 && (
+                      <p className={`mb-3 ${labelCls}`}>Passenger {i + 1}</p>
+                    )}
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>First name</label>
+                          <input type="text" value={p.given_name} onChange={(e) => updatePassenger(i, "given_name", e.target.value)} placeholder="John" className={inputErrCls("given_name")} />
+                          {fieldErr("given_name")}
+                        </div>
+                        <div>
+                          <label className={labelCls}>Last name</label>
+                          <input type="text" value={p.family_name} onChange={(e) => updatePassenger(i, "family_name", e.target.value)} placeholder="Doe" className={inputErrCls("family_name")} />
+                          {fieldErr("family_name")}
+                        </div>
                       </div>
                       <div>
-                        <label className={labelCls}>Last name</label>
-                        <input type="text" value={p.family_name} onChange={(e) => updatePassenger(i, "family_name", e.target.value)} placeholder="Doe" className={inputCls} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Date of birth</label>
-                      <input type="date" value={p.born_on} onChange={(e) => updatePassenger(i, "born_on", e.target.value)} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Email</label>
-                      <input type="email" value={p.email} onChange={(e) => updatePassenger(i, "email", e.target.value)} placeholder="john@example.com" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Phone (E.164 e.g. +14155550123)</label>
-                      <input type="tel" value={p.phone_number} onChange={(e) => updatePassenger(i, "phone_number", e.target.value)} placeholder="+14155550123" className={inputCls} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Title</label>
-                        <select value={p.title} onChange={(e) => updatePassenger(i, "title", e.target.value as PassengerForm["title"])} className={inputCls}>
-                          <option value="mr">Mr</option>
-                          <option value="ms">Ms</option>
-                          <option value="mrs">Mrs</option>
-                          <option value="dr">Dr</option>
-                        </select>
+                        <label className={labelCls}>Date of birth (must be 18+)</label>
+                        <input type="date" value={p.born_on} onChange={(e) => updatePassenger(i, "born_on", e.target.value)} className={inputErrCls("born_on")} />
+                        {fieldErr("born_on")}
                       </div>
                       <div>
-                        <label className={labelCls}>Gender</label>
-                        <select value={p.gender} onChange={(e) => updatePassenger(i, "gender", e.target.value as PassengerForm["gender"])} className={inputCls}>
-                          <option value="m">Male</option>
-                          <option value="f">Female</option>
-                        </select>
+                        <label className={labelCls}>Email</label>
+                        <input type="email" value={p.email} onChange={(e) => updatePassenger(i, "email", e.target.value)} placeholder="john@example.com" className={inputErrCls("email")} />
+                        {fieldErr("email")}
+                      </div>
+                      <div>
+                        <label className={labelCls}>Phone</label>
+                        <input type="tel" value={p.phone_number} onChange={(e) => updatePassenger(i, "phone_number", e.target.value)} placeholder="+14155550123" className={inputErrCls("phone_number")} />
+                        {fieldErr("phone_number")}
+                        <p className="mt-1 text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-600">
+                          Include country code — e.g. +1 for US
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Title</label>
+                          <select value={p.title} onChange={(e) => updatePassenger(i, "title", e.target.value as PassengerForm["title"])} className={inputCls}>
+                            <option value="mr">Mr</option>
+                            <option value="ms">Ms</option>
+                            <option value="mrs">Mrs</option>
+                            <option value="dr">Dr</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Gender</label>
+                          <select value={p.gender} onChange={(e) => updatePassenger(i, "gender", e.target.value as PassengerForm["gender"])} className={inputCls}>
+                            <option value="m">Male</option>
+                            <option value="f">Female</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setStep("results")} className={btnSecondary}>Back</button>
-                <button
-                  onClick={() => setStep("confirm")}
-                  disabled={!passengerFormValid()}
-                  className={`flex-1 ${btnPrimary}`}
-                >
+                <button onClick={handleReviewBooking} className={`flex-1 ${btnPrimary}`}>
                   Review booking
                 </button>
               </div>
