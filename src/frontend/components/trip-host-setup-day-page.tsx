@@ -24,6 +24,8 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import { DayItineraryMap, DayStopPin, type DayMapStop } from "@/frontend/components/day-itinerary-map";
+import { DuffelFlightBookingDrawer } from "@/frontend/components/duffel-flight-booking-drawer";
+import { DuffelLodgingBookingDrawer } from "@/frontend/components/duffel-lodging-booking-drawer";
 
 type Props = {
   tripId: string;
@@ -566,54 +568,145 @@ function sortScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
   });
 }
 
-function DayScheduleTimeline({ items, subtitle }: { items: ScheduleRow[]; subtitle?: string }) {
+/** Extract IATA pair from text like "MIA → JFK" or "MIA -> JFK". */
+function extractIataCodes(text: string): { origin: string; destination: string } | null {
+  const m = text.match(/([A-Z]{3})\s*(?:→|->)\s*([A-Z]{3})/);
+  return m ? { origin: m[1]!, destination: m[2]! } : null;
+}
+
+/** Advance a YYYY-MM-DD date by one day. */
+function nextDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+type BookingDrawerState =
+  | { type: "flight"; row: ScheduleRow; origin: string; destination: string }
+  | { type: "lodging" }
+  | null;
+
+function DayScheduleTimeline({
+  items,
+  subtitle,
+  tripId,
+  dateIso,
+  destination,
+  passengerCount,
+}: {
+  items: ScheduleRow[];
+  subtitle?: string;
+  tripId?: string;
+  dateIso?: string;
+  destination?: string;
+  passengerCount?: number;
+}) {
   const sorted = useMemo(() => sortScheduleRows(items), [items]);
+  const [drawerState, setDrawerState] = useState<BookingDrawerState>(null);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-neutral-900/12 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="border-b border-neutral-900/8 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
-        <h2 className="font-sans text-[13px] font-black uppercase tracking-[0.08em] text-neutral-950 dark:text-white">
-          Today&apos;s itinerary
-        </h2>
-        {subtitle ? (
-          <p className="mt-0.5 font-sans text-[11px] text-neutral-500 dark:text-neutral-400">{subtitle}</p>
-        ) : null}
-      </div>
-      <div className="px-5 py-5 sm:px-6 sm:py-6">
-        {sorted.length === 0 ? (
-          <EmptyHint label="No itinerary yet — generate one from the trip calendar, or pin places manually." />
-        ) : (
-          <ol className="relative space-y-0">
-            {sorted.map((row, index) => (
-              <li key={row.key} className="relative flex gap-4 pb-8 last:pb-0">
-                {index < sorted.length - 1 ? (
-                  <span
-                    className="absolute left-[5px] top-3 h-[calc(100%-4px)] w-px bg-neutral-200 dark:bg-white/10"
-                    aria-hidden
-                  />
-                ) : null}
-                <span
-                  className={`relative z-[1] mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-dm-card ${row.confirmed ? "bg-emerald-500" : row.dotClass}`}
-                  aria-hidden
-                />
-                <div className="min-w-[4.5rem] shrink-0 pt-0.5">
-                  <p className="text-xs font-bold tabular-nums leading-tight text-[#2563EB] dark:text-[#60A5FA]">
-                    {row.time?.trim() || "—"}
-                  </p>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <ScheduleTimelineRowContent row={row} />
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </section>
+    <>
+      <section className="overflow-hidden rounded-xl border border-neutral-900/12 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="border-b border-neutral-900/8 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
+          <h2 className="font-sans text-[13px] font-black uppercase tracking-[0.08em] text-neutral-950 dark:text-white">
+            Today&apos;s itinerary
+          </h2>
+          {subtitle ? (
+            <p className="mt-0.5 font-sans text-[11px] text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+          ) : null}
+        </div>
+        <div className="px-5 py-5 sm:px-6 sm:py-6">
+          {sorted.length === 0 ? (
+            <EmptyHint label="No itinerary yet — generate one from the trip calendar, or pin places manually." />
+          ) : (
+            <ol className="relative space-y-0">
+              {sorted.map((row, index) => {
+                const iataFromRow = row.sub === "Flight"
+                  ? (extractIataCodes(row.description ?? "") ?? extractIataCodes(row.label))
+                  : null;
+
+                const onBookFlight = iataFromRow && dateIso && tripId
+                  ? () => setDrawerState({ type: "flight", row, origin: iataFromRow.origin, destination: iataFromRow.destination })
+                  : undefined;
+
+                const onBookLodging = row.sub === "Lodging" && dateIso && tripId && destination
+                  ? () => setDrawerState({ type: "lodging" })
+                  : undefined;
+
+                return (
+                  <li key={row.key} className="relative flex gap-4 pb-8 last:pb-0">
+                    {index < sorted.length - 1 ? (
+                      <span
+                        className="absolute left-[5px] top-3 h-[calc(100%-4px)] w-px bg-neutral-200 dark:bg-white/10"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span
+                      className={`relative z-[1] mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-dm-card ${row.confirmed ? "bg-emerald-500" : row.dotClass}`}
+                      aria-hidden
+                    />
+                    <div className="min-w-[4.5rem] shrink-0 pt-0.5">
+                      <p className="text-xs font-bold tabular-nums leading-tight text-[#2563EB] dark:text-[#60A5FA]">
+                        {row.time?.trim() || "—"}
+                      </p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <ScheduleTimelineRowContent
+                        row={row}
+                        onBookFlight={onBookFlight}
+                        onBookLodging={onBookLodging}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      </section>
+
+      {/* Flight booking drawer */}
+      {drawerState?.type === "flight" && tripId && dateIso && (
+        <DuffelFlightBookingDrawer
+          open
+          onClose={() => setDrawerState(null)}
+          tripId={tripId}
+          origin={drawerState.origin}
+          destination={drawerState.destination}
+          departureDate={dateIso}
+          passengerCount={Math.max(1, passengerCount ?? 1)}
+          flightLabel={drawerState.row.label}
+        />
+      )}
+
+      {/* Lodging booking drawer */}
+      {drawerState?.type === "lodging" && tripId && dateIso && destination && (
+        <DuffelLodgingBookingDrawer
+          open
+          onClose={() => setDrawerState(null)}
+          tripId={tripId}
+          initialDestination={destination}
+          initialCheckIn={dateIso}
+          initialCheckOut={nextDay(dateIso)}
+          initialGuests={Math.max(1, passengerCount ?? 1)}
+          initialRooms={1}
+        />
+      )}
+    </>
   );
 }
 
-function ScheduleTimelineRowContent({ row }: { row: ScheduleRow }) {
+function ScheduleTimelineRowContent({
+  row,
+  onBookFlight,
+  onBookLodging,
+}: {
+  row: ScheduleRow;
+  onBookFlight?: () => void;
+  onBookLodging?: () => void;
+}) {
+  const btnClass =
+    "mt-2 inline-flex rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/10 dark:text-neutral-400 dark:hover:border-[#60A5FA] dark:hover:text-[#60A5FA]";
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -634,13 +727,12 @@ function ScheduleTimelineRowContent({ row }: { row: ScheduleRow }) {
           {row.description}
         </p>
       ) : null}
-      {row.href ? (
-        <a
-          href={row.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-flex rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-[#2563EB] hover:text-[#2563EB] dark:border-white/10 dark:text-neutral-400 dark:hover:border-[#60A5FA] dark:hover:text-[#60A5FA]"
-        >
+      {row.sub === "Flight" && onBookFlight ? (
+        <button type="button" onClick={onBookFlight} className={btnClass}>Book</button>
+      ) : row.sub === "Lodging" && onBookLodging ? (
+        <button type="button" onClick={onBookLodging} className={btnClass}>Book stay</button>
+      ) : row.href ? (
+        <a href={row.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
           {row.sub === "Transport" ? "Details" : row.confirmed ? "Open ↗" : "Book"}
         </a>
       ) : null}
@@ -1165,6 +1257,10 @@ export function TripHostSetupDayPage({
         <DayScheduleTimeline
           items={scheduleItems}
           subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
+          tripId={tripId}
+          dateIso={dateIso}
+          destination={plan.location ?? undefined}
+          passengerCount={plan.people.count ?? 1}
         />
 
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">

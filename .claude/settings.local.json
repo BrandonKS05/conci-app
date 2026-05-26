@@ -8,7 +8,9 @@
       "Bash(git -C \"C:/Users/jinwo/conci-app\" add src/frontend/components/trip-form-parser.tsx)",
       "Bash(git -C \"C:/Users/jinwo/conci-app\" diff --name-only --diff-filter=U)",
       "Bash(npm run *)",
-      "Bash(xargs grep -l \"map\\\\|Map\")"
+      "Bash(xargs grep -l \"map\\\\|Map\")",
+      "Bash(npm install *)",
+      "Bash(mkdir -p /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/search /Users/brandonlee/conci-app/src/app/api/trip-plans/\\\\[id\\\\]/duffel/flights/book)"
     ]
   }
 }
