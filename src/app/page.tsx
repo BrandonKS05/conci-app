@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingTwPlusHero } from "@/frontend/components/landing-tw-plus-hero";
 import { ScrollReveal } from "@/frontend/components/scroll-reveal";
+import { PlaneFly } from "@/frontend/components/plane-fly";
 import Image from "next/image";
 
 const CREATE_URL = "/trip-parser";
@@ -126,6 +127,7 @@ const memberRows = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[color:var(--surface-dim)] text-[color:var(--on-surface)] dark:bg-black dark:text-neutral-200">
+      <PlaneFly />
       <LandingTwPlusHero />
 
       <div className="flex flex-col gap-4 bg-white dark:bg-black pt-4">

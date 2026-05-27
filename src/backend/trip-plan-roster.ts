@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aliasesForParticipant, voteKeysIntersectAliases } from "@/shared/collab-vote-keys";
 import type { ClassifiedDecision, CollabStateV1 } from "@/shared/collaboration";
-import type { TripRosterPerson } from "@/shared/trip-roster";
+import type { TripMemberRole, TripRosterPerson } from "@/shared/trip-roster";
 import { fetchDisplayNameMap } from "@/backend/trip-member-names";
 
 function blobVoteKeysAcrossPlan(classified: ClassifiedDecision[], collab: CollabStateV1): Map<string, string[]> {
@@ -66,6 +66,10 @@ export async function fetchTripPlanRoster(
     if (!uid) continue;
     const aliasSet = aliasesForParticipant(uid, []);
     const voteAliases = [...aliasSet];
+    const rawRole = row.role as string | undefined;
+    const memberRole: TripMemberRole =
+      rawRole === "host" ? "host" : rawRole === "co-host" ? "co-host" : "member";
+    const effectiveRole: TripMemberRole = uid === ownerId ? "host" : memberRole;
     roster.push({
       kind: "member",
       memberId: uid,
@@ -74,6 +78,7 @@ export async function fetchTripPlanRoster(
       voteAliases,
       maskedContact: null,
       hasParticipated: participated(aliasSet),
+      role: effectiveRole,
     });
   }
 

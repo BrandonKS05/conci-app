@@ -14,6 +14,7 @@ import { TripSpotlightsInteractive } from "@/frontend/components/trip-spotlights
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripDepositTracker } from "@/frontend/components/trip-deposit-tracker";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { TripDepositSuccessToast } from "@/frontend/components/trip-deposit-success-toast";
 import { GeneratedItineraryView } from "@/frontend/components/generated-itinerary-view";
 
 /** Trip home: live itinerary + collaboration; host sees share controls and invite. */
@@ -85,6 +86,7 @@ export function TripSharedPanel({
 
   return (
     <div className="space-y-8">
+      <TripDepositSuccessToast />
       {isHost ? (
         <div className="flex justify-end">
           <div className="flex flex-col gap-1 sm:items-end">

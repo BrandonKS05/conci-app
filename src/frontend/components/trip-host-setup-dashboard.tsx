@@ -68,6 +68,8 @@ import { tripDestinationCoverFromPlan } from "@/shared/trip-destination-cover";
 import { TripCardChatWidget } from "@/frontend/components/trip-card-chat-widget";
 import { TripCollaborationPanel } from "@/frontend/components/trip-collaboration-panel";
 import { TripContributeButton } from "@/frontend/components/trip-contribute-button";
+import { TripDepositSuccessToast } from "@/frontend/components/trip-deposit-success-toast";
+import { TripFundHostPanel } from "@/frontend/components/trip-fund-host-panel";
 import { MyPreferencesCard } from "@/frontend/components/my-preferences-card";
 import { TripCostRollup } from "@/frontend/components/trip-cost-rollup";
 import { InviteCodeRow } from "@/frontend/components/invite-code-row";
@@ -1445,6 +1447,7 @@ export function TripHostSetupDashboard({
 
   return (
     <>
+    <TripDepositSuccessToast />
     <SiteShell tripTypography contentWide>
       <div className="mx-auto w-full pb-24 lg:pb-12">
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-[260px_minmax(0,1fr)] xl:gap-9">
@@ -1676,6 +1679,20 @@ export function TripHostSetupDashboard({
               flights={liveData?.flights ?? []}
               showContributions
             />
+
+            {isHost ? (
+              <section className="space-y-4">
+                <div className="border-t border-[color:var(--hairline)] pt-5 dark:border-white/10">
+                  <p className="label-caps mb-1 text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                    Host fund management
+                  </p>
+                  <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
+                    Track who paid, how much, and record withdrawals when you move funds from Stripe to your bank.
+                  </p>
+                </div>
+                <TripFundHostPanel tripId={tripId} />
+              </section>
+            ) : null}
           </div>
           ) : null}
 
@@ -1792,15 +1809,6 @@ export function TripHostSetupDashboard({
             {/* Secondary calendar toolbar — actions + peers, kept accessible but visually minimal */}
             {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
               <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
-                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
-                <button
-                  type="button"
-                    onClick={() => router.push(`/trip/${tripId}/setup/lodging`)}
-                    className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4]"
-                >
-                    Add lodging
-                </button>
-                ) : null}
                 {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
                   <button
                     type="button"

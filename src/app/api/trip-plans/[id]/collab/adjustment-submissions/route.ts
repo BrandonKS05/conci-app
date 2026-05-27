@@ -169,19 +169,23 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const ix = list.findIndex((s) => s.id === submissionId);
   if (ix < 0) return NextResponse.json({ error: "Suggestion not found." }, { status: 404 });
 
-  const nextStatus = action === "dismiss" ? ("dismissed" as const) : ("applied" as const);
-
   /** Idempotent resolve for non-pending rows. */
   if (list[ix]!.status !== "pending") {
     return NextResponse.json({ ok: true as const, collab });
   }
 
-  const nextList = [...list];
-  nextList[ix] = {
-    ...nextList[ix]!,
-    status: nextStatus,
-    resolvedAt: new Date().toISOString(),
-  };
+  let nextList: typeof list;
+  if (action === "dismiss") {
+    // Permanently remove dismissed suggestions — never show them again or feed them to itinerary AI.
+    nextList = list.filter((_, i) => i !== ix);
+  } else {
+    nextList = [...list];
+    nextList[ix] = {
+      ...nextList[ix]!,
+      status: "applied" as const,
+      resolvedAt: new Date().toISOString(),
+    };
+  }
   const nextCollab = { ...collab, adjustmentSubmissions: nextList };
 
   const { error: upErr } = await svc

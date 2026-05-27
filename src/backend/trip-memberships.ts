@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type TripMembershipRole = "host" | "member";
+export type TripMembershipRole = "host" | "co-host" | "member";
 
 /** Host row for a trip the user owns (idempotent). */
 export async function ensureHostMembership(
@@ -61,11 +61,11 @@ export async function getTripRoleForUser(
     .eq("user_id", userId)
     .maybeSingle();
   const r = row?.role;
-  if (r === "host" || r === "member") return r;
+  if (r === "host" || r === "co-host" || r === "member") return r;
   return null;
 }
 
-/** Host from trip_plans.user_id or membership role host. */
+/** Host from trip_plans.user_id or membership role host. Co-hosts also get isHost: true. */
 export async function resolveTripAccess(
   svc: SupabaseClient,
   tripPlanId: string,
@@ -79,6 +79,7 @@ export async function resolveTripAccess(
   const m = await getTripRoleForUser(svc, tripPlanId, userId);
   if (m === "member") return { role: "member", isHost: false };
   if (m === "host") return { role: "host", isHost: true };
+  if (m === "co-host") return { role: "co-host", isHost: true };
   return null;
 }
 
@@ -120,7 +121,7 @@ export async function removeTripMemberAsHost(
     .delete()
     .eq("trip_plan_id", tripPlanId)
     .eq("user_id", targetUserId)
-    .eq("role", "member")
+    .in("role", ["member", "co-host"])
     .select("id");
 
   if (error) {
@@ -133,5 +134,57 @@ export async function removeTripMemberAsHost(
       status: 404,
     };
   }
+  return { ok: true };
+}
+
+/**
+ * Host-only (trip owner): promotes a member to co-host or demotes a co-host back to member.
+ * Only the true trip owner (trip_plans.user_id) can change roles — co-hosts cannot promote others.
+ */
+export async function setMemberRoleAsOwner(
+  svc: SupabaseClient,
+  tripPlanId: string,
+  targetUserId: string,
+  actorUserId: string,
+  newRole: "co-host" | "member"
+): Promise<{ ok: true } | { error: string; status: number }> {
+  const { data: plan } = await svc.from("trip_plans").select("user_id").eq("id", tripPlanId).maybeSingle();
+  const ownerId = typeof plan?.user_id === "string" ? plan.user_id : null;
+
+  if (!ownerId || actorUserId !== ownerId) {
+    return { error: "Only the trip owner can change member roles.", status: 403 };
+  }
+  if (targetUserId === ownerId) {
+    return { error: "Cannot change the trip owner's role.", status: 400 };
+  }
+  if (targetUserId === actorUserId) {
+    return { error: "You cannot change your own role.", status: 400 };
+  }
+
+  const { data: existing } = await svc
+    .from("trip_memberships")
+    .select("id, role")
+    .eq("trip_plan_id", tripPlanId)
+    .eq("user_id", targetUserId)
+    .maybeSingle();
+
+  if (!existing) {
+    return { error: "That user is not a member of this trip.", status: 404 };
+  }
+  if (existing.role === "host") {
+    return { error: "Cannot change the role of a host.", status: 400 };
+  }
+
+  const { error } = await svc
+    .from("trip_memberships")
+    .update({ role: newRole })
+    .eq("trip_plan_id", tripPlanId)
+    .eq("user_id", targetUserId);
+
+  if (error) {
+    console.error("[trip-memberships] setMemberRoleAsOwner", error.message);
+    return { error: "Could not update role.", status: 500 };
+  }
+
   return { ok: true };
 }

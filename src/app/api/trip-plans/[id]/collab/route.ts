@@ -101,6 +101,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
     visitorKey: "",
     canonicalVoterKey,
     roster,
+    viewerRole: access.role,
     ...(access.isHost
       ? {
           viewerIsTripOwner: true as const,

@@ -55,7 +55,7 @@ import { mergeLiveRestaurantsOntoHints, type RestaurantPick } from "@/shared/res
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import { estimateTripCostSummary } from "@/shared/trip-cost-estimate";
 import type { TripPlanStatus } from "@/shared/trip-status";
-import type { TripRosterPerson } from "@/shared/trip-roster";
+import type { TripMemberRole, TripRosterPerson } from "@/shared/trip-roster";
 import { LivePlaceCoverImage } from "@/frontend/components/live-place-cover-image";
 import {
   AlternateDatesRangeModal,
@@ -81,6 +81,8 @@ type CollabPayload = {
   nudgeEmailReady?: boolean;
   /** Trip `trip_plans.user_id` — used to hide remove on the owner row. */
   tripOwnerUserId?: string;
+  /** The current viewer's membership role. */
+  viewerRole?: "host" | "co-host" | "member";
   planSnapshot: { datesOptions: string[]; peopleNames: string[]; peopleCount: number | null };
 };
 
@@ -181,6 +183,8 @@ export function TripCollaborationPanel({
   const [nudgeNotice, setNudgeNotice] = useState<string | null>(null);
   const [removeMemberBusyId, setRemoveMemberBusyId] = useState<string | null>(null);
   const [removeMemberErr, setRemoveMemberErr] = useState<string | null>(null);
+  const [roleUpdateBusyId, setRoleUpdateBusyId] = useState<string | null>(null);
+  const [roleUpdateErr, setRoleUpdateErr] = useState<string | null>(null);
   const [notifySelectedMemberIds, setNotifySelectedMemberIds] = useState(() => new Set<string>());
   const [notifyEmailModalOpen, setNotifyEmailModalOpen] = useState(false);
   const [notifyEmailModalRecipients, setNotifyEmailModalRecipients] = useState<string[]>([]);
@@ -418,6 +422,51 @@ export function TripCollaborationPanel({
       }
     },
     [tripId, load]
+  );
+
+  const updateMemberRole = useCallback(
+    async (memberUserId: string, newRole: "co-host" | "member") => {
+      setRoleUpdateBusyId(memberUserId);
+      setRoleUpdateErr(null);
+      const prevRoster = data?.roster ?? [];
+      if (data) {
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                roster: prev.roster.map((p) =>
+                  p.memberId === memberUserId ? { ...p, role: newRole as TripMemberRole } : p
+                ),
+              }
+            : prev
+        );
+      }
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/members/${memberUserId}/role`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: newRole }),
+        });
+        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        if (!r.ok) {
+          setRoleUpdateErr(typeof j.error === "string" ? j.error : "Could not update role.");
+          if (data) {
+            setData((prev) => (prev ? { ...prev, roster: prevRoster } : prev));
+          }
+          return;
+        }
+        await load();
+      } catch {
+        setRoleUpdateErr("Network error — try again.");
+        if (data) {
+          setData((prev) => (prev ? { ...prev, roster: prevRoster } : prev));
+        }
+      } finally {
+        setRoleUpdateBusyId(null);
+      }
+    },
+    [tripId, data, load]
   );
 
   const submitVote = async (payload: Record<string, unknown>) => {
@@ -660,6 +709,10 @@ export function TripCollaborationPanel({
     );
   }
 
+  const viewerIsOwner = Boolean(
+    viewerUserId && tripOwnerUserId && viewerUserId === tripOwnerUserId
+  );
+
   const mainCollaborationColumn = (
     <>
       <section className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
@@ -673,6 +726,18 @@ export function TripCollaborationPanel({
           ))}
         </ul>
       </section>
+
+      {isHost && data?.roster && data.roster.length > 0 ? (
+        <AccessSettingsSection
+          tripId={tripId}
+          roster={data.roster}
+          tripOwnerUserId={data.tripOwnerUserId ?? tripOwnerUserId ?? null}
+          viewerIsOwner={viewerIsOwner}
+          roleUpdateBusyId={roleUpdateBusyId}
+          roleUpdateErr={roleUpdateErr}
+          onUpdateRole={(memberId, newRole) => void updateMemberRole(memberId, newRole)}
+        />
+      ) : null}
 
       {showDecideTogetherColumn ? (
         <div className="space-y-6">
@@ -1411,13 +1476,14 @@ export function ActivityVibePollCard({
         const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
         if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not update recommendation.");
         if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+        await reloadCollab();
       } catch (e) {
         setUiErr(e instanceof Error ? e.message : "Recommendation update failed.");
       } finally {
         setActionBusyId(null);
       }
     },
-    [isTripOwner, onPlanUpdated, tripId]
+    [isTripOwner, onPlanUpdated, reloadCollab, tripId]
   );
 
   const applyRecommendationWithCopilot = useCallback(
@@ -1426,34 +1492,28 @@ export function ActivityVibePollCard({
       setActionBusyId(`rec:${recommendation.id}`);
       setUiErr(null);
       try {
-        const category = MEMBER_RECOMMENDATION_CATEGORY_LABELS[recommendation.category];
-        const msg = `Conci recommended this change based on ${recommendation.memberName}'s preferences:\n\nCategory: ${category}\nImpact: ${recommendation.impact}\nSummary: ${recommendation.summary}\nDetail: ${recommendation.detail}\n\nApply this in the smallest clean way that improves the live trip plan. Update the calendar, lodging, restaurants, activities, transport, budget, or vibe only where it clearly helps.`;
-        const res = await fetch(`/api/trip-plans/${tripId}/host-copilot`, {
+        const res = await fetch(`/api/trip-plans/${tripId}/member-recommendations/accept`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msg }),
+          body: JSON.stringify({ recommendationId: recommendation.id }),
         });
-        const j = (await res.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
-        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Copilot could not apply that.");
-
-        const patch = await fetch(`/api/trip-plans/${tripId}/member-recommendations`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recommendationId: recommendation.id, action: "mark_applied" }),
-        });
-        const pj = (await patch.json().catch(() => ({}))) as { error?: string; plan?: TripPlan };
-        if (!patch.ok) throw new Error(typeof pj.error === "string" ? pj.error : "Saved plan but could not mark recommendation applied.");
-        if (pj.plan) onPlanUpdated?.(normalizePlan(pj.plan));
-        else if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+        const j = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          plan?: TripPlan;
+          replacementApplied?: boolean;
+          explanation?: string;
+        };
+        if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Could not apply recommendation.");
+        if (j.plan) onPlanUpdated?.(normalizePlan(j.plan));
+        await reloadCollab();
       } catch (e) {
         setUiErr(e instanceof Error ? e.message : "Apply failed.");
       } finally {
         setActionBusyId(null);
       }
     },
-    [isTripOwner, onPlanUpdated, tripId]
+    [isTripOwner, onPlanUpdated, reloadCollab, tripId]
   );
 
   return (
@@ -2851,4 +2911,86 @@ function DecisionCard({
   }
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// AccessSettingsSection — host-only: view roles, promote/demote members
+// ---------------------------------------------------------------------------
+
+type AccessSettingsSectionProps = {
+  tripId: string;
+  roster: TripRosterPerson[];
+  tripOwnerUserId: string | null;
+  viewerIsOwner: boolean;
+  roleUpdateBusyId: string | null;
+  roleUpdateErr: string | null;
+  onUpdateRole: (memberId: string, newRole: "co-host" | "member") => void;
+};
+
+function AccessSettingsSection({
+  roster,
+  tripOwnerUserId,
+  viewerIsOwner,
+  roleUpdateBusyId,
+  roleUpdateErr,
+  onUpdateRole,
+}: AccessSettingsSectionProps) {
+  const members = roster.filter((p) => p.memberId && p.kind === "member");
+  if (members.length === 0) return null;
+
+  return (
+    <section className="mb-6 rounded-2xl border border-[color:var(--hairline)] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-none">
+      <h3 className="font-display text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">
+        Access settings
+      </h3>
+      <p className="mt-1 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+        Co-hosts can edit the itinerary and use AI. Only you can change roles.
+      </p>
+      {roleUpdateErr ? (
+        <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+          {roleUpdateErr}
+        </p>
+      ) : null}
+      <ul className="mt-3 space-y-2">
+        {members.map((p) => {
+          const isOwner = p.memberId === tripOwnerUserId;
+          const role: TripMemberRole = isOwner ? "host" : (p.role ?? "member");
+          const busy = roleUpdateBusyId === p.memberId;
+          return (
+            <li key={p.memberId} className="flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate text-sm text-[color:var(--on-surface)] dark:text-neutral-200">
+                {p.displayName}
+              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                {isOwner ? (
+                  <span className="rounded-full bg-[color:var(--sage)]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--sage)] dark:bg-[color:var(--sage-soft)]/15 dark:text-[color:var(--sage-soft)]">
+                    Owner
+                  </span>
+                ) : viewerIsOwner && p.memberId ? (
+                  <select
+                    value={role}
+                    disabled={busy}
+                    onChange={(e) =>
+                      onUpdateRole(p.memberId!, e.target.value as "co-host" | "member")
+                    }
+                    className="rounded-lg border border-[color:var(--hairline)] bg-white px-2 py-1 text-xs text-[color:var(--on-surface)] disabled:opacity-50 dark:border-white/10 dark:bg-dm-elevated dark:text-neutral-200"
+                  >
+                    <option value="member">Member</option>
+                    <option value="co-host">Co-host</option>
+                  </select>
+                ) : (
+                  <span className="rounded-full border border-[color:var(--hairline)] px-2.5 py-0.5 text-[11px] text-[color:var(--on-surface-variant)] dark:border-white/10 dark:text-neutral-400">
+                    {role === "co-host" ? "Co-host" : "Member"}
+                  </span>
+                )}
+                {busy ? (
+                  <span className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">…</span>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
