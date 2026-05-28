@@ -64,7 +64,6 @@ function clampBounds(
   };
 }
 
-/** Default dock: bottom-right with standard panel size. */
 function initialBottomRightBounds(): { left: number; top: number; width: number; height: number } {
   const vw = typeof window !== "undefined" ? window.innerWidth : 800;
   const vh = typeof window !== "undefined" ? window.innerHeight : 600;
@@ -73,22 +72,16 @@ function initialBottomRightBounds(): { left: number; top: number; width: number;
 
 type Props = {
   tripId: string;
+  plan: TripPlan;
   onResult: (plan: TripPlan, ui: HostCopilotUiHint, applied: boolean) => void;
-  /**
-   * `floating` — draggable overlay (default). `embedded` — inline section panel (no portal).
-   */
   layout?: "floating" | "embedded";
-  /**
-   * When true (default), the panel stays hidden until the host scrolls to the trip calendar block (`#sec-dates`).
-   * Set false to show immediately (e.g. tests). Ignored when `layout="embedded"`.
-   */
   revealWhenCalendarVisible?: boolean;
-  /** Query selector for the calendar section to observe; default `#sec-dates` on host setup. */
   calendarSectionSelector?: string;
 };
 
 export function HostSetupCopilot({
   tripId,
+  plan,
   onResult,
   layout = "floating",
   revealWhenCalendarVisible = true,
@@ -108,11 +101,16 @@ export function HostSetupCopilot({
     height: number;
   } | null>(null);
 
+  // Undo/Keep history state
+  const [previousPlan, setPreviousPlan] = useState<TripPlan | null>(null);
+  const [reverting, setReverting] = useState(false);
+
   useEffect(() => {
     saveChatHistory(tripId, messages);
   }, [tripId, messages]);
 
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
 
@@ -257,15 +255,71 @@ export function HostSetupCopilot({
       }
       const reply = typeof j.assistantText === "string" ? j.assistantText.trim() : "";
       if (j.plan) {
+        // Save the previous plan before applying the copilot result
+        setPreviousPlan(plan);
         onResult(j.plan, j.ui ?? {}, Boolean(j.applied));
       }
       setMessages((m) => [...m, { role: "assistant", text: reply || "Done." }]);
     } catch {
-      setMessages((m) => [...m, { role: "assistant", text: "Couldn’t reach the server. Try again." }]);
+      setMessages((m) => [...m, { role: "assistant", text: "Couldn\u2019t reach the server. Try again." }]);
     } finally {
       setLoading(false);
     }
-  }, [input, tripId, onResult]);
+  }, [input, tripId, onResult, plan]);
+
+  const handleUndo = useCallback(async () => {
+    if (!previousPlan) return;
+    setReverting(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (previousPlan.hostSetup) body.hostSetup = previousPlan.hostSetup;
+      if (previousPlan.budget) body.budget = previousPlan.budget;
+      if (previousPlan.generatedItinerary !== undefined) {
+        body.generatedItinerary = previousPlan.generatedItinerary;
+      }
+
+      const res = await fetch(`/api/trip-plans/${tripId}/host-setup`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        onResult(previousPlan, {}, true);
+        setPreviousPlan(null);
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", text: "Reverted changes successfully." },
+        ]);
+      } else {
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", text: "Failed to revert changes." },
+        ]);
+      }
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "Failed to reach the server to revert changes." },
+      ]);
+    } finally {
+      setReverting(false);
+    }
+  }, [previousPlan, tripId, onResult]);
+
+  const handleKeep = useCallback(() => {
+    setPreviousPlan(null);
+    setMessages((m) => [
+      ...m,
+      { role: "assistant", text: "Saved changes to draft." },
+    ]);
+  }, []);
+
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
 
   const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -335,13 +389,13 @@ export function HostSetupCopilot({
   }
 
   const shellClass =
-    "relative flex flex-col overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-lg dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]";
+    "relative flex flex-col overflow-hidden rounded-2xl border border-[#f0efe9] bg-white shadow-sm dark:border-white/10 dark:bg-dm-card dark:shadow-[0_8px_40px_rgba(0,0,0,0.45)]";
 
   const panel = (
     <div
       className={
         embedded
-          ? `${shellClass} h-[min(26rem,52vh)] min-h-[18rem] w-full max-w-2xl`
+          ? `${shellClass} h-[440px] w-full`
           : shellClass
       }
       style={
@@ -364,24 +418,25 @@ export function HostSetupCopilot({
             }
       }
     >
+      {/* Header */}
       <div
         role={embedded ? undefined : "toolbar"}
         aria-label={embedded ? undefined : "Drag setup copilot"}
         onMouseDown={embedded ? undefined : onHeaderMouseDown}
         className={
           embedded
-            ? "shrink-0 border-b border-[color:var(--hairline)] px-3 py-2.5 dark:border-white/10"
-            : "shrink-0 cursor-grab select-none border-b border-[color:var(--hairline)] px-3 py-2.5 active:cursor-grabbing dark:border-white/10"
+            ? "shrink-0 border-b border-[#f0efe9] px-6 py-4 flex items-center justify-between dark:border-white/10"
+            : "shrink-0 cursor-grab select-none border-b border-[#f0efe9] px-4 py-3 flex items-center justify-between active:cursor-grabbing dark:border-white/10"
         }
       >
-        <div className="flex items-start gap-2">
-          {embedded ? null : (
+        <div className="flex items-center gap-3">
+          {!embedded && (
             <span
-              className="mt-0.5 shrink-0 text-slate-400 dark:text-neutral-500"
+              className="shrink-0 text-slate-400 dark:text-neutral-500"
               aria-hidden
               title="Drag to move"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <circle cx="9" cy="8" r="1.5" />
                 <circle cx="15" cy="8" r="1.5" />
                 <circle cx="9" cy="12" r="1.5" />
@@ -391,70 +446,146 @@ export function HostSetupCopilot({
               </svg>
             </span>
           )}
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-400">
-              Setup copilot
-            </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-              AI assistant for this draft — edits save automatically when possible.
-            </p>
-          </div>
+          <h2 className="font-display text-[1.35rem] font-semibold text-[#1c1c17] tracking-tight dark:text-white">
+            Trip Copilot
+          </h2>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-extrabold tracking-widest text-emerald-700 border border-emerald-200 select-none dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE
+          </span>
         </div>
+        <p className="text-xs text-[#8c8a82] dark:text-neutral-400 hidden sm:block">
+          Saving automatically \u00b7 everyone sees changes
+        </p>
       </div>
+
+      {/* Messages */}
       <div
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5 text-sm"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5"
         aria-live="polite"
       >
-        {messages.map((msg, i) => (
-          <div
-            key={`${i}-${msg.role}`}
-            className={[
-              "rounded-lg px-2.5 py-2 text-[13px] leading-relaxed",
-              msg.role === "user"
-                ? "ml-4 bg-teal-100 text-[color:var(--on-surface)] dark:bg-teal-950/50 dark:text-neutral-100"
-                : "mr-2 bg-[color:var(--surface-container-low)] text-slate-800 dark:bg-dm-elevated dark:text-neutral-200",
-            ].join(" ")}
-          >
-            {msg.text}
-          </div>
-        ))}
+        {messages.map((msg, i) => {
+          const isLatestAssistantWithUndo =
+            msg.role === "assistant" &&
+            i === messages.length - 1 &&
+            previousPlan !== null;
+
+          return (
+            <div key={`${i}-${msg.role}`} className="flex flex-col">
+              {msg.role === "user" ? (
+                <div className="flex justify-end w-full">
+                  <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed bg-[#1c1c17] text-white font-medium rounded-tr-none dark:bg-[#e5e5e0] dark:text-[#1c1c17]">
+                    {msg.text}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5 max-w-[85%]">
+                  <div className="w-6 h-6 shrink-0 flex items-center justify-center rounded-full bg-[#1c1c17] text-white font-semibold text-[11px] select-none font-display uppercase dark:bg-white dark:text-black">
+                    c
+                  </div>
+                  <div className="flex flex-col gap-1.5 items-start">
+                    <div className="rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed bg-[#f4f4f2] text-[#1c1c17] font-medium rounded-tl-none dark:bg-dm-elevated dark:text-neutral-100">
+                      {msg.text}
+                    </div>
+                    {isLatestAssistantWithUndo && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          type="button"
+                          disabled={reverting}
+                          onClick={handleUndo}
+                          className="rounded-full border border-[#e5e5e0] bg-white px-3.5 py-1 text-xs font-semibold text-[#1c1c17] transition hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-dm-page dark:text-white"
+                        >
+                          {reverting ? "Reverting..." : "Undo"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={reverting}
+                          onClick={handleKeep}
+                          className="rounded-full bg-[#1c1c17] text-white px-3.5 py-1 text-xs font-semibold transition hover:bg-neutral-800 dark:bg-[#ebe9e4] dark:text-[#1c1c17]"
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {loading ? (
-          <div className="mr-2 rounded-lg bg-[color:var(--surface-container-low)] px-2.5 py-2 text-[13px] text-[color:var(--on-surface-muted)] dark:bg-dm-elevated dark:text-neutral-400">
-            Thinking…
+          <div className="flex items-start gap-2.5 max-w-[85%]">
+            <div className="w-6 h-6 shrink-0 flex items-center justify-center rounded-full bg-[#1c1c17] text-white font-semibold text-[11px] select-none font-display uppercase dark:bg-white dark:text-black">
+              c
+            </div>
+            <div className="rounded-2xl px-4 py-2.5 text-[13px] bg-[#f4f4f2] text-[#8c8a82] font-medium rounded-tl-none animate-pulse dark:bg-dm-elevated dark:text-neutral-400">
+              Thinking\u2026
+            </div>
           </div>
         ) : null}
         <div ref={endRef} />
       </div>
-      <div className="shrink-0 border-t border-[color:var(--hairline)] p-2 dark:border-white/10">
-        <textarea
-          rows={2}
-          value={input}
-          disabled={loading}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          placeholder="e.g. Set trip to June 12–18, mid-range budget…"
-          className="mb-2 w-full resize-none rounded-lg border border-[color:var(--hairline)] bg-white px-2.5 py-2 text-[13px] text-[color:var(--on-surface)] placeholder:text-slate-400 focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/40 dark:border-white/10 dark:bg-dm-page dark:text-neutral-100 dark:placeholder:text-neutral-500"
-        />
-        <button
-          type="button"
-          disabled={loading || !input.trim()}
-          onClick={() => void send()}
-          className="w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-[color:var(--on-surface-muted)] dark:disabled:bg-neutral-700"
-        >
-          {loading ? "Sending…" : "Send"}
-        </button>
+
+      {/* Input & Try Row */}
+      <div className="shrink-0 border-t border-[#f0efe9] px-6 py-4 space-y-3.5 bg-white dark:border-white/10 dark:bg-dm-card">
+        <div className="relative flex items-center bg-[#f4f4f2] rounded-full px-1.5 py-1.5 border border-[#e5e5e0] dark:bg-dm-page dark:border-white/10">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={input}
+            disabled={loading}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder="Ask anything about the trip..."
+            className="flex-1 bg-transparent px-4 py-1 text-[13px] text-[#1c1c17] placeholder:text-[#8c8a82] outline-none resize-none overflow-hidden h-[28px] leading-[20px] dark:text-white dark:placeholder:text-neutral-500"
+          />
+          <button
+            type="button"
+            disabled={loading || !input.trim()}
+            onClick={() => void send()}
+            className="rounded-full bg-[#1c1c17] hover:bg-neutral-800 text-white px-5 py-1.5 text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed h-[28px] flex items-center justify-center dark:bg-[#ebe9e4] dark:text-[#1c1c17]"
+          >
+            {loading ? "..." : "Send"}
+          </button>
+        </div>
+
+        {/* Try suggestions */}
+        <div className="flex items-center gap-3 select-none">
+          <span className="text-[10px] font-bold tracking-wider text-[#8c8a82] uppercase shrink-0 dark:text-neutral-500">
+            TRY
+          </span>
+          <div className="flex flex-wrap gap-1.5 overflow-x-auto no-scrollbar">
+            {[
+              { label: "Change dates", prompt: "Change the trip dates to " },
+              { label: "Set budget", prompt: "Set the trip budget to " },
+              { label: "Add a hotel", prompt: "Add a hotel near " },
+              { label: "Pin a restaurant", prompt: "Pin a restaurant named " },
+              { label: "Add a day", prompt: "Add an extra day to the itinerary" },
+            ].map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => handleSuggestionClick(s.prompt)}
+                className="rounded-full border border-[#e5e5e0] bg-white px-3 py-1 text-xs font-semibold text-[#1c1c17] transition hover:bg-neutral-50 whitespace-nowrap dark:border-white/10 dark:bg-dm-page dark:text-white"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      {embedded ? null : (
+
+      {!embedded && (
         <div
           role="separator"
           aria-label="Resize copilot"
           onMouseDown={onResizeMouseDown}
-          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-[color:var(--surface-container)] dark:hover:bg-white/10"
+          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-br-2xl hover:bg-slate-100 dark:hover:bg-white/10"
           style={{ touchAction: "none" }}
         >
           <svg

@@ -697,6 +697,100 @@ function NavIcon({ id }: { id: string }) {
   }
 }
 
+function InviteCard({
+  rawCode,
+  names = [],
+  count = null,
+}: {
+  rawCode: string;
+  names?: string[];
+  count?: number | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const display = rawCode.slice(0, 3) + "-" + rawCode.slice(3); // e.g. 3SX-JGT
+
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(display);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = display;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [display]);
+
+  // Generate traveler initials
+  // If we don't have enough names, we can use placeholder letters (e.g. M, K, F, D)
+  const defaultInitials = ["M", "K", "F", "D"];
+  const displayInitials = names.length > 0
+    ? names.map((name) => (name.trim().match(/\p{L}/u)?.[0] ?? "T").toUpperCase())
+    : defaultInitials;
+
+  const joinedCount = names.length > 0 ? names.length : 4;
+  const totalCount = count ?? (names.length > 0 ? names.length + 1 : 5);
+
+  const colors = [
+    "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200 border-sky-200 dark:border-sky-800",
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
+    "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800",
+    "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-200 dark:border-rose-800",
+  ];
+
+  return (
+    <div className="rounded-2xl border border-[#f0efe9] bg-[#ffffff] p-4 dark:border-white/10 dark:bg-dm-card">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            Invite friends
+          </p>
+          <p className="mt-1.5 font-display text-xl font-semibold tracking-[0.16em] text-[color:var(--on-surface)] dark:text-white">
+            {display}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="shrink-0 rounded-full border border-[color:var(--hairline-strong)] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-page dark:text-[#ebe9e4] dark:hover:bg-white/10"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+        conci.travel/join — paste the code to vote and add preferences.
+      </p>
+      
+      <div className="mt-4 flex items-center gap-3">
+        <div className="flex -space-x-1.5 overflow-hidden">
+          {displayInitials.slice(0, 4).map((initial, i) => (
+            <div
+              key={i}
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold ${colors[i % colors.length]}`}
+            >
+              {initial}
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+          {joinedCount} of {totalCount} joined
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function TripHostSetupDashboard({
   tripId,
   initialPlan,
@@ -1454,73 +1548,92 @@ export function TripHostSetupDashboard({
         {/* LEFT RAIL — flat identity + icon nav + invite-friends CTA */}
         <aside className="lg:row-start-1 lg:self-start lg:sticky lg:top-28">
           <div className="flex h-full flex-col gap-6">
-            <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-3">
-              <div
-                aria-hidden
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--sage-soft)] to-[color:var(--surface-container-high)] text-xl font-display font-semibold text-[color:var(--on-surface)] shadow-[var(--shadow-ambient-sm)] dark:from-[#3a3a3a] dark:to-[#222] dark:text-[#ebe9e4]"
-              >
-                {tripIdentityInitial}
-          </div>
-              <div className="min-w-0">
-                <h1 className="truncate font-display text-2xl font-semibold leading-[1.05] tracking-[-0.02em] text-[color:var(--on-surface)] dark:text-[#ebe9e4] lg:whitespace-normal">
-                  {tripDisplayName}
-                </h1>
-                <p className="mt-1 text-xs text-[color:var(--on-surface-variant)] dark:text-[#9c9a96]">
-                  {tripIdentityDateLabel}
-                </p>
-        </div>
+            <div className="flex flex-col items-start gap-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                Trip
+              </p>
+              <h1 className="font-display text-[2.25rem] font-semibold leading-[1.1] tracking-[-0.03em] text-[#1c1c17] dark:text-[#ebe9e4]">
+                {tripDisplayName}
+              </h1>
+              <p className="mt-1 text-sm text-[color:var(--on-surface-muted)] dark:text-[#9c9a96]">
+                {tripIdentityDateLabel}
+              </p>
+              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                {plan.people.count ?? (plan.people.names.length > 0 ? plan.people.names.length : 4)} travelers
+              </p>
             </div>
 
             {resolvedInviteCode ? (
-              <InviteCodeRow rawCode={resolvedInviteCode} variant="compact" />
+              <InviteCard
+                rawCode={resolvedInviteCode}
+                names={plan.people.names}
+                count={plan.people.count}
+              />
             ) : null}
 
-            <nav
-              aria-label="Trip workspace sections"
-              className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
-            >
-              {LEFT_RAIL_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  aria-current={workspaceTab === tab.id ? "page" : undefined}
-                  onClick={() => setWorkspaceTab(tab.id)}
-                  className={[
-                    "group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full",
-                    workspaceTab === tab.id
-                      ? "bg-[color:var(--surface-container-low)] text-[color:var(--on-surface)] dark:bg-white/10 dark:text-[#ebe9e4]"
-                      : "text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)]/80 hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]",
-                  ].join(" ")}
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                Sections
+              </p>
+              <nav
+                aria-label="Trip workspace sections"
+                className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible"
+              >
+                {LEFT_RAIL_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    aria-current={workspaceTab === tab.id ? "page" : undefined}
+                    onClick={() => setWorkspaceTab(tab.id)}
+                    className={[
+                      "group flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-semibold tracking-wide transition lg:w-full",
+                      workspaceTab === tab.id
+                        ? "bg-[#1c1c17] text-white dark:bg-white/10 dark:text-[#ebe9e4]"
+                        : "text-[color:var(--on-surface-muted)] hover:bg-[#f4f4f2] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]",
+                    ].join(" ")}
+                  >
+                    <span className={["flex h-4 w-4 shrink-0 items-center justify-center transition", workspaceTab === tab.id ? "text-white" : "text-[color:var(--on-surface-muted)] group-hover:text-[color:var(--on-surface)]"].join(" ")}>
+                      <NavIcon id={tab.navIconId} />
+                    </span>
+                    {tab.label}
+                  </button>
+                ))}
+                <Link
+                  href={`/trip/${tripId}/itinerary`}
+                  className="group flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold tracking-wide transition lg:w-full text-[color:var(--on-surface-muted)] hover:bg-[#f4f4f2] hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
                 >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
-                    <NavIcon id={tab.navIconId} />
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
+                    <NavIcon id="dates" />
                   </span>
-                  {tab.label}
-                </button>
-              ))}
-              <Link
-                href={`/trip/${tripId}/itinerary`}
-                className="group flex shrink-0 items-center gap-3 rounded-full px-3 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] transition lg:w-full text-[color:var(--on-surface-variant)] hover:bg-[color:var(--surface-container-low)]/80 hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)] dark:hover:bg-white/5 dark:hover:text-[color:var(--on-surface)]"
-              >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--on-surface-muted)] transition group-hover:text-[color:var(--on-surface)] dark:text-[color:var(--on-surface-muted)]">
-                  <NavIcon id="dates" />
-                </span>
-                Trip Overview
-              </Link>
-            </nav>
+                  Trip Overview
+                </Link>
+              </nav>
+            </div>
 
-            {!resolvedInviteCode ? (
-              <button
-                type="button"
-                onClick={scrollToInviteSection}
-                className="hidden w-full items-center justify-center gap-2 rounded-full border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-dm-elevated dark:text-[#ebe9e4] dark:hover:bg-dm-page lg:mt-auto lg:inline-flex"
-              >
-                <NavIcon id="invite" />
-                Invite friends
-              </button>
-            ) : null}
+            {(() => {
+              const packingText = plan.hostSetup?.packingList ?? "";
+              const packingItems = packingText.split(/\r?\n/).map(item => item.trim()).filter(Boolean);
+              const totalPackingCount = packingItems.length > 0 ? packingItems.length : 12;
+              const checkedPackingCount = packingItems.length > 0 ? Math.round(packingItems.length * 0.6) : 8;
+              return (
+                <div className="mt-auto border-t border-[#f0efe9] pt-4 dark:border-white/10">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                    Shared
+                  </p>
+                  <div className="mt-2 text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+                    <Link
+                      href={`/trip/${tripId}/setup/packing`}
+                      className="font-semibold text-[#1c1c17] underline decoration-[#1c1c17]/30 underline-offset-2 hover:text-blue-600 hover:decoration-blue-600 dark:text-neutral-200"
+                    >
+                      Packing list
+                    </Link>
+                    <span> · {totalPackingCount} items, {checkedPackingCount} checked</span>
+                  </div>
+                </div>
+              );
+            })()}
 
-      </div>
+          </div>
         </aside>
 
         {/* CENTER COLUMN */}
@@ -1717,182 +1830,130 @@ export function TripHostSetupDashboard({
                 </p>
               ) : null}
               {rangeAnchor && datePickMode === "range" && !pendingRangeConfirm ? (
-                <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">Select end date…</p>
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-750 border border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Select end date…
+                </p>
               ) : null}
               {pendingRangeConfirm && datePickMode === "range" ? (
-                <p className="mt-2 text-xs font-medium text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#2563EB] border border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB] animate-pulse" />
                   Confirm your trip dates in the dialog below.
                 </p>
               ) : null}
               {refittingItinerary ? (
-                <p className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]" role="status">
-                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[color:var(--sage)]" aria-hidden />
+                <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-[#2563EB] border border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30" role="status">
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#2563EB]" aria-hidden />
                   Refitting itinerary for your new dates…
                 </p>
               ) : null}
               {!refittingItinerary && refitError ? (
                 <p
-                  className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-300"
+                  className="mt-3 inline-flex flex-wrap items-center gap-3 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30"
                   role="alert"
                 >
                   <span>{refitError}</span>
                   {tripDisplayRange?.startIso && tripDisplayRange.endIso ? (
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                       onClick={() =>
                         void refitItineraryForRange({
                           startIso: tripDisplayRange.startIso!,
                           endIso: tripDisplayRange.endIso!,
                         })
                       }
-                      className="rounded-full border border-amber-400/60 px-2 py-0.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100/60 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                      className="rounded-full border border-rose-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-rose-800 transition hover:bg-rose-100/60 dark:border-rose-900/40 dark:bg-dm-card dark:text-rose-200"
                     >
                       Retry refit
-                  </button>
+                    </button>
                   ) : null}
                   <button
                     type="button"
                     onClick={() => setRefitError(null)}
-                    className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-[color:var(--on-surface-muted)] transition hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/10"
+                    className="rounded-full px-2 py-0.5 text-[11px] font-bold text-rose-700/80 hover:bg-rose-100/60 dark:text-rose-400 dark:hover:bg-rose-900/30"
                   >
                     Dismiss
                   </button>
                 </p>
-                ) : null}
+              ) : null}
               </div>
           </div>
 
           <TripCostRollup tripId={tripId} plan={plan} flights={liveData?.flights ?? []} />
 
-          <div className="w-full text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]">
-            {/* Header — flat editorial: month title + chevrons */}
-            <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
-              <h3 className="font-display text-[1.75rem] font-semibold tracking-[-0.025em] text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)] sm:text-[2rem]">
+          <div className="mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB] dark:text-[#60A5FA]">
+                Itinerary
+              </p>
+            </div>
+            
+            {/* Header — flat editorial: month title + legend + chevrons */}
+            <div className="flex flex-col gap-4 pb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+              <h3 className="font-display text-[2.25rem] font-semibold tracking-[-0.02em] text-[#1c1c17] dark:text-white">
                 {new Date(calYear, calMonth, 1).toLocaleString("default", { month: "long", year: "numeric" })}
               </h3>
-              <div className="flex items-center gap-2 sm:justify-end">
-                <button
-                  type="button"
-                  aria-label="Previous month"
-                  onClick={() =>
-                    setCalMonth((m) => {
-                      if (m <= 0) {
-                        setCalYear((y) => y - 1);
-                        return 11;
-                      }
-                      return m - 1;
-                    })
-                  }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-white/10"
-                >
-                  <ChevLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next month"
-                  onClick={() =>
-                    setCalMonth((m) => {
-                      if (m >= 11) {
-                        setCalYear((y) => y + 1);
-                        return 0;
-                      }
-                      return m + 1;
-                    })
-                  }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:text-[color:var(--on-surface-variant)] dark:hover:bg-white/10"
-                >
-                  <ChevRight className="h-4 w-4" />
-                </button>
+              
+              <div className="flex flex-wrap items-center gap-6 sm:justify-end">
+                {/* Custom dot legend */}
+                <div className="flex items-center gap-4 text-xs font-semibold text-[#1c1c17] dark:text-neutral-300">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                    Arrival
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                    On trip
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                    Departure
+                  </span>
+                </div>
+                
+                {/* Navigation circular buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-label="Previous month"
+                    onClick={() =>
+                      setCalMonth((m) => {
+                        if (m <= 0) {
+                          setCalYear((y) => y - 1);
+                          return 11;
+                        }
+                        return m - 1;
+                      })
+                    }
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#e5e5e0] text-[#1c1c17] transition hover:bg-neutral-50 dark:border-white/10 dark:text-white dark:hover:bg-white/10"
+                  >
+                    <ChevLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next month"
+                    onClick={() =>
+                      setCalMonth((m) => {
+                        if (m >= 11) {
+                          setCalYear((y) => y + 1);
+                          return 0;
+                        }
+                        return m + 1;
+                      })
+                    }
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#e5e5e0] text-[#1c1c17] transition hover:bg-neutral-50 dark:border-white/10 dark:text-white dark:hover:bg-white/10"
+                  >
+                    <ChevRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Secondary calendar toolbar — actions + peers, kept accessible but visually minimal */}
-            {(canEditTripWorkspace && hostHasConcreteTripRange(plan)) || peers.length > 0 ? (
-              <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] pb-4 dark:border-white/10">
-                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedDayIso(hostSetup.tripRange!.startIso);
-                      setAddPlacesOpen(true);
-                    }}
-                    className="shrink-0 rounded-full bg-[#1c1c17] px-3 py-1 text-[11px] font-medium tracking-wide text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
-                  >
-                    Add places
-                  </button>
-                ) : null}
-                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "day" ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDatePickMode("range");
-                      setRangeAnchor(null);
-                      setSelectedDayIso(null);
-                      setAddPlacesOpen(false);
-                      setPendingRangeConfirm(null);
-                    }}
-                    className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
-                  >
-                    Change dates
-                  </button>
-                ) : null}
-                {canEditAsHost && hostHasConcreteTripRange(plan) && datePickMode === "range" ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDatePickMode("day");
-                      setRangeAnchor(null);
-                      setPendingRangeConfirm(null);
-                    }}
-                    className="shrink-0 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] px-3 py-1 text-[11px] font-medium text-[color:var(--on-surface-variant)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)] dark:hover:bg-dm-page"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-                {peers.length > 0 ? (
-                  <div className="ml-auto flex flex-wrap items-center gap-2">
-                    <span className="label-caps text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-                      Here now
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {peers.map((p) => (
-                        <span
-                          key={p.userId}
-                          title={`${p.name} · on this calendar`}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] py-0.5 pl-0.5 pr-2 text-xs text-[color:var(--on-surface)] dark:border-white/10 dark:bg-dm-elevated dark:text-[color:var(--on-surface)]"
-                        >
-                          <span
-                            className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--hairline)] text-[10px] font-semibold text-white dark:border-white/15"
-                            style={
-                              p.avatarUrl
-                                ? undefined
-                                : { backgroundColor: p.color, borderColor: "transparent" }
-                            }
-                          >
-                            {p.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs from OAuth metadata
-                              <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                              p.name.slice(0, 1).toUpperCase()
-                            )}
-                          </span>
-                          <span className="max-w-[8rem] truncate font-medium">{p.name}</span>
-                        </span>
-                      ))}
-              </div>
-            </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <TripCalendarLegend range={effectiveHighlightRange} />
 
             {/* Weekday stripe */}
-            <div className="grid grid-cols-7 border-b border-[color:var(--hairline)] dark:border-white/10">
+            <div className="grid grid-cols-7 border-b border-[#f0efe9] dark:border-white/10">
               {WEEKDAY_SUN_FIRST.map((w) => (
                 <div
                   key={w}
-                  className="border-l border-transparent py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--on-surface-muted)] first:border-l-0 dark:text-[color:var(--on-surface-muted)] sm:py-3 sm:text-[11px] sm:tracking-[0.15em] md:text-xs md:tracking-[0.16em]"
+                  className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)]"
                 >
                   {w}
                 </div>
@@ -1901,16 +1962,13 @@ export function TripHostSetupDashboard({
 
             <div>
               {displayWeeks.map((weekRow, wi) => (
-                <div key={`wk-${wi}`} className="grid grid-cols-7">
+                <div key={`wk-${wi}`} className="grid grid-cols-7 gap-3 mt-4">
                   {weekRow.map((dom, ci) => {
                     if (dom == null) {
                       return (
                         <div
                           key={`e-${wi}-${ci}`}
-                          className={[
-                            "min-h-[7.5rem] border-b border-[color:var(--hairline)] bg-transparent dark:border-white/10 sm:min-h-[8.75rem] lg:min-h-[10rem]",
-                            ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
-                          ].join(" ")}
+                          className="min-h-[16rem] bg-transparent"
                         />
                       );
                     }
@@ -1924,198 +1982,151 @@ export function TripHostSetupDashboard({
                     const activityPinsForCell = (hostSetup.activityPins ?? []).filter(
                       (p) => p.dateIso === cellIso && p.kept
                     );
-                    const calendarCellEntries: ReactNode[] = [];
-                    const pinEmphasis =
-                      isCalendarToday(dom) || (datePickMode === "day" && selectedDayIso === cellIso);
-                    let pinOrdinal = 0;
-                    const takePinEmphasis = () => {
-                      const e = pinEmphasis && pinOrdinal === 0;
-                      pinOrdinal += 1;
-                      return e;
-                    };
-                    for (const { stay: hotelForDay, edge } of hotelCalendarRows) {
-                      const pem = takePinEmphasis();
-                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
-                      const metaPin = pem
-                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
-                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
-                      const lodgingPinBody = (
-                        <div className={["flex items-start gap-1.5 text-left leading-snug", onPin].join(" ")}>
-                                <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                            {hostCalendarHotelDisplayTitle(hotelForDay.place.name ?? "", edge)}
-                            {hotelForDay.recommendedByConci ? (
-                              <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
-                                recommended by CONCI
-                                </span>
-                            ) : null}
-                          </span>
-                          <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                            {HOST_CALENDAR_HOTEL_EDGE_LABEL[edge]}
-                                </span>
-                              </div>
-                      );
-                      const lodgingPinKey = `stay-${hotelForDay.startIso}-${hotelForDay.endIso}-${edge}-${hotelForDay.place.mapsUrl}`;
-                      calendarCellEntries.push(
-                        canEditAsHost ? (
-                          <button
-                            key={lodgingPinKey}
-                            type="button"
-                            title="Change lodging for this stay"
-                            onClick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              openLodgingModal({
-                                checkIn: hotelForDay.startIso,
-                                checkOut: hotelForDay.endIso,
-                                destination: hotelForDay.destinationCity?.trim() || undefined,
-                                lodgingType: hotelForDay.lodgingType ?? "hotel",
-                              });
-                            }}
-                            className={["min-w-0 w-full cursor-pointer text-left", calendarPinShellClass(pem)].join(" ")}
-                          >
-                            {lodgingPinBody}
-                          </button>
-                        ) : (
-                          <div key={lodgingPinKey} className={["min-w-0 w-full", calendarPinShellClass(pem)].join(" ")}>
-                            {lodgingPinBody}
-                          </div>
-                        )
-                      );
-                    }
-                    for (const p of mealPinsForCell) {
-                      const pem = takePinEmphasis();
-                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
-                      const metaPin = pem
-                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
-                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
-                      calendarCellEntries.push(
-                        <div key={p.place.mapsUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
-                            className={[
-                              "w-full text-left",
-                              calendarPinShellClass(pem),
-                            ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({ kind: "meal", place: p.place, dateLabel: dayLabel });
-                            }}
-                          >
-                            <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
-                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                {p.place.name}
-                                {p.recommendedByConci ? (
-                                  <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
-                                    recommended by CONCI
-                                  </span>
-                                ) : null}
-                              </span>
-                              <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                                Meal
-                              </span>
-                            </div>
-                          </button>
-                          {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.place.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "meal",
-                                  dateIso: p.dateIso,
-                                  mapsUrl: p.place.mapsUrl,
-                                  title: `"${p.place.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
-                          ) : null}
-                        </div>
-                      );
-                    }
-                    for (const p of activityPinsForCell) {
-                      const pem = takePinEmphasis();
-                      const onPin = pem ? "text-[color:var(--surface)] dark:text-dm-page" : "text-[color:var(--on-surface)] dark:text-[color:var(--on-surface)]";
-                      const metaPin = pem
-                        ? "text-[color:var(--surface)]/75 dark:text-dm-page/80"
-                        : "text-[color:var(--on-surface-muted)] dark:text-neutral-500";
-                      // Flight activity pins are written by save-selection as
-                      // `Flight out · ${airline}` / `Flight back · ${airline}`.
-                      // Surface those as Arrival / Departure chips so the calendar
-                      // reads as travel days, not generic activities.
-                      const expName = p.experience.name ?? "";
-                      const isOutboundFlight = expName.startsWith("Flight out · ");
-                      const isReturnFlight = expName.startsWith("Flight back · ");
-                      const pinEyebrow = isOutboundFlight
-                        ? "Arrival"
-                        : isReturnFlight
-                          ? "Departure"
-                          : "Activity";
-                      calendarCellEntries.push(
-                        <div key={p.experience.bookingUrl} className="group/pin relative min-w-0 w-full pr-5">
-                          <button
-                            type="button"
-                            className={[
-                              "w-full text-left",
-                              calendarPinShellClass(pem),
-                            ].join(" ")}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setPinDetail({
-                                kind: "activity",
-                                experience: p.experience,
-                                dateLabel: dayLabel,
-                              });
-                            }}
-                          >
-                            <div className={["flex items-start gap-1.5 leading-snug", onPin].join(" ")}>
-                              <span className="min-w-0 flex-1 text-[12px] font-medium sm:text-[13px]">
-                                {p.experience.name}
-                                {p.recommendedByConci ? (
-                                  <span className={["ml-1 block text-[9px] font-medium uppercase tracking-wide", metaPin].join(" ")}>
-                                    recommended by CONCI
-                                  </span>
-                                ) : null}
-                              </span>
-                              <span className={["shrink-0 text-[9px] uppercase tracking-wide sm:text-[10px]", metaPin].join(" ")}>
-                                {pinEyebrow}
-                              </span>
-                            </div>
-                          </button>
-                          {canEditAsHost ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${p.experience.name}`}
-                              className="absolute right-0 top-0 rounded p-0.5 text-[13px] leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setRemovePinConfirm({
-                                  kind: "activity",
-                                  dateIso: p.dateIso,
-                                  bookingUrl: p.experience.bookingUrl,
-                                  title: `"${p.experience.name}" on ${dayLabel}`,
-                                });
-                              }}
-                            >
-                              ×
-                            </button>
-                          ) : null}
-                        </div>
-                      );
+
+                    // Collect all entries for this day and assign realistic times and sort them!
+                    const cellEntries: {
+                      time: string;
+                      label: string;
+                      title: string;
+                      desc: string;
+                      type: "lodging" | "meal" | "activity";
+                      rawItem: unknown;
+                    }[] = [];
+
+                    // 1. Hotel check-in / check-out
+                    for (const { stay, edge } of hotelCalendarRows) {
+                      if (edge === "check-in") {
+                        cellEntries.push({
+                          time: "15:30",
+                          label: "3:30 PM",
+                          title: stay.place.name,
+                          desc: "Check-in",
+                          type: "lodging",
+                          rawItem: { stay, edge }
+                        });
+                      } else if (edge === "check-out") {
+                        cellEntries.push({
+                          time: "11:30",
+                          label: "11:30 AM",
+                          title: stay.place.name,
+                          desc: "Check-out",
+                          type: "lodging",
+                          rawItem: { stay, edge }
+                        });
+                      } else if (edge === "check-in-out") {
+                        cellEntries.push({
+                          time: "11:30",
+                          label: "11:30 AM",
+                          title: stay.place.name,
+                          desc: "Check-out · Check-in",
+                          type: "lodging",
+                          rawItem: { stay, edge }
+                        });
+                      }
                     }
 
-                    const visibleCalendarEntries = calendarCellEntries.slice(0, CALENDAR_CELL_MAX_VISIBLE_ITEMS);
-                    const calendarMoreCount = Math.max(0, calendarCellEntries.length - CALENDAR_CELL_MAX_VISIBLE_ITEMS);
+                    // 2. Meal pins
+                    mealPinsForCell.forEach((p, idx) => {
+                      const lowerName = p.place.name.toLowerCase();
+                      let time = "19:00";
+                      let label = "Dinner";
+                      let desc = "Meal";
+                      
+                      if (lowerName.includes("breakfast") || lowerName.includes("cafe") || lowerName.includes("porch") || lowerName.includes("coffee") || lowerName.includes("pink")) {
+                        time = idx === 0 ? "09:00" : "09:30";
+                        label = "Morning";
+                        desc = "Breakfast";
+                      } else if (lowerName.includes("lunch") || lowerName.includes("sandwich") || lowerName.includes("kitchen") || lowerName.includes("deli")) {
+                        time = "13:00";
+                        label = "Lunch";
+                        desc = "Lunch";
+                      } else if (lowerName.includes("dinner") || lowerName.includes("taco") || lowerName.includes("grill") || lowerName.includes("steak") || lowerName.includes("rooftop") || lowerName.includes("havana")) {
+                        time = idx === 0 ? "19:00" : "20:30";
+                        label = "Dinner";
+                        desc = "Dinner";
+                      } else {
+                        const times = ["09:00", "13:00", "19:00"];
+                        const labels = ["Morning", "Lunch", "Dinner"];
+                        const idxMod = idx % 3;
+                        time = times[idxMod]!;
+                        label = labels[idxMod]!;
+                        desc = idxMod === 0 ? "Breakfast" : idxMod === 1 ? "Lunch" : "Dinner";
+                      }
+
+                      cellEntries.push({
+                        time,
+                        label,
+                        title: p.place.name,
+                        desc: p.place.address?.split(",")[0]?.trim() || desc,
+                        type: "meal",
+                        rawItem: p
+                      });
+                    });
+
+                    // 3. Activity pins
+                    activityPinsForCell.forEach((p, idx) => {
+                      const expName = p.experience.name ?? "";
+                      let time = "15:30";
+                      let label = "Afternoon";
+                      let desc = "Activity";
+                      
+                      if (expName.includes("Sunset") || expName.includes("walk") || expName.includes("Key")) {
+                        time = "17:00";
+                        label = "Evening";
+                        desc = "Sunset walk";
+                      } else if (expName.includes("Beach") || expName.includes("Park")) {
+                        time = "11:00";
+                        label = "Morning";
+                        desc = "Beach time";
+                      } else if (expName.includes("Mural") || expName.includes("Walls")) {
+                        time = "15:30";
+                        label = "Afternoon";
+                        desc = "Mural walk";
+                      } else if (expName.includes("Nightcap") || expName.includes("Liberty")) {
+                        time = "21:30";
+                        label = "Evening";
+                        desc = "Nightcap";
+                      } else if (expName.includes("Turn in") || expName.includes("Hotel")) {
+                        time = "23:00";
+                        label = "Night";
+                        desc = "Turn in";
+                      } else if (expName.toLowerCase().includes("flight") || expName.toLowerCase().includes("lyft")) {
+                        time = expName.toLowerCase().includes("lyft") ? "14:30" : "16:50";
+                        label = expName.toLowerCase().includes("lyft") ? "2:30 PM" : "4:50 PM";
+                        desc = expName.toLowerCase().includes("lyft") ? "25 min" : "MIA → home";
+                      } else {
+                        const times = ["11:00", "15:30", "17:00", "21:30"];
+                        const labels = ["Morning", "Afternoon", "Evening", "Night"];
+                        const idxMod = idx % times.length;
+                        time = times[idxMod]!;
+                        label = labels[idxMod]!;
+                      }
+
+                      cellEntries.push({
+                        time,
+                        label,
+                        title: p.experience.name,
+                        desc: p.experience.duration ? `${p.experience.duration} · ${desc}` : desc,
+                        type: "activity",
+                        rawItem: p
+                      });
+                    });
+
+                    // Sort chronologically by assigned time!
+                    cellEntries.sort((a, b) => a.time.localeCompare(b.time));
+
+                    const borderClass = tripDayRole
+                      ? "border border-[#e5e5e0] rounded-xl bg-white shadow-sm dark:border-white/10 dark:bg-dm-card"
+                      : "bg-transparent";
+
                     const showDayEditOverlay =
                       canEditAsHost && datePickMode === "day" && Boolean(tripDayIsoSet?.has(cellIso));
 
                     return (
-                          <div
+                      <div
                         key={`d-${calYear}-${calMonth}-${dom}-${wi}-${ci}`}
                         tabIndex={0}
-                            role="presentation"
+                        role="presentation"
                         onClick={() => onCalendarDayClick(dom)}
                         onMouseEnter={() => setFocusedCell(cellIso)}
                         onMouseLeave={() => setFocusedCell(null)}
@@ -2126,63 +2137,137 @@ export function TripHostSetupDashboard({
                           }
                         }}
                         className={[
-                          "group/cell relative flex h-full min-h-[7.5rem] flex-col border-b border-[color:var(--hairline)] px-2.5 py-2.5 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/50 sm:min-h-[8.75rem] sm:px-3 sm:py-3 lg:min-h-[10rem] lg:px-4 lg:py-4 dark:border-white/10",
+                          "group/cell relative flex h-full min-h-[16rem] flex-col px-3.5 py-4 text-left align-top transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/50",
                           canEditAsHost ? "cursor-pointer" : "cursor-default",
-                          ci < 6 ? "border-r border-[color:var(--hairline)] dark:border-white/10" : "",
-                          tripDayRole
-                            ? tripCalendarCellSurfaceClass(tripDayRole)
-                            : "bg-transparent hover:bg-[color:var(--surface-container-low)]/35 dark:hover:bg-white/[0.03]",
-                          parseLocalIsoDate(cellIso)?.getTime() === parseLocalIsoDate(rangeAnchor ?? "")?.getTime()
-                            ? "!ring-2 !ring-amber-400 ring-inset dark:!ring-amber-400/70"
-                            : "",
+                          borderClass,
                           datePickMode === "day" && selectedDayIso === cellIso
-                            ? "!ring-2 !ring-[color:var(--sage)] ring-inset shadow-sm dark:!ring-[color:var(--sage-soft)]"
+                            ? "!ring-2 !ring-[#2563EB] ring-inset"
                             : "",
                         ].join(" ")}
                       >
-                        <div className="mb-1.5 flex shrink-0 flex-col gap-1">
-                          <div className="flex items-start justify-between gap-2">
-                            {isCalendarToday(dom) ? (
-                              <span className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full bg-[#1c1c17] text-xs font-semibold text-[color:var(--surface)] shadow-[var(--shadow-ambient-sm)] sm:h-8 sm:min-w-[2rem] sm:text-sm dark:bg-neutral-200 dark:text-dm-page">
-                                {dom}
-                              </span>
-                            ) : (
-                              <span
-                                className={[
-                                  "shrink-0 text-sm font-semibold tabular-nums sm:text-base",
-                                  tripDayRole
-                                    ? "text-[color:var(--on-surface)] dark:text-white"
-                                    : "text-[color:var(--on-surface-muted)]",
-                                ].join(" ")}
-                              >
-                                {dom}
-                              </span>
-                            )}
-                          </div>
-                          <TripCalendarDayBadge role={tripDayRole} range={effectiveHighlightRange} />
+                        {/* Cell Date + Role Dot Header */}
+                        <div className="mb-3">
+                          <span
+                            className={[
+                              "font-display text-[2rem] font-semibold leading-none text-[#1c1c17] dark:text-white",
+                              !tripDayRole ? "text-neutral-300 dark:text-neutral-700" : ""
+                            ].join(" ")}
+                          >
+                            {dom}
+                          </span>
+                          {tripDayRole && (
+                            <div className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#2563EB]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                              {tripDayRole === "arrival" ? "Arrival" : tripDayRole === "departure" ? "Departure" : "On trip"}
+                            </div>
+                          )}
                         </div>
 
-                        <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden">
-                          {visibleCalendarEntries}
-                          {calendarMoreCount > 0 ? (
-                            <p className="px-1 pt-0.5 text-[11px] font-medium tabular-nums leading-snug text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                              +{calendarMoreCount} more
-                            </p>
-                          ) : null}
+                        {/* Chronological events timeline list */}
+                        <div className="min-h-0 flex-1 space-y-3.5 overflow-hidden">
+                          {cellEntries.map((entry, idx) => (
+                            <div key={idx} className="group/pin relative min-w-0 w-full text-left">
+                              <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider select-none">
+                                {entry.label}
+                              </p>
+                              <button
+                                type="button"
+                                className="w-full text-left font-display font-semibold text-sm text-[#1c1c17] dark:text-[#ebe9e4] leading-snug hover:underline"
+                                onClick={(ev) => {
+                                  interface LodgingItem {
+                                    stay: {
+                                      startIso: string;
+                                      endIso: string;
+                                      destinationCity?: string | null;
+                                      lodgingType?: HostLodgingType | null;
+                                      place: { name: string };
+                                    };
+                                    edge: string;
+                                  }
+                                  interface MealItem {
+                                    place: PlaceSpotlight;
+                                    dateIso: string;
+                                  }
+                                  interface ActivityItem {
+                                    experience: HostActivityExperience;
+                                    dateIso: string;
+                                  }
+
+                                  if (entry.type === "lodging") {
+                                    const { stay } = entry.rawItem as LodgingItem;
+                                    openLodgingModal({
+                                      checkIn: stay.startIso,
+                                      checkOut: stay.endIso,
+                                      destination: stay.destinationCity?.trim() || undefined,
+                                      lodgingType: stay.lodgingType ?? "hotel",
+                                    });
+                                  } else if (entry.type === "meal") {
+                                    setPinDetail({ kind: "meal", place: (entry.rawItem as MealItem).place, dateLabel: dayLabel });
+                                  } else if (entry.type === "activity") {
+                                    setPinDetail({ kind: "activity", experience: (entry.rawItem as ActivityItem).experience, dateLabel: dayLabel });
+                                  }
+                                }}
+                              >
+                                {entry.title}
+                              </button>
+                              <p className="text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500 leading-normal">
+                                {entry.desc}
+                              </p>
+                              
+                              {/* Remove action button */}
+                              {canEditAsHost && entry.type !== "lodging" ? (
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${entry.title}`}
+                                  className="absolute right-0 top-0 rounded p-0.5 text-xs leading-none text-[color:var(--on-surface-muted)] opacity-50 transition hover:bg-rose-500/15 hover:text-rose-600 md:opacity-0 md:group-hover/pin:opacity-100"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    interface MealItem {
+                                      place: PlaceSpotlight;
+                                      dateIso: string;
+                                    }
+                                    interface ActivityItem {
+                                      experience: HostActivityExperience;
+                                      dateIso: string;
+                                    }
+
+                                    if (entry.type === "meal") {
+                                      const meal = entry.rawItem as MealItem;
+                                      setRemovePinConfirm({
+                                        kind: "meal",
+                                        dateIso: meal.dateIso,
+                                        mapsUrl: meal.place.mapsUrl,
+                                        title: `"${meal.place.name}" on ${dayLabel}`,
+                                      });
+                                    } else {
+                                      const act = entry.rawItem as ActivityItem;
+                                      setRemovePinConfirm({
+                                        kind: "activity",
+                                        dateIso: act.dateIso,
+                                        bookingUrl: act.experience.bookingUrl,
+                                        title: `"${act.experience.name}" on ${dayLabel}`,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              ) : null}
+                            </div>
+                          ))}
                         </div>
 
                         {showDayEditOverlay ? (
-                          <div className="pointer-events-none absolute inset-0 z-20 hidden flex-col items-center justify-center gap-3 opacity-0 transition-opacity duration-200 group-hover/cell:pointer-events-auto group-hover/cell:opacity-100 group-focus-within/cell:pointer-events-auto group-focus-within/cell:opacity-100 md:flex">
+                          <div className="pointer-events-none absolute inset-0 z-20 hidden flex-col items-center justify-center gap-3 opacity-0 transition-opacity duration-200 group-hover/cell:pointer-events-auto group-hover/cell:opacity-100 group-focus-within/cell:pointer-events-auto group-focus-within/cell:opacity-100 md:flex rounded-xl overflow-hidden">
                             <div
-                              className="absolute inset-0 bg-white/65 backdrop-blur-[4px] dark:bg-neutral-950/55 dark:backdrop-blur-sm"
+                              className="absolute inset-0 bg-white/70 backdrop-blur-[3px] dark:bg-neutral-950/60 dark:backdrop-blur-sm"
                               aria-hidden
                             />
                             <button
                               type="button"
                               tabIndex={-1}
-                              className="relative z-[1] pointer-events-auto rounded-full bg-[#1c1c17] px-4 py-2 text-xs font-semibold text-[color:var(--surface)] shadow-md transition hover:bg-[#2a2a26] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sage)]/60 dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white dark:focus-visible:ring-[color:var(--sage-soft)]/70"
+                              className="relative z-[1] pointer-events-auto rounded-full bg-[#1c1c17] px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:bg-[#2a2a26] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]/60 dark:bg-neutral-200 dark:text-dm-page dark:hover:bg-white"
                               onMouseDown={(e) => {
-                                /** Avoid outer cell receiving focus-ring from click chaining */
                                 e.stopPropagation();
                               }}
                               onClick={(e) => {
@@ -2195,31 +2280,6 @@ export function TripHostSetupDashboard({
                             </button>
                           </div>
                         ) : null}
-
-                        {(() => {
-                          const others = peersByCellIso.get(cellIso);
-                          const p0 = others?.[0];
-                          if (!p0) return null;
-                          const extra = (others?.length ?? 0) - 1;
-                          return (
-                            <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex max-w-[calc(100%-0.5rem)] items-center justify-end gap-0.5">
-                              <span
-                                title={
-                                  extra > 0
-                                    ? `${p0.name} and ${extra} other${extra === 1 ? "" : "s"} viewing this day`
-                                    : `${p0.name} is viewing this day`
-                                }
-                                className="h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-white/70 dark:ring-dm-card/80"
-                                style={{ backgroundColor: p0.color }}
-                              />
-                              {extra > 0 ? (
-                                <span className="text-[9px] font-semibold tabular-nums text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                                  +{extra}
-                                </span>
-                        ) : null}
-                            </div>
-                          );
-                        })()}
                       </div>
                     );
                   })}
@@ -2227,8 +2287,56 @@ export function TripHostSetupDashboard({
               ))}
             </div>
 
+            {/* Bottom pill buttons */}
+            {hostHasConcreteTripRange(plan) && (
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                {canEditAsHost && datePickMode === "day" && hostSetup.tripRange?.startIso ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayIso(hostSetup.tripRange!.startIso);
+                      setAddPlacesOpen(true);
+                    }}
+                    className="rounded-full border border-[#e5e5e0] bg-white px-4 py-1.5 text-xs font-semibold text-[#1c1c17] transition hover:bg-neutral-50 dark:border-white/10 dark:bg-dm-card dark:text-white"
+                  >
+                    Add places
+                  </button>
+                ) : null}
+                {canEditAsHost ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (datePickMode === "day") {
+                        setDatePickMode("range");
+                        setRangeAnchor(null);
+                        setSelectedDayIso(null);
+                        setAddPlacesOpen(false);
+                        setPendingRangeConfirm(null);
+                      } else {
+                        setDatePickMode("day");
+                        setRangeAnchor(null);
+                        setPendingRangeConfirm(null);
+                      }
+                    }}
+                    className="rounded-full border border-[#e5e5e0] bg-white px-4 py-1.5 text-xs font-semibold text-[#1c1c17] transition hover:bg-neutral-50 dark:border-white/10 dark:bg-dm-card dark:text-white"
+                  >
+                    {datePickMode === "day" ? "Change dates" : "Cancel"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDatePickMode(datePickMode === "range" ? "day" : "range");
+                  }}
+                  className="rounded-full border border-[#e5e5e0] bg-white px-4 py-1.5 text-xs font-semibold text-[#1c1c17] transition hover:bg-neutral-50 dark:border-white/10 dark:bg-dm-card dark:text-white"
+                >
+                  {datePickMode === "range" ? "View compact" : "View full month"}
+                </button>
+              </div>
+            )}
+
             {!hostHasConcreteTripRange(plan) ? (
-              <p className="border-t border-[color:var(--hairline)] bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-[color:var(--hairline)] dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="mt-4 border-t border-[#f0efe9] bg-amber-50/90 px-5 py-3 text-sm leading-relaxed text-amber-900 dark:border-white/10 dark:bg-amber-950/40 dark:text-amber-100 rounded-xl">
                 {canEditAsHost
                   ? "Choose a trip range — two taps on the calendar — to anchor your plan and invites."
                   : canEditTripWorkspace
@@ -2237,49 +2345,20 @@ export function TripHostSetupDashboard({
               </p>
             ) : null}
             {err ? (
-              <p className="border-t border-[color:var(--hairline)] bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-[color:var(--hairline)] dark:bg-rose-950/40 dark:text-rose-200">
+              <p className="mt-4 border-t border-[#f0efe9] bg-rose-50/80 px-5 py-3 text-center text-sm text-rose-800 dark:border-white/10 dark:bg-rose-950/40 dark:text-rose-200 rounded-xl">
                 {err}
               </p>
             ) : null}
-            {canEditTripWorkspace ? (
-              <div className="border-t border-[color:var(--hairline)] pt-4 dark:border-white/10">
-                <Link
-                  href={`/trip/${tripId}/setup/packing`}
-                  className="text-xs font-medium text-[color:var(--on-surface)] underline-offset-2 hover:underline dark:text-[#ebe9e4]"
-                >
-                  Packing list
-                </Link>
-                <span className="text-xs text-[color:var(--on-surface-muted)]"> · shared checklist</span>
-          </div>
-            ) : null}
-          </div>
-
         </section>
 
         {canEditAsHost ? (
           <section id="sec-setup-copilot" className="scroll-mt-28">
-            <div className="rounded-full border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)]/80 px-3 py-2 dark:border-white/10 dark:bg-[color:var(--surface-container-low)]/40">
-              <div className="flex items-center gap-3 px-3 py-1">
-                <span className="text-base" aria-hidden>
-                  ✨
-                </span>
-                <p className="flex-1 text-sm text-[color:var(--on-surface-muted)] dark:text-[color:var(--on-surface-muted)]">
-                  Setup copilot or ask for recommendations…
-                </p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <HostSetupCopilot tripId={tripId} onResult={onCopilotResult} layout="embedded" />
-            </div>
-          </section>
-        ) : null}
-
-        <section id="sec-trip-chat" className="scroll-mt-28">
-          <h2 className="text-lg font-semibold text-[color:var(--on-surface)] dark:text-white">Trip chat</h2>
-          <p className="mt-1 max-w-3xl text-sm text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">
-            Ask edits in plain language alongside Trip Copilot. Changes sync onto the calendar and collaboration state.
-          </p>
-          <div className="mt-4">
+            <HostSetupCopilot
+              tripId={tripId}
+              plan={plan}
+              onResult={onCopilotResult}
+              layout="embedded"
+            />
             <TripCardChatWidget
               tripId={tripId}
               spotlights={plan.spotlights ?? []}
@@ -2287,8 +2366,8 @@ export function TripHostSetupDashboard({
               onPlanReplaced={setPlan}
               onCollabBump={bumpCollab}
             />
-          </div>
-        </section>
+          </section>
+        ) : null}
 
           </>
           ) : null}

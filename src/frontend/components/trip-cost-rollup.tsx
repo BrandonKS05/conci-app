@@ -163,7 +163,7 @@ export function TripCostRollup({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   return (
-    <div className="mb-5 border-b border-[color:var(--hairline)] pb-5 dark:border-white/10">
+    <div className="mb-6 rounded-2xl border border-[#f0efe9] bg-white p-5 dark:border-white/10 dark:bg-dm-card">
       <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4 sm:gap-x-8">
         <Stat
           label="Estimated total"
@@ -312,23 +312,20 @@ function Stat({
   const Wrapper = onClick ? "button" : "div";
   return (
     <Wrapper
-      className={`min-w-0 flex flex-col gap-1 text-left ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+      className={`min-w-0 flex flex-col gap-0.5 text-left ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
       onClick={onClick}
     >
-      <span className="label-caps text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--on-surface-muted)] dark:text-neutral-500">
         {label} {onClick ? "▾" : ""}
       </span>
       <span
         className={[
-          "font-display font-semibold leading-none tracking-[-0.02em] text-[1.6rem] sm:text-[1.8rem]",
-          emphasize
-            ? "text-[color:var(--on-surface)] dark:text-white"
-            : "text-[color:var(--on-surface)] dark:text-white",
+          "font-display text-[2.25rem] font-semibold leading-tight text-[#1c1c17] dark:text-[#ebe9e4]",
         ].join(" ")}
       >
         {value}
       </span>
-      <span className="truncate text-[11px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+      <span className="truncate text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
         {helper}
       </span>
     </Wrapper>
