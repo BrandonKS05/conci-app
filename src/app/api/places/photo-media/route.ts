@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
 import { isValidGooglePlacesPhotoResourceName } from "@/backend/google-places-photo-media";
+import { requireAuth } from "@/backend/supabase/require-auth";
 
 export async function GET(request: Request) {
+  const auth = await requireAuth();
+  if ("response" in auth) return auth.response;
   const { searchParams } = new URL(request.url);
   const name = searchParams.get("name")?.trim() ?? "";
   if (!isValidGooglePlacesPhotoResourceName(name)) {

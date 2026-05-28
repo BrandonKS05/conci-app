@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/backend/supabase/require-auth";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import { TRIP_PARSER_SYSTEM_PROMPT } from "@/shared/trip-parser-system-prompt";
 import {
@@ -25,6 +26,9 @@ function buildUserContent(
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth();
+  if ("response" in auth) return auth.response;
+
   const body = (await request.json().catch(() => ({}))) as { input?: string; images?: unknown };
   const input = (body.input || "").trim();
   const imagesRaw = Array.isArray(body.images) ? body.images : [];

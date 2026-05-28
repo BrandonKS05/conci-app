@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/backend/supabase/require-auth";
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
 
 export const runtime = "nodejs";
@@ -10,6 +11,9 @@ export type AutocompleteSuggestion = {
 };
 
 export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if ("response" in auth) return auth.response;
+
   const body = (await req.json().catch(() => ({}))) as {
     q?: string;
     locationHint?: string | null;
