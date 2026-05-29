@@ -551,6 +551,37 @@ function formatTripRangeLabel(startIso: string, endIso: string): string {
   return `${a.toLocaleDateString(undefined, o)} — ${b.toLocaleDateString(undefined, o)}`;
 }
 
+/**
+ * Clip a host setup's pins and hotel stays to a new trip range: drop pins/stays
+ * with no overlap, clamp partially-overlapping stays. Shared by the manual
+ * calendar confirm and the copilot date-change paths so both stay in sync.
+ */
+function trimHostSetupToRange(
+  setup: HostSetupState,
+  range: { startIso: string; endIso: string }
+): Partial<HostSetupState> {
+  const newDays = new Set(enumerateLocalIsoDays(range.startIso, range.endIso));
+  const restaurantPins = (setup.restaurantPins ?? []).filter((p) => newDays.has(p.dateIso));
+  const activityPins = (setup.activityPins ?? []).filter((p) => newDays.has(p.dateIso));
+  const hotelStays: HostHotelStay[] = (setup.hotelStays ?? [])
+    .map((stay) => {
+      const stayDays = enumerateLocalIsoDays(stay.startIso, stay.endIso).filter((d) =>
+        newDays.has(d)
+      );
+      if (stayDays.length === 0) return null;
+      return { ...stay, startIso: stayDays[0]!, endIso: stayDays[stayDays.length - 1]! };
+    })
+    .filter((s): s is HostHotelStay => s !== null);
+  return {
+    hotel: hotelStays[0]?.place ?? null,
+    hotelStays,
+    experiencesOutlined: setup.experiencesOutlined,
+    tripRange: range,
+    restaurantPins,
+    activityPins,
+  };
+}
+
 function ChevLeft({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
@@ -1303,46 +1334,13 @@ export function TripHostSetupDashboard({
     setSelectedDayIso(null);
 
     /** Preserve pins / stays whose dates still fall inside the new range; drop the rest. */
-    const newDays = new Set(enumerateLocalIsoDays(pendingRangeConfirm.startIso, pendingRangeConfirm.endIso));
-    const preservedRestaurantPins = (hostSetup.restaurantPins ?? []).filter((p) =>
-      newDays.has(p.dateIso)
-    );
-    const preservedActivityPins = (hostSetup.activityPins ?? []).filter((p) =>
-      newDays.has(p.dateIso)
-    );
-    const preservedHotelStays: HostHotelStay[] = (hostSetup.hotelStays ?? [])
-      .map((stay) => {
-        const stayDays = enumerateLocalIsoDays(stay.startIso, stay.endIso).filter((d) =>
-          newDays.has(d)
-        );
-        if (stayDays.length === 0) return null;
-        return { ...stay, startIso: stayDays[0]!, endIso: stayDays[stayDays.length - 1]! };
-      })
-      .filter((s): s is HostHotelStay => s !== null);
-    const preservedHotelPlace = preservedHotelStays[0]?.place ?? null;
-
-    const ok = await persistHostSetup({
-      hotel: preservedHotelPlace,
-      hotelStays: preservedHotelStays,
-      experiencesOutlined: hostSetup.experiencesOutlined,
-      tripRange: pendingRangeConfirm,
-      restaurantPins: preservedRestaurantPins,
-      activityPins: preservedActivityPins,
-    });
+    const ok = await persistHostSetup(trimHostSetupToRange(hostSetup, pendingRangeConfirm));
     if (!ok) return;
 
       setPendingRangeConfirm(null);
       setDatePickMode("day");
     void refitItineraryForRange(pendingRangeConfirm);
-  }, [
-    pendingRangeConfirm,
-    hostSetup.experiencesOutlined,
-    hostSetup.restaurantPins,
-    hostSetup.activityPins,
-    hostSetup.hotelStays,
-    persistHostSetup,
-    refitItineraryForRange,
-  ]);
+  }, [pendingRangeConfirm, hostSetup, persistHostSetup, refitItineraryForRange]);
 
   const cancelPendingTripRange = useCallback(() => {
     setPendingRangeConfirm(null);
@@ -1423,6 +1421,31 @@ export function TripHostSetupDashboard({
       setPlan(nextPlan);
       setPendingRangeConfirm(null);
       setRangeAnchor(null);
+
+      // The copilot updates `hostSetup.tripRange` but never regenerates the itinerary,
+      // so a date change leaves `generatedItinerary` anchored to the old days. Mirror the
+      // manual calendar path: trim pins/stays to the new range, then refit. Guarded so we
+      // skip undo (itinerary already matches) and trips without an itinerary yet.
+      const prevRange = plan.hostSetup?.tripRange;
+      const newRange = nextPlan.hostSetup?.tripRange;
+      const rangeChanged =
+        !!newRange?.startIso &&
+        !!newRange?.endIso &&
+        (newRange.startIso !== prevRange?.startIso || newRange.endIso !== prevRange?.endIso);
+      if (rangeChanged) {
+        const rangeDayIsos = enumerateLocalIsoDays(newRange!.startIso, newRange!.endIso);
+        const itineraryDayIsos = (nextPlan.generatedItinerary?.days ?? []).map((d) => d.dateIso);
+        const itineraryMatchesRange =
+          itineraryDayIsos.length === rangeDayIsos.length &&
+          rangeDayIsos.every((iso, i) => itineraryDayIsos[i] === iso);
+        if (itineraryDayIsos.length > 0 && !itineraryMatchesRange) {
+          const patch = trimHostSetupToRange(nextPlan.hostSetup ?? {}, newRange!);
+          void (async () => {
+            const ok = await persistHostSetup(patch);
+            if (ok) await refitItineraryForRange(newRange!);
+          })();
+        }
+      }
     }
     if (ui.suggestDatePickMode) {
       setDatePickMode(ui.suggestDatePickMode);
@@ -1439,7 +1462,12 @@ export function TripHostSetupDashboard({
     if (ui.scrollTo) {
       scrollToWorkspaceSection(`sec-${ui.scrollTo}`);
     }
-  }, [scrollToWorkspaceSection]);
+  }, [
+    plan.hostSetup?.tripRange,
+    persistHostSetup,
+    refitItineraryForRange,
+    scrollToWorkspaceSection,
+  ]);
 
   const cells = useMemo(() => calendarCellsSundayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
