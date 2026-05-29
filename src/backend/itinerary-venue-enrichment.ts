@@ -101,41 +101,45 @@ export async function enrichItineraryWithVenues(
   }
 
   let verified = 0;
-  const batches: typeof searches[] = [];
-  for (let i = 0; i < searches.length; i += MAX_PARALLEL_SEARCHES) {
-    batches.push(searches.slice(i, i + MAX_PARALLEL_SEARCHES));
-  }
 
-  for (const batch of batches) {
-    const results = await Promise.allSettled(
-      batch.map((s) => searchPlacesGoogleMaps(s.query, location, { limit: 3 }))
-    );
+  const processSearch = async (search: (typeof searches)[number]) => {
+    const { dayIdx, actIdx, query } = search;
+    const results = await searchPlacesGoogleMaps(query, location, { limit: 3 }).catch(() => []);
+    if (!results.length) return;
 
-    for (let i = 0; i < batch.length; i++) {
-      const { dayIdx, actIdx } = batch[i]!;
-      const result = results[i];
-      if (result?.status !== "fulfilled" || !result.value.length) continue;
+    const act = itinerary.days[dayIdx]!.activities[actIdx]!;
 
-      const act = itinerary.days[dayIdx]!.activities[actIdx]!;
+    // Pick the best-rated result with >= 3.5 stars, or fall back to first
+    const candidates = results.filter((p) => p.rating == null || p.rating >= 3.5);
+    const place = candidates[0] ?? results[0]!;
 
-      // Pick the best-rated result with >= 3.5 stars, or fall back to first
-      const candidates = result.value.filter((p) => p.rating == null || p.rating >= 3.5);
-      const place = candidates[0] ?? result.value[0]!;
-
-      act.bookingUrl = place.mapsUrl;
-      if (place.rating && place.rating >= 3.5) {
-        const ratingInfo = `${place.rating}\u2605${place.reviewCount ? `, ${place.reviewCount} reviews` : ""}`;
-        act.description = `${act.description} (${ratingInfo})`.trim();
-      }
-
-      // For budget tier, check if price range matches expectations
-      if (place.priceRange && budgetTier === "budget" && activity_seems_expensive(place.priceRange)) {
-        continue;
-      }
-
-      verified++;
+    act.bookingUrl = place.mapsUrl;
+    if (place.rating && place.rating >= 3.5) {
+      const ratingInfo = `${place.rating}\u2605${place.reviewCount ? `, ${place.reviewCount} reviews` : ""}`;
+      act.description = `${act.description} (${ratingInfo})`.trim();
     }
-  }
+
+    // For budget tier, don't count venues that look too expensive
+    if (place.priceRange && budgetTier === "budget" && activity_seems_expensive(place.priceRange)) {
+      return;
+    }
+
+    verified++;
+  };
+
+  // Worker pool: keep up to MAX_PARALLEL_SEARCHES requests in flight at all times rather
+  // than draining one batch before starting the next. Same total request count, much less
+  // wall-clock time when there are many activities.
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < searches.length) {
+      const idx = cursor++;
+      await processSearch(searches[idx]!);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(MAX_PARALLEL_SEARCHES, searches.length) }, () => worker())
+  );
 
   return {
     itinerary,

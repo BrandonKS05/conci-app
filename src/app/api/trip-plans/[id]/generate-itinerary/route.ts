@@ -25,6 +25,10 @@ import {
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 import { enrichItineraryWithVenues } from "@/backend/itinerary-venue-enrichment";
+import type { PlacePreview } from "@/shared/place-preview";
+
+/** Hard ceiling on each OpenAI call so a slow upstream can't hang the request. */
+const OPENAI_TIMEOUT_MS = 60_000;
 
 const ITINERARY_SYSTEM_PROMPT = `You are a travel itinerary planner. Given trip details, generate a realistic day-by-day itinerary with estimated costs.
 
@@ -311,11 +315,12 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
   return { restaurantPins, activityPins, hotelStays, dayVoting };
 }
 
-async function searchAndSetHotel(
+/** SerpAPI hotel lookup — depends only on budget + location, so it can run in parallel
+ * with itinerary generation. Date assignment happens later in {@link buildHotelStayFromCandidate}. */
+async function searchHotelCandidate(
   plan: TripPlan,
-  itinerary: GeneratedItinerary,
   location: string
-): Promise<HostHotelStay[] | null> {
+): Promise<PlacePreview | null> {
   const { searchPlacesGoogleMaps } = await import("@/backend/serpapi-places");
   const budgetHint = plan.budget?.tier?.toLowerCase() || "";
   let query = `hotel ${location}`;
@@ -323,9 +328,14 @@ async function searchAndSetHotel(
   else if (budgetHint.includes("splurge") || budgetHint.includes("luxury")) query = `luxury hotel ${location}`;
 
   const results = await searchPlacesGoogleMaps(query, location, { limit: 3 });
-  if (!results.length) return null;
+  return results[0] ?? null;
+}
 
-  const top = results[0]!;
+function buildHotelStayFromCandidate(
+  plan: TripPlan,
+  itinerary: GeneratedItinerary,
+  top: PlacePreview
+): HostHotelStay[] | null {
   const days = inferTripDays(plan, itinerary);
   if (!days.length) return null;
 
@@ -742,24 +752,40 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Missing OPENAI_API_KEY on server." }, { status: 500 });
   }
 
+  const location = plan.location.trim();
+
+  // Kick off the hotel SerpAPI lookup now so it overlaps with itinerary generation instead
+  // of adding a serial round-trip after it. Dates are assigned once the itinerary exists.
+  const needHotelSearch = !hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []);
+  const hotelCandidatePromise: Promise<PlacePreview | null> = needHotelSearch
+    ? searchHotelCandidate(plan, location).catch(() => null)
+    : Promise.resolve(null);
+
   const userPrompt = buildItineraryUserPrompt(plan, seedText);
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      temperature: 0.7,
-      input: [
-        { role: "system", content: ITINERARY_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      text: { format: { type: "json_object" } },
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        temperature: 0.7,
+        input: [
+          { role: "system", content: ITINERARY_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        text: { format: { type: "json_object" } },
+      }),
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+    });
+  } catch (e) {
+    console.error("[generate-itinerary] OpenAI request failed:", (e as Error)?.message);
+    return NextResponse.json({ error: "AI service timed out. Please try again." }, { status: 504 });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -815,6 +841,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
             ],
             text: { format: { type: "json_object" } },
           }),
+          signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
         });
 
         if (repairRes.ok) {
@@ -847,27 +874,27 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const generated = buildAutofillRecommendations(plan, itinerary);
 
-  // Run all three SerpAPI enrichment steps in parallel — they are independent
-  if (plan.location?.trim()) {
-    const location = plan.location.trim();
-    await Promise.allSettled([
-      enrichItineraryWithVenues(itinerary, location, budget?.tier ?? "moderate", plan.vibe)
-        .then((r) => console.log(`[generate-itinerary] Venues verified: ${r.venuesVerified}/${r.venuesTotal}`))
-        .catch((e: unknown) => console.warn("[generate-itinerary] Venue enrichment failed (non-fatal):", (e as Error)?.message)),
+  // Venue + activity enrichment run in parallel. The hotel search was already kicked off
+  // before generation, so here we just await its result and assign dates.
+  await Promise.allSettled([
+    enrichItineraryWithVenues(itinerary, location, budget?.tier ?? "moderate", plan.vibe)
+      .then((r) => console.log(`[generate-itinerary] Venues verified: ${r.venuesVerified}/${r.venuesTotal}`))
+      .catch((e: unknown) => console.warn("[generate-itinerary] Venue enrichment failed (non-fatal):", (e as Error)?.message)),
 
-      (!hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? [])
-        ? searchAndSetHotel(plan, itinerary, location)
-            .then((realHotel) => { if (realHotel?.length) generated.hotelStays = realHotel; })
-            .catch((e: unknown) => console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message))
-        : Promise.resolve()),
+    hotelCandidatePromise
+      .then((top) => {
+        if (!top) return;
+        const stays = buildHotelStayFromCandidate(plan, itinerary, top);
+        if (stays?.length) generated.hotelStays = stays;
+      })
+      .catch((e: unknown) => console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message)),
 
-      (generated.activityPins.length > 0
-        ? enrichActivityPins(generated.activityPins, location)
-            .then((pins) => { generated.activityPins = pins; })
-            .catch((e: unknown) => console.warn("[generate-itinerary] Activity enrichment failed (non-fatal):", (e as Error)?.message))
-        : Promise.resolve()),
-    ]);
-  }
+    (generated.activityPins.length > 0
+      ? enrichActivityPins(generated.activityPins, location)
+          .then((pins) => { generated.activityPins = pins; })
+          .catch((e: unknown) => console.warn("[generate-itinerary] Activity enrichment failed (non-fatal):", (e as Error)?.message))
+      : Promise.resolve()),
+  ]);
 
   const mergedHotelStays = mergeAiHotelStaysPreservingUser(plan.hostSetup?.hotelStays, generated.hotelStays);
   const updatedPlan: TripPlan = {

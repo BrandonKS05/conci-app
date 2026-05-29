@@ -133,18 +133,16 @@ function DatePartsInput({
   const updatePart = useCallback((field: "month" | "day" | "year", raw: string) => {
     const maxLength = field === "year" ? 4 : 2;
     const nextValue = raw.replace(/\D/g, "").slice(0, maxLength);
-    setParts((prev) => {
-      const next = { ...prev, [field]: nextValue };
-      onChange(partsToIsoDate(next));
-      return next;
-    });
+    const next = { ...parts, [field]: nextValue };
+    setParts(next);
+    onChange(partsToIsoDate(next));
     if (field === "month" && nextValue.length === 2) {
       window.setTimeout(() => dayRef.current?.focus(), 0);
     }
     if (field === "day" && nextValue.length === 2) {
       window.setTimeout(() => yearRef.current?.focus(), 0);
     }
-  }, [onChange]);
+  }, [onChange, parts]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.preventDefault();

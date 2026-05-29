@@ -3,6 +3,15 @@ import type { PlacePreview } from "@/shared/place-preview";
 
 const SERP = "https://serpapi.com/search.json";
 
+/** Per-request timeout so a slow SerpAPI call can't stall itinerary generation. */
+const SERP_TIMEOUT_MS = 12_000;
+
+/** Short-lived in-memory cache so repeated/refit generations reuse recent lookups
+ * instead of re-billing SerpAPI for the same query. */
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 300;
+const placeCache = new Map<string, { at: number; data: PlacePreview[] }>();
+
 function mapsSearchUrl(name: string, address?: string): string {
   const q = [name, address].filter(Boolean).join(" ");
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
@@ -86,18 +95,28 @@ export async function searchPlacesGoogleMaps(
   const start = typeof opts?.start === "number" && opts.start >= 0 ? Math.floor(opts.start) : 0;
   const limit = typeof opts?.limit === "number" && opts.limit > 0 ? Math.min(opts.limit, 30) : 5;
 
+  const trimmedQuery = query.slice(0, 200);
+  const cacheKey = `${trimmedQuery}|${start}|${limit}`;
+  const hit = placeCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
+
   const qs = new URLSearchParams({
     engine: "google_maps",
     type: "search",
     google_domain: "google.com",
     hl: "en",
     gl: "us",
-    q: query.slice(0, 200),
+    q: trimmedQuery,
     api_key: key,
     start: String(start),
   });
 
-  const res = await fetch(`${SERP}?${qs}`, { cache: "no-store" });
+  let res: Response;
+  try {
+    res = await fetch(`${SERP}?${qs}`, { cache: "no-store", signal: AbortSignal.timeout(SERP_TIMEOUT_MS) });
+  } catch {
+    return [];
+  }
   if (!res.ok) return [];
   let j: unknown;
   try {
@@ -113,5 +132,11 @@ export async function searchPlacesGoogleMaps(
     if (p) out.push(p);
     if (out.length >= limit) break;
   }
+
+  if (placeCache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = placeCache.keys().next().value;
+    if (oldest !== undefined) placeCache.delete(oldest);
+  }
+  placeCache.set(cacheKey, { at: Date.now(), data: out });
   return out;
 }

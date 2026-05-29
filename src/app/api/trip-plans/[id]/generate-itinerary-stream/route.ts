@@ -2,6 +2,10 @@ import { isUuid } from "@/shared/is-uuid";
 
 export const dynamic = "force-dynamic";
 
+/** Upper bound on the internal generate-itinerary call so the SSE stream can't hang forever.
+ * Generous enough to cover a long trip with a budget-repair pass. */
+const STREAM_FETCH_TIMEOUT_MS = 150_000;
+
 type ChecklistItem = "lodging" | "meals" | "activities" | "budget";
 
 interface ProgressPayload {
@@ -68,24 +72,45 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
       try {
         emit({ type: "progress", stage: "Getting ready...", percent: 5, completed: [] });
-        emit({ type: "progress", stage: "Analyzing your trip details...", percent: 14, completed: [] });
-        emit({ type: "progress", stage: "Crafting your perfect itinerary...", percent: 22, completed: [] });
+        emit({ type: "progress", stage: "Analyzing your trip details...", percent: 12, completed: [] });
 
-        // Slowly advance percent while the AI call is in flight
-        let livePercent = 22;
-        const ticker = setInterval(() => {
-          if (livePercent < 60) {
-            livePercent = Math.min(60, livePercent + 2);
-            emit({ type: "progress", stage: "Crafting your perfect itinerary...", percent: livePercent, completed: [] });
-          }
-        }, 1800);
+        // We can't observe the AI route's internal stages without restructuring it, so pace
+        // the checklist (lodging → meals → activities) over the expected wait instead of
+        // dumping all of it the instant the call returns. The final "budget" item is checked
+        // off by the real `complete` event below.
+        const steps: { after: number; percent: number; stage: string; completed: ChecklistItem[] }[] = [
+          { after: 5000, percent: 35, stage: "Reviewing lodging options...", completed: ["lodging"] },
+          { after: 12000, percent: 60, stage: "Curating restaurant picks...", completed: ["lodging", "meals"] },
+          { after: 20000, percent: 82, stage: "Scheduling activities...", completed: ["lodging", "meals", "activities"] },
+        ];
+        const timers = steps.map((s) =>
+          setTimeout(
+            () => emit({ type: "progress", stage: s.stage, percent: s.percent, completed: s.completed }),
+            s.after
+          )
+        );
+        const clearTimers = () => timers.forEach(clearTimeout);
 
-        const generateRes = await fetch(`${origin}/api/trip-plans/${id}/generate-itinerary`, {
-          method: "POST",
-          headers: { cookie: cookieHeader },
-        });
-
-        clearInterval(ticker);
+        let generateRes: Response;
+        try {
+          generateRes = await fetch(`${origin}/api/trip-plans/${id}/generate-itinerary`, {
+            method: "POST",
+            headers: { cookie: cookieHeader },
+            signal: AbortSignal.timeout(STREAM_FETCH_TIMEOUT_MS),
+          });
+        } catch (e) {
+          clearTimers();
+          const timedOut = (e as Error)?.name === "TimeoutError";
+          emit({
+            type: "error",
+            message: timedOut
+              ? "Itinerary generation timed out. Please try again."
+              : "Failed to generate itinerary",
+          });
+          close();
+          return;
+        }
+        clearTimers();
 
         if (!generateRes.ok) {
           const errBody = await generateRes.json().catch(() => ({})) as { error?: string };
@@ -95,11 +120,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         }
 
         const result = await generateRes.json() as { itinerary?: unknown; plan?: unknown };
-
-        emit({ type: "progress", stage: "Reviewing lodging options...", percent: 70, completed: ["lodging"] });
-        emit({ type: "progress", stage: "Curating restaurant picks...", percent: 80, completed: ["lodging", "meals"] });
-        emit({ type: "progress", stage: "Scheduling activities...", percent: 88, completed: ["lodging", "meals", "activities"] });
-        emit({ type: "progress", stage: "Finalizing your budget...", percent: 94, completed: ["lodging", "meals", "activities", "budget"] });
         emit({ type: "complete", itinerary: result.itinerary, plan: result.plan });
         close();
       } catch (err) {
