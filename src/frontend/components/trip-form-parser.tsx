@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
@@ -88,6 +88,114 @@ function tripNightCount(start: string, end: string): number {
   const s = new Date(`${start}T12:00:00`);
   const e = end ? new Date(`${end}T12:00:00`) : s;
   return Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
+}
+
+function isoDateToParts(value: string): { month: string; day: string; year: string } {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return { month: "", day: "", year: "" };
+  return { month: match[2], day: match[3], year: match[1] };
+}
+
+function partsToIsoDate(parts: { month: string; day: string; year: string }): string {
+  if (parts.month.length !== 2 || parts.day.length !== 2 || parts.year.length !== 4) return "";
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  const year = Number(parts.year);
+  if (!Number.isInteger(month) || !Number.isInteger(day) || !Number.isInteger(year)) return "";
+  const candidate = new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00`);
+  if (
+    Number.isNaN(candidate.getTime()) ||
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() + 1 !== month ||
+    candidate.getDate() !== day
+  ) {
+    return "";
+  }
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function DatePartsInput({
+  value,
+  onChange,
+  autoFocus = false,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  autoFocus?: boolean;
+  ariaLabel: string;
+}) {
+  const [parts, setParts] = useState(() => isoDateToParts(value));
+  const monthRef = useRef<HTMLInputElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+
+  const updatePart = useCallback((field: "month" | "day" | "year", raw: string) => {
+    const maxLength = field === "year" ? 4 : 2;
+    const nextValue = raw.replace(/\D/g, "").slice(0, maxLength);
+    setParts((prev) => {
+      const next = { ...prev, [field]: nextValue };
+      onChange(partsToIsoDate(next));
+      return next;
+    });
+    if (field === "month" && nextValue.length === 2) {
+      window.setTimeout(() => dayRef.current?.focus(), 0);
+    }
+    if (field === "day" && nextValue.length === 2) {
+      window.setTimeout(() => yearRef.current?.focus(), 0);
+    }
+  }, [onChange]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.preventDefault();
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5" aria-label={ariaLabel}>
+      <input
+        ref={monthRef}
+        autoFocus={autoFocus}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={parts.month}
+        onChange={(e) => updatePart("month", e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="MM"
+        aria-label={`${ariaLabel} month`}
+        className="block w-14 rounded-lg border bg-white px-2 py-2 text-center text-sm outline-none"
+        style={{ borderColor: "var(--hairline)" }}
+      />
+      <span className="text-sm text-[color:var(--on-surface-muted)]">/</span>
+      <input
+        ref={dayRef}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={parts.day}
+        onChange={(e) => updatePart("day", e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="DD"
+        aria-label={`${ariaLabel} day`}
+        className="block w-14 rounded-lg border bg-white px-2 py-2 text-center text-sm outline-none"
+        style={{ borderColor: "var(--hairline)" }}
+      />
+      <span className="text-sm text-[color:var(--on-surface-muted)]">/</span>
+      <input
+        ref={yearRef}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={parts.year}
+        onChange={(e) => updatePart("year", e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="YYYY"
+        aria-label={`${ariaLabel} year`}
+        className="block w-20 rounded-lg border bg-white px-2 py-2 text-center text-sm outline-none"
+        style={{ borderColor: "var(--hairline)" }}
+      />
+    </div>
+  );
 }
 
 function buildPlanFromForm(form: FormData): TripPlan {
@@ -522,22 +630,23 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>Start date</label>
-                      <input autoFocus type="date" value={form.dateStart}
-                        onChange={(e) => {
-                          updateField("dateStart", e.target.value);
-                          if (e.target.value) updateField("roughTiming", "");
+                      <DatePartsInput
+                        autoFocus
+                        value={form.dateStart}
+                        ariaLabel="Start date"
+                        onChange={(value) => {
+                          updateField("dateStart", value);
+                          if (value) updateField("roughTiming", "");
                         }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); } }}
-                        className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
-                        style={{ borderColor: "var(--hairline)" }} />
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--on-surface-muted)" }}>End date</label>
-                      <input type="date" value={form.dateEnd} min={form.dateStart || undefined}
-                        onChange={(e) => updateField("dateEnd", e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); } }}
-                        className="block w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none [color-scheme:light]"
-                        style={{ borderColor: "var(--hairline)" }} />
+                      <DatePartsInput
+                        value={form.dateEnd}
+                        ariaLabel="End date"
+                        onChange={(value) => updateField("dateEnd", value)}
+                      />
                     </div>
                   </div>
                   <div className="mt-4 space-y-1.5">
@@ -714,7 +823,7 @@ export function TripFormParser({ initialPrompt = "", activeTrip = null }: { init
                     </p>
                   ) : (
                     <p className="text-sm" style={{ color: "color-mix(in srgb, var(--sage) 55%, rgba(100,116,139,0.4))" }}>
-                      + Tap to add… or leave blank
+                      We want one fancy dinner and a beach day… or leave blank
                     </p>
                   )}
                 </div>
@@ -918,6 +1027,12 @@ function TripInputCanvas({
               onChange={(e) => setFreeText(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !isParsing) {
+                  e.preventDefault();
+                  parseInput();
+                }
+              }}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => { e.preventDefault(); setIsDragging(false); void handleImageUpload(e.dataTransfer.files); }}
@@ -977,7 +1092,7 @@ function TripInputCanvas({
                 onClick={skipToForm}
                 className="text-sm text-[color:var(--on-surface-muted)] transition-colors hover:text-[color:var(--on-surface)] dark:hover:text-neutral-200"
               >
-                Skip — fill in manually
+                Skip, fill in manually
               </button>
 
               <button

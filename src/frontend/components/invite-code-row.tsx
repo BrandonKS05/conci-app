@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { formatInviteCodeDisplay } from "@/backend/invite-code";
+import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
 
 export function InviteCodeRow({
   rawCode,
@@ -13,17 +13,18 @@ export function InviteCodeRow({
   variant?: "compact";
 }) {
   const display = formatInviteCodeDisplay(rawCode);
+  const inviteLink = `https://conci.travel/join/${normalizeInviteCode(rawCode)}`;
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(display);
+      await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       try {
         const ta = document.createElement("textarea");
-        ta.value = display;
+        ta.value = inviteLink;
         ta.style.position = "fixed";
         ta.style.left = "-9999px";
         document.body.appendChild(ta);
@@ -36,7 +37,7 @@ export function InviteCodeRow({
         /* ignore */
       }
     }
-  }, [display]);
+  }, [inviteLink]);
 
   if (variant === "compact") {
     return (

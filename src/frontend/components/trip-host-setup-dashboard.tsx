@@ -79,6 +79,7 @@ import {
   type TripWorkspaceTabId,
 } from "@/frontend/hooks/use-active-trip-tab";
 import { useTripWorkspaceRealtime } from "@/frontend/hooks/use-trip-workspace-realtime";
+import { formatInviteCodeDisplay, normalizeInviteCode } from "@/backend/invite-code";
 
 const JOIN_WITH_CODE_URL = "/join?from=create";
 
@@ -707,17 +708,18 @@ function InviteCard({
   count?: number | null;
 }) {
   const [copied, setCopied] = useState(false);
-  const display = rawCode.slice(0, 3) + "-" + rawCode.slice(3); // e.g. 3SX-JGT
+  const display = formatInviteCodeDisplay(rawCode);
+  const inviteLink = `https://conci.travel/join/${normalizeInviteCode(rawCode)}`;
 
   const copy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(display);
+      await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       try {
         const ta = document.createElement("textarea");
-        ta.value = display;
+        ta.value = inviteLink;
         ta.style.position = "fixed";
         ta.style.left = "-9999px";
         document.body.appendChild(ta);
@@ -730,17 +732,11 @@ function InviteCard({
         /* ignore */
       }
     }
-  }, [display]);
+  }, [inviteLink]);
 
-  // Generate traveler initials
-  // If we don't have enough names, we can use placeholder letters (e.g. M, K, F, D)
-  const defaultInitials = ["M", "K", "F", "D"];
-  const displayInitials = names.length > 0
-    ? names.map((name) => (name.trim().match(/\p{L}/u)?.[0] ?? "T").toUpperCase())
-    : defaultInitials;
-
-  const joinedCount = names.length > 0 ? names.length : 4;
-  const totalCount = count ?? (names.length > 0 ? names.length + 1 : 5);
+  const totalCount = Math.max(0, count ?? names.length);
+  const joinedCount = Math.min(names.length, totalCount);
+  const displayInitials = names.map((name) => (name.trim().match(/\p{L}/u)?.[0] ?? "T").toUpperCase());
 
   const colors = [
     "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200 border-sky-200 dark:border-sky-800",
@@ -769,15 +765,19 @@ function InviteCard({
         </button>
       </div>
       <p className="mt-2 text-xs leading-relaxed text-[color:var(--on-surface-muted)] dark:text-neutral-400">
-        conci.travel/join — paste the code to vote and add preferences.
+        conci.travel/join/{normalizeInviteCode(rawCode)} to vote and add preferences.
       </p>
       
       <div className="mt-4 flex items-center gap-3">
         <div className="flex -space-x-1.5 overflow-hidden">
-          {displayInitials.slice(0, 4).map((initial, i) => (
+          {(displayInitials.length > 0 ? displayInitials : ["+"]).slice(0, 4).map((initial, i) => (
             <div
               key={i}
-              className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold ${colors[i % colors.length]}`}
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold ${
+                displayInitials.length > 0
+                  ? colors[i % colors.length]
+                  : "border-dashed border-[color:var(--hairline-strong)] bg-white text-[color:var(--on-surface-muted)] dark:border-white/15 dark:bg-dm-page dark:text-neutral-500"
+              }`}
             >
               {initial}
             </div>
