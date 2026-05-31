@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/brandonlee/conci-app/logs/.9972744f68cfecfc281a09f1454d54826db4da52-audit.json",
+    "files": [
+        {
+            "date": 1779903204988,
+            "name": "/Users/brandonlee/conci-app/logs/mcp-puppeteer-2026-05-27.log",
+            "hash": "65ca9032578caaab487bacbb517ae01a663f3cd0380bb7444f6dea0f2fa87f5a"
+        },
+        {
+            "date": 1780192344399,
+            "name": "/Users/brandonlee/conci-app/logs/mcp-puppeteer-2026-05-30.log",
+            "hash": "b84239e05759c3e4eb6668c384cb7b0343d450be2b7e45525a453d10664fa91e"
+        }
+    ],
+    "hashType": "sha256"
+}

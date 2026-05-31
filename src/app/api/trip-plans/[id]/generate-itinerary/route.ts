@@ -166,8 +166,15 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
     if (!dayItin) continue; // Don't repeat last day's content for extra calendar days
 
     const foodActs = (dayItin.activities ?? []).filter((a) => a.category === "food" && a.title.trim());
-    const lunch = cleanLabel(foodActs[0]?.title || `Lunch spot in ${location}`, 120);
-    const dinner = cleanLabel(foodActs[1]?.title || `Dinner spot in ${location}`, 120);
+    const isBreakfastItem = (t: string) => /breakfast|brunch|coffee|pastry|croissant|morning meal/i.test(t);
+    const isDinnerItem = (t: string) => /dinner|supper|evening meal|dine/i.test(t);
+    const isLunchItem = (t: string) => /lunch|midday/i.test(t);
+    const nonBreakfast = foodActs.filter((a) => !isBreakfastItem(a.title));
+    const dinnerAct = foodActs.find((a) => isDinnerItem(a.title)) ?? nonBreakfast[nonBreakfast.length - 1];
+    const lunchAct = nonBreakfast.find((a) => isLunchItem(a.title) && a !== dinnerAct)
+      ?? nonBreakfast.find((a) => a !== dinnerAct);
+    const lunch = lunchAct ? cleanLabel(lunchAct.title, 120) : null;
+    const dinner = dinnerAct ? cleanLabel(dinnerAct.title, 120) : null;
     const actRows = (dayItin.activities ?? []).filter((a) => a.category === "activity" && a.title.trim()).slice(0, 2);
     // Don't pad with generic placeholders — only use real activities from the itinerary
 
@@ -179,18 +186,22 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
       : cleanLabel(`${departure} \u2192 ${location} flight`, 140);
     const flightPrice = flightActivity?.estimatedCostPp;
 
-    restaurantPins.push({
-      dateIso,
-      place: { name: lunch, mapsUrl: mapsSearchUrl(`${lunch} ${location}`), spotlightCategory: "restaurant" },
-      kept: true,
-      recommendedByConci: true,
-    });
-    restaurantPins.push({
-      dateIso,
-      place: { name: dinner, mapsUrl: mapsSearchUrl(`${dinner} ${location}`), spotlightCategory: "restaurant" },
-      kept: true,
-      recommendedByConci: true,
-    });
+    if (lunch) {
+      restaurantPins.push({
+        dateIso,
+        place: { name: lunch, mapsUrl: mapsSearchUrl(`${lunch} ${location}`), spotlightCategory: "restaurant" },
+        kept: true,
+        recommendedByConci: true,
+      });
+    }
+    if (dinner) {
+      restaurantPins.push({
+        dateIso,
+        place: { name: dinner, mapsUrl: mapsSearchUrl(`${dinner} ${location}`), spotlightCategory: "restaurant" },
+        kept: true,
+        recommendedByConci: true,
+      });
+    }
 
     for (const a of actRows) {
       const name = cleanLabel(a.title, 130);
@@ -241,22 +252,22 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
     dayVoting[dateIso] = {
       restaurants: {
         options: [
-          {
+          ...(lunch ? [{
             id: dayVoteId("rest", `${dateIso}|${lunch}`),
             label: lunch,
             detail: "recommended by CONCI",
             href: mapsSearchUrl(`${lunch} ${location}`),
-            votes: [],
+            votes: [] as never[],
             suggestedBy: "conci:auto",
-          },
-          {
+          }] : []),
+          ...(dinner ? [{
             id: dayVoteId("rest", `${dateIso}|${dinner}`),
             label: dinner,
             detail: "recommended by CONCI",
             href: mapsSearchUrl(`${dinner} ${location}`),
-            votes: [],
+            votes: [] as never[],
             suggestedBy: "conci:auto",
-          },
+          }] : []),
         ],
       },
       hotels: {
@@ -885,7 +896,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       .then((top) => {
         if (!top) return;
         const stays = buildHotelStayFromCandidate(plan, itinerary, top);
-        if (stays?.length) generated.hotelStays = stays;
+        if (stays?.length) {
+          generated.hotelStays = stays;
+          // Backfill the real hotel name into dayVoting hotel options
+          const realName = stays[0]!.place.name;
+          for (const dateIso of Object.keys(generated.dayVoting)) {
+            const hotelOpts = generated.dayVoting[dateIso]?.hotels?.options;
+            if (hotelOpts?.length) {
+              hotelOpts[0]!.label = realName;
+              hotelOpts[0]!.id = dayVoteId("hotel", `${dateIso}|${realName}`);
+              hotelOpts[0]!.href = stays[0]!.place.mapsUrl ?? hotelOpts[0]!.href;
+            }
+          }
+        }
       })
       .catch((e: unknown) => console.warn("[generate-itinerary] Hotel search failed (non-fatal):", (e as Error)?.message)),
 

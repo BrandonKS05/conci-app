@@ -71,10 +71,23 @@ function buildDayRows(
     rows.push({ icon: "🏨", label: hotelName, sub: "Lodging" });
   }
 
+  const removedActivityPinNames = new Set(
+    (plan.hostSetup?.activityPins ?? [])
+      .filter((p) => p.dateIso === iso && !p.kept)
+      .map((p) => p.experience?.name?.toLowerCase().trim())
+      .filter(Boolean)
+  );
   const generatedTransport =
     plan.generatedItinerary?.days
       .find((day) => day.dateIso === iso)
-      ?.activities.filter((activity) => activity.category === "transport" && activity.title.trim()) ?? [];
+      ?.activities.filter((activity) => {
+        if (!activity.category || activity.category !== "transport" || !activity.title.trim()) return false;
+        // Flights are managed via activityPins (which have their own kept flag); skip them here
+        if (/^flight:/i.test(activity.title)) return false;
+        // Skip any transport that the user has removed via activityPins
+        if (removedActivityPinNames.has(activity.title.toLowerCase().trim())) return false;
+        return true;
+      }) ?? [];
   for (const activity of generatedTransport) {
     const meta = [activity.time, activity.description].filter(Boolean).join(" · ");
     rows.push({ icon: transportIcon(activity.title), label: activity.title.trim(), sub: meta ? `Transport · ${meta}` : "Transport" });
