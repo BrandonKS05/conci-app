@@ -56,10 +56,11 @@ Do not deviate. Do not introduce new colors, fonts, or shadows.
 - AI routes: Stream responses — do not change streaming error handling without end-to-end testing.
 - Trip Copilot: Must update live Supabase itinerary state — text-only responses without state mutation are broken.
 - Itinerary pipeline: generate → overshoot repair → venue enrichment using SerpAPI + Google Maps.
+- Schema changes: use `/supabase-migration <description>` to scaffold timestamped migration files.
+- Docs: context7 MCP is available — use it for Next.js, Supabase, Stripe, and OpenAI API lookups instead of relying on training data.
 
 ## Hard Stops — Never Do These
 
-- Never read, expose, or modify `.env.local` or any secrets
 - Never push to `main`
 - Never touch Stripe, Supabase schema, Vercel config, or auth logic unless explicitly asked
 - Never install packages or delete files without explicit approval
