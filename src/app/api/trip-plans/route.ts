@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
-import { allocateUniqueInviteCode, formatInviteCodeDisplay } from "@/backend/invite-code";
+import { allocateUniqueInviteCode } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { ensureHostMembership } from "@/backend/trip-memberships";
 import {
@@ -112,8 +112,6 @@ export async function POST(request: Request) {
   let planForSave = normalizedPlan;
   if (hostSetupDraft) {
     const tripRange = tripRangeForHostDraftSave(normalizedPlan, new Date().getFullYear());
-    console.log("[host-setup-draft] plan.dates.options:", normalizedPlan.dates.options);
-    console.log("[host-setup-draft] tripRange result:", tripRange);
 
     const baseHs = parseHostSetup(normalizedPlan.hostSetup) ?? {};
     if (tripRange && !baseHs.tripRange?.startIso) {
@@ -135,16 +133,6 @@ export async function POST(request: Request) {
     status: nextStatus,
     updated_at: new Date().toISOString(),
   };
-
-  console.log("[trip-plans POST] upsert payload", {
-    hostSetupDraft,
-    hasInviteCode: Boolean(codeToSave),
-    invite_code: codeToSave,
-    status: nextStatus,
-    keys: Object.keys(row),
-    "plan.hostSetup.tripRange": planForSave.hostSetup?.tripRange ?? null,
-    planHostSetupKeys: planForSave.hostSetup ? Object.keys(planForSave.hostSetup) : [],
-  });
 
   const { data, error } = await svc.from("trip_plans").upsert(row, { onConflict: "id" }).select("id, invite_code").single();
 
@@ -185,14 +173,6 @@ export async function POST(request: Request) {
 
   const savedCode =
     persistedCode ?? (typeof data?.invite_code === "string" ? data.invite_code : codeToSave ?? null);
-
-  console.log("[trip-plans POST] invite_code written to Supabase", {
-    tripId: id,
-    upsertReturned: data,
-    rowReadAfterSave: fromDb,
-    finalInviteCode: savedCode,
-    display: savedCode ? formatInviteCodeDisplay(savedCode) : null,
-  });
 
   try {
     await ensureHostMembership(svc, id, user.id);

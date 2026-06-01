@@ -12,10 +12,6 @@ export async function findTripPlanIdByInviteCode(
   normalizedSix: string
 ): Promise<{ id: string } | null> {
   if (normalizedSix.length !== 6) {
-    console.log("[invite-lookup] skip: need 6 alphanumeric chars after normalize", {
-      normalizedSix,
-      length: normalizedSix.length,
-    });
     return null;
   }
 
@@ -28,30 +24,12 @@ export async function findTripPlanIdByInviteCode(
     )
   );
 
-  console.log("[invite-lookup] query", {
-    table: "public.trip_plans",
-    column: "invite_code",
-    operator: "in",
-    candidates,
-  });
-
   const { data, error } = await svc
     .from("trip_plans")
     .select("id, invite_code")
     .in("invite_code", candidates)
     .limit(1)
     .maybeSingle();
-
-  console.log("[invite-lookup] supabase response", {
-    found: Boolean(data?.id),
-    tripId: data?.id ?? null,
-    matchedStoredCode: typeof (data as { invite_code?: string } | null)?.invite_code === "string"
-      ? (data as { invite_code: string }).invite_code
-      : null,
-    errorMessage: error?.message ?? null,
-    errorCode: error?.code ?? null,
-    errorDetails: error?.details ?? null,
-  });
 
   if (error) throwPostgrest(error, "Invite code lookup failed.");
   if (data?.id) return { id: data.id as string };
