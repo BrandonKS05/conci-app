@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/backend/supabase/require-auth";
 import { isLikelySamePlace } from "@/backend/place-match";
 import { searchPlacesGoogleMaps } from "@/backend/serpapi-places";
 import { extractPlaceCandidates } from "@/shared/place-candidates";
@@ -18,6 +19,9 @@ async function searchWithFallbacks(q: string, locationHint: string | null): Prom
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth();
+  if ("response" in auth) return auth.response;
+
   const body = (await request.json().catch(() => ({}))) as {
     text?: string;
     locationHint?: string | null;

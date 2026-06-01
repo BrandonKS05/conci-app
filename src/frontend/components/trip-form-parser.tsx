@@ -1118,7 +1118,14 @@ function TripInputCanvas({
               <div className="mt-5 flex gap-3">
                 {images.map((url, i) => (
                   <div key={i} className="relative">
-                    <img src={url} alt={`Upload ${i + 1}`} className="h-16 w-16 rounded-2xl object-cover ring-1 ring-[color:var(--hairline)] dark:ring-white/10" />
+                    <NextImage
+                      src={url}
+                      alt={`Upload ${i + 1}`}
+                      width={64}
+                      height={64}
+                      unoptimized
+                      className="h-16 w-16 rounded-2xl object-cover ring-1 ring-[color:var(--hairline)] dark:ring-white/10"
+                    />
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
