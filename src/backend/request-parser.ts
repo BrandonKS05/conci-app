@@ -391,6 +391,7 @@ function buildSummary(category: ParsedRequest["category"], parsed: Partial<Parse
 }
 
 function logParser(mode: "mock mode" | "OpenAI mode", parsed: ParsedRequest) {
+  if (process.env.DEBUG_CONCI_PARSER !== "1") return;
   console.log(
     `Conci parser: ${mode}`,
     JSON.stringify(
@@ -545,13 +546,11 @@ export async function parseRequestWithLLM(request: string): Promise<ParsedReques
     const parsed = parseLocally(trimmedRequest);
     parsed.fallback_reason ??=
       "OPENAI_API_KEY is not configured, so the app is using a local fallback.";
-    console.log("Conci parser: mock mode");
     logParser("mock mode", parsed);
     return parsed;
   }
 
   try {
-    console.log("Conci parser: OpenAI mode");
     const { default: OpenAI } = await import("openai");
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -589,7 +588,6 @@ export async function parseRequestWithLLM(request: string): Promise<ParsedReques
     }
 
     const parsed = normalizeParsedRequest(JSON.parse(raw), trimmedRequest);
-    console.log("Conci parser: OpenAI mode");
     logParser("OpenAI mode", parsed);
     return parsed;
   } catch (error) {
@@ -597,7 +595,6 @@ export async function parseRequestWithLLM(request: string): Promise<ParsedReques
       error instanceof Error ? error.message : "The parser encountered an unexpected error.";
     const parsed = parseLocally(trimmedRequest);
     parsed.fallback_reason = message;
-    console.log("Conci parser: mock mode");
     logParser("mock mode", parsed);
     return parsed;
   }
