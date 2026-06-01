@@ -14,3 +14,13 @@ export function getGooglePlacesApiKey(): string | undefined {
   const k = getEnvTrimmed("GOOGLE_PLACES_API_KEY");
   return k.length ? k : undefined;
 }
+
+/** LiteAPI (Nuitée) — hotel search, prebook, and booking. */
+export function getLiteApiKey(): string | undefined {
+  const k = getEnvTrimmed("LITEAPI_API_KEY");
+  return k.length ? k : undefined;
+}
+
+export function isLiteApiConfigured(): boolean {
+  return !!getLiteApiKey();
+}
