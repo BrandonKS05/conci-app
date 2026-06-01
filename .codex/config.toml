@@ -1,0 +1,12 @@
+[mcp_servers.github]
+url = "https://mcp.github.com"
+
+[mcp_servers.playwright]
+url = "https://mcp.playwright.dev"
+
+[mcp_servers.sequential-thinking]
+command = "npx"
+args = ["@modelcontextprotocol/server-sequential-thinking"]
+
+[mcp_servers.vercel]
+url = "https://mcp.vercel.com"
