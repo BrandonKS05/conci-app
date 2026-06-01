@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type MouseEvent,
-  type ReactNode,
 } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -22,9 +21,7 @@ import {
   mergeAiHotelStaysPreservingUser,
   enumerateLocalIsoDays,
   hostHasConcreteTripRange,
-  hostCalendarHotelDisplayTitle,
   hotelStayRowsForCalendarDay,
-  type HostHotelCalendarEdge,
   normalizePlan,
   parseLocalIsoDate,
   seedTextMentionsDining,
@@ -164,15 +161,6 @@ function daysInMonth(y: number, m0: number): number {
 }
 
 const WEEKDAY_SUN_FIRST = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
-
-/** Stay + pins shown per day cell; extra rows summarized so week rows stay a uniform height. */
-const CALENDAR_CELL_MAX_VISIBLE_ITEMS = 2;
-
-const HOST_CALENDAR_HOTEL_EDGE_LABEL: Record<HostHotelCalendarEdge, string> = {
-  "check-in": "Check-in",
-  "check-out": "Check-out",
-  "check-in-out": "Check-in · Check-out",
-};
 
 function lodgingTypeBadgeLabel(type: HostLodgingType | undefined): string {
   if (type === "airbnb") return "Airbnb";
@@ -428,109 +416,6 @@ function tripCalendarDayRole(
   if (cellIso === range.startIso) return "arrival";
   if (cellIso === range.endIso) return "departure";
   return "on-trip";
-}
-
-function tripCalendarCellSurfaceClass(role: TripCalendarDayRole): string {
-  if (!role) return "";
-  if (role === "arrival") {
-    return "bg-sky-500/[0.08] ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/[0.14] dark:ring-sky-500/50";
-  }
-  if (role === "departure") {
-    return "bg-violet-500/[0.08] ring-2 ring-inset ring-violet-400/60 dark:bg-violet-500/[0.14] dark:ring-violet-500/50";
-  }
-  return "bg-[#2563EB]/[0.08] ring-2 ring-inset ring-[#2563EB]/35 dark:bg-[#2563EB]/[0.14] dark:ring-[#60A5FA]/40";
-}
-
-function tripCalendarDayBadgeLabel(
-  role: TripCalendarDayRole,
-  range: { startIso: string; endIso: string } | null
-): string | null {
-  if (!role || !range) return null;
-  if (range.startIso === range.endIso) return "Trip day";
-  if (role === "arrival") return "Arrival";
-  if (role === "departure") return "Departure";
-  return "On trip";
-}
-
-function TripCalendarDayBadge({
-  role,
-  range,
-}: {
-  role: TripCalendarDayRole;
-  range: { startIso: string; endIso: string } | null;
-}) {
-  const label = tripCalendarDayBadgeLabel(role, range);
-  if (!label) return null;
-  const tone =
-    role === "arrival"
-      ? "border-sky-300/80 bg-sky-100/90 text-sky-900 dark:border-sky-600/50 dark:bg-sky-900/50 dark:text-sky-100"
-      : role === "departure"
-        ? "border-violet-300/80 bg-violet-100/90 text-violet-900 dark:border-violet-600/50 dark:bg-violet-900/50 dark:text-violet-100"
-        : "border-[#2563EB]/30 bg-white/80 text-[#1e40af] dark:border-[#60A5FA]/35 dark:bg-[#2563EB]/20 dark:text-[#93c5fd]";
-  return (
-    <span
-      className={[
-        "inline-flex max-w-full items-center rounded-md border px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.1em] sm:text-[10px]",
-        tone,
-      ].join(" ")}
-    >
-      {label}
-    </span>
-  );
-}
-
-function TripCalendarLegend({
-  range,
-}: {
-  range: { startIso: string; endIso: string } | null;
-}) {
-  if (!range?.startIso || !range?.endIso) return null;
-  const singleDay = range.startIso === range.endIso;
-  return (
-    <div
-      className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color:var(--hairline)] pb-3 text-[11px] font-medium text-[color:var(--on-surface-muted)] dark:border-white/10"
-      aria-label="Trip calendar legend"
-    >
-      {singleDay ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className="h-4 w-5 shrink-0 rounded-sm bg-sky-500/15 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/25 dark:ring-sky-500/50"
-            aria-hidden
-          />
-          Trip day
-        </span>
-      ) : (
-        <>
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="h-4 w-5 shrink-0 rounded-sm bg-sky-500/15 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-500/25 dark:ring-sky-500/50"
-              aria-hidden
-            />
-            Arrival
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="h-4 w-5 shrink-0 rounded-sm bg-[#2563EB]/10 ring-2 ring-inset ring-[#2563EB]/35 dark:bg-[#2563EB]/20 dark:ring-[#60A5FA]/40"
-              aria-hidden
-            />
-            On trip
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="h-4 w-5 shrink-0 rounded-sm bg-violet-500/15 ring-2 ring-inset ring-violet-400/60 dark:bg-violet-500/25 dark:ring-violet-500/50"
-              aria-hidden
-            />
-            Departure
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
-
-function calendarPinShellClass(emphasis: boolean): string {
-  if (!emphasis) return "min-w-0 py-0.5";
-  return "rounded-md bg-[#1c1c17] px-1.5 py-1 shadow-none dark:bg-neutral-200";
 }
 
 /** Human-readable range for the confirm dialog. */
@@ -998,7 +883,7 @@ export function TripHostSetupDashboard({
     return new Date().getMonth();
   });
 
-  const { peers, peersByCellIso, setFocusedCell } = useTripCalendarPresence(tripId, {
+  const { setFocusedCell } = useTripCalendarPresence(tripId, {
     enabled: true,
     calendarYear: calYear,
     calendarMonth0: calMonth,
@@ -1037,10 +922,6 @@ export function TripHostSetupDashboard({
     },
     [scrollToWorkspaceSection]
   );
-
-  const scrollToInviteSection = useCallback(() => {
-    scrollToWorkspaceSection("sec-invite");
-  }, [scrollToWorkspaceSection]);
 
   /** Saved host range wins; else only highlight days the parser nailed down explicitly. */
   const tripDisplayRange = hostSetup.tripRange ?? parserConcreteRange ?? null;
@@ -1444,16 +1325,6 @@ export function TripHostSetupDashboard({
   const cells = useMemo(() => calendarCellsSundayFirst(calYear, calMonth), [calYear, calMonth]);
   const weeks = useMemo(() => chunkWeeks(cells), [cells]);
 
-  const isCalendarToday = useCallback(
-    (dom: number): boolean => {
-      const now = new Date();
-      return (
-        dom === now.getDate() && calMonth === now.getMonth() && calYear === now.getFullYear()
-      );
-    },
-    [calYear, calMonth]
-  );
-
   /**
    * Calendar view modes:
    *  - "expanded": full Sunday-first month grid (the owner is in range-pick mode,
@@ -1530,7 +1401,6 @@ export function TripHostSetupDashboard({
   }, [sortedHotelStays, plan.location]);
 
   const tripDisplayName = (plan.title?.trim() || plan.location?.trim() || "Trip");
-  const tripIdentityInitial = (tripDisplayName.match(/\p{L}/u)?.[0] ?? "T").toUpperCase();
   const tripIdentityDateLabel = useMemo(() => {
     if (tripDisplayRange?.startIso && tripDisplayRange.endIso) {
       return formatTripRangeLabel(tripDisplayRange.startIso, tripDisplayRange.endIso);
@@ -2173,7 +2043,7 @@ export function TripHostSetupDashboard({
                               <button
                                 type="button"
                                 className="w-full text-left font-display font-semibold text-sm text-[#1c1c17] dark:text-[#ebe9e4] leading-snug hover:underline"
-                                onClick={(ev) => {
+                                onClick={() => {
                                   interface LodgingItem {
                                     stay: {
                                       startIso: string;

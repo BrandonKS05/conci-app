@@ -131,7 +131,6 @@ function DaySpendEstimateBar({
   baselineGroupUsd,
   mealsUsd,
   activitiesUsd,
-  estimatedTotalUsd,
 }: {
   baselineGroupUsd: number | null;
   hotelUsd: number;
@@ -937,7 +936,6 @@ export function TripHostSetupDayPage({
   }, [dateIso, dreamText, syncPlanFromServer, tripId]);
 
   const hostSetup = plan.hostSetup;
-  const dest = plan.location?.trim() || "Destination TBD";
 
   const formatted = useMemo(() => {
     const d = parseLocalIsoDate(dateIso);

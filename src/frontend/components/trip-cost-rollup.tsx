@@ -321,6 +321,7 @@ function Stat({
       <span
         className={[
           "font-display text-[2.25rem] font-semibold leading-tight text-[#1c1c17] dark:text-[#ebe9e4]",
+          emphasize ? "text-rose-700 dark:text-rose-300" : "",
         ].join(" ")}
       >
         {value}
