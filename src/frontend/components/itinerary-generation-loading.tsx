@@ -7,11 +7,13 @@ interface ProgressEvent {
   type: "progress";
   stage: string;
   percent: number;
+  checklist: ChecklistItem[];
   completed: string[];
 }
 
 interface CompleteEvent {
   type: "complete";
+  checklist: ChecklistItem[];
   itinerary: unknown;
   plan: TripPlan;
 }
@@ -23,14 +25,7 @@ interface ErrorEvent {
 
 type StreamEvent = ProgressEvent | CompleteEvent | ErrorEvent;
 
-// Keys match exactly what the backend emits in `completed[]` on each progress event.
-// Order must follow the backend's emission order: lodging → meals → activities → budget.
-const CHECKLIST: { key: string; label: string }[] = [
-  { key: "lodging",    label: "Lodging" },
-  { key: "meals",      label: "Meals" },
-  { key: "activities", label: "Activities" },
-  { key: "budget",     label: "Budget" },
-];
+type ChecklistItem = { key: string; label: string };
 
 const STATUSES = [
   "Finding the best restaurant experiences...",
@@ -63,6 +58,7 @@ export function ItineraryGenerationLoading({
   const [statusText, setStatusText] = useState(STATUSES[0]);
   const [statusVisible, setStatusVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [completed, setCompleted] = useState<string[]>([]);
   const [started, setStarted] = useState(false);
 
@@ -187,9 +183,11 @@ export function ItineraryGenerationLoading({
               const event = JSON.parse(line.slice(6)) as StreamEvent;
               if (event.type === "progress") {
                 setStarted(true);
+                setChecklist(event.checklist);
                 setCompleted(event.completed);
               } else if (event.type === "complete") {
-                setCompleted(["lodging", "meals", "activities", "budget"]);
+                setChecklist(event.checklist);
+                setCompleted(event.checklist.map((item) => item.key));
                 setExiting(true);
                 const plan = event.plan;
                 setTimeout(() => {
@@ -199,12 +197,12 @@ export function ItineraryGenerationLoading({
                 if (!aborted) onErrorRef.current(event.message);
               }
             } catch {
-              // malformed SSE line — skip
+              // malformed SSE line - skip
             }
           }
         }
       } catch {
-        if (!aborted) onErrorRef.current("Network error — check your connection.");
+        if (!aborted) onErrorRef.current("Network error - check your connection.");
       }
     };
 
@@ -296,59 +294,61 @@ export function ItineraryGenerationLoading({
             BUILDING YOUR TRIP
           </div>
 
-          {/* Checklist — keys derived from backend progress events */}
-          <div style={{ width: 480, maxWidth: "100vw", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {CHECKLIST.map(({ key, label }) => {
-              const done = completed.includes(key);
-              const active = !done && started && CHECKLIST.find(c => !completed.includes(c.key))?.key === key;
-              return (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    borderRadius: 12,
-                    border: `1px solid ${done ? "rgba(20,184,166,0.35)" : "rgba(15,23,42,0.08)"}`,
-                    backgroundColor: done ? "rgba(20,184,166,0.06)" : "transparent",
-                    padding: "10px 14px",
-                    transition: "border-color 0.35s ease, background-color 0.35s ease",
-                  }}
-                >
-                  {done ? (
-                    <span style={{
-                      display: "inline-flex", width: 20, height: 20, borderRadius: "50%",
-                      backgroundColor: "#14b8a6", alignItems: "center", justifyContent: "center",
-                      color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
-                    }}>✓</span>
-                  ) : active ? (
-                    <span
-                      className="animate-spin"
-                      style={{
+          {/* Checklist keys come from backend progress events. */}
+          {checklist.length > 0 ? (
+            <div style={{ width: 480, maxWidth: "calc(100vw - 32px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+              {checklist.map(({ key, label }) => {
+                const done = completed.includes(key);
+                const active = !done && started && checklist.find((item) => !completed.includes(item.key))?.key === key;
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      borderRadius: 12,
+                      border: `1px solid ${done ? "rgba(20,184,166,0.35)" : "rgba(15,23,42,0.08)"}`,
+                      backgroundColor: done ? "rgba(20,184,166,0.06)" : "transparent",
+                      padding: "10px 14px",
+                      transition: "border-color 0.35s ease, background-color 0.35s ease",
+                    }}
+                  >
+                    {done ? (
+                      <span style={{
+                        display: "inline-flex", width: 20, height: 20, borderRadius: "50%",
+                        backgroundColor: "#14b8a6", alignItems: "center", justifyContent: "center",
+                        color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      }}>{"\u2713"}</span>
+                    ) : active ? (
+                      <span
+                        className="animate-spin"
+                        style={{
+                          display: "inline-block", width: 20, height: 20, borderRadius: "50%",
+                          border: "2px solid rgba(20,184,166,0.2)", borderTopColor: "#14b8a6",
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <span style={{
                         display: "inline-block", width: 20, height: 20, borderRadius: "50%",
-                        border: "2px solid rgba(20,184,166,0.2)", borderTopColor: "#14b8a6",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : (
+                        border: "1.5px solid rgba(15,23,42,0.12)", flexShrink: 0,
+                      }} />
+                    )}
                     <span style={{
-                      display: "inline-block", width: 20, height: 20, borderRadius: "50%",
-                      border: "1.5px solid rgba(15,23,42,0.12)", flexShrink: 0,
-                    }} />
-                  )}
-                  <span style={{
-                    fontFamily: "system-ui, sans-serif",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: done ? "#0d9488" : active ? "#374151" : "#94a3b8",
-                    transition: "color 0.35s ease",
-                  }}>
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                      fontFamily: "system-ui, sans-serif",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: done ? "#0d9488" : active ? "#374151" : "#94a3b8",
+                      transition: "color 0.35s ease",
+                    }}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </>

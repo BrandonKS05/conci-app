@@ -8,15 +8,24 @@ const STREAM_FETCH_TIMEOUT_MS = 150_000;
 
 type ChecklistItem = "lodging" | "meals" | "activities" | "budget";
 
+const CHECKLIST_ITEMS: { key: ChecklistItem; label: string }[] = [
+  { key: "lodging", label: "Lodging" },
+  { key: "meals", label: "Meals" },
+  { key: "activities", label: "Activities" },
+  { key: "budget", label: "Budget" },
+];
+
 interface ProgressPayload {
   type: "progress";
   stage: string;
   percent: number;
+  checklist: typeof CHECKLIST_ITEMS;
   completed: ChecklistItem[];
 }
 
 interface CompletePayload {
   type: "complete";
+  checklist: typeof CHECKLIST_ITEMS;
   itinerary: unknown;
   plan: unknown;
 }
@@ -71,11 +80,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       };
 
       try {
-        emit({ type: "progress", stage: "Getting ready...", percent: 5, completed: [] });
-        emit({ type: "progress", stage: "Analyzing your trip details...", percent: 12, completed: [] });
+        emit({ type: "progress", stage: "Getting ready...", percent: 5, checklist: CHECKLIST_ITEMS, completed: [] });
+        emit({ type: "progress", stage: "Analyzing your trip details...", percent: 12, checklist: CHECKLIST_ITEMS, completed: [] });
 
         // We can't observe the AI route's internal stages without restructuring it, so pace
-        // the checklist (lodging → meals → activities) over the expected wait instead of
+        // the checklist (lodging -> meals -> activities) over the expected wait instead of
         // dumping all of it the instant the call returns. The final "budget" item is checked
         // off by the real `complete` event below.
         const steps: { after: number; percent: number; stage: string; completed: ChecklistItem[] }[] = [
@@ -85,7 +94,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         ];
         const timers = steps.map((s) =>
           setTimeout(
-            () => emit({ type: "progress", stage: s.stage, percent: s.percent, completed: s.completed }),
+            () => emit({ type: "progress", stage: s.stage, percent: s.percent, checklist: CHECKLIST_ITEMS, completed: s.completed }),
             s.after
           )
         );
@@ -120,7 +129,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         }
 
         const result = await generateRes.json() as { itinerary?: unknown; plan?: unknown };
-        emit({ type: "complete", itinerary: result.itinerary, plan: result.plan });
+        emit({ type: "complete", checklist: CHECKLIST_ITEMS, itinerary: result.itinerary, plan: result.plan });
         close();
       } catch (err) {
         emit({ type: "error", message: (err as Error)?.message ?? "Something went wrong" });
