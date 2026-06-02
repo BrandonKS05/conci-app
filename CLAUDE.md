@@ -6,7 +6,7 @@ AI-led group trip planning app. One person does all the work in the group chat â
 
 ## Current Stage
 
-Launching within a week. Default to the smallest safe change. Stability and polish over new features.
+Default to the smallest safe change. Stability and polish over new features.
 
 ## Commands
 
@@ -74,7 +74,6 @@ Do not deviate. Do not introduce new colors, fonts, or shadows.
 - LangGraph
 - Whisper
 - pgvector/memory
-- Google Calendar API
 - Stripe Connect
 - OpenTable/Resy
 - Official Airbnb/Booking.com APIs
