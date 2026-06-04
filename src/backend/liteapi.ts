@@ -1,4 +1,10 @@
-import { getLiteApiKey, isLiteApiConfigured } from "@/backend/env-api-keys";
+import {
+  getLiteApiKey,
+  isLiteApiConfigured,
+  getLiteApiEnvironment,
+  getLiteApiMarginPct,
+  getGooglePlacesApiKey,
+} from "@/backend/env-api-keys";
 import type {
   LiteApiHotelResult,
   LiteApiRate,
@@ -6,30 +12,34 @@ import type {
   LiteApiBookingRecord,
   LiteApiBookingGuest,
   LiteApiCancellationPolicy,
+  LiteApiEnvironment,
 } from "@/shared/liteapi";
 
 export { isLiteApiConfigured };
 
-const BASE_URL = "https://api.liteapi.travel/v3.0";
+/** Search, hotel content, and static data live on the data host (all free). */
+const DATA_BASE = "https://api.liteapi.travel/v3.0";
+/** Prebook and book live on the booking host — NOT api.liteapi.travel. */
+const BOOK_BASE = "https://book.liteapi.travel/v3.0";
 const LOG = "[liteapi]";
 
 function liteApiHeaders(): Record<string, string> {
   const key = getLiteApiKey();
   if (!key) throw new Error("LITEAPI_API_KEY is not set.");
   return {
-    "X-Api-Key": key,
+    "X-API-Key": key,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
 }
 
-async function liteGet(path: string, query: Record<string, string | number | undefined>): Promise<unknown> {
+async function liteGet(base: string, path: string, query: Record<string, string | number | undefined>): Promise<unknown> {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
     if (v === undefined || v === "") continue;
     qs.set(k, String(v));
   }
-  const url = `${BASE_URL}${path}?${qs.toString()}`;
+  const url = `${base}${path}${qs.toString() ? `?${qs.toString()}` : ""}`;
 
   let res: Response;
   try {
@@ -43,11 +53,8 @@ async function liteGet(path: string, query: Record<string, string | number | und
   const text = await res.text();
   console.info(`${LOG} GET ${path}`, { status: res.status, bodyLen: text.length });
 
-  if (!res.ok) {
-    throw new Error(`LiteAPI GET ${path} (${res.status}): ${text.slice(0, 800)}`);
-  }
+  if (!res.ok) throw new Error(`LiteAPI GET ${path} (${res.status}): ${text.slice(0, 800)}`);
   if (!text.trim()) throw new Error(`LiteAPI ${path}: empty response.`);
-
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -55,8 +62,8 @@ async function liteGet(path: string, query: Record<string, string | number | und
   }
 }
 
-async function litePost(path: string, body: unknown): Promise<unknown> {
-  const url = `${BASE_URL}${path}`;
+async function litePost(base: string, path: string, body: unknown): Promise<unknown> {
+  const url = `${base}${path}`;
 
   let res: Response;
   try {
@@ -75,11 +82,8 @@ async function litePost(path: string, body: unknown): Promise<unknown> {
   const text = await res.text();
   console.info(`${LOG} POST ${path}`, { status: res.status, bodyLen: text.length });
 
-  if (!res.ok) {
-    throw new Error(`LiteAPI POST ${path} (${res.status}): ${text.slice(0, 800)}`);
-  }
+  if (!res.ok) throw new Error(`LiteAPI POST ${path} (${res.status}): ${text.slice(0, 800)}`);
   if (!text.trim()) throw new Error(`LiteAPI ${path}: empty response.`);
-
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -87,7 +91,33 @@ async function litePost(path: string, body: unknown): Promise<unknown> {
   }
 }
 
-// ─── Response normalisers ──────────────────────────────────────────────────
+// ─── Geocoding (Google Places — never LiteAPI /data/places) ─────────────────
+
+async function geocodeDestination(query: string): Promise<{ latitude: number; longitude: number } | null> {
+  const googleApiKey = getGooglePlacesApiKey();
+  if (!googleApiKey) return null;
+  try {
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": googleApiKey,
+        "X-Goog-FieldMask": "places.location",
+      },
+      body: JSON.stringify({ textQuery: query }),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      places?: Array<{ location?: { latitude: number; longitude: number } }>;
+    };
+    return data.places?.[0]?.location ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Primitives ─────────────────────────────────────────────────────────────
 
 function num(x: unknown): number {
   if (typeof x === "number" && !Number.isNaN(x)) return x;
@@ -102,10 +132,14 @@ function str(x: unknown): string {
   return typeof x === "string" ? x : "";
 }
 
+function asRecord(x: unknown): Record<string, unknown> {
+  return x && typeof x === "object" ? (x as Record<string, unknown>) : {};
+}
+
 function parseCancellationPolicies(raw: unknown): LiteApiCancellationPolicy[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((p) => {
-    const o = (p as Record<string, unknown>) ?? {};
+    const o = asRecord(p);
     return {
       cancelByDate: str(o.cancelByDate || o.cancelBy || o.deadline) || null,
       refundable: o.refundable === true || o.type === "FREE_CANCELLATION",
@@ -115,12 +149,12 @@ function parseCancellationPolicies(raw: unknown): LiteApiCancellationPolicy[] {
 }
 
 function parseRate(raw: unknown): LiteApiRate | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const rateId = str(o.rateId || o.id);
+  const o = asRecord(raw);
+  // In v3, a rate's offer identifier is `rateId` (also accepted as `offerId` upstream).
+  const rateId = str(o.rateId || o.offerId || o.id);
   if (!rateId) return null;
 
-  const retail = (o.retailRate as Record<string, unknown>) ?? {};
+  const retail = asRecord(o.retailRate);
   const totalArr = Array.isArray(retail.total) ? (retail.total as unknown[]) : [];
 
   return {
@@ -129,8 +163,8 @@ function parseRate(raw: unknown): LiteApiRate | null {
     boardType: str(o.boardType || o.boardName || o.mealPlan) || null,
     retailRate: {
       total: totalArr.map((t) => {
-        const tc = (t as Record<string, unknown>) ?? {};
-        return { amount: num(tc.amount || tc.value), currency: str(tc.currency) };
+        const tc = asRecord(t);
+        return { amount: num(tc.amount ?? tc.value), currency: str(tc.currency) };
       }),
       baseRate: null,
       taxes: null,
@@ -138,7 +172,7 @@ function parseRate(raw: unknown): LiteApiRate | null {
     cancellationPolicies: parseCancellationPolicies(o.cancellationPolicies || o.cancellation),
     rooms: Array.isArray(o.rooms)
       ? (o.rooms as unknown[]).map((r) => {
-          const ro = (r as Record<string, unknown>) ?? {};
+          const ro = asRecord(r);
           return {
             name: str(ro.name || ro.type),
             description: str(ro.description) || null,
@@ -150,56 +184,108 @@ function parseRate(raw: unknown): LiteApiRate | null {
   };
 }
 
-function normaliseHotelResult(raw: unknown): LiteApiHotelResult | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
+/** Flatten v3 `roomTypes[].rates[]` (with fallback to a flat `rates[]`). */
+function collectRates(hotelData: Record<string, unknown>): LiteApiRate[] {
+  const out: LiteApiRate[] = [];
+  const roomTypes = Array.isArray(hotelData.roomTypes) ? (hotelData.roomTypes as unknown[]) : [];
+  for (const rt of roomTypes) {
+    const rtRates = Array.isArray(asRecord(rt).rates) ? (asRecord(rt).rates as unknown[]) : [];
+    for (const r of rtRates) {
+      const parsed = parseRate(r);
+      if (parsed) out.push(parsed);
+    }
+  }
+  if (out.length === 0 && Array.isArray(hotelData.rates)) {
+    for (const r of hotelData.rates as unknown[]) {
+      const parsed = parseRate(r);
+      if (parsed) out.push(parsed);
+    }
+  }
+  return out;
+}
 
-  const hotelId = str(o.hotelId || o.id);
-  const name = str(o.name || o.hotelName);
+function cheapestOf(rates: LiteApiRate[]): LiteApiRate | null {
+  if (rates.length === 0) return null;
+  return rates.reduce((best, r) => {
+    const b = best.retailRate.total[0]?.amount ?? Infinity;
+    const c = r.retailRate.total[0]?.amount ?? Infinity;
+    return c < b ? r : best;
+  });
+}
+
+/** Merge hotel content (from the parallel `hotels[]` map or embedded `hotel`) with its rates. */
+function buildHotelResult(content: Record<string, unknown>, rates: LiteApiRate[]): LiteApiHotelResult | null {
+  const hotelId = str(content.hotelId || content.id);
+  const name = str(content.name || content.hotelName);
   if (!hotelId || !name) return null;
 
-  const addr = (o.address as Record<string, unknown>) ?? {};
-  const photos = Array.isArray(o.photos)
-    ? (o.photos as unknown[]).map((p) => ({ url: str((p as Record<string, unknown>).url ?? p) })).filter((p) => p.url)
-    : [];
-
-  const rawRates = Array.isArray(o.rates) ? (o.rates as unknown[]) : [];
-  const rates = rawRates.map(parseRate).filter((r): r is LiteApiRate => r !== null);
-  const cheapestRate = rates.length > 0
-    ? rates.reduce((best, r) => {
-        const bAmt = best.retailRate.total[0]?.amount ?? Infinity;
-        const rAmt = r.retailRate.total[0]?.amount ?? Infinity;
-        return rAmt < bAmt ? r : best;
-      })
-    : null;
+  const addr = asRecord(content.address);
+  const photos = Array.isArray(content.photos)
+    ? (content.photos as unknown[]).map((p) => ({ url: str(asRecord(p).url ?? p) })).filter((p) => p.url)
+    : [str(content.main_photo || content.thumbnail)].filter(Boolean).map((url) => ({ url }));
 
   return {
     hotelId,
     name,
-    rating: typeof o.starRating === "number" ? o.starRating : typeof o.rating === "number" ? o.rating : null,
-    reviewScore: num(o.reviewScore || o.guestScore) || null,
-    reviewCount: typeof o.reviewCount === "number" ? o.reviewCount : null,
+    rating:
+      typeof content.starRating === "number"
+        ? content.starRating
+        : typeof content.stars === "number"
+          ? content.stars
+          : typeof content.rating === "number"
+            ? content.rating
+            : null,
+    reviewScore: num(content.reviewScore ?? content.guestScore ?? content.rating) || null,
+    reviewCount: typeof content.reviewCount === "number" ? content.reviewCount : null,
     address: {
-      country: str(addr.country),
-      countryCode: str(addr.countryCode),
+      country: str(addr.country || content.country),
+      countryCode: str(addr.countryCode || content.countryCode),
       state: str(addr.state) || null,
-      city: str(addr.city || addr.cityName),
-      street: str(addr.street || addr.addressLine1) || null,
+      city: str(addr.city || addr.cityName || content.city),
+      street: str(addr.street || addr.addressLine1 || content.address) || null,
       zip: str(addr.zip || addr.postalCode) || null,
-      latitude: typeof addr.latitude === "number" ? addr.latitude : null,
-      longitude: typeof addr.longitude === "number" ? addr.longitude : null,
+      latitude: typeof addr.latitude === "number" ? addr.latitude : typeof content.latitude === "number" ? content.latitude : null,
+      longitude: typeof addr.longitude === "number" ? addr.longitude : typeof content.longitude === "number" ? content.longitude : null,
     },
     photos,
-    description: str(o.description) || null,
-    amenities: Array.isArray(o.amenities) ? (o.amenities as unknown[]).map(str).filter(Boolean) : [],
-    checkInTime: str(o.checkInTime || o.checkIn) || null,
-    checkOutTime: str(o.checkOutTime || o.checkOut) || null,
-    cheapestRate,
+    description: str(content.description || content.hotelDescription) || null,
+    amenities: Array.isArray(content.amenities) ? (content.amenities as unknown[]).map(str).filter(Boolean) : [],
+    checkInTime: str(content.checkInTime || content.checkIn) || null,
+    checkOutTime: str(content.checkOutTime || content.checkOut) || null,
+    cheapestRate: cheapestOf(rates),
     rates,
   };
 }
 
-// ─── Public API ─────────────────────────────────────────────────────────────
+function parseRatesResponse(body: unknown): LiteApiHotelResult[] {
+  const root = asRecord(body);
+  const dataArr: unknown[] = Array.isArray(root.data) ? root.data : [];
+
+  // Content can arrive as a parallel `hotels[]` array keyed by id, or embedded per data row.
+  const contentById = new Map<string, Record<string, unknown>>();
+  const hotelsArr = Array.isArray(root.hotels) ? (root.hotels as unknown[]) : [];
+  for (const h of hotelsArr) {
+    const ho = asRecord(h);
+    const id = str(ho.id || ho.hotelId);
+    if (id) contentById.set(id, ho);
+  }
+
+  const results: LiteApiHotelResult[] = [];
+  for (const row of dataArr) {
+    const ro = asRecord(row);
+    const hotelId = str(ro.hotelId || ro.id);
+    if (!hotelId) continue;
+    const rates = collectRates(ro);
+    const content = contentById.get(hotelId) ?? asRecord(ro.hotel) ?? ro;
+    // Ensure the id is present on the content record for buildHotelResult.
+    const merged = { ...content, hotelId };
+    const built = buildHotelResult(merged, rates);
+    if (built) results.push(built);
+  }
+  return results;
+}
+
+// ─── Search ─────────────────────────────────────────────────────────────────
 
 export type LiteApiSearchParams = {
   destination: string;
@@ -208,71 +294,100 @@ export type LiteApiSearchParams = {
   adults: number;
   children?: number[];
   currency?: string;
+  guestNationality?: string;
   limit?: number;
 };
 
-export async function searchLiteApiHotels(params: LiteApiSearchParams): Promise<LiteApiHotelResult[]> {
-  const body = await liteGet("/hotels/rates", {
-    destination: params.destination,
+function buildRatesBody(params: LiteApiSearchParams, coords: { latitude: number; longitude: number }) {
+  return {
+    occupancies: [{ adults: Math.max(1, params.adults), ...(params.children?.length ? { children: params.children } : {}) }],
+    currency: params.currency ?? "USD",
+    guestNationality: params.guestNationality ?? "US",
     checkin: params.checkInDate,
     checkout: params.checkOutDate,
-    adults: params.adults,
-    children: params.children?.join(",") ?? "",
-    currency: params.currency ?? "USD",
-    limit: params.limit ?? 20,
-  });
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    roomMapping: true,
+    maxRatesPerHotel: 1,
+    includeHotelData: true,
+    margin: getLiteApiMarginPct(),
+    limit: params.limit ?? 25,
+  };
+}
 
-  const root = body as Record<string, unknown>;
-  const dataArr: unknown[] = Array.isArray(root.data)
-    ? root.data
-    : Array.isArray(root.hotels)
-      ? root.hotels
-      : Array.isArray(root.results)
-        ? root.results
-        : [];
+/** Full rates search (free). Prices come from retailRate.total — never a price-index endpoint. */
+export async function searchLiteApiHotels(params: LiteApiSearchParams): Promise<LiteApiHotelResult[]> {
+  const coords = await geocodeDestination(params.destination);
+  if (!coords) {
+    throw new Error(`Could not geocode "${params.destination}". Ensure GOOGLE_PLACES_API_KEY is configured.`);
+  }
 
-  const results = dataArr
-    .map(normaliseHotelResult)
-    .filter((h): h is LiteApiHotelResult => h !== null)
-    .slice(0, params.limit ?? 20);
+  const body = await litePost(DATA_BASE, "/hotels/rates", buildRatesBody(params, coords));
+  const results = parseRatesResponse(body).slice(0, params.limit ?? 25);
 
   console.info(`${LOG} searchHotels`, {
     destination: params.destination,
     checkIn: params.checkInDate,
     checkOut: params.checkOutDate,
-    rawCount: dataArr.length,
     parsedCount: results.length,
   });
-
   return results;
 }
 
-export async function prebookLiteApiRate(rateId: string): Promise<LiteApiPrebookResult> {
-  const body = await litePost("/rates/prebook", { rateId, usePaymentSdk: true });
+/** Cheapest-per-hotel (free) for list views where full rate detail isn't needed yet. */
+export async function minRatesLiteApiHotels(params: LiteApiSearchParams): Promise<LiteApiHotelResult[]> {
+  const coords = await geocodeDestination(params.destination);
+  if (!coords) {
+    throw new Error(`Could not geocode "${params.destination}". Ensure GOOGLE_PLACES_API_KEY is configured.`);
+  }
+  const body = await litePost(DATA_BASE, "/hotels/min-rates", buildRatesBody(params, coords));
+  return parseRatesResponse(body).slice(0, params.limit ?? 25);
+}
 
-  const root = body as Record<string, unknown>;
-  const data = (root.data ?? root) as Record<string, unknown>;
+/** Static hotel content (free) — images, description, facilities, location. */
+export async function getLiteApiHotelDetails(hotelId: string): Promise<LiteApiHotelResult | null> {
+  const body = await liteGet(DATA_BASE, "/data/hotel", { hotelId, timeout: 4 });
+  const root = asRecord(body);
+  const content = asRecord(root.data ?? root);
+  return buildHotelResult({ ...content, hotelId: str(content.id || content.hotelId || hotelId) }, []);
+}
+
+// ─── Prebook (booking host) ──────────────────────────────────────────────────
+
+export async function prebookLiteApiRate(offerId: string): Promise<LiteApiPrebookResult> {
+  const environment: LiteApiEnvironment = getLiteApiEnvironment();
+  const body = await litePost(BOOK_BASE, "/rates/prebook", { offerId, usePaymentSdk: true });
+
+  const root = asRecord(body);
+  const data = asRecord(root.data ?? root);
 
   const prebookId = str(data.prebookId || data.id);
   if (!prebookId) throw new Error("LiteAPI prebook returned no prebookId.");
 
-  const total = (data.retailRate as Record<string, unknown> | undefined)?.total;
-  const firstTotal = Array.isArray(total) ? (total[0] as Record<string, unknown>) : null;
+  const total = asRecord(data.retailRate).total;
+  const firstTotal = Array.isArray(total) ? asRecord(total[0]) : {};
 
   return {
     prebookId,
     hotelId: str(data.hotelId),
-    rateId: str(data.rateId || rateId),
-    price: num(firstTotal?.amount ?? data.price ?? data.totalAmount),
-    currency: str(firstTotal?.currency ?? data.currency ?? "USD"),
+    rateId: str(data.rateId || data.offerId || offerId),
+    price: num(firstTotal.amount ?? data.price ?? data.totalAmount),
+    currency: str(firstTotal.currency ?? data.currency ?? "USD"),
     cancellationPolicies: parseCancellationPolicies(data.cancellationPolicies),
-    priceChanged: data.priceChanged === true,
+    priceChanged: data.priceChanged === true || data.priceDifference != null,
     cancellationChanged: data.cancellationChanged === true,
+    transactionId: str(data.transactionId || data.transaction_id) || null,
+    secretKey: str(data.secretKey || data.secret_key) || null,
+    environment,
   };
 }
 
+// ─── Book (booking host) ──────────────────────────────────────────────────────
+
 export type LiteApiBookParams = {
   prebookId: string;
+  /** From prebook — required to settle payment via the SDK transaction. */
+  transactionId: string;
   rateId: string;
   hotelId: string;
   hotelName: string;
@@ -280,29 +395,39 @@ export type LiteApiBookParams = {
   checkOutDate: string;
   guest: LiteApiBookingGuest;
   clientReference?: string;
-  markup?: number;
 };
 
 export async function bookLiteApiRate(params: LiteApiBookParams): Promise<LiteApiBookingRecord> {
+  if (!params.transactionId) {
+    throw new Error("LiteAPI book requires a transactionId from the Payment SDK prebook step.");
+  }
+
   const payload: Record<string, unknown> = {
     prebookId: params.prebookId,
-    guestInfo: {
-      guestFirstName: params.guest.firstName,
-      guestLastName: params.guest.lastName,
-      guestEmail: params.guest.email,
-      ...(params.guest.phone ? { guestPhone: params.guest.phone } : {}),
+    holder: {
+      firstName: params.guest.firstName,
+      lastName: params.guest.lastName,
+      email: params.guest.email,
+      ...(params.guest.phone ? { phone: params.guest.phone } : {}),
     },
-    payment: { method: "STRIPE_TOKEN" },
-    ...(params.markup != null ? { markup: params.markup } : {}),
+    guests: [
+      {
+        occupancyNumber: 1,
+        firstName: params.guest.firstName,
+        lastName: params.guest.lastName,
+        email: params.guest.email,
+      },
+    ],
+    payment: { method: "TRANSACTION_ID", transactionId: params.transactionId },
     ...(params.clientReference ? { clientReference: params.clientReference } : {}),
   };
 
-  const body = await litePost("/rates/book", payload);
-  const root = body as Record<string, unknown>;
-  const data = (root.data ?? root) as Record<string, unknown>;
+  const body = await litePost(BOOK_BASE, "/rates/book", payload);
+  const root = asRecord(body);
+  const data = asRecord(root.data ?? root);
 
   const bookingId = str(data.bookingId || data.id);
-  const status = str(data.status || "CONFIRMED").toUpperCase() as LiteApiBookingRecord["status"];
+  const status = (str(data.status || "CONFIRMED").toUpperCase() as LiteApiBookingRecord["status"]) || "CONFIRMED";
 
   return {
     provider: "liteapi",

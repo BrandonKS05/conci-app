@@ -25,6 +25,9 @@ export type MockHotelResult = {
 
 export type MockHotelAmenityIcon = "pool" | "hot_tub" | "wifi" | "gym" | "breakfast" | "shuttle";
 
+/** Which integration returned a lodging result. Used for routing, booking, and debug logging. */
+export type LodgingProviderName = "liteapi" | "duffel" | "rapidapi";
+
 export type MockHotelBrowseResult = MockHotelResult & {
   imageUrl: string | null;
   distanceLabel: string;
@@ -41,6 +44,12 @@ export type MockHotelBrowseResult = MockHotelResult & {
   urgencyText?: string;
   propertyKind: "hotel" | "home";
   bookingUrl?: string;
+  /** Provider that produced this result (omitted on legacy/mock rows). */
+  provider?: LodgingProviderName;
+  /** Provider-native hotel id — needed to fetch details or prebook. */
+  providerHotelId?: string;
+  /** Provider-native cheapest-rate id — the offer a future checkout page prebooks. */
+  providerRateId?: string;
 };
 
 const HOTEL_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [

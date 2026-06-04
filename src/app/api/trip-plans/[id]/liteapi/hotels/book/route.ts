@@ -44,6 +44,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   let body: {
     prebookId?: string;
+    transactionId?: string;
     rateId?: string;
     hotelId?: string;
     hotelName?: string;
@@ -51,7 +52,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     checkOutDate?: string;
     guest?: LiteApiBookingGuest;
     destinationCity?: string;
-    markup?: number;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -60,6 +60,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const prebookId = typeof body.prebookId === "string" ? body.prebookId.trim() : "";
+  const transactionId = typeof body.transactionId === "string" ? body.transactionId.trim() : "";
   const rateId = typeof body.rateId === "string" ? body.rateId.trim() : "";
   const hotelId = typeof body.hotelId === "string" ? body.hotelId.trim() : "";
   const hotelName = typeof body.hotelName === "string" ? body.hotelName.trim() : "";
@@ -70,6 +71,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!prebookId || !rateId || !hotelId || !hotelName || !checkInDate || !checkOutDate) {
     return NextResponse.json(
       { error: "prebookId, rateId, hotelId, hotelName, checkInDate, and checkOutDate are required.", booking: null } satisfies LiteApiBookApiResponse,
+      { status: 400 }
+    );
+  }
+
+  // Phase 2 settlement: the transactionId is produced by the LiteAPI Payment SDK
+  // (future Conci checkout page) after the guest pays. Until that page exists,
+  // this endpoint stays reachable but a real booking requires the transactionId.
+  if (!transactionId) {
+    return NextResponse.json(
+      {
+        error: "Payment not completed. A transactionId from the LiteAPI Payment SDK is required to confirm this booking.",
+        booking: null,
+      } satisfies LiteApiBookApiResponse,
       { status: 400 }
     );
   }
@@ -101,6 +115,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   try {
     booking = await bookLiteApiRate({
       prebookId,
+      transactionId,
       rateId,
       hotelId,
       hotelName,
@@ -108,7 +123,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       checkOutDate,
       guest,
       clientReference: `conci-${id.slice(0, 8)}`,
-      markup: typeof body.markup === "number" ? body.markup : undefined,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Booking failed.";

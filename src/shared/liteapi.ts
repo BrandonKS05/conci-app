@@ -69,7 +69,19 @@ export type LiteApiPrebookResult = {
   cancellationPolicies: LiteApiCancellationPolicy[];
   priceChanged: boolean;
   cancellationChanged: boolean;
+  /**
+   * Payment-SDK handshake values (present when prebooked with usePaymentSdk).
+   * A future Conci checkout page loads the LiteAPI Payment SDK with `secretKey`,
+   * then confirms the booking with `transactionId` via the TRANSACTION_ID method.
+   */
+  transactionId: string | null;
+  secretKey: string | null;
+  /** Environment the prebook was made against — the checkout SDK must match this. */
+  environment: LiteApiEnvironment;
 };
+
+/** Sandbox keys are prefixed `sand_`/`sandbox_`; everything else is treated as live. */
+export type LiteApiEnvironment = "sandbox" | "live";
 
 export type LiteApiBookingGuest = {
   firstName: string;
