@@ -254,7 +254,20 @@ function buildHotelResult(content: Record<string, unknown>, rates: LiteApiRate[]
     checkOutTime: str(content.checkOutTime || content.checkOut) || null,
     cheapestRate: cheapestOf(rates),
     rates,
+    ...extractVibeMeta(content),
   };
+}
+
+/** aiSearch responses carry tags/persona/style/story/location_type — fold them into vibe metadata. */
+function extractVibeMeta(content: Record<string, unknown>): { vibeTags?: string[]; vibeText?: string } {
+  const tags = Array.isArray(content.tags) ? (content.tags as unknown[]).map(str).filter(Boolean) : [];
+  const locType = str(content.location_type || content.locationType);
+  const allTags = locType ? [...tags, locType] : tags;
+  const textParts = [content.persona, content.style, content.story].map(str).filter(Boolean);
+  const out: { vibeTags?: string[]; vibeText?: string } = {};
+  if (allTags.length) out.vibeTags = allTags;
+  if (textParts.length) out.vibeText = textParts.join(" · ");
+  return out;
 }
 
 function parseRatesResponse(body: unknown): LiteApiHotelResult[] {
@@ -331,6 +344,42 @@ export async function searchLiteApiHotels(params: LiteApiSearchParams): Promise<
     checkOut: params.checkOutDate,
     parsedCount: results.length,
   });
+  return results;
+}
+
+/**
+ * Vibe/natural-language search (free) — same /hotels/rates endpoint with an
+ * `aiSearch` query instead of coordinates. Returns AI-ranked hotels with
+ * persona/style/story/tags. No geocode needed; aiSearch resolves the location.
+ */
+export type LiteApiAiSearchParams = {
+  aiSearch: string;
+  checkInDate: string;
+  checkOutDate: string;
+  adults: number;
+  currency?: string;
+  guestNationality?: string;
+  limit?: number;
+};
+
+export async function aiSearchLiteApiHotels(params: LiteApiAiSearchParams): Promise<LiteApiHotelResult[]> {
+  const body = {
+    aiSearch: params.aiSearch,
+    occupancies: [{ adults: Math.max(1, params.adults) }],
+    currency: params.currency ?? "USD",
+    guestNationality: params.guestNationality ?? "US",
+    checkin: params.checkInDate,
+    checkout: params.checkOutDate,
+    roomMapping: true,
+    maxRatesPerHotel: 1,
+    includeHotelData: true,
+    margin: getLiteApiMarginPct(),
+    limit: params.limit ?? 20,
+  };
+  const resp = await litePost(DATA_BASE, "/hotels/rates", body);
+  // Preserve AI ranking order from the response.
+  const results = parseRatesResponse(resp).slice(0, params.limit ?? 20);
+  console.info(`${LOG} aiSearch`, { q: params.aiSearch.slice(0, 80), parsedCount: results.length });
   return results;
 }
 

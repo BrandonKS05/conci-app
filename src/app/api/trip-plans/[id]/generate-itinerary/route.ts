@@ -330,16 +330,41 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
  * with itinerary generation. Date assignment happens later in {@link buildHotelStayFromCandidate}. */
 async function searchHotelCandidate(
   plan: TripPlan,
-  location: string
+  location: string,
+  seedText?: string | null
 ): Promise<PlacePreview | null> {
-  const { searchPlacesGoogleMaps } = await import("@/backend/serpapi-places");
-  const budgetHint = plan.budget?.tier?.toLowerCase() || "";
-  let query = `hotel ${location}`;
-  if (budgetHint.includes("budget") || budgetHint.includes("cheap")) query = `budget hotel ${location}`;
-  else if (budgetHint.includes("splurge") || budgetHint.includes("luxury")) query = `luxury hotel ${location}`;
+  // Only auto-suggest when we know exact dates — the bookable rates search needs them.
+  const range = plan.hostSetup?.tripRange;
+  const checkIn = range?.startIso?.trim();
+  const checkOut = range?.endIso?.trim();
+  if (!checkIn || !checkOut) return null;
 
-  const results = await searchPlacesGoogleMaps(query, location, { limit: 3 });
-  return results[0] ?? null;
+  const guests = plan.people?.count ?? plan.people?.names?.length ?? 2;
+  const { suggestStayForTrip } = await import("@/backend/lodging/suggest-stay");
+  const pick = await suggestStayForTrip({
+    destination: location,
+    checkIn,
+    checkOut,
+    guests: Math.max(1, guests),
+    rooms: 1,
+    vibe: plan.vibe ?? [],
+    budgetTier: plan.budget?.tier ?? null,
+    budgetPerPerson: plan.budget?.perPerson ?? null,
+    seedText,
+  });
+  if (!pick) return null;
+
+  const h = pick.hotel;
+  console.log(`[generate-itinerary] Suggested stay: ${h.name} (${pick.source}) — ${pick.reason}`);
+  return {
+    name: h.name,
+    rating: h.rating > 0 ? h.rating : undefined,
+    reviewCount: h.reviewCount || undefined,
+    address: h.addressLine || undefined,
+    priceRange: h.nightlyUsd > 0 ? `~$${h.nightlyUsd}/night` : undefined,
+    photoUrl: h.imageUrl,
+    mapsUrl: mapsSearchUrl(`${h.name} ${location}`),
+  };
 }
 
 function buildHotelStayFromCandidate(
@@ -769,7 +794,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   // of adding a serial round-trip after it. Dates are assigned once the itinerary exists.
   const needHotelSearch = !hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []);
   const hotelCandidatePromise: Promise<PlacePreview | null> = needHotelSearch
-    ? searchHotelCandidate(plan, location).catch(() => null)
+    ? searchHotelCandidate(plan, location, seedText).catch(() => null)
     : Promise.resolve(null);
 
   const userPrompt = buildItineraryUserPrompt(plan, seedText);

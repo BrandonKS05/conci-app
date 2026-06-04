@@ -58,6 +58,10 @@ export type LiteApiHotelResult = {
   checkOutTime: string | null;
   cheapestRate: LiteApiRate | null;
   rates: LiteApiRate[];
+  /** aiSearch vibe descriptors (tags + location_type), when present. */
+  vibeTags?: string[];
+  /** aiSearch persona/style/story joined, for semantic intent matching. */
+  vibeText?: string;
 };
 
 export type LiteApiPrebookResult = {

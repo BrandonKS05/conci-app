@@ -1,4 +1,4 @@
-import { searchLiteApiHotels, isLiteApiConfigured } from "@/backend/liteapi";
+import { searchLiteApiHotels, aiSearchLiteApiHotels, isLiteApiConfigured } from "@/backend/liteapi";
 import type { LiteApiHotelResult } from "@/shared/liteapi";
 import type { MockHotelBrowseResult } from "@/shared/mock-hotel-search";
 import {
@@ -43,7 +43,32 @@ function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseR
     provider: "liteapi",
     providerHotelId: h.hotelId,
     providerRateId: rate.rateId,
+    ...(h.address.latitude != null ? { latitude: h.address.latitude } : {}),
+    ...(h.address.longitude != null ? { longitude: h.address.longitude } : {}),
+    ...(h.vibeTags?.length ? { vibeTags: h.vibeTags } : {}),
+    ...(h.vibeText ? { vibeText: h.vibeText } : {}),
   };
+}
+
+/**
+ * Vibe/natural-language search via LiteAPI aiSearch. Returns AI-ranked results
+ * (order preserved) normalized into MockHotelBrowseResult with vibe metadata.
+ */
+export async function liteApiAiSearch(
+  aiQuery: string,
+  input: LodgingSearchInput
+): Promise<MockHotelBrowseResult[]> {
+  const nights = nightsBetween(input.checkIn, input.checkOut);
+  const hotels = await aiSearchLiteApiHotels({
+    aiSearch: aiQuery,
+    checkInDate: input.checkIn,
+    checkOutDate: input.checkOut,
+    adults: input.guests,
+    limit: input.limit ?? 20,
+  });
+  return hotels
+    .map((h) => toBrowseResult(h, nights))
+    .filter((r): r is MockHotelBrowseResult => r !== null);
 }
 
 export const liteApiProvider: LodgingProvider = {

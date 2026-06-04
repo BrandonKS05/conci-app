@@ -50,6 +50,13 @@ export type MockHotelBrowseResult = MockHotelResult & {
   providerHotelId?: string;
   /** Provider-native cheapest-rate id — the offer a future checkout page prebooks. */
   providerRateId?: string;
+  /** Coordinates when the provider supplies them (used for centrality scoring). */
+  latitude?: number;
+  longitude?: number;
+  /** Vibe descriptors from LiteAPI aiSearch (tags like "central location", "boutique hotel"). */
+  vibeTags?: string[];
+  /** Joined persona/style/story text from aiSearch, for semantic intent matching. */
+  vibeText?: string;
 };
 
 const HOTEL_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [
