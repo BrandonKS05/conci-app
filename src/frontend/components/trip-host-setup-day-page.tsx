@@ -25,7 +25,6 @@ import {
 } from "@/shared/trip-plan";
 import { DayItineraryMap, DayStopPin, type DayMapStop } from "@/frontend/components/day-itinerary-map";
 import { DuffelFlightBookingDrawer } from "@/frontend/components/duffel-flight-booking-drawer";
-import { DuffelLodgingBookingDrawer } from "@/frontend/components/duffel-lodging-booking-drawer";
 
 type Props = {
   tripId: string;
@@ -574,15 +573,9 @@ function extractIataCodes(text: string): { origin: string; destination: string }
 }
 
 /** Advance a YYYY-MM-DD date by one day. */
-function nextDay(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 type BookingDrawerState =
   | { type: "flight"; row: ScheduleRow; origin: string; destination: string }
-  | { type: "lodging" }
   | null;
 
 function DayScheduleTimeline({
@@ -590,15 +583,19 @@ function DayScheduleTimeline({
   subtitle,
   tripId,
   dateIso,
-  destination,
+  tripEndIso,
   passengerCount,
+  hotelBookingUrl,
 }: {
   items: ScheduleRow[];
   subtitle?: string;
   tripId?: string;
   dateIso?: string;
-  destination?: string;
+  /** Trip end date — enables round-trip flight search when after this day. */
+  tripEndIso?: string;
   passengerCount?: number;
+  /** Real booking link for the day's stay (LiteAPI/provider URL) when available. */
+  hotelBookingUrl?: string | null;
 }) {
   const sorted = useMemo(() => sortScheduleRows(items), [items]);
   const [drawerState, setDrawerState] = useState<BookingDrawerState>(null);
@@ -628,8 +625,17 @@ function DayScheduleTimeline({
                   ? () => setDrawerState({ type: "flight", row, origin: iataFromRow.origin, destination: iataFromRow.destination })
                   : undefined;
 
-                const onBookLodging = row.sub === "Lodging" && dateIso && tripId && destination
-                  ? () => setDrawerState({ type: "lodging" })
+                // Hotel booking goes through LiteAPI / the stay's real provider link —
+                // not the Duffel flow. Use the booking link when we have one, else send
+                // the host to the LiteAPI-powered lodging tab to search and book.
+                const onBookLodging = row.sub === "Lodging" && tripId
+                  ? () => {
+                      if (hotelBookingUrl) {
+                        window.open(hotelBookingUrl, "_blank", "noopener,noreferrer");
+                      } else {
+                        window.location.href = `/trip/${tripId}/setup/lodging`;
+                      }
+                    }
                   : undefined;
 
                 return (
@@ -673,24 +679,12 @@ function DayScheduleTimeline({
           origin={drawerState.origin}
           destination={drawerState.destination}
           departureDate={dateIso}
+          returnDate={tripEndIso && tripEndIso > dateIso ? tripEndIso : null}
           passengerCount={Math.max(1, passengerCount ?? 1)}
           flightLabel={drawerState.row.label}
         />
       )}
 
-      {/* Lodging booking drawer */}
-      {drawerState?.type === "lodging" && tripId && dateIso && destination && (
-        <DuffelLodgingBookingDrawer
-          open
-          onClose={() => setDrawerState(null)}
-          tripId={tripId}
-          initialDestination={destination}
-          initialCheckIn={dateIso}
-          initialCheckOut={nextDay(dateIso)}
-          initialGuests={Math.max(1, passengerCount ?? 1)}
-          initialRooms={1}
-        />
-      )}
     </>
   );
 }
@@ -1257,8 +1251,9 @@ export function TripHostSetupDayPage({
           subtitle={plan.generatedItinerary ? "AI-built schedule · edit with Copilot" : "Pinned places for this day"}
           tripId={tripId}
           dateIso={dateIso}
-          destination={plan.location ?? undefined}
+          tripEndIso={plan.hostSetup?.tripRange?.endIso ?? undefined}
           passengerCount={plan.people.count ?? 1}
+          hotelBookingUrl={hotel?.bookingUrl ?? null}
         />
 
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">

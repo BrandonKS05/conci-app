@@ -35,7 +35,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const origin = (url.searchParams.get("origin") ?? "").trim().toUpperCase();
   const destination = (url.searchParams.get("destination") ?? "").trim().toUpperCase();
   const departureDate = (url.searchParams.get("date") ?? "").trim();
+  const returnDateRaw = (url.searchParams.get("returnDate") ?? "").trim();
   const passengers = Math.max(1, Number(url.searchParams.get("passengers")) || 1);
+  const cabinRaw = (url.searchParams.get("cabin") ?? "").trim();
+  const cabinClass =
+    cabinRaw === "premium_economy" || cabinRaw === "business" || cabinRaw === "first" ? cabinRaw : "economy";
 
   if (!IATA.test(origin) || !IATA.test(destination)) {
     return NextResponse.json(
@@ -51,8 +55,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     );
   }
 
+  const returnDate = ISO_DAY.test(returnDateRaw) && returnDateRaw > departureDate ? returnDateRaw : undefined;
+
   try {
-    const result = await searchDuffelFlights({ origin, destination, departureDate, passengers });
+    const result = await searchDuffelFlights({ origin, destination, departureDate, returnDate, passengers, cabinClass });
     return NextResponse.json(result satisfies DuffelFlightsSearchApiResponse);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Flight search failed.";

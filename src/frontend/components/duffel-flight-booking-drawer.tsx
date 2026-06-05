@@ -1,11 +1,109 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DuffelOffer,
   DuffelFlightPassenger,
   DuffelFlightBookingRecord,
 } from "@/shared/duffel-flights";
+
+type AirportSuggestion = { iata: string; name: string; city: string; country: string };
+
+/** Type city/airport/code → pick an airport (resolves to IATA). Duffel-backed, no SerpAPI. */
+function AirportAutocomplete({
+  tripId,
+  label,
+  valueIata,
+  onChange,
+}: {
+  tripId: string;
+  label: string;
+  valueIata: string;
+  onChange: (iata: string) => void;
+}) {
+  const [query, setQuery] = useState(valueIata);
+  const [suggestions, setSuggestions] = useState<AirportSuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(valueIata);
+  }, [valueIata]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/airport-search?q=${encodeURIComponent(q)}`, {
+          credentials: "include",
+        });
+        const j = (await r.json()) as { airports?: AirportSuggestion[] };
+        if (!cancelled) setSuggestions(j.airports ?? []);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, tripId]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  return (
+    <div ref={boxRef} className="relative flex flex-col gap-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">{label}</span>
+      <input
+        value={query}
+        onChange={(e) => {
+          const v = e.target.value;
+          setQuery(v);
+          setOpen(true);
+          const code = v.trim().toUpperCase();
+          if (/^[A-Z]{3}$/.test(code)) onChange(code);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="City, airport, or code"
+        className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+      />
+      {open && suggestions.length > 0 ? (
+        <ul className="absolute top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-[color:var(--hairline-strong)] bg-white shadow-lg dark:border-white/15 dark:bg-dm-page">
+          {suggestions.map((s) => (
+            <li key={s.iata}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(s.iata);
+                  setQuery(s.iata);
+                  setOpen(false);
+                }}
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/[0.06]"
+              >
+                <span className="font-semibold text-[color:var(--on-surface)] dark:text-white">{s.iata}</span>
+                <span className="truncate text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+                  {[s.city, s.name].filter(Boolean).join(" · ")}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 // ─── Style tokens (matches lodging drawer) ───────────────────────────────────
 
@@ -39,6 +137,7 @@ export type DuffelFlightDrawerProps = {
   origin: string; // IATA e.g. "MIA"
   destination: string; // IATA e.g. "JFK"
   departureDate: string; // YYYY-MM-DD
+  returnDate?: string | null; // YYYY-MM-DD — enables round-trip when present
   passengerCount: number;
   flightLabel?: string; // e.g. "Flight: Miami → New York City"
   onBookingComplete?: (booking: DuffelFlightBookingRecord) => void;
@@ -210,6 +309,7 @@ export function DuffelFlightBookingDrawer({
   origin,
   destination,
   departureDate,
+  returnDate,
   passengerCount,
   flightLabel,
   onBookingComplete,
@@ -223,44 +323,62 @@ export function DuffelFlightBookingDrawer({
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [paxErrors, setPaxErrors] = useState<PassengerFieldErrors[]>([]);
   const [booking, setBooking] = useState<DuffelFlightBookingRecord | null>(null);
+  // Editable search fields (seeded from props; user can change and re-search).
+  const [searchOrigin, setSearchOrigin] = useState(origin);
+  const [searchDestination, setSearchDestination] = useState(destination);
+  const [searchDate, setSearchDate] = useState(departureDate);
+  const [searchReturnDate, setSearchReturnDate] = useState(returnDate ?? "");
+  const [searchPax, setSearchPax] = useState(Math.max(1, passengerCount));
+  const [searchCabin, setSearchCabin] = useState<"economy" | "premium_economy" | "business" | "first">("economy");
 
-  const fetchOffers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setOffers(null);
-    try {
-      const params = new URLSearchParams({
-        origin,
-        destination,
-        date: departureDate,
-        passengers: String(Math.max(1, passengerCount)),
-      });
-      const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/search?${params.toString()}`, {
-        credentials: "include",
-      });
-      const j = (await r.json()) as { offers?: DuffelOffer[]; isMock?: boolean; error?: string };
-      if (!r.ok || !j.offers) {
-        setError(j.error ?? "Failed to load flights.");
-        return;
+  const runSearch = useCallback(
+    async (p: { origin: string; destination: string; date: string; returnDate?: string; pax: number; cabin: string }) => {
+      setLoading(true);
+      setError(null);
+      setOffers(null);
+      try {
+        const params = new URLSearchParams({
+          origin: p.origin.trim().toUpperCase(),
+          destination: p.destination.trim().toUpperCase(),
+          date: p.date,
+          passengers: String(Math.max(1, p.pax)),
+          cabin: p.cabin,
+        });
+        if (p.returnDate && p.returnDate > p.date) params.set("returnDate", p.returnDate);
+        const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/search?${params.toString()}`, {
+          credentials: "include",
+        });
+        const j = (await r.json()) as { offers?: DuffelOffer[]; isMock?: boolean; error?: string };
+        if (!r.ok || !j.offers) {
+          setError(j.error ?? "Failed to load flights.");
+          return;
+        }
+        setOffers(j.offers);
+        setIsMock(j.isMock ?? false);
+      } catch {
+        setError("Network error. Please try again.");
+      } finally {
+        setLoading(false);
       }
-      setOffers(j.offers);
-      setIsMock(j.isMock ?? false);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [tripId, origin, destination, departureDate, passengerCount]);
+    },
+    [tripId]
+  );
 
-  // Fetch when drawer opens
+  // Fetch when drawer opens — reset editable fields to the incoming flight.
   const handleOpen = useCallback(() => {
     setStep("results");
     setSelectedOffer(null);
     setBooking(null);
     setError(null);
     setPaxErrors([]);
-    void fetchOffers();
-  }, [fetchOffers]);
+    setSearchOrigin(origin);
+    setSearchDestination(destination);
+    setSearchDate(departureDate);
+    setSearchReturnDate(returnDate ?? "");
+    setSearchPax(Math.max(1, passengerCount));
+    setSearchCabin("economy");
+    void runSearch({ origin, destination, date: departureDate, returnDate: returnDate ?? undefined, pax: passengerCount, cabin: "economy" });
+  }, [runSearch, origin, destination, departureDate, returnDate, passengerCount]);
 
   const handleSelectOffer = useCallback((offer: DuffelOffer) => {
     setSelectedOffer(offer);
@@ -381,6 +499,65 @@ export function DuffelFlightBookingDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5">
 
+          {/* Editable search — origin/destination/date/travelers/cabin */}
+          {step === "results" && (
+            <div className="mb-4 grid grid-cols-2 gap-3 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-4 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-3">
+              <AirportAutocomplete tripId={tripId} label="From" valueIata={searchOrigin} onChange={setSearchOrigin} />
+              <AirportAutocomplete tripId={tripId} label="To" valueIata={searchDestination} onChange={setSearchDestination} />
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Depart
+                <input
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Return <span className="normal-case text-[color:var(--on-surface-muted)]">(optional)</span>
+                <input
+                  type="date"
+                  value={searchReturnDate}
+                  min={searchDate || undefined}
+                  onChange={(e) => setSearchReturnDate(e.target.value)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Travelers
+                <input
+                  type="number"
+                  min={1}
+                  max={9}
+                  value={searchPax}
+                  onChange={(e) => setSearchPax(Math.max(1, Math.min(9, Number(e.target.value) || 1)))}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Cabin
+                <select
+                  value={searchCabin}
+                  onChange={(e) => setSearchCabin(e.target.value as typeof searchCabin)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                >
+                  <option value="economy">Economy</option>
+                  <option value="premium_economy">Premium economy</option>
+                  <option value="business">Business</option>
+                  <option value="first">First</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void runSearch({ origin: searchOrigin, destination: searchDestination, date: searchDate, returnDate: searchReturnDate || undefined, pax: searchPax, cabin: searchCabin })}
+                className="self-end rounded-full bg-[#1c1c17] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2a2a26] disabled:opacity-50 dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
+              >
+                Search
+              </button>
+            </div>
+          )}
+
           {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -398,7 +575,7 @@ export function DuffelFlightBookingDrawer({
             <div className="rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900/30 dark:bg-red-950/20">
               <p className="text-sm font-medium text-red-800 dark:text-red-300">{error}</p>
               {step === "results" && (
-                <button onClick={() => void fetchOffers()} className={`mt-3 ${btnSecondary}`}>
+                <button onClick={() => void runSearch({ origin: searchOrigin, destination: searchDestination, date: searchDate, returnDate: searchReturnDate || undefined, pax: searchPax, cabin: searchCabin })} className={`mt-3 ${btnSecondary}`}>
                   Try again
                 </button>
               )}

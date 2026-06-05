@@ -31,6 +31,8 @@ export type FlightSearchParams = {
   origin: string; // IATA code
   destination: string;
   departureDate: string; // YYYY-MM-DD
+  /** When set, searches a round trip (return leg destination→origin). */
+  returnDate?: string; // YYYY-MM-DD
   passengers: number;
   cabinClass?: "economy" | "premium_economy" | "business" | "first";
 };
@@ -43,16 +45,16 @@ export async function searchDuffelFlights(
   }
 
   const count = Math.max(1, Math.min(9, params.passengers));
+  const slices = [
+    { origin: params.origin, destination: params.destination, departure_date: params.departureDate },
+  ];
+  if (params.returnDate) {
+    slices.push({ origin: params.destination, destination: params.origin, departure_date: params.returnDate });
+  }
   const resp = await duffelPost<DuffelOfferRequestResponse>("/air/offer_requests", {
     data: {
       return_offers: true,
-      slices: [
-        {
-          origin: params.origin,
-          destination: params.destination,
-          departure_date: params.departureDate,
-        },
-      ],
+      slices,
       passengers: Array.from({ length: count }, () => ({ type: "adult" })),
       cabin_class: params.cabinClass ?? "economy",
     },

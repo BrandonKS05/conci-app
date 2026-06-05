@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { fetchLiveRestaurantsForPlan } from "@/backend/trip-live-restaurants";
 import { searchPlacesGoogleMaps } from "@/backend/serpapi-places";
+import { suggestStayForTrip } from "@/backend/lodging/suggest-stay";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
@@ -191,7 +192,7 @@ Return ONLY valid JSON (no markdown) with this exact shape:
     - For "Italian restaurant on the 16th": query = "Italian restaurant [destination]", dateIso = "2026-07-16"
   - **constraints** (optional): extra context like "for 7 people", "under $100/night", "near downtown", "all-inclusive"
 
-**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** and they (or you) have nailed down **scope**. The server runs Google Maps (SerpAPI) search and saves the top result.
+**autoBookHotel** (optional): Use when the host asks to **pick or book a hotel / place to stay** and they (or you) have nailed down **scope**. The server runs the LiteAPI lodging search (vibe/budget aware) and saves the best match. Put the host's lodging intent (style, area, price) in **searchHint**.
   - You MUST set one of:
     - **fullTrip**: true — stay covers the entire **Host trip range** (first night through last night).
     - **stayStartIso** AND **stayEndIso** (YYYY-MM-DD, within **Trip calendar days**, inclusive) — specific check-in through check-out range.
@@ -292,23 +293,41 @@ async function applyAutoBookHotel(
     };
   }
 
-  const hintRaw = (req.searchHint ?? "boutique hotel").trim() || "boutique hotel";
-  const hint = hintRaw.slice(0, 100);
+  const hint = (req.searchHint ?? "").trim().slice(0, 120);
   const loc = plan.location.trim();
-  const cityHead = loc.split(",")[0]?.trim() || loc;
-  const q = `${cityHead} ${hint}`;
+  const checkIn = req.fullTrip ? tripStart : a!;
+  const checkOut = req.fullTrip ? tripEnd : b!;
 
-  const picks = await searchPlacesGoogleMaps(q, loc, { limit: 5 });
-  const top = picks[0];
-  if (!top) {
+  // Lodging intent → LiteAPI vibe-aware lodging flow (never SerpAPI Google Maps).
+  const pick = await suggestStayForTrip({
+    destination: loc,
+    checkIn,
+    checkOut,
+    guests: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+    rooms: 1,
+    vibe: plan.vibe ?? [],
+    budgetTier: plan.budget?.tier ?? null,
+    budgetPerPerson: plan.budget?.perPerson ?? null,
+    seedText: hint || (plan.vibe ?? []).join(" "),
+  });
+  if (!pick) {
     return {
       plan,
       placeName: null,
-      error: "No hotels matched that search. Try another style or check SerpAPI configuration.",
+      error: "No lodging matched that search. Try another style, dates, or budget.",
     };
   }
-
-  const place: PlaceSpotlight = { ...top, spotlightCategory: "hotel" };
+  const h = pick.hotel;
+  const place: PlaceSpotlight = {
+    name: h.name,
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${h.name} ${loc}`)}`,
+    spotlightCategory: "hotel",
+    ...(h.rating > 0 ? { rating: h.rating } : {}),
+    ...(h.reviewCount ? { reviewCount: h.reviewCount } : {}),
+    ...(h.addressLine ? { address: h.addressLine } : {}),
+    ...(h.imageUrl ? { photoUrl: h.imageUrl } : {}),
+    ...(h.nightlyUsd > 0 ? { priceRange: `~$${h.nightlyUsd}/night` } : {}),
+  };
 
   let hotelStays;
   let hotel: PlaceSpotlight;
@@ -337,7 +356,7 @@ async function applyAutoBookHotel(
     ...(plan as unknown as Record<string, unknown>),
     hostSetup: mergedSetup,
   };
-  return { plan: normalizePlan(planRecord), placeName: top.name, error: null };
+  return { plan: normalizePlan(planRecord), placeName: h.name, error: null };
 }
 
 async function applyAutoPinRestaurant(
@@ -516,29 +535,54 @@ async function applyAutoSearch(
   const location = plan.location?.trim();
   if (!location) return { plan, resultName: null, error: "Set a destination first." };
 
+  // Lodging intent → LiteAPI vibe-aware lodging flow (never SerpAPI Google Maps).
+  if (search.type === "hotel") {
+    const tr = plan.hostSetup?.tripRange;
+    if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };
+    const startIso = search.stayStartIso || tr.startIso;
+    const endIso = search.stayEndIso || tr.endIso;
+    const pick = await suggestStayForTrip({
+      destination: location,
+      checkIn: startIso,
+      checkOut: endIso,
+      guests: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+      rooms: 1,
+      vibe: plan.vibe ?? [],
+      budgetTier: plan.budget?.tier ?? null,
+      budgetPerPerson: plan.budget?.perPerson ?? null,
+      seedText: search.query,
+    });
+    if (!pick) return { plan, resultName: null, error: `No lodging matched "${search.query}". Try different details.` };
+    const h = pick.hotel;
+    const place: PlaceSpotlight = {
+      name: h.name,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${h.name} ${location}`)}`,
+      spotlightCategory: "hotel",
+      ...(h.rating > 0 ? { rating: h.rating } : {}),
+      ...(h.reviewCount ? { reviewCount: h.reviewCount } : {}),
+      ...(h.addressLine ? { address: h.addressLine } : {}),
+      ...(h.imageUrl ? { photoUrl: h.imageUrl } : {}),
+      ...(h.nightlyUsd > 0 ? { priceRange: `~$${h.nightlyUsd}/night` } : {}),
+    };
+    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tr.startIso, tr.endIso, startIso, endIso, place);
+    const hotelStays = tagLodgingStayAtRange(r.hotelStays, startIso, endIso, place.mapsUrl, {
+      userSelected: false,
+      recommendedByConci: true,
+    });
+    const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { hotelStays, hotel: r.hotel });
+    return {
+      plan: normalizePlan({ ...(plan as unknown as Record<string, unknown>), hostSetup: mergedSetup }),
+      resultName: h.name,
+      error: null,
+    };
+  }
+
+  // Restaurants / activities / other enrichment → SerpAPI Places.
   const results = await searchPlacesGoogleMaps(search.query, location, { limit: 3 });
   const top = results[0];
   if (!top) return { plan, resultName: null, error: `No results found for "${search.query}". Try different keywords.` };
 
   switch (search.type) {
-    case "hotel": {
-      const tr = plan.hostSetup?.tripRange;
-      if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };
-      const startIso = search.stayStartIso || tr.startIso;
-      const endIso = search.stayEndIso || tr.endIso;
-      const place: PlaceSpotlight = { ...top, spotlightCategory: "hotel" };
-      const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tr.startIso, tr.endIso, startIso, endIso, place);
-      const hotelStays = tagLodgingStayAtRange(r.hotelStays, startIso, endIso, place.mapsUrl, {
-        userSelected: false,
-        recommendedByConci: true,
-      });
-      const mergedSetup = mergeHostSetupPatch(plan.hostSetup, { hotelStays, hotel: r.hotel });
-      return {
-        plan: normalizePlan({ ...(plan as unknown as Record<string, unknown>), hostSetup: mergedSetup }),
-        resultName: top.name,
-        error: null,
-      };
-    }
     case "restaurant": {
       const tr = plan.hostSetup?.tripRange;
       if (!tr?.startIso || !tr?.endIso) return { plan, resultName: null, error: "Set trip dates first." };

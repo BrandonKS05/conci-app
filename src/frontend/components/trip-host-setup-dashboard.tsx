@@ -55,7 +55,7 @@ import {
   type HostCopilotUiHint,
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
-import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-panel";
+import { HostDuffelFlightPanel } from "@/frontend/components/host-duffel-flight-panel";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -321,8 +321,16 @@ function TripLodgingPanel({
                         rel="noopener noreferrer"
                         className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
                       >
-                        Booking
+                        Book stay
                       </a>
+                    ) : canEditAsHost ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenLodgingModal()}
+                        className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
+                      >
+                        Book stay
+                      </button>
                     ) : null}
                     {stay.place.mapsUrl?.startsWith("http") ? (
                       <a
@@ -2411,8 +2419,8 @@ export function TripHostSetupDashboard({
           {flightCurationErr ? (
               <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
             ) : null}
-            {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
-              <HostFlightSearchPanel tripId={tripId} enabled />
+            {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() && plan.departureCity?.trim() ? (
+              <HostDuffelFlightPanel tripId={tripId} plan={plan} />
           ) : null}
           {showFlightTransport ? (
               <div className="space-y-4 border-t border-[color:var(--hairline)] pt-6 dark:border-white/10">
