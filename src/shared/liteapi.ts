@@ -53,6 +53,7 @@ export type LiteApiHotelResult = {
   address: LiteApiHotelAddress;
   photos: LiteApiHotelPhoto[];
   description: string | null;
+  propertyType: string | null;
   amenities: string[];
   checkInTime: string | null;
   checkOutTime: string | null;

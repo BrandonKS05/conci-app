@@ -1,0 +1,141 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e93] [cursor=pointer]:
+    - img [ref=e94]
+  - alert [ref=e97]: Conci · AI for group trips
+  - main [ref=e249]:
+    - generic [ref=e251]:
+      - link "Conci home" [ref=e252] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e253]: Conci
+      - navigation "Main" [ref=e254]:
+        - link "Create a Trip" [ref=e255] [cursor=pointer]:
+          - /url: /trip-parser
+        - link "My Trips" [ref=e256] [cursor=pointer]:
+          - /url: /my-trips
+        - link "Joined Trips" [ref=e257] [cursor=pointer]:
+          - /url: /joined-trips
+        - link "Pricing" [ref=e258] [cursor=pointer]:
+          - /url: /pricing
+        - link "Profile" [ref=e259] [cursor=pointer]:
+          - /url: /profile/me
+      - button "D" [ref=e262] [cursor=pointer]:
+        - generic [ref=e263]: D
+    - generic [ref=e267]:
+      - complementary [ref=e268]:
+        - generic [ref=e269]:
+          - generic [ref=e270]:
+            - paragraph [ref=e271]: Trip
+            - heading "Lisbon Trip" [level=1] [ref=e272]
+            - paragraph [ref=e273]: Mar 14, 2026 — Mar 17, 2026
+            - paragraph [ref=e274]: 4 travelers
+          - generic [ref=e275]:
+            - generic [ref=e276]:
+              - generic [ref=e277]:
+                - paragraph [ref=e278]: Invite friends
+                - paragraph [ref=e279]: W4Y-8YN
+              - button "Copy" [ref=e280] [cursor=pointer]
+            - paragraph [ref=e281]: conci.travel/join/W4Y8YN to vote and add preferences.
+            - generic [ref=e282]:
+              - generic [ref=e284]: +
+              - paragraph [ref=e285]: 0 of 0 joined
+          - generic [ref=e286]:
+            - paragraph [ref=e287]: Sections
+            - navigation "Trip workspace sections" [ref=e288]:
+              - button "Overview" [ref=e289] [cursor=pointer]:
+                - img [ref=e291]
+                - text: Overview
+              - button "Transportation" [ref=e296] [cursor=pointer]:
+                - img [ref=e298]
+                - text: Transportation
+              - button "Budget & Fund" [ref=e300] [cursor=pointer]:
+                - img [ref=e302]
+                - text: Budget & Fund
+              - button "Collaborate" [ref=e305] [cursor=pointer]:
+                - img [ref=e307]
+                - text: Collaborate
+              - button "Lodging" [ref=e313] [cursor=pointer]:
+                - img [ref=e315]
+                - text: Lodging
+              - link "Trip Overview" [ref=e318] [cursor=pointer]:
+                - /url: /trip/d2d2ee93-5cab-4f84-8820-2307db71a207/itinerary
+                - img [ref=e320]
+                - text: Trip Overview
+          - generic [ref=e323]:
+            - paragraph [ref=e324]: Shared
+            - generic [ref=e325]:
+              - link "Packing list" [ref=e326] [cursor=pointer]:
+                - /url: /trip/d2d2ee93-5cab-4f84-8820-2307db71a207/setup/packing
+              - generic [ref=e327]: · 12 items, 8 checked
+      - main [ref=e328]:
+        - generic [ref=e526]:
+          - generic [ref=e527]:
+            - paragraph [ref=e528]: Transportation
+            - heading "Flights & getting there" [level=2] [ref=e529]
+            - paragraph [ref=e530]: Search routes, save the ones you like, and review driving alternates.
+          - generic [ref=e531]:
+            - generic [ref=e532]:
+              - generic [ref=e533]:
+                - paragraph [ref=e534]: Flights
+                - paragraph [ref=e535]: Miami → Lisbon
+              - button "Search & book flights" [ref=e536] [cursor=pointer]
+            - dialog "Book flight" [ref=e545]:
+              - generic [ref=e546]:
+                - generic [ref=e547]:
+                  - generic [ref=e548]:
+                    - paragraph [ref=e549]: Book flight
+                    - generic [ref=e550]: Test mode
+                  - heading "Miami → Lisbon" [level=2] [ref=e551]
+                  - paragraph [ref=e552]: Saturday, March 14, 2026 · 1 passenger
+                - button "Close" [ref=e553] [cursor=pointer]:
+                  - img [ref=e554]
+              - generic [ref=e677]:
+                - generic [ref=e678]:
+                  - paragraph [ref=e679]: Selected flight
+                  - paragraph [ref=e680]: American Airlines AA100
+                  - paragraph [ref=e681]: Sat, Mar 14, 12:00 PM → 2:00 PM
+                  - paragraph [ref=e682]: $200.00
+                - generic [ref=e684]:
+                  - generic [ref=e685]:
+                    - generic [ref=e686]:
+                      - text: First name
+                      - textbox "John" [ref=e687]
+                    - generic [ref=e688]:
+                      - text: Last name
+                      - textbox "Doe" [ref=e689]
+                  - generic [ref=e690]:
+                    - text: Date of birth (must be 18+)
+                    - textbox [ref=e691]
+                  - generic [ref=e692]:
+                    - text: Email
+                    - textbox "john@example.com" [ref=e693]
+                  - generic [ref=e694]:
+                    - text: Phone
+                    - textbox "+14155550123" [ref=e695]
+                    - paragraph [ref=e696]: Include country code — e.g. +1 for US
+                  - generic [ref=e697]:
+                    - generic [ref=e698]:
+                      - text: Title
+                      - combobox [ref=e699]:
+                        - option "Mr" [selected]
+                        - option "Ms"
+                        - option "Mrs"
+                        - option "Dr"
+                    - generic [ref=e700]:
+                      - text: Gender
+                      - combobox [ref=e701]:
+                        - option "Male" [selected]
+                        - option "Female"
+                - generic [ref=e702]:
+                  - button "Back" [ref=e703] [cursor=pointer]
+                  - button "Review booking" [ref=e704] [cursor=pointer]
+          - generic [ref=e537]:
+            - paragraph [ref=e538]:
+              - text: From
+              - strong [ref=e539]: Miami
+              - text: to
+              - strong [ref=e540]: Lisbon
+            - paragraph [ref=e541]: "SerpApi 401: { \"error\": \"Invalid API key. Your API key should be here: https://serpapi.com/manage-api-key\" }"
+            - paragraph [ref=e542]:
+              - text: Driving instead?
+              - link "Open directions in Google Maps" [ref=e543] [cursor=pointer]:
+                - /url: https://www.google.com/maps/dir/?api=1&origin=Miami&destination=Lisbon

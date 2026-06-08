@@ -147,8 +147,8 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
       const num = Number.parseFloat(rawPrice.replace(/[^0-9.]/g, ""));
       const per =
         !Number.isNaN(num) && num > 0
-          ? `~$${Math.round(num / headcount)}/person (est. · party of ${headcount})`
-          : `${rawPrice} · total shown on Google Flights`;
+          ? `Inspiration estimate ~$${Math.round(num / headcount)}/person (party of ${headcount})`
+          : `${rawPrice} · shown on Google Flights`;
       const dur = formatDurationMinutes(
         typeof bf.duration === "number" ? bf.duration : Number.parseInt(String(bf.duration ?? ""), 10)
       );
@@ -164,6 +164,7 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
         departureTime: firstLegDeparture(bf as { flights?: { departure_airport?: { time?: string } }[] }),
         duration: dur,
         bookOnGoogleFlightsUrl: book,
+        bookingStatus: "inspiration",
       };
     });
 

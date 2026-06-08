@@ -1,14 +1,13 @@
 import type { LodgingProvider, LodgingSearchInput } from "@/backend/lodging/provider";
 import { liteApiProvider } from "@/backend/lodging/liteapi-provider";
 import { duffelProvider } from "@/backend/lodging/duffel-provider";
-import { rapidApiProvider } from "@/backend/lodging/rapidapi-provider";
 import { cacheKey, readCache, writeCache, type LodgingSearchResult } from "@/backend/lodging/search-cache";
 
 const LOG = "[lodging-service]";
 const PROVIDER_TIMEOUT_MS = 12_000;
 
-/** Priority order: LiteAPI primary → Duffel fallback → RapidAPI legacy fallback. */
-const PROVIDERS: LodgingProvider[] = [liteApiProvider, duffelProvider, rapidApiProvider];
+/** Priority order: LiteAPI primary → Duffel fallback. RapidAPI remains legacy-only, never auto-checkout. */
+const PROVIDERS: LodgingProvider[] = [liteApiProvider, duffelProvider];
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([

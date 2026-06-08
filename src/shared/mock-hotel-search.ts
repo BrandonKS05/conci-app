@@ -1,5 +1,5 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import type { HostLodgingType } from "@/shared/trip-plan";
+import type { HostLodgingStayMeta, HostLodgingType } from "@/shared/trip-plan";
 
 export type MockHotelSearchInput = {
   destination: string;
@@ -339,14 +339,46 @@ export function mockHotelResultToPlace(
   destinationCity: string
 ): PlaceSpotlight {
   const q = `${r.name} ${r.addressLine}`;
+  const photoUrl = (r as Partial<MockHotelBrowseResult>).imageUrl;
   return {
     name: r.name,
     mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
     rating: r.rating,
     address: r.addressLine,
     priceRange: r.priceEstimatePerNight,
-    photoUrl: null,
+    photoUrl: typeof photoUrl === "string" && photoUrl.startsWith("http") ? photoUrl : null,
     spotlightCategory: "hotel",
     sourceQuery: destinationCity.trim() || r.neighborhood,
+  };
+}
+
+export function hotelBrowseResultToLodgingMeta(
+  hotel: MockHotelBrowseResult,
+  opts?: { destinationCity?: string; guestCount?: number; roomCount?: number; searchSource?: string; userSelected?: boolean }
+): HostLodgingStayMeta {
+  const provider = hotel.provider;
+  const bookingType =
+    provider === "liteapi" && hotel.providerHotelId && hotel.providerRateId
+      ? "in_app"
+      : hotel.bookingUrl
+        ? "deep_link"
+        : undefined;
+
+  return {
+    ...(opts?.destinationCity?.trim() ? { destinationCity: opts.destinationCity.trim() } : {}),
+    lodgingType: hotel.lodgingType,
+    bookingUrl: hotel.bookingUrl ?? undefined,
+    ...(opts?.guestCount !== undefined ? { guestCount: opts.guestCount } : {}),
+    ...(opts?.roomCount !== undefined ? { roomCount: opts.roomCount } : {}),
+    ...(provider ? { provider } : {}),
+    ...(hotel.providerHotelId ? { providerHotelId: hotel.providerHotelId } : {}),
+    ...(hotel.providerRateId ? { providerRateId: hotel.providerRateId } : {}),
+    providerResultId: hotel.id,
+    ...(opts?.searchSource ? { providerSearchSource: opts.searchSource } : {}),
+    nightlyUsd: hotel.nightlyUsd,
+    totalUsd: hotel.totalUsd,
+    priceCurrency: "USD",
+    ...(bookingType ? { bookingType } : {}),
+    ...(opts?.userSelected === true ? { userSelected: true } : {}),
   };
 }

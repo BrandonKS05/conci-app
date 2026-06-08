@@ -95,5 +95,14 @@ export type DuffelFlightsSearchApiResponse = {
 
 export type DuffelFlightsBookApiResponse = {
   booking: DuffelFlightBookingRecord | null;
+  isMock?: boolean;
+  requiresAcceptance?: boolean;
+  priceChange?: {
+    previousAmount: string;
+    previousCurrency: string;
+    confirmedAmount: string;
+    confirmedCurrency: string;
+    confirmedOffer: DuffelOffer;
+  };
   error?: string;
 };

@@ -1,17 +1,12 @@
-import { duffelPost, duffelGet, duffelDelete, isDuffelConfigured } from "@/backend/duffel/client";
+import { duffelPost, isDuffelConfigured } from "@/backend/duffel/client";
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
+import { fetchWithRetry } from "@/backend/http-retry";
 import type {
   DuffelStayResult,
   DuffelRate,
   DuffelAccommodation,
-  DuffelBookingGuestDetails,
-  DuffelBookingRecord,
 } from "@/shared/duffel-stays";
-import {
-  mockSearchDuffelStays,
-  mockQuoteDuffelRate,
-  mockCreateReservation,
-} from "@/backend/duffel/stays-mock";
+import { mockSearchDuffelStays } from "@/backend/duffel/stays-mock";
 
 export { isDuffelConfigured };
 
@@ -20,7 +15,7 @@ async function geocodeDestination(
   googleApiKey: string
 ): Promise<{ latitude: number; longitude: number } | null> {
   try {
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    const res = await fetchWithRetry("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -29,7 +24,7 @@ async function geocodeDestination(
       },
       body: JSON.stringify({ textQuery: city }),
       cache: "no-store",
-    });
+    }, { timeoutMs: 8_000, retryUnsafeMethods: true });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       places?: Array<{ location?: { latitude: number; longitude: number } }>;
@@ -52,29 +47,6 @@ type DuffelSearchResponse = {
       cheapest_rate_currency: string;
       rates: DuffelRate[];
     }>;
-  };
-};
-
-type DuffelQuoteResponse = {
-  data: {
-    id: string;
-    rate: DuffelRate;
-    accommodation: DuffelAccommodation;
-  };
-};
-
-type DuffelReservationResponse = {
-  data: {
-    id: string;
-    booking_reference: string;
-    status: string;
-    accommodation: DuffelAccommodation;
-    rate: DuffelRate;
-    total_amount: string;
-    total_currency: string;
-    check_in_date: string;
-    check_out_date: string;
-    cancellation: null | { fully_refundable_before: string | null };
   };
 };
 
@@ -136,113 +108,4 @@ export async function searchDuffelStays(
     searchId: resp.data.id,
     isMock: false,
   };
-}
-
-export async function quoteDuffelStayRate(rateId: string): Promise<{
-  rate: DuffelRate;
-  accommodation: DuffelAccommodation;
-  quoteId: string;
-  isMock: boolean;
-}> {
-  if (!isDuffelConfigured()) {
-    const mock = mockQuoteDuffelRate(rateId);
-    return { ...mock, quoteId: `mock-quote-${Date.now()}`, isMock: true };
-  }
-
-  const resp = await duffelPost<DuffelQuoteResponse>("/stays/quotes", {
-    data: { rate_id: rateId },
-  });
-
-  return {
-    rate: resp.data.rate,
-    accommodation: resp.data.accommodation,
-    quoteId: resp.data.id,
-    isMock: false,
-  };
-}
-
-function reservationToRecord(
-  d: DuffelReservationResponse["data"],
-  rateId: string,
-  isMock = false
-): DuffelBookingRecord {
-  return {
-    provider: "duffel",
-    reservationId: d.id,
-    bookingReference: d.booking_reference,
-    status:
-      d.status === "confirmed" || d.status === "pending" || d.status === "cancelled"
-        ? d.status
-        : "pending",
-    rateId,
-    totalAmount: d.total_amount,
-    currency: d.total_currency,
-    checkInDate: d.check_in_date,
-    checkOutDate: d.check_out_date,
-    bookedAt: new Date().toISOString(),
-    cancellationPolicy:
-      d.rate?.cancellation_timeline?.length
-        ? {
-            fully_refundable_before: d.cancellation?.fully_refundable_before ?? null,
-            timeline: d.rate.cancellation_timeline,
-          }
-        : null,
-    accommodationName: d.accommodation.name,
-    accommodationId: d.accommodation.id,
-    ...(isMock ? { isMock: true } : {}),
-  };
-}
-
-export async function createDuffelStayReservation(params: {
-  rateId: string;
-  guests: DuffelBookingGuestDetails[];
-  checkInDate: string;
-  checkOutDate: string;
-  accommodationName: string;
-  specialRequests?: string | null;
-}): Promise<{ booking: DuffelBookingRecord; isMock: boolean }> {
-  if (!isDuffelConfigured()) {
-    const mock = mockCreateReservation(params);
-    return { booking: mock, isMock: true };
-  }
-
-  const resp = await duffelPost<DuffelReservationResponse>("/stays/reservations", {
-    data: {
-      rate_id: params.rateId,
-      guests: params.guests,
-      accommodation_special_requests: params.specialRequests ?? null,
-    },
-  });
-
-  return {
-    booking: reservationToRecord(resp.data, params.rateId),
-    isMock: false,
-  };
-}
-
-export async function getDuffelReservation(
-  reservationId: string
-): Promise<{ booking: DuffelBookingRecord; isMock: boolean }> {
-  if (!isDuffelConfigured()) {
-    throw new Error("Duffel is not configured — cannot retrieve reservation.");
-  }
-
-  const resp = await duffelGet<DuffelReservationResponse>(
-    `/stays/reservations/${reservationId}`
-  );
-
-  return {
-    booking: reservationToRecord(resp.data, resp.data.rate?.id ?? ""),
-    isMock: false,
-  };
-}
-
-export async function cancelDuffelReservation(
-  reservationId: string
-): Promise<{ cancelled: boolean }> {
-  if (!isDuffelConfigured()) {
-    throw new Error("Duffel is not configured — cannot cancel reservation.");
-  }
-  await duffelDelete(`/stays/reservations/${reservationId}`);
-  return { cancelled: true };
 }

@@ -597,6 +597,7 @@ function DayScheduleTimeline({
   /** Real booking link for the day's stay (LiteAPI/provider URL) when available. */
   hotelBookingUrl?: string | null;
 }) {
+  const router = useRouter();
   const sorted = useMemo(() => sortScheduleRows(items), [items]);
   const [drawerState, setDrawerState] = useState<BookingDrawerState>(null);
 
@@ -682,6 +683,10 @@ function DayScheduleTimeline({
           returnDate={tripEndIso && tripEndIso > dateIso ? tripEndIso : null}
           passengerCount={Math.max(1, passengerCount ?? 1)}
           flightLabel={drawerState.row.label}
+          onBookingComplete={() => {
+            setDrawerState(null);
+            router.refresh();
+          }}
         />
       )}
 

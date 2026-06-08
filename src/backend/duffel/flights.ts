@@ -1,4 +1,4 @@
-import { duffelPost, isDuffelConfigured } from "@/backend/duffel/client";
+import { duffelGet, duffelPost, isDuffelConfigured } from "@/backend/duffel/client";
 import { mockSearchFlights, mockBookFlight } from "@/backend/duffel/flights-mock";
 import type {
   DuffelOffer,
@@ -23,6 +23,10 @@ type DuffelOrderResponse = {
     slices: DuffelOffer["slices"];
     passengers: DuffelOffer["passengers"];
   };
+};
+
+type DuffelOfferGetResponse = {
+  data: DuffelOffer;
 };
 
 // ─── Service functions ─────────────────────────────────────────────────────
@@ -65,6 +69,19 @@ export async function searchDuffelFlights(
   );
 
   return { offers: offers.slice(0, 8), requestId: resp.data.id, isMock: false };
+}
+
+export async function getDuffelFlightOffer(offerId: string): Promise<DuffelOffer | null> {
+  if (!isDuffelConfigured()) return null;
+  const resp = await duffelGet<DuffelOfferGetResponse>(`/air/offers/${encodeURIComponent(offerId)}`);
+  return resp.data;
+}
+
+export function duffelOfferPriceChanged(
+  previous: DuffelOffer,
+  confirmed: DuffelOffer
+): boolean {
+  return previous.total_amount !== confirmed.total_amount || previous.total_currency !== confirmed.total_currency;
 }
 
 export async function bookDuffelFlight(params: {

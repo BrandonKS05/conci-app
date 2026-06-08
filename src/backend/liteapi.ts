@@ -5,6 +5,7 @@ import {
   getLiteApiMarginPct,
   getGooglePlacesApiKey,
 } from "@/backend/env-api-keys";
+import { fetchWithRetry } from "@/backend/http-retry";
 import type {
   LiteApiHotelResult,
   LiteApiRate,
@@ -43,7 +44,7 @@ async function liteGet(base: string, path: string, query: Record<string, string 
 
   let res: Response;
   try {
-    res = await fetch(url, { headers: liteApiHeaders(), cache: "no-store" });
+    res = await fetchWithRetry(url, { headers: liteApiHeaders(), cache: "no-store" }, { timeoutMs: 12_000 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`${LOG} GET network error`, { path, msg });
@@ -67,12 +68,12 @@ async function litePost(base: string, path: string, body: unknown): Promise<unkn
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithRetry(url, {
       method: "POST",
       headers: liteApiHeaders(),
       body: JSON.stringify(body),
       cache: "no-store",
-    });
+    }, { timeoutMs: 12_000, retryUnsafeMethods: base === DATA_BASE });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`${LOG} POST network error`, { path, msg });
@@ -97,7 +98,7 @@ async function geocodeDestination(query: string): Promise<{ latitude: number; lo
   const googleApiKey = getGooglePlacesApiKey();
   if (!googleApiKey) return null;
   try {
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    const res = await fetchWithRetry("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -106,7 +107,7 @@ async function geocodeDestination(query: string): Promise<{ latitude: number; lo
       },
       body: JSON.stringify({ textQuery: query }),
       cache: "no-store",
-    });
+    }, { timeoutMs: 8_000, retryUnsafeMethods: true });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       places?: Array<{ location?: { latitude: number; longitude: number } }>;
@@ -249,6 +250,17 @@ function buildHotelResult(content: Record<string, unknown>, rates: LiteApiRate[]
     },
     photos,
     description: str(content.description || content.hotelDescription) || null,
+    propertyType:
+      str(
+        content.propertyType ||
+          content.accommodationType ||
+          content.hotelType ||
+          content.type ||
+          content.category ||
+          content.property_category ||
+          content.propertyCategory ||
+          content.location_type
+      ) || null,
     amenities: Array.isArray(content.amenities) ? (content.amenities as unknown[]).map(str).filter(Boolean) : [],
     checkInTime: str(content.checkInTime || content.checkIn) || null,
     checkOutTime: str(content.checkOutTime || content.checkOut) || null,

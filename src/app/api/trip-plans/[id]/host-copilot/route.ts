@@ -3,14 +3,14 @@ import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { fetchLiveRestaurantsForPlan } from "@/backend/trip-live-restaurants";
 import { searchPlacesGoogleMaps } from "@/backend/serpapi-places";
 import { suggestStayForTrip } from "@/backend/lodging/suggest-stay";
+import { hotelBrowseResultToLodgingMeta } from "@/shared/mock-hotel-search";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
 import { extractOpenAiResponsesOutputText } from "@/shared/openai-responses";
 import { restaurantPickToSpotlight } from "@/shared/restaurants";
 import type { PlaceSpotlight } from "@/shared/place-preview";
 import {
-  applyHostHotelDateRange,
-  applyHostHotelSelection,
+  applyHostLodgingSegment,
   tagLodgingStayAtRange,
   applyTripPlanChatPatch,
   enumerateLocalIsoDays,
@@ -39,6 +39,7 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   if (patch.activityPins !== undefined) out.activityPins = patch.activityPins;
   if (patch.hotel !== undefined) out.hotel = patch.hotel;
   if (patch.hotelStays !== undefined) out.hotelStays = patch.hotelStays;
+  if (patch.flightBookings !== undefined) out.flightBookings = patch.flightBookings;
   if (patch.packingList !== undefined) out.packingList = patch.packingList;
   if (patch.experiencesOutlined !== undefined) out.experiencesOutlined = patch.experiencesOutlined;
   return out;
@@ -333,14 +334,20 @@ async function applyAutoBookHotel(
   let hotel: PlaceSpotlight;
   let stayStart: string;
   let stayEnd: string;
+  const meta = hotelBrowseResultToLodgingMeta(h, {
+    destinationCity: loc,
+    guestCount: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+    roomCount: 1,
+    searchSource: pick.source,
+  });
   if (req.fullTrip) {
-    const r = applyHostHotelSelection(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, place, "full");
+    const r = applyHostLodgingSegment(plan.hostSetup?.hotelStays, tripStart, tripEnd, tripStart, tripEnd, place, meta);
     hotelStays = r.hotelStays;
     hotel = r.hotel;
     stayStart = tripStart;
     stayEnd = tripEnd;
   } else {
-    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tripStart, tripEnd, a!, b!, place);
+    const r = applyHostLodgingSegment(plan.hostSetup?.hotelStays, tripStart, tripEnd, a!, b!, place, meta);
     hotelStays = r.hotelStays;
     hotel = r.hotel;
     stayStart = a!;
@@ -564,7 +571,20 @@ async function applyAutoSearch(
       ...(h.imageUrl ? { photoUrl: h.imageUrl } : {}),
       ...(h.nightlyUsd > 0 ? { priceRange: `~$${h.nightlyUsd}/night` } : {}),
     };
-    const r = applyHostHotelDateRange(plan.hostSetup?.hotelStays, tr.startIso, tr.endIso, startIso, endIso, place);
+    const r = applyHostLodgingSegment(
+      plan.hostSetup?.hotelStays,
+      tr.startIso,
+      tr.endIso,
+      startIso,
+      endIso,
+      place,
+      hotelBrowseResultToLodgingMeta(h, {
+        destinationCity: location,
+        guestCount: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+        roomCount: 1,
+        searchSource: pick.source,
+      })
+    );
     const hotelStays = tagLodgingStayAtRange(r.hotelStays, startIso, endIso, place.mapsUrl, {
       userSelected: false,
       recommendedByConci: true,
@@ -1103,7 +1123,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (res.placeName && !res.error) {
       nextPlan = res.plan;
       hotelApplied = true;
-      assistantText = `${assistantText}\n\nSaved stay: ${res.placeName} (top Maps search).`.trim();
+      assistantText = `${assistantText}\n\nSaved stay: ${res.placeName} (provider-matched lodging result).`.trim();
     } else if (res.error) {
       assistantText = `${assistantText}\n\n${res.error}`.trim();
     }

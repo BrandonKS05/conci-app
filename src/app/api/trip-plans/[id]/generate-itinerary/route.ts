@@ -25,7 +25,7 @@ import {
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 import { enrichItineraryWithVenues } from "@/backend/itinerary-venue-enrichment";
-import type { PlacePreview } from "@/shared/place-preview";
+import { hotelBrowseResultToLodgingMeta, type MockHotelBrowseResult } from "@/shared/mock-hotel-search";
 
 /** Hard ceiling on each OpenAI call so a slow upstream can't hang the request. */
 const OPENAI_TIMEOUT_MS = 60_000;
@@ -330,13 +330,19 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
   return { restaurantPins, activityPins, hotelStays, dayVoting };
 }
 
-/** SerpAPI hotel lookup — depends only on budget + location, so it can run in parallel
+type HotelCandidate = {
+  hotel: MockHotelBrowseResult;
+  reason: string;
+  source: "aiSearch" | "rates";
+};
+
+/** Provider lodging lookup — depends only on budget + location, so it can run in parallel
  * with itinerary generation. Date assignment happens later in {@link buildHotelStayFromCandidate}. */
 async function searchHotelCandidate(
   plan: TripPlan,
   location: string,
   seedText?: string | null
-): Promise<PlacePreview | null> {
+): Promise<HotelCandidate | null> {
   // Only auto-suggest when we know exact dates — the bookable rates search needs them.
   const range = plan.hostSetup?.tripRange;
   const checkIn = range?.startIso?.trim();
@@ -360,37 +366,39 @@ async function searchHotelCandidate(
 
   const h = pick.hotel;
   console.log(`[generate-itinerary] Suggested stay: ${h.name} (${pick.source}) — ${pick.reason}`);
-  return {
-    name: h.name,
-    rating: h.rating > 0 ? h.rating : undefined,
-    reviewCount: h.reviewCount || undefined,
-    address: h.addressLine || undefined,
-    priceRange: h.nightlyUsd > 0 ? `~$${h.nightlyUsd}/night` : undefined,
-    photoUrl: h.imageUrl,
-    mapsUrl: mapsSearchUrl(`${h.name} ${location}`),
-  };
+  return pick;
 }
 
 function buildHotelStayFromCandidate(
   plan: TripPlan,
   itinerary: GeneratedItinerary,
-  top: PlacePreview
+  top: HotelCandidate
 ): HostHotelStay[] | null {
   const days = inferTripDays(plan, itinerary);
   if (!days.length) return null;
+  const h = top.hotel;
 
   return [{
     startIso: days[0]!,
     endIso: days[days.length - 1]!,
     place: {
-      name: top.name,
-      mapsUrl: top.mapsUrl,
+      name: h.name,
+      mapsUrl: mapsSearchUrl(`${h.name} ${plan.location?.trim() || h.addressLine}`),
       spotlightCategory: "hotel" as const,
-      rating: top.rating,
-      photoUrl: top.photoUrl,
-      address: top.address,
+      rating: h.rating > 0 ? h.rating : undefined,
+      reviewCount: h.reviewCount || undefined,
+      photoUrl: h.imageUrl,
+      address: h.addressLine || undefined,
+      priceRange: h.nightlyUsd > 0 ? `~$${h.nightlyUsd}/night` : undefined,
     },
     recommendedByConci: true,
+    ...hotelBrowseResultToLodgingMeta(h, {
+      destinationCity: plan.location?.trim() || undefined,
+      guestCount: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+      roomCount: 1,
+      searchSource: top.source,
+    }),
+    notes: `Conci suggested this stay: ${top.reason}`,
   }];
 }
 
@@ -841,10 +849,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const location = plan.location.trim();
 
-  // Kick off the hotel SerpAPI lookup now so it overlaps with itinerary generation instead
+  // Kick off the provider lodging lookup now so it overlaps with itinerary generation instead
   // of adding a serial round-trip after it. Dates are assigned once the itinerary exists.
   const needHotelSearch = !hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []);
-  const hotelCandidatePromise: Promise<PlacePreview | null> = needHotelSearch
+  const hotelCandidatePromise: Promise<HotelCandidate | null> = needHotelSearch
     ? searchHotelCandidate(plan, location, seedText).catch(() => null)
     : Promise.resolve(null);
 

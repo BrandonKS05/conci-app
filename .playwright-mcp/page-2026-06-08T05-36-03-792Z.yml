@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e297] [cursor=pointer]:
+    - img [ref=e298]
+  - alert [ref=e117]
+  - generic [ref=e301]:
+    - link "← Back to lodging" [ref=e302] [cursor=pointer]:
+      - /url: /trip/6ce12131-3fb7-411b-ad80-94f3cb696e9d/setup#sec-lodging
+    - heading "Book your stay" [level=1] [ref=e303]
+    - paragraph [ref=e304]: Barcelona Princess · 2026-11-12 – 2026-11-15
+    - paragraph [ref=e313]: "LiteAPI POST /rates/prebook (400): {\"error\":{\"code\":4002,\"description\":\"invalid offerId\",\"message\":\"required request field is missing or wrong input\"}}"
+    - generic [ref=e314]:
+      - paragraph [ref=e315]: Lead guest
+      - generic [ref=e316]:
+        - textbox "First name" [ref=e317]: Qa
+        - textbox "Last name" [ref=e318]: Tester
+      - textbox "Email" [ref=e319]: qa.tester@concitest.dev
+      - textbox "Phone (optional)" [ref=e320]
+      - button "Continue to payment" [ref=e321] [cursor=pointer]

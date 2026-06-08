@@ -1,5 +1,6 @@
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
 import { googlePlaceFirstPhotoProxyPath } from "@/backend/google-places-photo-media";
+import { fetchWithRetry } from "@/backend/http-retry";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 
@@ -88,7 +89,7 @@ export async function fetchGooglePlacesExperiences(plan: TripPlan): Promise<{
   const textQuery = textQueryForCity(city);
 
   try {
-    const res = await fetch(SEARCH_URL, {
+    const res = await fetchWithRetry(SEARCH_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -101,7 +102,7 @@ export async function fetchGooglePlacesExperiences(plan: TripPlan): Promise<{
         languageCode: "en",
       }),
       cache: "no-store",
-    });
+    }, { timeoutMs: 10_000, retryUnsafeMethods: true });
 
     const text = await res.text();
     let j: unknown;

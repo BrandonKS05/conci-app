@@ -11,8 +11,10 @@ export type RestaurantPick = {
   ratingDisplay: string;
   /** Typical spend at this tier */
   priceRange: string;
-  /** Listing link (historical field name — usually Google Maps). */
-  openTableUrl: string;
+  /** Discovery/listing link, usually Google Maps. */
+  mapsUrl: string;
+  /** @deprecated Historical alias for `mapsUrl`; not an OpenTable integration. */
+  openTableUrl?: string;
   /** When live APIs fill this in (e.g. editorial snippet). */
   cuisineType?: string;
   reserveCtaLabel?: string;
@@ -54,7 +56,7 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
     const bump = seed % 8;
     const rating = `${(4 + bump / 10).toFixed(1)} · diner rating`;
     const priceRange = priceBands[idx % priceBands.length]!;
-    const openTableUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${city}`)}`;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${city}`)}`;
     const id = `eat-${idx}`;
 
     return {
@@ -63,7 +65,8 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
       neighborhood: neighborhoodFromHint(name, city),
       ratingDisplay: rating,
       priceRange,
-      openTableUrl,
+      mapsUrl,
+      openTableUrl: mapsUrl,
     };
   });
 }
@@ -72,9 +75,10 @@ export function buildRestaurantPicksFromVenueHints(plan: TripPlan, hints: string
 export function restaurantPickToSpotlight(r: RestaurantPick): PlaceSpotlight {
   const ratingMatch = r.ratingDisplay.match(/^(\d+(?:\.\d+)?)/);
   const rating = ratingMatch ? parseFloat(ratingMatch[1]!) : undefined;
+  const mapsUrl = r.mapsUrl || r.openTableUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name)}`;
   return {
     name: r.name,
-    mapsUrl: r.openTableUrl.startsWith("http") ? r.openTableUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name)}`,
+    mapsUrl: mapsUrl.startsWith("http") ? mapsUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name)}`,
     rating: Number.isFinite(rating) ? rating : undefined,
     priceRange: r.priceRange,
     photoUrl: r.coverPhotoUrl ?? null,
@@ -101,7 +105,8 @@ export function mergeLiveRestaurantsOntoHints(
       neighborhood: L.neighborhood,
       ratingDisplay: L.ratingDisplay,
       priceRange: L.priceRange,
-      openTableUrl: L.openTableUrl,
+      mapsUrl: L.mapsUrl || L.openTableUrl || b.mapsUrl,
+      openTableUrl: L.mapsUrl || L.openTableUrl || b.mapsUrl,
       cuisineType: L.cuisineType,
       reserveCtaLabel: L.reserveCtaLabel,
       coverPhotoUrl: L.coverPhotoUrl ?? b.coverPhotoUrl,

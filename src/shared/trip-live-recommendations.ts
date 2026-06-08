@@ -15,6 +15,8 @@ export type LiveFlightCard = {
   departureTime: string;
   duration: string;
   bookOnGoogleFlightsUrl: string;
+  /** Whether this row is bookable in-app (Duffel) or discovery-only inspiration (SerpAPI). */
+  bookingStatus?: "inspiration" | "bookable";
 };
 
 export type LiveDriveSummary = {

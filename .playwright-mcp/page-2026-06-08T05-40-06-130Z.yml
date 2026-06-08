@@ -1,0 +1,97 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Conci home" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: Conci
+        - navigation "Main" [ref=e7]:
+          - link "Create a Trip" [ref=e8] [cursor=pointer]:
+            - /url: /trip-parser
+          - link "My Trips" [ref=e9] [cursor=pointer]:
+            - /url: /my-trips
+          - link "Joined Trips" [ref=e10] [cursor=pointer]:
+            - /url: /joined-trips
+          - link "Pricing" [ref=e11] [cursor=pointer]:
+            - /url: /pricing
+          - link "Profile" [ref=e12] [cursor=pointer]:
+            - /url: /profile/me
+        - button "D" [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: D
+    - main [ref=e15]:
+      - generic [ref=e16]:
+        - generic:
+          - generic:
+            - img:
+              - generic: "N"
+          - generic: 35°N · 139°E
+          - generic: 40°N · 14°E
+          - generic: 46°N · 8°E
+        - generic [ref=e17]:
+          - generic [ref=e19]: Step 1/2 · Tell Us Anything
+          - generic [ref=e20]:
+            - paragraph [ref=e21]: Type a little or a lot. Conci will do the rest.
+            - generic [ref=e22]:
+              - generic:
+                - paragraph: "We’re planning a 4-day bachelor party in Austin with 8 guys: craft cocktails, BBQ crawl, a pool day, one big night out."
+                - paragraph: "Taking a slow, luxury foodie escape to Kyoto this autumn: ryokan stays, omakase, temple walks at dawn."
+                - paragraph: Family of five doing 10 days in Costa Rica with surf lessons for the kids, a cloud-forest night, and two days of pure rest.
+                - paragraph: Long weekend in Lisbon with my partner in late February, looking for tile-walking neighborhoods, tinned fish, natural wine.
+                - paragraph: "Five college friends, ten years out, want a barefoot week in the Greek islands: sailing day, sleepy tavernas, no agenda."
+              - textbox "Describe your trip" [ref=e23]
+            - generic [ref=e25]:
+              - button "Continue" [ref=e26] [cursor=pointer]:
+                - generic [ref=e27]:
+                  - text: Continue
+                  - generic [ref=e28]: →
+              - button "Skip, fill in manually" [ref=e29] [cursor=pointer]
+              - button "Add screenshots" [ref=e30] [cursor=pointer]:
+                - img [ref=e31]
+                - text: Add screenshots
+          - generic [ref=e33]:
+            - generic [ref=e35]:
+              - generic [ref=e36]:
+                - generic [ref=e37]:
+                  - img [ref=e38]
+                  - text: Collaborate
+                - generic [ref=e42]:
+                  - heading "Join a Trip" [level=3] [ref=e43]
+                  - paragraph [ref=e44]: Have an invite code from your host? Drop it in to hop into the workspace.
+                - generic [ref=e45]:
+                  - generic [ref=e46]:
+                    - generic [ref=e47]: Invite code
+                    - textbox "Invite code" [ref=e48]:
+                      - /placeholder: Enter Invite Code
+                  - button "Connect" [ref=e49] [cursor=pointer]
+              - link "Open Barcelona, Spain Trip" [ref=e50] [cursor=pointer]:
+                - /url: /trip/6ce12131-3fb7-411b-ad80-94f3cb696e9d/setup
+                - generic [ref=e51]:
+                  - generic [ref=e52]:
+                    - img [ref=e53]
+                    - text: Active
+                  - generic [ref=e56]: 158 Days Left
+                - generic [ref=e57]:
+                  - heading "Barcelona, Spain Trip" [level=3] [ref=e58]
+                  - paragraph [ref=e59]: November 12 — November 15, 2026
+                - img [ref=e62]
+            - generic [ref=e64]:
+              - paragraph [ref=e65]: Or start from a sketch
+              - generic [ref=e66]:
+                - button "Tokyo & Kyoto 10 days · Culture & Cuisine Tokyo & Kyoto" [ref=e67] [cursor=pointer]:
+                  - img "Tokyo & Kyoto" [ref=e68]
+                  - generic [ref=e70]:
+                    - paragraph [ref=e71]: 10 days · Culture & Cuisine
+                    - heading "Tokyo & Kyoto" [level=3] [ref=e72]
+                - button "Amalfi Coast 7 days · Relaxation Amalfi Coast" [ref=e73] [cursor=pointer]:
+                  - img "Amalfi Coast" [ref=e74]
+                  - generic [ref=e76]:
+                    - paragraph [ref=e77]: 7 days · Relaxation
+                    - heading "Amalfi Coast" [level=3] [ref=e78]
+                - button "Swiss Alps 5 days · Adventure Swiss Alps" [ref=e79] [cursor=pointer]:
+                  - img "Swiss Alps" [ref=e80]
+                  - generic [ref=e82]:
+                    - paragraph [ref=e83]: 5 days · Adventure
+                    - heading "Swiss Alps" [level=3] [ref=e84]
+  - button "Open Next.js Dev Tools" [ref=e93] [cursor=pointer]:
+    - img [ref=e94]
+  - alert [ref=e97]

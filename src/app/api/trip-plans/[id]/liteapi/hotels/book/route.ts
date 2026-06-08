@@ -169,6 +169,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         destinationCity: destinationCity || undefined,
         userSelected: true,
         lodgingType: "hotel",
+        provider: "liteapi",
+        providerHotelId: hotelId,
+        providerRateId: rateId,
+        providerResultId: `liteapi:${hotelId}`,
+        bookingType: "in_app",
+        totalUsd: booking.totalAmount,
+        priceCurrency: booking.currency,
+        liteApiBooking: booking,
         notes: `LiteAPI booking ${booking.bookingId} · ${booking.status}`,
       }
     );

@@ -1,0 +1,100 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Conci home" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: Conci
+        - navigation "Main" [ref=e7]:
+          - link "Create a Trip" [ref=e8] [cursor=pointer]:
+            - /url: /trip-parser
+          - link "My Trips" [ref=e9] [cursor=pointer]:
+            - /url: /my-trips
+          - link "Joined Trips" [ref=e10] [cursor=pointer]:
+            - /url: /joined-trips
+          - link "Pricing" [ref=e11] [cursor=pointer]:
+            - /url: /pricing
+          - link "Profile" [ref=e12] [cursor=pointer]:
+            - /url: /profile/me
+        - button "D" [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: D
+    - main [ref=e15]:
+      - generic [ref=e89]:
+        - paragraph [ref=e90]: Step 2/2 · Ready for Liftoff?
+        - generic [ref=e91]:
+          - generic [ref=e94]:
+            - generic [ref=e95]:
+              - img [ref=e96]
+              - generic [ref=e98]: Conci
+              - generic [ref=e99]: · Boarding pass
+            - button "Edit prompt" [ref=e101] [cursor=pointer]:
+              - img [ref=e102]
+              - text: Edit prompt
+          - generic [ref=e104]:
+            - generic [ref=e105]:
+              - generic [ref=e106]: Required *
+              - generic [ref=e107]: Tap any field to edit
+            - heading "Your trip" [level=1] [ref=e108]
+            - generic [ref=e109]:
+              - textbox "Destination" [active] [ref=e184]
+              - generic [ref=e111]: "*"
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]:
+                - paragraph [ref=e115]: Depart
+                - text: —
+              - img [ref=e117]
+              - generic [ref=e119]:
+                - paragraph [ref=e120]: Return
+                - text: —
+            - paragraph [ref=e121]: "* Required"
+            - generic [ref=e123]:
+              - generic [ref=e124]: Optional
+              - generic [ref=e125]: Tap to fill or skip
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Flight
+                - generic [ref=e130]:
+                  - button "Flying from…" [ref=e131] [cursor=pointer]
+                  - button "No flight" [ref=e132] [cursor=pointer]
+                  - button "Skip" [ref=e133] [cursor=pointer]
+              - generic [ref=e134]:
+                - generic [ref=e135]: Travelers
+                - generic [ref=e137]:
+                  - button "Set count" [ref=e138] [cursor=pointer]
+                  - button "Skip" [ref=e139] [cursor=pointer]
+              - generic [ref=e140]:
+                - generic [ref=e141]: Budget
+                - generic [ref=e143]:
+                  - button "Set budget" [ref=e144] [cursor=pointer]
+                  - button "Skip" [ref=e145] [cursor=pointer]
+              - generic [ref=e146]:
+                - generic [ref=e147]: Vibes
+                - generic [ref=e148]:
+                  - button "chill" [ref=e149] [cursor=pointer]
+                  - button "party" [ref=e150] [cursor=pointer]
+                  - button "culture" [ref=e151] [cursor=pointer]
+                  - button "outdoors" [ref=e152] [cursor=pointer]
+                  - button "foodie" [ref=e153] [cursor=pointer]
+                  - button "adventure" [ref=e154] [cursor=pointer]
+                  - button "romantic" [ref=e155] [cursor=pointer]
+                  - button "luxury" [ref=e156] [cursor=pointer]
+              - generic [ref=e157]:
+                - generic [ref=e158]: Pace
+                - generic [ref=e159]:
+                  - button "packed" [ref=e160] [cursor=pointer]
+                  - button "relaxed" [ref=e161] [cursor=pointer]
+                  - button "balanced" [ref=e162] [cursor=pointer]
+                  - button "Skip" [ref=e163] [cursor=pointer]
+              - generic [ref=e164]:
+                - generic [ref=e165]: Anything else?
+                - paragraph [ref=e167]: We want one fancy dinner and a beach day… or leave blank
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - generic [ref=e170]: Waiting
+              - generic [ref=e171]: Add a destination
+            - button "Build trip" [disabled] [ref=e172]:
+              - text: Build trip
+              - generic [ref=e173]: ▸
+  - button "Open Next.js Dev Tools" [ref=e179] [cursor=pointer]:
+    - img [ref=e180]
+  - alert [ref=e183]

@@ -2,6 +2,8 @@ import { searchLodging } from "@/backend/lodging/lodging-service";
 import { liteApiAiSearch } from "@/backend/lodging/liteapi-provider";
 import type { LodgingSearchInput } from "@/backend/lodging/provider";
 import type { MockHotelBrowseResult } from "@/shared/mock-hotel-search";
+import { rankTravelOptionsWithModel } from "@/backend/travel-option-ranking";
+import { travelOptionFromLodgingBrowse } from "@/shared/travel-option";
 import {
   extractLodgingIntent,
   buildAiSearchQuery,
@@ -12,6 +14,7 @@ import {
 
 const LOG = "[suggest-stay]";
 const AISEARCH_TIMEOUT_MS = 9_000;
+const AISEARCH_CACHE_TTL_MS = 7 * 60 * 1000;
 
 /**
  * Pick one bookable stay that feels matched to *this* trip — Conci's default
@@ -78,6 +81,55 @@ function filterToDestination(hotels: MockHotelBrowseResult[], destination: strin
 
 function timeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("aiSearch timeout")), ms))]);
+}
+
+type AiSearchCacheEntry = {
+  expiresAt: number;
+  hotels: MockHotelBrowseResult[];
+};
+
+const aiSearchCache = new Map<string, AiSearchCacheEntry>();
+const aiSearchInflight = new Map<string, Promise<MockHotelBrowseResult[]>>();
+
+function aiSearchCacheKey(aiQuery: string, input: LodgingSearchInput): string {
+  return JSON.stringify({
+    q: aiQuery,
+    destination: input.destination.trim().toLowerCase(),
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    guests: input.guests,
+    rooms: input.rooms,
+    lodgingType: input.lodgingType,
+    limit: input.limit ?? 20,
+  });
+}
+
+async function cachedLiteApiAiSearch(
+  aiQuery: string,
+  input: LodgingSearchInput
+): Promise<MockHotelBrowseResult[]> {
+  const key = aiSearchCacheKey(aiQuery, input);
+  const cached = aiSearchCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.info(`${LOG} aiSearch cache hit`, { key, count: cached.hotels.length });
+    return cached.hotels;
+  }
+  const running = aiSearchInflight.get(key);
+  if (running) {
+    console.info(`${LOG} aiSearch dedupe wait`, { key });
+    return running;
+  }
+
+  const promise = timeout(liteApiAiSearch(aiQuery, input), AISEARCH_TIMEOUT_MS)
+    .then((hotels) => {
+      aiSearchCache.set(key, { hotels, expiresAt: Date.now() + AISEARCH_CACHE_TTL_MS });
+      return hotels;
+    })
+    .finally(() => {
+      aiSearchInflight.delete(key);
+    });
+  aiSearchInflight.set(key, promise);
+  return promise;
 }
 
 // Positive markers per signal — matched against the candidate's vibe text/tags/name.
@@ -177,6 +229,42 @@ function score(
   return { hotel: chosen, reason: reasonParts.join(", ") };
 }
 
+async function modelRankPick(
+  hotels: MockHotelBrowseResult[],
+  input: SuggestStayInput,
+  source: SuggestStayResult["source"],
+  perNightCap: number | null
+): Promise<{ hotel: MockHotelBrowseResult; reason: string } | null> {
+  if (hotels.length < 2) return null;
+  const options = hotels.map((h) => travelOptionFromLodgingBrowse(h, source));
+  const userIntent = [
+    `Destination: ${input.destination}`,
+    input.vibe?.length ? `Vibe: ${input.vibe.join(", ")}` : "",
+    input.budgetTier ? `Budget tier: ${input.budgetTier}` : "",
+    input.budgetPerPerson ? `Budget: ${input.budgetPerPerson}` : "",
+    perNightCap ? `Per-night cap: about $${perNightCap}` : "",
+    input.seedText ? `Trip/lodging request: ${input.seedText}` : "",
+  ].filter(Boolean).join("\n");
+
+  const ranked = await rankTravelOptionsWithModel({
+    options,
+    userIntent,
+    category: "lodging",
+  }).catch(() => null);
+  const topId = ranked?.rankedIds[0];
+  if (!topId) return null;
+  const topOption = options.find((o) => o.id === topId);
+  const hotel = topOption
+    ? hotels.find((h) => h.id === topOption.rawProviderResultId)
+    : undefined;
+  if (!hotel) return null;
+  const modelReason = ranked?.reasonById[topId]?.trim();
+  return {
+    hotel,
+    reason: [modelReason || "matched the retrieved lodging options", `$${hotel.nightlyUsd}/night`].join(", "),
+  };
+}
+
 export async function suggestStayForTrip(input: SuggestStayInput): Promise<SuggestStayResult | null> {
   const intent = extractLodgingIntent({
     seedText: input.seedText,
@@ -202,12 +290,15 @@ export async function suggestStayForTrip(input: SuggestStayInput): Promise<Sugge
     perNightCapUsd: perNightCap,
   });
   try {
-    const aiHotelsRaw = await timeout(liteApiAiSearch(aiQuery, searchInput), AISEARCH_TIMEOUT_MS);
+    const aiHotelsRaw = await cachedLiteApiAiSearch(aiQuery, searchInput);
     const aiHotels = filterToDestination(aiHotelsRaw, input.destination);
     if (aiHotelsRaw.length > 0 && aiHotels.length === 0) {
       console.info(`${LOG} aiSearch results were off-location for "${input.destination}" — falling back to rates`);
     }
-    const picked = aiHotels.length > 0 ? score(aiHotels, intent, input.budgetTier ?? "", perNightCap, true) : null;
+    const picked = aiHotels.length > 0
+      ? (await modelRankPick(aiHotels, input, "aiSearch", perNightCap)) ??
+        score(aiHotels, intent, input.budgetTier ?? "", perNightCap, true)
+      : null;
     if (picked) {
       console.info(`${LOG} aiSearch pick`, {
         hotel: picked.hotel.name,
@@ -225,7 +316,9 @@ export async function suggestStayForTrip(input: SuggestStayInput): Promise<Sugge
   // 2) Fallback: normal provider-router rates search + same scoring (no AI rank).
   try {
     const { hotels } = await searchLodging(searchInput);
-    const picked = score(hotels, intent, input.budgetTier ?? "", perNightCap, false);
+    const picked =
+      (await modelRankPick(hotels, input, "rates", perNightCap)) ??
+      score(hotels, intent, input.budgetTier ?? "", perNightCap, false);
     if (picked) {
       console.info(`${LOG} rates pick`, { hotel: picked.hotel.name, signals: [...intent.signals], reason: picked.reason });
       return { hotel: picked.hotel, reason: picked.reason, source: "rates" };

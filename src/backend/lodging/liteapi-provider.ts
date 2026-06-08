@@ -10,6 +10,20 @@ import {
   gradientFor,
 } from "@/backend/lodging/provider";
 
+function inferLiteApiPropertyKind(h: LiteApiHotelResult): { propertyKind: "hotel" | "home"; lodgingType: MockHotelBrowseResult["lodgingType"] } {
+  const text = [h.propertyType, h.name, h.description, ...(h.vibeTags ?? [])].filter(Boolean).join(" ").toLowerCase();
+  if (/\b(villa|house|home|apartment|condo|residence|residential|aparthotel|serviced apartment|suite apartment|townhouse|guesthouse)\b/.test(text)) {
+    return { propertyKind: "home", lodgingType: /\bvilla\b/.test(text) ? "villa" : "airbnb" };
+  }
+  if (/\b(resort)\b/.test(text)) {
+    return { propertyKind: "hotel", lodgingType: "resort" };
+  }
+  if (/\b(hostel)\b/.test(text)) {
+    return { propertyKind: "hotel", lodgingType: "hostel" };
+  }
+  return { propertyKind: "hotel", lodgingType: "hotel" };
+}
+
 function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseResult | null {
   const rate = h.cheapestRate;
   const total = rate?.retailRate.total[0]?.amount ?? 0;
@@ -18,6 +32,7 @@ function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseR
   const nightly = Math.round(total / nights);
   const score = h.reviewScore ?? 0;
   const grad = gradientFor(h.hotelId);
+  const kind = inferLiteApiPropertyKind(h);
 
   return {
     id: `liteapi:${h.hotelId}`,
@@ -29,7 +44,7 @@ function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseR
     priceEstimatePerNight: `$${nightly}`,
     gradientFrom: grad.from,
     gradientTo: grad.to,
-    lodgingType: "hotel",
+    lodgingType: kind.lodgingType,
     imageUrl: h.photos[0]?.url ?? null,
     distanceLabel: "",
     amenities: mapAmenities(h.amenities),
@@ -39,7 +54,7 @@ function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseR
     reviewScore: score,
     reviewLabel: reviewLabelFor(score),
     reviewCount: h.reviewCount ?? 0,
-    propertyKind: "hotel",
+    propertyKind: kind.propertyKind,
     provider: "liteapi",
     providerHotelId: h.hotelId,
     providerRateId: rate.rateId,

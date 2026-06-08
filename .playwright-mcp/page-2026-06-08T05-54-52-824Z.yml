@@ -1,0 +1,198 @@
+- main [ref=e3]:
+  - generic [ref=e5]:
+    - link "Conci home" [ref=e6] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e7]: Conci
+    - navigation "Main" [ref=e8]:
+      - link "Create a Trip" [ref=e9] [cursor=pointer]:
+        - /url: /trip-parser
+      - link "My Trips" [ref=e10] [cursor=pointer]:
+        - /url: /my-trips
+      - link "Joined Trips" [ref=e11] [cursor=pointer]:
+        - /url: /joined-trips
+      - link "Pricing" [ref=e12] [cursor=pointer]:
+        - /url: /pricing
+      - link "Profile" [ref=e13] [cursor=pointer]:
+        - /url: /profile/me
+    - link "Sign in" [ref=e15] [cursor=pointer]:
+      - /url: /auth
+  - generic [ref=e19]:
+    - complementary [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - paragraph [ref=e23]: Trip
+          - heading "Barcelona, Spain Trip" [level=1] [ref=e24]
+          - paragraph [ref=e25]: Nov 12, 2026 — Nov 15, 2026
+          - paragraph [ref=e26]: 4 travelers
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]:
+              - paragraph [ref=e30]: Invite friends
+              - paragraph [ref=e31]: J8C-C8S
+            - button "Copy" [ref=e32] [cursor=pointer]
+          - paragraph [ref=e33]: conci.travel/join/J8CC8S to vote and add preferences.
+          - generic [ref=e34]:
+            - generic [ref=e36]: +
+            - paragraph [ref=e37]: 0 of 0 joined
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: Sections
+          - navigation "Trip workspace sections" [ref=e40]:
+            - button "Overview" [ref=e41] [cursor=pointer]:
+              - img [ref=e43]
+              - text: Overview
+            - button "Transportation" [ref=e48] [cursor=pointer]:
+              - img [ref=e50]
+              - text: Transportation
+            - button "Budget & Fund" [ref=e52] [cursor=pointer]:
+              - img [ref=e54]
+              - text: Budget & Fund
+            - button "Collaborate" [ref=e57] [cursor=pointer]:
+              - img [ref=e59]
+              - text: Collaborate
+            - button "Lodging" [ref=e65] [cursor=pointer]:
+              - img [ref=e67]
+              - text: Lodging
+            - link "Trip Overview" [ref=e70] [cursor=pointer]:
+              - /url: /trip/6ce12131-3fb7-411b-ad80-94f3cb696e9d/itinerary
+              - img [ref=e72]
+              - text: Trip Overview
+        - generic [ref=e75]:
+          - paragraph [ref=e76]: Shared
+          - generic [ref=e77]:
+            - link "Packing list" [ref=e78] [cursor=pointer]:
+              - /url: /trip/6ce12131-3fb7-411b-ad80-94f3cb696e9d/setup/packing
+            - generic [ref=e79]: · 12 items, 8 checked
+    - main [ref=e80]:
+      - generic [ref=e81]:
+        - generic [ref=e83]:
+          - button "Estimated total ▾ $2,744 for 2 travelers" [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]: Estimated total ▾
+            - generic [ref=e86]: $2,744
+            - generic [ref=e87]: for 2 travelers
+          - generic [ref=e88]:
+            - generic [ref=e89]: Per person
+            - generic [ref=e90]: $1,372
+            - generic [ref=e91]: budget only — flights pending
+          - generic [ref=e92]:
+            - generic [ref=e93]: Trip fund
+            - generic [ref=e94]: —
+            - generic [ref=e95]: Loading…
+          - generic [ref=e96]:
+            - generic [ref=e97]: Still owed
+            - generic [ref=e98]: $2,744
+            - generic [ref=e99]: Estimate minus current fund
+        - paragraph [ref=e101]: Itinerary
+        - generic [ref=e102]:
+          - heading "November 2026" [level=3] [ref=e103]
+          - generic [ref=e104]:
+            - generic [ref=e105]:
+              - generic [ref=e106]: Arrival
+              - generic [ref=e108]: On trip
+              - generic [ref=e110]: Departure
+            - generic [ref=e112]:
+              - button "Previous month" [ref=e113] [cursor=pointer]:
+                - img [ref=e114]
+              - button "Next month" [ref=e116] [cursor=pointer]:
+                - img [ref=e117]
+        - generic [ref=e119]:
+          - generic [ref=e120]: SUN
+          - generic [ref=e121]: MON
+          - generic [ref=e122]: TUE
+          - generic [ref=e123]: WED
+          - generic [ref=e124]: THU
+          - generic [ref=e125]: FRI
+          - generic [ref=e126]: SAT
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]:
+                - text: "12"
+                - generic [ref=e135]: Arrival
+              - generic [ref=e137]:
+                - generic [ref=e138]:
+                  - paragraph [ref=e139]: 3:30 PM
+                  - button "Barcelona Princess" [ref=e140]
+                  - paragraph [ref=e141]: Check-in
+                - generic [ref=e142]:
+                  - paragraph [ref=e143]: 4:50 PM
+                  - 'button "Flight: Departure City → Barcelona" [ref=e144]'
+                  - paragraph [ref=e145]: Approximate flight duration 8 hours. Economy round-trip ~$600 pp. · MIA → home
+                  - 'button "Remove Flight: Departure City → Barcelona" [ref=e146]': ×
+                - generic [ref=e147]:
+                  - paragraph [ref=e148]: Dinner
+                  - button "Rooftop Dinner at Hotel" [ref=e149]
+                  - paragraph [ref=e150]: Dinner
+                  - button "Remove Rooftop Dinner at Hotel" [ref=e151]: ×
+              - button "Edit day" [ref=e152]
+            - generic [ref=e153] [cursor=pointer]:
+              - generic [ref=e154]:
+                - text: "13"
+                - generic [ref=e155]: On trip
+              - generic [ref=e157]:
+                - generic [ref=e158]:
+                  - paragraph [ref=e159]: Morning
+                  - button "Tapas at El Nacional" [ref=e160]
+                  - paragraph [ref=e161]: Breakfast
+                  - button "Remove Tapas at El Nacional" [ref=e162]: ×
+                - generic [ref=e163]:
+                  - paragraph [ref=e164]: Morning
+                  - button "Couples Spa Experience" [ref=e165]
+                  - paragraph [ref=e166]: Late Morning · Activity
+                  - button "Remove Couples Spa Experience" [ref=e167]: ×
+                - generic [ref=e168]:
+                  - paragraph [ref=e169]: Afternoon
+                  - button "Wine Tasting Tour" [ref=e170]
+                  - paragraph [ref=e171]: Afternoon · Activity
+                  - button "Remove Wine Tasting Tour" [ref=e172]: ×
+                - generic [ref=e173]:
+                  - paragraph [ref=e174]: Dinner
+                  - button "Dinner at Gothic Quarter Bistro" [ref=e175]
+                  - paragraph [ref=e176]: Dinner
+                  - button "Remove Dinner at Gothic Quarter Bistro" [ref=e177]: ×
+              - button "Edit day" [ref=e178]
+            - generic [ref=e179] [cursor=pointer]:
+              - generic [ref=e180]:
+                - text: "14"
+                - generic [ref=e181]: On trip
+              - generic [ref=e183]:
+                - generic [ref=e184]:
+                  - paragraph [ref=e185]: Morning
+                  - button "Private Walking Tour" [ref=e186]
+                  - paragraph [ref=e187]: Late Morning · Activity
+                  - button "Remove Private Walking Tour" [ref=e188]: ×
+                - generic [ref=e189]:
+                  - paragraph [ref=e190]: Morning
+                  - button "Free Time - Explore Park Güell" [ref=e191]
+                  - paragraph [ref=e192]: Afternoon · Beach time
+                  - button "Remove Free Time - Explore Park Güell" [ref=e193]: ×
+                - generic [ref=e194]:
+                  - paragraph [ref=e195]: Lunch
+                  - button "Lunch at La Boqueria Market" [ref=e196]
+                  - paragraph [ref=e197]: Lunch
+                  - button "Remove Lunch at La Boqueria Market" [ref=e198]: ×
+              - button "Edit day" [ref=e199]
+          - generic [ref=e201] [cursor=pointer]:
+            - generic [ref=e202]:
+              - text: "15"
+              - generic [ref=e203]: Departure
+            - generic [ref=e205]:
+              - generic [ref=e206]:
+                - paragraph [ref=e207]: 11:30 AM
+                - button "Barcelona Princess" [ref=e208]
+                - paragraph [ref=e209]: Check-out
+              - generic [ref=e210]:
+                - paragraph [ref=e211]: Lunch
+                - button "Farewell Lunch at Seaside Restaurant" [ref=e212]
+                - paragraph [ref=e213]: Lunch
+                - button "Remove Farewell Lunch at Seaside Restaurant" [ref=e214]: ×
+              - generic [ref=e215]:
+                - paragraph [ref=e216]: 4:50 PM
+                - 'button "Flight: Barcelona → Departure City" [ref=e217]'
+                - paragraph [ref=e218]: Return flight, approximately 8 hours. · MIA → home
+                - 'button "Remove Flight: Barcelona → Departure City" [ref=e219]': ×
+            - button "Edit day" [ref=e220]
+        - generic [ref=e227]:
+          - button "Add places" [ref=e228] [cursor=pointer]
+          - button "Change dates" [ref=e229] [cursor=pointer]
+          - button "View full month" [ref=e230] [cursor=pointer]
+      - button "Open trip chat" [ref=e231] [cursor=pointer]: 💬

@@ -1,0 +1,13 @@
+- generic [ref=e2]:
+  - link "← Back to lodging" [ref=e3] [cursor=pointer]:
+    - /url: /trip/6ce12131-3fb7-411b-ad80-94f3cb696e9d/setup#sec-lodging
+  - heading "Book your stay" [level=1] [ref=e4]
+  - paragraph [ref=e5]: Good Nite Inn - Redwood City · 2026-11-12 – 2026-11-15
+  - generic [ref=e6]:
+    - paragraph [ref=e7]: Lead guest
+    - generic [ref=e8]:
+      - textbox "First name" [ref=e9]
+      - textbox "Last name" [ref=e10]
+    - textbox "Email" [ref=e11]
+    - textbox "Phone (optional)" [ref=e12]
+    - button "Continue to payment" [ref=e13] [cursor=pointer]

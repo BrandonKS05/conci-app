@@ -41,10 +41,18 @@ import {
   LiveCurationErrorBanner,
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
-import type { LodgingModalSeed } from "@/frontend/components/host-hotel-search-modal";
 import {
   HostSetupAddPlacesModal,
 } from "@/frontend/components/host-setup-add-places-modal";
+
+/** Seed values passed when opening the lodging setup flow (date range, destination, segment, type). */
+type LodgingModalSeed = {
+  segmentId?: string;
+  checkIn?: string;
+  checkOut?: string;
+  destination?: string;
+  lodgingType?: HostLodgingType;
+};
 import {
   HostSetupPinDetailModal,
   HostSetupRemovePinConfirm,

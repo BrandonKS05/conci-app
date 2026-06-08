@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 import {
+  hotelBrowseResultToLodgingMeta,
   mockHotelResultToPlace,
   type MockHotelAmenityIcon,
   type MockHotelBrowseResult,
@@ -403,14 +404,12 @@ export function TripHostLodgingPage(props: {
         checkIn,
         checkOut,
         place,
-        {
+        hotelBrowseResultToLodgingMeta(hotel, {
           destinationCity: destination,
           guestCount: guests,
           roomCount: rooms,
           userSelected: true,
-          lodgingType: hotel.lodgingType,
-          bookingUrl: hotel.bookingUrl ?? undefined,
-        }
+        })
       );
       const gi = plan.generatedItinerary
         ? upsertLodgingActivitiesInGeneratedItinerary(
@@ -493,6 +492,8 @@ export function TripHostLodgingPage(props: {
         guestCount: guests,
         roomCount: rooms,
         userSelected: true,
+        provider: "manual",
+        bookingType: "manual",
         lodgingType: manualStay.lodgingType,
         bookingUrl: bookingUrl || undefined,
         notes: manualStay.notes,
@@ -632,7 +633,7 @@ export function TripHostLodgingPage(props: {
                       hotel={hotel}
                       onSelect={() => void commitHotel(hotel)}
                       onBook={
-                        hotel.providerRateId
+                        hotel.provider === "liteapi" && hotel.providerHotelId && hotel.providerRateId
                           ? () =>
                               router.push(
                                 `/trip/${props.tripId}/lodging/checkout?` +

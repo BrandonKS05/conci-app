@@ -7,6 +7,7 @@ import type {
   LiteApiBookingRecord,
   LiteApiPrebookApiResponse,
   LiteApiBookApiResponse,
+  LiteApiPrebookResult,
 } from "@/shared/liteapi";
 
 const PAYMENT_SDK_SRC = "https://payment-wrapper.liteapi.travel/dist/liteAPIPayment.js";
@@ -57,12 +58,13 @@ const inputCls =
   "w-full rounded-lg border border-[color:var(--hairline-strong)] bg-white px-3 py-2 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white";
 
 export function LiteApiCheckout(props: Props) {
-  const [phase, setPhase] = useState<"form" | "paying" | "confirming" | "done" | "error">(
+  const [phase, setPhase] = useState<"form" | "review-change" | "paying" | "confirming" | "done" | "error">(
     props.returnPrebookId ? "confirming" : "form"
   );
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState<LiteApiBookingRecord | null>(null);
   const [guest, setGuest] = useState<LiteApiBookingGuest>({ firstName: "", lastName: "", email: "", phone: "" });
+  const [pendingPrebook, setPendingPrebook] = useState<LiteApiPrebookResult | null>(null);
   const sdkRequested = useRef(false);
 
   // Return leg: confirm the booking with the prebook's transactionId.
@@ -110,8 +112,65 @@ export function LiteApiCheckout(props: Props) {
     })();
   }, [props.returnPrebookId, props.tripId]);
 
+  const launchPayment = useCallback((pb: LiteApiPrebookResult) => {
+    if (!pb.secretKey || !pb.transactionId) {
+      setError("In-app payment isn't available for this rate.");
+      setPhase("form");
+      return;
+    }
+
+    setPhase("paying");
+    const ctx: StoredCtx = {
+      transactionId: pb.transactionId,
+      rateId: props.rateId,
+      hotelId: props.hotelId,
+      hotelName: props.hotelName,
+      checkIn: props.checkIn,
+      checkOut: props.checkOut,
+      city: props.city,
+      guest,
+    };
+    sessionStorage.setItem(ctxKey(pb.prebookId), JSON.stringify(ctx));
+
+    const returnUrl = `${window.location.origin}/trip/${props.tripId}/lodging/checkout?status=return&prebookId=${encodeURIComponent(pb.prebookId)}`;
+
+    const mount = () => {
+      const Ctor = window.LiteAPIPayment;
+      if (!Ctor) {
+        setError("Payment module failed to load. Please try again.");
+        setPhase("form");
+        return;
+      }
+      new Ctor({
+        publicKey: pb.environment === "sandbox" ? "sandbox" : "live",
+        secretKey: pb.secretKey!,
+        targetElement: "#liteapi-payment-element",
+        returnUrl,
+        appearance: { theme: "light" },
+      }).handlePayment();
+    };
+
+    if (window.LiteAPIPayment) {
+      mount();
+      return;
+    }
+    if (!sdkRequested.current) {
+      sdkRequested.current = true;
+      const s = document.createElement("script");
+      s.src = PAYMENT_SDK_SRC;
+      s.async = true;
+      s.onload = mount;
+      s.onerror = () => {
+        setError("Could not load the payment module.");
+        setPhase("form");
+      };
+      document.body.appendChild(s);
+    }
+  }, [guest, props]);
+
   const startPayment = useCallback(async () => {
     setError(null);
+    setPendingPrebook(null);
     if (!guest.firstName.trim() || !guest.lastName.trim() || !guest.email.trim()) {
       setError("Enter the lead guest's first name, last name, and email.");
       return;
@@ -131,63 +190,17 @@ export function LiteApiCheckout(props: Props) {
         return;
       }
       const pb = pj.prebook;
-      if (!pb.secretKey || !pb.transactionId) {
-        setError("In-app payment isn't available for this rate.");
-        setPhase("form");
+      if (pb.priceChanged || pb.cancellationChanged) {
+        setPendingPrebook(pb);
+        setPhase("review-change");
         return;
       }
-
-      const ctx: StoredCtx = {
-        transactionId: pb.transactionId,
-        rateId: props.rateId,
-        hotelId: props.hotelId,
-        hotelName: props.hotelName,
-        checkIn: props.checkIn,
-        checkOut: props.checkOut,
-        city: props.city,
-        guest,
-      };
-      sessionStorage.setItem(ctxKey(pb.prebookId), JSON.stringify(ctx));
-
-      const returnUrl = `${window.location.origin}/trip/${props.tripId}/lodging/checkout?status=return&prebookId=${encodeURIComponent(pb.prebookId)}`;
-
-      const mount = () => {
-        const Ctor = window.LiteAPIPayment;
-        if (!Ctor) {
-          setError("Payment module failed to load. Please try again.");
-          setPhase("form");
-          return;
-        }
-        new Ctor({
-          publicKey: pb.environment === "sandbox" ? "sandbox" : "live",
-          secretKey: pb.secretKey!,
-          targetElement: "#liteapi-payment-element",
-          returnUrl,
-          appearance: { theme: "light" },
-        }).handlePayment();
-      };
-
-      if (window.LiteAPIPayment) {
-        mount();
-        return;
-      }
-      if (!sdkRequested.current) {
-        sdkRequested.current = true;
-        const s = document.createElement("script");
-        s.src = PAYMENT_SDK_SRC;
-        s.async = true;
-        s.onload = mount;
-        s.onerror = () => {
-          setError("Could not load the payment module.");
-          setPhase("form");
-        };
-        document.body.appendChild(s);
-      }
+      launchPayment(pb);
     } catch {
       setError("Network error preparing the booking.");
       setPhase("form");
     }
-  }, [guest, props]);
+  }, [guest, props.tripId, props.rateId, launchPayment]);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10 sm:px-6">
@@ -221,6 +234,47 @@ export function LiteApiCheckout(props: Props) {
           >
             Continue to payment
           </button>
+        </div>
+      ) : null}
+
+      {phase === "review-change" && pendingPrebook ? (
+        <div className="mt-6 space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/30 dark:bg-amber-950/20">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Review updated rate</p>
+            <p className="mt-1 text-sm text-amber-950 dark:text-amber-100">
+              LiteAPI refreshed this rate before checkout. Accept the current terms before payment opens.
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/70 px-4 py-3 text-sm text-amber-950 dark:bg-black/10 dark:text-amber-100">
+            <p className="font-semibold">
+              {pendingPrebook.currency} {pendingPrebook.price.toFixed(2)}
+            </p>
+            <p className="mt-1">
+              {[
+                pendingPrebook.priceChanged ? "Price changed" : "",
+                pendingPrebook.cancellationChanged ? "Cancellation terms changed" : "",
+              ].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => {
+                setPendingPrebook(null);
+                setPhase("form");
+              }}
+              className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-900/30"
+            >
+              Edit guest details
+            </button>
+            <button
+              type="button"
+              onClick={() => launchPayment(pendingPrebook)}
+              className="rounded-full bg-[#1c1c17] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
+            >
+              Accept updated terms
+            </button>
+          </div>
         </div>
       ) : null}
 

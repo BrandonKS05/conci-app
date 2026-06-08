@@ -1,0 +1,240 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e179] [cursor=pointer]:
+    - img [ref=e180]
+  - alert [ref=e183]: Conci · AI for group trips
+  - main [ref=e247]:
+    - generic [ref=e249]:
+      - link "Conci home" [ref=e250] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e251]: Conci
+      - navigation "Main" [ref=e252]:
+        - link "Create a Trip" [ref=e253] [cursor=pointer]:
+          - /url: /trip-parser
+        - link "My Trips" [ref=e254] [cursor=pointer]:
+          - /url: /my-trips
+        - link "Joined Trips" [ref=e255] [cursor=pointer]:
+          - /url: /joined-trips
+        - link "Pricing" [ref=e256] [cursor=pointer]:
+          - /url: /pricing
+        - link "Profile" [ref=e257] [cursor=pointer]:
+          - /url: /profile/me
+      - button "D" [ref=e260] [cursor=pointer]:
+        - generic [ref=e261]: D
+    - generic [ref=e265]:
+      - complementary [ref=e266]:
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - paragraph [ref=e269]: Trip
+            - heading "Napa Valley Trip" [level=1] [ref=e270]
+            - paragraph [ref=e271]: Apr 10, 2026 — Apr 13, 2026
+            - paragraph [ref=e272]: 4 travelers
+          - generic [ref=e273]:
+            - generic [ref=e274]:
+              - generic [ref=e275]:
+                - paragraph [ref=e276]: Invite friends
+                - paragraph [ref=e277]: 2LN-5EK
+              - button "Copy" [ref=e278] [cursor=pointer]
+            - paragraph [ref=e279]: conci.travel/join/2LN5EK to vote and add preferences.
+            - generic [ref=e280]:
+              - generic [ref=e282]: +
+              - paragraph [ref=e283]: 0 of 0 joined
+          - generic [ref=e284]:
+            - paragraph [ref=e285]: Sections
+            - navigation "Trip workspace sections" [ref=e286]:
+              - button "Overview" [ref=e287] [cursor=pointer]:
+                - img [ref=e289]
+                - text: Overview
+              - button "Transportation" [ref=e294] [cursor=pointer]:
+                - img [ref=e296]
+                - text: Transportation
+              - button "Budget & Fund" [ref=e298] [cursor=pointer]:
+                - img [ref=e300]
+                - text: Budget & Fund
+              - button "Collaborate" [ref=e303] [cursor=pointer]:
+                - img [ref=e305]
+                - text: Collaborate
+              - button "Lodging" [ref=e311] [cursor=pointer]:
+                - img [ref=e313]
+                - text: Lodging
+              - link "Trip Overview" [ref=e316] [cursor=pointer]:
+                - /url: /trip/2388ef7d-205e-4aa7-8b97-1ad23e4d9bef/itinerary
+                - img [ref=e318]
+                - text: Trip Overview
+          - generic [ref=e321]:
+            - paragraph [ref=e322]: Shared
+            - generic [ref=e323]:
+              - link "Packing list" [ref=e324] [cursor=pointer]:
+                - /url: /trip/2388ef7d-205e-4aa7-8b97-1ad23e4d9bef/setup/packing
+              - generic [ref=e325]: · 12 items, 8 checked
+      - main [ref=e326]:
+        - generic [ref=e327]:
+          - generic [ref=e329]:
+            - button "Estimated total ▾ $1,882 for 2 travelers" [ref=e330] [cursor=pointer]:
+              - generic [ref=e331]: Estimated total ▾
+              - generic [ref=e332]: $1,882
+              - generic [ref=e333]: for 2 travelers
+            - generic [ref=e334]:
+              - generic [ref=e335]: Per person
+              - generic [ref=e336]: $941
+              - generic [ref=e337]: budget only — flights pending
+            - generic [ref=e338]:
+              - generic [ref=e339]: Trip fund
+              - generic [ref=e340]: $0
+              - generic [ref=e341]: No contributions yet
+            - generic [ref=e342]:
+              - generic [ref=e343]: Still owed
+              - generic [ref=e344]: $1,882
+              - generic [ref=e345]: Estimate minus current fund
+          - paragraph [ref=e347]: Itinerary
+          - generic [ref=e348]:
+            - heading "April 2026" [level=3] [ref=e349]
+            - generic [ref=e350]:
+              - generic [ref=e351]:
+                - generic [ref=e352]: Arrival
+                - generic [ref=e354]: On trip
+                - generic [ref=e356]: Departure
+              - generic [ref=e358]:
+                - button "Previous month" [ref=e359] [cursor=pointer]:
+                  - img [ref=e360]
+                - button "Next month" [ref=e362] [cursor=pointer]:
+                  - img [ref=e363]
+          - generic [ref=e365]:
+            - generic [ref=e366]: SUN
+            - generic [ref=e367]: MON
+            - generic [ref=e368]: TUE
+            - generic [ref=e369]: WED
+            - generic [ref=e370]: THU
+            - generic [ref=e371]: FRI
+            - generic [ref=e372]: SAT
+          - generic [ref=e373]:
+            - generic [ref=e374]:
+              - generic [ref=e380] [cursor=pointer]:
+                - generic [ref=e381]:
+                  - text: "10"
+                  - generic [ref=e382]: Arrival
+                - generic [ref=e384]:
+                  - generic [ref=e385]:
+                    - paragraph [ref=e386]: Morning
+                    - button "Stroll through Downtown Napa" [ref=e387]
+                    - paragraph [ref=e388]: Afternoon · Activity
+                    - button "Remove Stroll through Downtown Napa" [ref=e389]: ×
+                  - generic [ref=e390]:
+                    - paragraph [ref=e391]: Lunch
+                    - button "Lunch at Oxbow Public Market" [ref=e392]
+                    - paragraph [ref=e393]: Lunch
+                    - button "Remove Lunch at Oxbow Public Market" [ref=e394]: ×
+                  - generic [ref=e395]:
+                    - paragraph [ref=e396]: 3:30 PM
+                    - button "Recommended stay in Napa Valley" [ref=e397]
+                    - paragraph [ref=e398]: Check-in
+                  - generic [ref=e399]:
+                    - paragraph [ref=e400]: Dinner
+                    - button "Dinner at Angele Restaurant & Bar" [ref=e401]
+                    - paragraph [ref=e402]: Dinner
+                    - button "Remove Dinner at Angele Restaurant & Bar" [ref=e403]: ×
+                - button "Edit day" [ref=e404]
+              - generic [ref=e405] [cursor=pointer]:
+                - generic [ref=e406]:
+                  - text: "11"
+                  - generic [ref=e407]: On trip
+                - generic [ref=e409]:
+                  - generic [ref=e410]:
+                    - paragraph [ref=e411]: Morning
+                    - button "Picnic at V. Sattui Winery" [ref=e412]
+                    - paragraph [ref=e413]: Breakfast
+                    - button "Remove Picnic at V. Sattui Winery" [ref=e414]: ×
+                  - generic [ref=e415]:
+                    - paragraph [ref=e416]: Morning
+                    - button "Wine Tasting at Castello di Amorosa" [ref=e417]
+                    - paragraph [ref=e418]: Late Morning · Activity
+                    - button "Remove Wine Tasting at Castello di Amorosa" [ref=e419]: ×
+                  - generic [ref=e420]:
+                    - paragraph [ref=e421]: Afternoon
+                    - button "Hot Air Balloon Ride" [ref=e422]
+                    - paragraph [ref=e423]: Afternoon · Activity
+                    - button "Remove Hot Air Balloon Ride" [ref=e424]: ×
+                  - generic [ref=e425]:
+                    - paragraph [ref=e426]: Dinner
+                    - button "Dinner at Bottega" [ref=e427]
+                    - paragraph [ref=e428]: Dinner
+                    - button "Remove Dinner at Bottega" [ref=e429]: ×
+                - button "Edit day" [ref=e430]
+            - generic [ref=e431]:
+              - generic [ref=e432] [cursor=pointer]:
+                - generic [ref=e433]:
+                  - text: "12"
+                  - generic [ref=e434]: On trip
+                - generic [ref=e436]:
+                  - generic [ref=e437]:
+                    - paragraph [ref=e438]: Morning
+                    - button "Visit di Rosa Center for Contemporary Art" [ref=e439]
+                    - paragraph [ref=e440]: Late Morning · Activity
+                    - button "Remove Visit di Rosa Center for Contemporary Art" [ref=e441]: ×
+                  - generic [ref=e442]:
+                    - paragraph [ref=e443]: Morning
+                    - button "Hike at Bothe-Napa Valley State Park" [ref=e444]
+                    - paragraph [ref=e445]: Afternoon · Beach time
+                    - button "Remove Hike at Bothe-Napa Valley State Park" [ref=e446]: ×
+                  - generic [ref=e447]:
+                    - paragraph [ref=e448]: Lunch
+                    - button "Lunch at Farmstead at Long Meadow Ranch" [ref=e449]
+                    - paragraph [ref=e450]: Lunch
+                    - button "Remove Lunch at Farmstead at Long Meadow Ranch" [ref=e451]: ×
+                  - generic [ref=e452]:
+                    - paragraph [ref=e453]: Dinner
+                    - button "Dinner at The Charter Oak" [ref=e454]
+                    - paragraph [ref=e455]: Dinner
+                    - button "Remove Dinner at The Charter Oak" [ref=e456]: ×
+                - button "Edit day" [ref=e457]
+              - generic [ref=e458] [cursor=pointer]:
+                - generic [ref=e459]:
+                  - text: "13"
+                  - generic [ref=e460]: Departure
+                - generic [ref=e462]:
+                  - generic [ref=e463]:
+                    - paragraph [ref=e464]: Morning
+                    - button "Olive Oil Tasting at Round Pond Estate" [ref=e465]
+                    - paragraph [ref=e466]: Late Morning · Activity
+                    - button "Remove Olive Oil Tasting at Round Pond Estate" [ref=e467]: ×
+                  - generic [ref=e468]:
+                    - paragraph [ref=e469]: 11:30 AM
+                    - button "Recommended stay in Napa Valley" [ref=e470]
+                    - paragraph [ref=e471]: Check-out
+                  - generic [ref=e472]:
+                    - paragraph [ref=e473]: Lunch
+                    - button "Lunch at Gott's Roadside" [ref=e474]
+                    - paragraph [ref=e475]: Lunch
+                    - button "Remove Lunch at Gott's Roadside" [ref=e476]: ×
+                  - generic [ref=e477]:
+                    - paragraph [ref=e478]: Afternoon
+                    - button "Relax at Silverado Resort & Spa" [ref=e479]
+                    - paragraph [ref=e480]: Afternoon · Activity
+                    - button "Remove Relax at Silverado Resort & Spa" [ref=e481]: ×
+                - button "Edit day" [ref=e482]
+          - generic [ref=e488]:
+            - button "Add places" [ref=e489] [cursor=pointer]
+            - button "Change dates" [ref=e490] [cursor=pointer]
+            - button "View full month" [ref=e491] [cursor=pointer]
+        - generic [ref=e492]:
+          - generic [ref=e493]:
+            - generic [ref=e494]:
+              - generic [ref=e495]:
+                - heading "Trip Copilot" [level=2] [ref=e496]
+                - generic [ref=e497]: LIVE
+              - paragraph [ref=e499]: Saving automatically \u00b7 everyone sees changes
+            - generic [ref=e502]:
+              - generic [ref=e503]: c
+              - generic [ref=e505]: Ask me to change trip dates, budget, group size, add a hotel (say whole trip or which nights), pin a restaurant on a day, or jump to a section — I’ll update your draft when I can.
+            - generic [ref=e506]:
+              - generic [ref=e507]:
+                - textbox "Ask anything about the trip..." [ref=e508]
+                - button "Send" [disabled] [ref=e509]
+              - generic [ref=e510]:
+                - generic [ref=e511]: TRY
+                - generic [ref=e512]:
+                  - button "Change dates" [ref=e513] [cursor=pointer]
+                  - button "Set budget" [ref=e514] [cursor=pointer]
+                  - button "Add a hotel" [ref=e515] [cursor=pointer]
+                  - button "Pin a restaurant" [ref=e516] [cursor=pointer]
+                  - button "Add a day" [ref=e517] [cursor=pointer]
+          - button "Open trip chat" [ref=e518] [cursor=pointer]: 💬

@@ -21,6 +21,7 @@ function mergeHostSetupPatch(current: unknown, patch: HostSetupPatch): HostSetup
   if (patch.activityPins !== undefined) out.activityPins = patch.activityPins;
   if (patch.hotel !== undefined) out.hotel = patch.hotel;
   if (patch.hotelStays !== undefined) out.hotelStays = patch.hotelStays;
+  if (patch.flightBookings !== undefined) out.flightBookings = patch.flightBookings;
   if (patch.packingList !== undefined) out.packingList = patch.packingList;
   if (patch.experiencesOutlined !== undefined) out.experiencesOutlined = patch.experiencesOutlined;
   return out;

@@ -5,6 +5,7 @@ import type {
   DuffelOffer,
   DuffelFlightPassenger,
   DuffelFlightBookingRecord,
+  DuffelFlightsBookApiResponse,
 } from "@/shared/duffel-flights";
 
 type AirportSuggestion = { iata: string; name: string; city: string; country: string };
@@ -323,6 +324,7 @@ export function DuffelFlightBookingDrawer({
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [paxErrors, setPaxErrors] = useState<PassengerFieldErrors[]>([]);
   const [booking, setBooking] = useState<DuffelFlightBookingRecord | null>(null);
+  const [pendingPriceChange, setPendingPriceChange] = useState<DuffelFlightsBookApiResponse["priceChange"] | null>(null);
   // Editable search fields (seeded from props; user can change and re-search).
   const [searchOrigin, setSearchOrigin] = useState(origin);
   const [searchDestination, setSearchDestination] = useState(destination);
@@ -369,6 +371,7 @@ export function DuffelFlightBookingDrawer({
     setStep("results");
     setSelectedOffer(null);
     setBooking(null);
+    setPendingPriceChange(null);
     setError(null);
     setPaxErrors([]);
     setSearchOrigin(origin);
@@ -382,12 +385,14 @@ export function DuffelFlightBookingDrawer({
 
   const handleSelectOffer = useCallback((offer: DuffelOffer) => {
     setSelectedOffer(offer);
+    setPendingPriceChange(null);
+    setError(null);
     setPassengers(Array.from({ length: offer.passengers.length }, blankPassenger));
     setPaxErrors(Array.from({ length: offer.passengers.length }, () => ({})));
     setStep("passenger-details");
   }, []);
 
-  const handleBook = useCallback(async () => {
+  const handleBook = useCallback(async (acceptPriceChange = false) => {
     if (!selectedOffer) return;
     setLoading(true);
     setError(null);
@@ -407,14 +412,27 @@ export function DuffelFlightBookingDrawer({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offerId: selectedOffer.id, offer: selectedOffer, passengers: paxPayload }),
+        body: JSON.stringify({
+          offerId: selectedOffer.id,
+          offer: selectedOffer,
+          passengers: paxPayload,
+          acceptPriceChange,
+        }),
       });
-      const j = (await r.json()) as { booking?: DuffelFlightBookingRecord; error?: string };
+      const j = (await r.json()) as DuffelFlightsBookApiResponse;
+      if (j.requiresAcceptance && j.priceChange) {
+        setSelectedOffer(j.priceChange.confirmedOffer);
+        setPendingPriceChange(j.priceChange);
+        setError(j.error ?? "Review and accept the updated price before booking.");
+        setStep("confirm");
+        return;
+      }
       if (!r.ok || !j.booking) {
         setError(j.error ?? "Booking failed.");
         return;
       }
       setBooking(j.booking);
+      setPendingPriceChange(null);
       setStep("done");
       onBookingComplete?.(j.booking);
     } catch {
@@ -738,6 +756,23 @@ export function DuffelFlightBookingDrawer({
                 )}
               </div>
 
+              {pendingPriceChange ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Updated Duffel offer</p>
+                  <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                    Price changed from {fmtCurrency(pendingPriceChange.previousAmount, pendingPriceChange.previousCurrency)} to{" "}
+                    {fmtCurrency(pendingPriceChange.confirmedAmount, pendingPriceChange.confirmedCurrency)}. Accept the updated offer to book.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleBook(true)}
+                    className="mt-3 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-800 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200"
+                  >
+                    Accept updated price
+                  </button>
+                </div>
+              ) : null}
+
               {error && (
                 <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300">
                   {error}
@@ -746,7 +781,11 @@ export function DuffelFlightBookingDrawer({
 
               <div className="flex gap-3">
                 <button onClick={() => setStep("passenger-details")} className={btnSecondary}>Back</button>
-                <button onClick={() => void handleBook()} className={`flex-1 ${btnPrimary}`}>
+                <button
+                  onClick={() => void handleBook()}
+                  disabled={Boolean(pendingPriceChange)}
+                  className={`flex-1 ${btnPrimary}`}
+                >
                   Confirm &amp; book
                 </button>
               </div>

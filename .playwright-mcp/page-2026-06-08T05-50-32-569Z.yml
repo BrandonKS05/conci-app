@@ -1,0 +1,36 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Conci home" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: Conci
+        - navigation "Main" [ref=e7]:
+          - link "Create a Trip" [ref=e8] [cursor=pointer]:
+            - /url: /trip-parser
+          - link "My Trips" [ref=e9] [cursor=pointer]:
+            - /url: /my-trips
+          - link "Joined Trips" [ref=e10] [cursor=pointer]:
+            - /url: /joined-trips
+          - link "Pricing" [ref=e11] [cursor=pointer]:
+            - /url: /pricing
+          - link "Profile" [ref=e12] [cursor=pointer]:
+            - /url: /profile/me
+        - button "D" [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: D
+    - main [ref=e15]:
+      - status [ref=e221]:
+        - generic [ref=e222]:
+          - img [ref=e225]:
+            - generic [ref=e226]: Conci
+            - img [ref=e229]
+          - generic [ref=e231]: Finding the best restaurant experiences...
+          - generic [ref=e232]: BUILDING YOUR TRIP
+          - generic [ref=e233]:
+            - generic [ref=e236]: Lodging
+            - generic [ref=e239]: Meals
+            - generic [ref=e242]: Activities
+            - generic [ref=e245]: Budget
+  - button "Open Next.js Dev Tools" [ref=e179] [cursor=pointer]:
+    - img [ref=e180]
+  - alert [ref=e183]

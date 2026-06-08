@@ -1,0 +1,244 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e93] [cursor=pointer]:
+    - img [ref=e94]
+  - alert [ref=e97]: Conci · AI for group trips
+  - main [ref=e249]:
+    - generic [ref=e251]:
+      - link "Conci home" [ref=e252] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e253]: Conci
+      - navigation "Main" [ref=e254]:
+        - link "Create a Trip" [ref=e255] [cursor=pointer]:
+          - /url: /trip-parser
+        - link "My Trips" [ref=e256] [cursor=pointer]:
+          - /url: /my-trips
+        - link "Joined Trips" [ref=e257] [cursor=pointer]:
+          - /url: /joined-trips
+        - link "Pricing" [ref=e258] [cursor=pointer]:
+          - /url: /pricing
+        - link "Profile" [ref=e259] [cursor=pointer]:
+          - /url: /profile/me
+      - button "D" [ref=e262] [cursor=pointer]:
+        - generic [ref=e263]: D
+    - generic [ref=e267]:
+      - complementary [ref=e268]:
+        - generic [ref=e269]:
+          - generic [ref=e270]:
+            - paragraph [ref=e271]: Trip
+            - heading "Lisbon Trip" [level=1] [ref=e272]
+            - paragraph [ref=e273]: Mar 14, 2026 — Mar 17, 2026
+            - paragraph [ref=e274]: 4 travelers
+          - generic [ref=e275]:
+            - generic [ref=e276]:
+              - generic [ref=e277]:
+                - paragraph [ref=e278]: Invite friends
+                - paragraph [ref=e279]: W4Y-8YN
+              - button "Copy" [ref=e280] [cursor=pointer]
+            - paragraph [ref=e281]: conci.travel/join/W4Y8YN to vote and add preferences.
+            - generic [ref=e282]:
+              - generic [ref=e284]: +
+              - paragraph [ref=e285]: 0 of 0 joined
+          - generic [ref=e286]:
+            - paragraph [ref=e287]: Sections
+            - navigation "Trip workspace sections" [ref=e288]:
+              - button "Overview" [ref=e289] [cursor=pointer]:
+                - img [ref=e291]
+                - text: Overview
+              - button "Transportation" [ref=e296] [cursor=pointer]:
+                - img [ref=e298]
+                - text: Transportation
+              - button "Budget & Fund" [ref=e300] [cursor=pointer]:
+                - img [ref=e302]
+                - text: Budget & Fund
+              - button "Collaborate" [ref=e305] [cursor=pointer]:
+                - img [ref=e307]
+                - text: Collaborate
+              - button "Lodging" [ref=e313] [cursor=pointer]:
+                - img [ref=e315]
+                - text: Lodging
+              - link "Trip Overview" [ref=e318] [cursor=pointer]:
+                - /url: /trip/d2d2ee93-5cab-4f84-8820-2307db71a207/itinerary
+                - img [ref=e320]
+                - text: Trip Overview
+          - generic [ref=e323]:
+            - paragraph [ref=e324]: Shared
+            - generic [ref=e325]:
+              - link "Packing list" [ref=e326] [cursor=pointer]:
+                - /url: /trip/d2d2ee93-5cab-4f84-8820-2307db71a207/setup/packing
+              - generic [ref=e327]: · 12 items, 8 checked
+      - main [ref=e328]:
+        - generic [ref=e329]:
+          - generic [ref=e331]:
+            - button "Estimated total ▾ $2,644 for 2 travelers" [ref=e332] [cursor=pointer]:
+              - generic [ref=e333]: Estimated total ▾
+              - generic [ref=e334]: $2,644
+              - generic [ref=e335]: for 2 travelers
+            - generic [ref=e336]:
+              - generic [ref=e337]: Per person
+              - generic [ref=e338]: $1,322
+              - generic [ref=e339]: budget only — flights pending
+            - generic [ref=e340]:
+              - generic [ref=e341]: Trip fund
+              - generic [ref=e342]: $0
+              - generic [ref=e343]: No contributions yet
+            - generic [ref=e344]:
+              - generic [ref=e345]: Still owed
+              - generic [ref=e346]: $2,644
+              - generic [ref=e347]: Estimate minus current fund
+          - paragraph [ref=e349]: Itinerary
+          - generic [ref=e350]:
+            - heading "March 2026" [level=3] [ref=e351]
+            - generic [ref=e352]:
+              - generic [ref=e353]:
+                - generic [ref=e354]: Arrival
+                - generic [ref=e356]: On trip
+                - generic [ref=e358]: Departure
+              - generic [ref=e360]:
+                - button "Previous month" [ref=e361] [cursor=pointer]:
+                  - img [ref=e362]
+                - button "Next month" [ref=e364] [cursor=pointer]:
+                  - img [ref=e365]
+          - generic [ref=e367]:
+            - generic [ref=e368]: SUN
+            - generic [ref=e369]: MON
+            - generic [ref=e370]: TUE
+            - generic [ref=e371]: WED
+            - generic [ref=e372]: THU
+            - generic [ref=e373]: FRI
+            - generic [ref=e374]: SAT
+          - generic [ref=e375]:
+            - generic [ref=e383] [cursor=pointer]:
+              - generic [ref=e384]:
+                - text: "14"
+                - generic [ref=e385]: Arrival
+              - generic [ref=e387]:
+                - generic [ref=e388]:
+                  - paragraph [ref=e389]: Morning
+                  - button "Explore Alfama District" [ref=e390]
+                  - paragraph [ref=e391]: Late Afternoon · Activity
+                  - button "Remove Explore Alfama District" [ref=e392]: ×
+                - generic [ref=e393]:
+                  - paragraph [ref=e394]: 3:30 PM
+                  - button "Recommended stay in Lisbon" [ref=e395]
+                  - paragraph [ref=e396]: Check-in
+                - generic [ref=e397]:
+                  - paragraph [ref=e398]: Afternoon
+                  - button "Fado Music Show" [ref=e399]
+                  - paragraph [ref=e400]: Evening · Activity
+                  - button "Remove Fado Music Show" [ref=e401]: ×
+                - generic [ref=e402]:
+                  - paragraph [ref=e403]: 4:50 PM
+                  - 'button "Flight: Miami → Lisbon" [ref=e404]'
+                  - paragraph [ref=e405]: MIA → LIS, ~9 hrs. Economy round-trip ~$800 pp. · MIA → home
+                  - 'button "Remove Flight: Miami → Lisbon" [ref=e406]': ×
+                - generic [ref=e407]:
+                  - paragraph [ref=e408]: Dinner
+                  - button "Dinner at Time Out Market" [ref=e409]
+                  - paragraph [ref=e410]: Dinner
+                  - button "Remove Dinner at Time Out Market" [ref=e411]: ×
+              - button "Edit day" [ref=e412]
+            - generic [ref=e413]:
+              - generic [ref=e414] [cursor=pointer]:
+                - generic [ref=e415]:
+                  - text: "15"
+                  - generic [ref=e416]: On trip
+                - generic [ref=e418]:
+                  - generic [ref=e419]:
+                    - paragraph [ref=e420]: Morning
+                    - button "Visit Belém Tower" [ref=e421]
+                    - paragraph [ref=e422]: Late Morning · Activity
+                    - button "Remove Visit Belém Tower" [ref=e423]: ×
+                  - generic [ref=e424]:
+                    - paragraph [ref=e425]: Lunch
+                    - button "Lunch at Pasteis de Belém" [ref=e426]
+                    - paragraph [ref=e427]: Lunch
+                    - button "Remove Lunch at Pasteis de Belém" [ref=e428]: ×
+                  - generic [ref=e429]:
+                    - paragraph [ref=e430]: Afternoon
+                    - button "Jerónimos Monastery" [ref=e431]
+                    - paragraph [ref=e432]: Afternoon · Activity
+                    - button "Remove Jerónimos Monastery" [ref=e433]: ×
+                  - generic [ref=e434]:
+                    - paragraph [ref=e435]: Dinner
+                    - button "Dinner at Cervejaria Ramiro" [ref=e436]
+                    - paragraph [ref=e437]: Dinner
+                    - button "Remove Dinner at Cervejaria Ramiro" [ref=e438]: ×
+                - button "Edit day" [ref=e439]
+              - generic [ref=e440] [cursor=pointer]:
+                - generic [ref=e441]:
+                  - text: "16"
+                  - generic [ref=e442]: On trip
+                - generic [ref=e444]:
+                  - generic [ref=e445]:
+                    - paragraph [ref=e446]: Morning
+                    - button "Day trip to Sintra" [ref=e447]
+                    - paragraph [ref=e448]: Late Morning · Activity
+                    - button "Remove Day trip to Sintra" [ref=e449]: ×
+                  - generic [ref=e450]:
+                    - paragraph [ref=e451]: Lunch
+                    - button "Lunch at Tascantiga" [ref=e452]
+                    - paragraph [ref=e453]: Lunch
+                    - button "Remove Lunch at Tascantiga" [ref=e454]: ×
+                  - generic [ref=e455]:
+                    - paragraph [ref=e456]: Afternoon
+                    - button "Explore Pena Palace" [ref=e457]
+                    - paragraph [ref=e458]: Afternoon · Activity
+                    - button "Remove Explore Pena Palace" [ref=e459]: ×
+                  - generic [ref=e460]:
+                    - paragraph [ref=e461]: Dinner
+                    - button "Dinner at Taberna da Rua das Flores" [ref=e462]
+                    - paragraph [ref=e463]: Dinner
+                    - button "Remove Dinner at Taberna da Rua das Flores" [ref=e464]: ×
+                - button "Edit day" [ref=e465]
+              - generic [ref=e466] [cursor=pointer]:
+                - generic [ref=e467]:
+                  - text: "17"
+                  - generic [ref=e468]: Departure
+                - generic [ref=e470]:
+                  - generic [ref=e471]:
+                    - paragraph [ref=e472]: Morning
+                    - button "Relax at Eduardo VII Park" [ref=e473]
+                    - paragraph [ref=e474]: Late Morning · Beach time
+                    - button "Remove Relax at Eduardo VII Park" [ref=e475]: ×
+                  - generic [ref=e476]:
+                    - paragraph [ref=e477]: 11:30 AM
+                    - button "Recommended stay in Lisbon" [ref=e478]
+                    - paragraph [ref=e479]: Check-out
+                  - generic [ref=e480]:
+                    - paragraph [ref=e481]: Lunch
+                    - button "Lunch at Mercado da Ribeira" [ref=e482]
+                    - paragraph [ref=e483]: Lunch
+                    - button "Remove Lunch at Mercado da Ribeira" [ref=e484]: ×
+                  - generic [ref=e485]:
+                    - paragraph [ref=e486]: 4:50 PM
+                    - 'button "Flight: Lisbon → Miami" [ref=e487]'
+                    - paragraph [ref=e488]: LIS → MIA, ~9 hrs. Return leg of round-trip. · MIA → home
+                    - 'button "Remove Flight: Lisbon → Miami" [ref=e489]': ×
+                - button "Edit day" [ref=e490]
+          - generic [ref=e495]:
+            - button "Add places" [ref=e496] [cursor=pointer]
+            - button "Change dates" [ref=e497] [cursor=pointer]
+            - button "View full month" [ref=e498] [cursor=pointer]
+        - generic [ref=e499]:
+          - generic [ref=e500]:
+            - generic [ref=e501]:
+              - generic [ref=e502]:
+                - heading "Trip Copilot" [level=2] [ref=e503]
+                - generic [ref=e504]: LIVE
+              - paragraph [ref=e506]: Saving automatically \u00b7 everyone sees changes
+            - generic [ref=e509]:
+              - generic [ref=e510]: c
+              - generic [ref=e512]: Ask me to change trip dates, budget, group size, add a hotel (say whole trip or which nights), pin a restaurant on a day, or jump to a section — I’ll update your draft when I can.
+            - generic [ref=e513]:
+              - generic [ref=e514]:
+                - textbox "Ask anything about the trip..." [ref=e515]
+                - button "Send" [disabled] [ref=e516]
+              - generic [ref=e517]:
+                - generic [ref=e518]: TRY
+                - generic [ref=e519]:
+                  - button "Change dates" [ref=e520] [cursor=pointer]
+                  - button "Set budget" [ref=e521] [cursor=pointer]
+                  - button "Add a hotel" [ref=e522] [cursor=pointer]
+                  - button "Pin a restaurant" [ref=e523] [cursor=pointer]
+                  - button "Add a day" [ref=e524] [cursor=pointer]
+          - button "Open trip chat" [ref=e525] [cursor=pointer]: 💬
