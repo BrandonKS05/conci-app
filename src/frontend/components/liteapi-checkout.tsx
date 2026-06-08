@@ -31,6 +31,7 @@ declare global {
 type StoredCtx = {
   transactionId: string;
   rateId: string;
+  offerId: string;
   hotelId: string;
   hotelName: string;
   checkIn: string;
@@ -44,6 +45,7 @@ const ctxKey = (prebookId: string) => `liteapi-checkout:${prebookId}`;
 type Props = {
   tripId: string;
   rateId: string;
+  offerId: string;
   hotelId: string;
   hotelName: string;
   checkIn: string;
@@ -88,6 +90,7 @@ export function LiteApiCheckout(props: Props) {
             prebookId,
             transactionId: ctx.transactionId,
             rateId: ctx.rateId,
+            offerId: ctx.offerId,
             hotelId: ctx.hotelId,
             hotelName: ctx.hotelName,
             checkInDate: ctx.checkIn,
@@ -123,6 +126,7 @@ export function LiteApiCheckout(props: Props) {
     const ctx: StoredCtx = {
       transactionId: pb.transactionId,
       rateId: props.rateId,
+      offerId: props.offerId,
       hotelId: props.hotelId,
       hotelName: props.hotelName,
       checkIn: props.checkIn,
@@ -181,7 +185,14 @@ export function LiteApiCheckout(props: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ rateId: props.rateId }),
+        body: JSON.stringify({
+          rateId: props.rateId,
+          offerId: props.offerId,
+          hotelId: props.hotelId,
+          checkIn: props.checkIn,
+          checkOut: props.checkOut,
+          guests: props.guests,
+        }),
       });
       const pj = (await pr.json()) as LiteApiPrebookApiResponse;
       if (!pr.ok || !pj.prebook) {
@@ -200,7 +211,7 @@ export function LiteApiCheckout(props: Props) {
       setError("Network error preparing the booking.");
       setPhase("form");
     }
-  }, [guest, props.tripId, props.rateId, launchPayment]);
+  }, [guest, props.tripId, props.rateId, props.offerId, props.hotelId, props.checkIn, props.checkOut, props.guests, launchPayment]);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10 sm:px-6">

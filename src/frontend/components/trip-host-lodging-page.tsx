@@ -639,6 +639,7 @@ export function TripHostLodgingPage(props: {
                                 `/trip/${props.tripId}/lodging/checkout?` +
                                   new URLSearchParams({
                                     rateId: hotel.providerRateId ?? "",
+                                    offerId: hotel.providerOfferId ?? "",
                                     hotelId: hotel.providerHotelId ?? "",
                                     hotelName: hotel.name,
                                     checkIn,

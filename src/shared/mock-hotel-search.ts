@@ -48,8 +48,10 @@ export type MockHotelBrowseResult = MockHotelResult & {
   provider?: LodgingProviderName;
   /** Provider-native hotel id — needed to fetch details or prebook. */
   providerHotelId?: string;
-  /** Provider-native cheapest-rate id — the offer a future checkout page prebooks. */
+  /** Provider-native cheapest-rate id — display/source metadata only. */
   providerRateId?: string;
+  /** roomType-level offer token — the value LiteAPI /rates/prebook expects (distinct from providerRateId). */
+  providerOfferId?: string;
   /** Coordinates when the provider supplies them (used for centrality scoring). */
   latitude?: number;
   longitude?: number;
@@ -373,6 +375,7 @@ export function hotelBrowseResultToLodgingMeta(
     ...(provider ? { provider } : {}),
     ...(hotel.providerHotelId ? { providerHotelId: hotel.providerHotelId } : {}),
     ...(hotel.providerRateId ? { providerRateId: hotel.providerRateId } : {}),
+    ...(hotel.providerOfferId ? { providerOfferId: hotel.providerOfferId } : {}),
     providerResultId: hotel.id,
     ...(opts?.searchSource ? { providerSearchSource: opts.searchSource } : {}),
     nightlyUsd: hotel.nightlyUsd,

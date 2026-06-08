@@ -102,8 +102,10 @@ export type HostLodgingStayMeta = {
   provider?: LodgingProviderName | "manual";
   /** Provider-native hotel/accommodation id. */
   providerHotelId?: string;
-  /** Provider-native rate/offer id; only route to that provider's checkout. */
+  /** Provider-native rate id — display/source metadata only. */
   providerRateId?: string;
+  /** roomType-level offer token used for LiteAPI prebook (distinct from providerRateId). */
+  providerOfferId?: string;
   /** Stable result id from the provider/search response. */
   providerResultId?: string;
   /** Search mode/provenance, e.g. LiteAPI aiSearch vs rates. */
@@ -435,6 +437,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       const provider = parseLodgingProvider(o.provider);
       const providerHotelId = trimStringField(o.providerHotelId);
       const providerRateId = trimStringField(o.providerRateId);
+      const providerOfferId = trimStringField(o.providerOfferId);
       const providerResultId = trimStringField(o.providerResultId);
       const providerSearchSource = trimStringField(o.providerSearchSource);
       const nightlyUsd = parseFiniteNumber(o.nightlyUsd);
@@ -459,6 +462,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
           ...(provider ? { provider } : {}),
           ...(providerHotelId ? { providerHotelId } : {}),
           ...(providerRateId ? { providerRateId } : {}),
+          ...(providerOfferId ? { providerOfferId } : {}),
           ...(providerResultId ? { providerResultId } : {}),
           ...(providerSearchSource ? { providerSearchSource } : {}),
           ...(nightlyUsd !== undefined ? { nightlyUsd } : {}),
@@ -1369,6 +1373,7 @@ export function applyHostLodgingSegment(
         ...(meta.provider ? { provider: meta.provider } : {}),
         ...(meta.providerHotelId?.trim() ? { providerHotelId: meta.providerHotelId.trim() } : {}),
         ...(meta.providerRateId?.trim() ? { providerRateId: meta.providerRateId.trim() } : {}),
+        ...(meta.providerOfferId?.trim() ? { providerOfferId: meta.providerOfferId.trim() } : {}),
         ...(meta.providerResultId?.trim() ? { providerResultId: meta.providerResultId.trim() } : {}),
         ...(meta.providerSearchSource?.trim() ? { providerSearchSource: meta.providerSearchSource.trim() } : {}),
         ...(meta.nightlyUsd !== undefined ? { nightlyUsd: meta.nightlyUsd } : {}),

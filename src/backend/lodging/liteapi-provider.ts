@@ -58,6 +58,7 @@ function toBrowseResult(h: LiteApiHotelResult, nights: number): MockHotelBrowseR
     provider: "liteapi",
     providerHotelId: h.hotelId,
     providerRateId: rate.rateId,
+    ...(rate.offerId ? { providerOfferId: rate.offerId } : {}),
     ...(h.address.latitude != null ? { latitude: h.address.latitude } : {}),
     ...(h.address.longitude != null ? { longitude: h.address.longitude } : {}),
     ...(h.vibeTags?.length ? { vibeTags: h.vibeTags } : {}),

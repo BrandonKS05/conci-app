@@ -91,7 +91,10 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
   const key = getSerpApiKey();
   const depCity = plan.departureCity?.trim();
   const dest = plan.location?.trim();
-  if (!key) return { flights: [], bookBaseUrl: null, error: "Add SERPAPI_KEY to search flights." };
+  if (!key) {
+    console.info("[trip-live-flights] SerpAPI key missing; flight inspiration skipped");
+    return { flights: [], bookBaseUrl: null, error: null };
+  }
   if (!depCity || !dest) {
     return { flights: [], bookBaseUrl: null, error: null };
   }
@@ -174,10 +177,11 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
       error: flights.length ? null : "No flight results returned for this search.",
     };
   } catch (e) {
+    console.error("[trip-live-flights] SerpAPI flight inspiration failed", e instanceof Error ? e.message : String(e));
     return {
       flights: [],
       bookBaseUrl: "https://www.google.com/travel/flights",
-      error: e instanceof Error ? e.message : "Flight search failed.",
+      error: null,
     };
   }
 }

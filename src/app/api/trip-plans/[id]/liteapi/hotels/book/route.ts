@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
 import { resolveTripAccess } from "@/backend/trip-memberships";
-import { bookLiteApiRate, isLiteApiConfigured } from "@/backend/liteapi";
+import { bookLiteApiRate, friendlyLiteApiError, isLiteApiConfigured } from "@/backend/liteapi";
 import {
   normalizePlan,
   parseHostSetup,
@@ -46,6 +46,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     prebookId?: string;
     transactionId?: string;
     rateId?: string;
+    offerId?: string;
     hotelId?: string;
     hotelName?: string;
     checkInDate?: string;
@@ -62,6 +63,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const prebookId = typeof body.prebookId === "string" ? body.prebookId.trim() : "";
   const transactionId = typeof body.transactionId === "string" ? body.transactionId.trim() : "";
   const rateId = typeof body.rateId === "string" ? body.rateId.trim() : "";
+  const offerId = typeof body.offerId === "string" ? body.offerId.trim() : "";
   const hotelId = typeof body.hotelId === "string" ? body.hotelId.trim() : "";
   const hotelName = typeof body.hotelName === "string" ? body.hotelName.trim() : "";
   const checkInDate = typeof body.checkInDate === "string" ? body.checkInDate.trim() : "";
@@ -127,7 +129,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Booking failed.";
     console.error("[liteapi/hotels/book] booking failed", msg);
-    return NextResponse.json({ error: msg, booking: null } satisfies LiteApiBookApiResponse, { status: 502 });
+    return NextResponse.json({ error: friendlyLiteApiError(e), booking: null } satisfies LiteApiBookApiResponse, { status: 502 });
   }
 
   if (!booking) {
@@ -172,6 +174,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         provider: "liteapi",
         providerHotelId: hotelId,
         providerRateId: rateId,
+        ...(offerId ? { providerOfferId: offerId } : {}),
         providerResultId: `liteapi:${hotelId}`,
         bookingType: "in_app",
         totalUsd: booking.totalAmount,

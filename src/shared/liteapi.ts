@@ -32,7 +32,10 @@ export type LiteApiRoom = {
 };
 
 export type LiteApiRate = {
+  /** Rate-level identifier — display/source metadata only. NOT accepted by /rates/prebook. */
   rateId: string;
+  /** roomType-level offer token — the value /rates/prebook expects as `offerId`. */
+  offerId?: string;
   name: string;
   boardType: string | null;
   retailRate: {

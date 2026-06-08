@@ -149,17 +149,21 @@ function parseCancellationPolicies(raw: unknown): LiteApiCancellationPolicy[] {
   });
 }
 
-function parseRate(raw: unknown): LiteApiRate | null {
+function parseRate(raw: unknown, roomTypeOfferId?: string): LiteApiRate | null {
   const o = asRecord(raw);
-  // In v3, a rate's offer identifier is `rateId` (also accepted as `offerId` upstream).
-  const rateId = str(o.rateId || o.offerId || o.id);
-  if (!rateId) return null;
+  // v3: `rateId` is the rate-level identifier (display/source only). The PREBOOK token is
+  // the roomType-level `offerId`, threaded in via collectRates; flat responses may carry it
+  // on the rate itself as `offerId`.
+  const rateId = str(o.rateId || o.id);
+  const offerId = str(roomTypeOfferId || o.offerId) || undefined;
+  if (!rateId && !offerId) return null;
 
   const retail = asRecord(o.retailRate);
   const totalArr = Array.isArray(retail.total) ? (retail.total as unknown[]) : [];
 
   return {
-    rateId,
+    rateId: rateId || offerId!,
+    ...(offerId ? { offerId } : {}),
     name: str(o.name || o.rateName || o.boardName),
     boardType: str(o.boardType || o.boardName || o.mealPlan) || null,
     retailRate: {
@@ -190,9 +194,12 @@ function collectRates(hotelData: Record<string, unknown>): LiteApiRate[] {
   const out: LiteApiRate[] = [];
   const roomTypes = Array.isArray(hotelData.roomTypes) ? (hotelData.roomTypes as unknown[]) : [];
   for (const rt of roomTypes) {
-    const rtRates = Array.isArray(asRecord(rt).rates) ? (asRecord(rt).rates as unknown[]) : [];
+    const rto = asRecord(rt);
+    // The prebook token lives at the roomType level in v3.
+    const rtOfferId = str(rto.offerId) || undefined;
+    const rtRates = Array.isArray(rto.rates) ? (rto.rates as unknown[]) : [];
     for (const r of rtRates) {
-      const parsed = parseRate(r);
+      const parsed = parseRate(r, rtOfferId);
       if (parsed) out.push(parsed);
     }
   }
@@ -323,6 +330,15 @@ export type LiteApiSearchParams = {
   limit?: number;
 };
 
+export type LiteApiFreshOfferParams = {
+  hotelId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  adults: number;
+  currency?: string;
+  guestNationality?: string;
+};
+
 function buildRatesBody(params: LiteApiSearchParams, coords: { latitude: number; longitude: number }) {
   return {
     occupancies: [{ adults: Math.max(1, params.adults), ...(params.children?.length ? { children: params.children } : {}) }],
@@ -413,10 +429,68 @@ export async function getLiteApiHotelDetails(hotelId: string): Promise<LiteApiHo
   return buildHotelResult({ ...content, hotelId: str(content.id || content.hotelId || hotelId) }, []);
 }
 
+/** Refresh one hotel's cheapest offer immediately before PREBOOK. */
+export async function getFreshLiteApiOffer(params: LiteApiFreshOfferParams): Promise<LiteApiRate | null> {
+  const body = {
+    hotelIds: [params.hotelId],
+    occupancies: [{ adults: Math.max(1, params.adults) }],
+    currency: params.currency ?? "USD",
+    guestNationality: params.guestNationality ?? "US",
+    checkin: params.checkInDate,
+    checkout: params.checkOutDate,
+    roomMapping: true,
+    maxRatesPerHotel: 1,
+    includeHotelData: true,
+    margin: getLiteApiMarginPct(),
+    limit: 1,
+  };
+  const resp = await litePost(DATA_BASE, "/hotels/rates", body);
+  const match = parseRatesResponse(resp).find((h) => h.hotelId === params.hotelId);
+  const fresh = match?.cheapestRate ?? null;
+  console.info(`${LOG} refreshOffer`, {
+    hotelId: params.hotelId,
+    checkIn: params.checkInDate,
+    checkOut: params.checkOutDate,
+    found: Boolean(fresh),
+    hasOfferId: Boolean(fresh?.offerId),
+  });
+  return fresh;
+}
+
 // ─── Prebook (booking host) ──────────────────────────────────────────────────
+
+export function friendlyLiteApiError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes("4002") ||
+    msg.includes("invalid offerid") ||
+    msg.includes("outdated offerid") ||
+    msg.includes("expired")
+  ) {
+    return "This rate just expired. Please reopen the stay to refresh pricing.";
+  }
+  if (
+    msg.includes("liteapi_api_key") ||
+    msg.includes("not set") ||
+    msg.includes("(401)") ||
+    msg.includes("(403)") ||
+    msg.includes("unauthorized") ||
+    msg.includes("forbidden")
+  ) {
+    return "Hotel booking is temporarily unavailable. Please try again soon.";
+  }
+  if (msg.includes("network") || msg.includes("timeout") || msg.includes("timed out") || msg.includes("(408)")) {
+    return "Hotel booking is taking longer than expected. Please try again.";
+  }
+  return "We couldn't prepare this booking. Please try again.";
+}
 
 export async function prebookLiteApiRate(offerId: string): Promise<LiteApiPrebookResult> {
   const environment: LiteApiEnvironment = getLiteApiEnvironment();
+  // `offerId` MUST be the roomType-level offer token (not a rate-level rateId), or LiteAPI
+  // returns 4002 invalid offerId.
+  console.info(`${LOG} prebook`, { environment, offerIdPreview: offerId.slice(0, 12), offerIdLen: offerId.length });
   const body = await litePost(BOOK_BASE, "/rates/prebook", { offerId, usePaymentSdk: true });
 
   const root = asRecord(body);

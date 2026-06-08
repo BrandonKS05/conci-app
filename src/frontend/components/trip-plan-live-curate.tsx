@@ -423,7 +423,7 @@ export function CuratedFlightsRows({
     return <p className="text-sm text-amber-800 dark:text-amber-200/90">{flightsError}</p>;
   }
   if (!flights.length) {
-    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No flight inspiration rows yet (check SERPAPI_KEY).</p>;
+    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No flight inspiration rows yet.</p>;
   }
 
   return (

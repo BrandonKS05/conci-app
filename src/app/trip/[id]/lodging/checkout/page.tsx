@@ -38,6 +38,7 @@ export default async function LiteApiCheckoutPage({
     <LiteApiCheckout
       tripId={id}
       rateId={asSingle(q.rateId).trim()}
+      offerId={asSingle(q.offerId).trim()}
       hotelId={asSingle(q.hotelId).trim()}
       hotelName={asSingle(q.hotelName).trim() || "Your stay"}
       checkIn={asSingle(q.checkIn).trim()}
