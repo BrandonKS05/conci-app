@@ -28,6 +28,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!access) {
     return NextResponse.json({ error: "Trip not found." }, { status: 403 });
   }
+  if (!access.isHost) {
+    return NextResponse.json(
+      { error: "Only the trip host can book flights.", booking: null } satisfies DuffelFlightsBookApiResponse,
+      { status: 403 }
+    );
+  }
 
   let body: { offerId?: string; passengers?: DuffelFlightPassenger[]; offer?: DuffelOffer; acceptPriceChange?: boolean };
   try {

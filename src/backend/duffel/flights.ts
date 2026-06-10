@@ -1,5 +1,6 @@
-import { duffelGet, duffelPost, isDuffelConfigured } from "@/backend/duffel/client";
+import { duffelGet, duffelPost, isDuffelConfigured, isDuffelTestToken } from "@/backend/duffel/client";
 import { mockSearchFlights, mockBookFlight } from "@/backend/duffel/flights-mock";
+import { flightSlicesFromOffer } from "@/shared/duffel-flights";
 import type {
   DuffelOffer,
   DuffelFlightPassenger,
@@ -22,6 +23,8 @@ type DuffelOrderResponse = {
     payment_status: { awaiting_payment: boolean };
     slices: DuffelOffer["slices"];
     passengers: DuffelOffer["passengers"];
+    /** False on test-mode orders (test token); absent on older API shapes. */
+    live_mode?: boolean;
   };
 };
 
@@ -68,7 +71,9 @@ export async function searchDuffelFlights(
     (a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount)
   );
 
-  return { offers: offers.slice(0, 8), requestId: resp.data.id, isMock: false };
+  // A Duffel TEST token returns real API data that can never be ticketed —
+  // surface it as test mode so the UI badge is honest.
+  return { offers: offers.slice(0, 8), requestId: resp.data.id, isMock: isDuffelTestToken() };
 }
 
 export async function getDuffelFlightOffer(offerId: string): Promise<DuffelOffer | null> {
@@ -103,7 +108,7 @@ export async function bookDuffelFlight(params: {
       totalAmount: params.offer.total_amount,
       totalCurrency: params.offer.total_currency,
     });
-    return { booking: mock, isMock: true };
+    return { booking: { ...mock, slices: flightSlicesFromOffer(params.offer) }, isMock: true };
   }
 
   const resp = await duffelPost<DuffelOrderResponse>("/air/orders", {
@@ -129,6 +134,11 @@ export async function bookDuffelFlight(params: {
     },
   });
 
+  // Test-mode honesty: trust the order's live_mode when present, else the token prefix.
+  const isTestOrder = resp.data.live_mode != null ? !resp.data.live_mode : isDuffelTestToken();
+
+  // Flat fields keep describing the first outbound segment (legacy shape);
+  // `slices` carries the complete itinerary including any return leg.
   const seg = params.offer.slices[0]?.segments[0];
   const booking: DuffelFlightBookingRecord = {
     provider: "duffel",
@@ -144,7 +154,8 @@ export async function bookDuffelFlight(params: {
     airlineName: seg?.marketing_carrier.name ?? "",
     flightNumber: `${seg?.marketing_carrier.iata_code ?? ""}${seg?.marketing_carrier_flight_number ?? ""}`,
     bookedAt: new Date().toISOString(),
+    slices: flightSlicesFromOffer(params.offer),
   };
 
-  return { booking, isMock: false };
+  return { booking, isMock: isTestOrder };
 }

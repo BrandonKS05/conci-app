@@ -13,6 +13,16 @@ export function isDuffelConfigured(): boolean {
   return !!getDuffelAccessToken();
 }
 
+/**
+ * True when the configured token is a Duffel TEST token (`duffel_test_…`).
+ * Test-mode searches/orders are real API calls but never charge money or issue
+ * tickets — they must render as "Test mode" alongside local-mock data.
+ */
+export function isDuffelTestToken(): boolean {
+  const t = getDuffelAccessToken();
+  return !!t && t.toLowerCase().startsWith("duffel_test");
+}
+
 function duffelHeaders(): Record<string, string> {
   const token = getDuffelAccessToken();
   if (!token) throw new Error("DUFFEL_ACCESS_TOKEN is not set.");

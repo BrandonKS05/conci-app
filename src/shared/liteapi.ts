@@ -79,8 +79,9 @@ export type LiteApiPrebookResult = {
   cancellationChanged: boolean;
   /**
    * Payment-SDK handshake values (present when prebooked with usePaymentSdk).
-   * A future Conci checkout page loads the LiteAPI Payment SDK with `secretKey`,
-   * then confirms the booking with `transactionId` via the TRANSACTION_ID method.
+   * The checkout page (liteapi-checkout.tsx at /trip/[id]/lodging/checkout) loads
+   * the LiteAPI Payment SDK with `secretKey`, then confirms the booking with
+   * `transactionId` via the TRANSACTION_ID method.
    */
   transactionId: string | null;
   secretKey: string | null;

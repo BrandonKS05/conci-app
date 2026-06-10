@@ -77,9 +77,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     );
   }
 
-  // Phase 2 settlement: the transactionId is produced by the LiteAPI Payment SDK
-  // (future Conci checkout page) after the guest pays. Until that page exists,
-  // this endpoint stays reachable but a real booking requires the transactionId.
+  // The transactionId is produced by the LiteAPI Payment SDK on the checkout page
+  // (liteapi-checkout.tsx at /trip/[id]/lodging/checkout) after the guest pays.
+  // Booking always requires it — there is no pay-later path through this endpoint.
   if (!transactionId) {
     return NextResponse.json(
       {

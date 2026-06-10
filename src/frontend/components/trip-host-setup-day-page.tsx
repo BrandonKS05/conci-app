@@ -25,6 +25,8 @@ import {
 } from "@/shared/trip-plan";
 import { DayItineraryMap, DayStopPin, type DayMapStop } from "@/frontend/components/day-itinerary-map";
 import { DuffelFlightBookingDrawer } from "@/frontend/components/duffel-flight-booking-drawer";
+import { resolveTripDayRole, travelDaySortKey, type TripDayRole } from "@/shared/travel-day";
+import { isGoogleMapsUrl } from "@/shared/external-link";
 
 type Props = {
   tripId: string;
@@ -554,16 +556,28 @@ function parseTimeToSortKey(time?: string): number | null {
   return null;
 }
 
-function sortScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
+/**
+ * Chronological sort with travel-day blocking: on the arrival day the flight is
+ * pinned first (nothing before it lands), on the departure day it is pinned last
+ * (nothing after it leaves). Identical rule to the calendar overview.
+ */
+function sortScheduleRows(rows: ScheduleRow[], dayRole: TripDayRole = null): ScheduleRow[] {
+  const keyOf = (r: ScheduleRow) =>
+    travelDaySortKey(r.sub === "Flight", dayRole, parseTimeToSortKey(r.time));
   return [...rows].sort((a, b) => {
-    const ka = parseTimeToSortKey(a.time);
-    const kb = parseTimeToSortKey(b.time);
-    if (ka == null && kb == null) return a.label.localeCompare(b.label);
-    if (ka == null) return 1;
-    if (kb == null) return -1;
+    const ka = keyOf(a);
+    const kb = keyOf(b);
     if (ka !== kb) return ka - kb;
     return a.label.localeCompare(b.label);
   });
+}
+
+/** ISO datetime → "h:mm AM/PM" for display (used when a saved flight supplies a real time). */
+function fmtClockFromIso(iso: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 /** Extract IATA pair from text like "MIA → JFK" or "MIA -> JFK". */
@@ -586,6 +600,7 @@ function DayScheduleTimeline({
   tripEndIso,
   passengerCount,
   hotelBookingUrl,
+  dayRole = null,
 }: {
   items: ScheduleRow[];
   subtitle?: string;
@@ -596,9 +611,11 @@ function DayScheduleTimeline({
   passengerCount?: number;
   /** Real booking link for the day's stay (LiteAPI/provider URL) when available. */
   hotelBookingUrl?: string | null;
+  /** Arrival/departure role — pins the flight to the top/bottom of travel days. */
+  dayRole?: TripDayRole;
 }) {
   const router = useRouter();
-  const sorted = useMemo(() => sortScheduleRows(items), [items]);
+  const sorted = useMemo(() => sortScheduleRows(items, dayRole), [items, dayRole]);
   const [drawerState, setDrawerState] = useState<BookingDrawerState>(null);
 
   return (
@@ -683,6 +700,10 @@ function DayScheduleTimeline({
           returnDate={tripEndIso && tripEndIso > dateIso ? tripEndIso : null}
           passengerCount={Math.max(1, passengerCount ?? 1)}
           flightLabel={drawerState.row.label}
+          onFlightSelected={() => {
+            setDrawerState(null);
+            router.refresh();
+          }}
           onBookingComplete={() => {
             setDrawerState(null);
             router.refresh();
@@ -731,7 +752,13 @@ function ScheduleTimelineRowContent({
         <button type="button" onClick={onBookLodging} className={btnClass}>Book stay</button>
       ) : row.href ? (
         <a href={row.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
-          {row.sub === "Transport" ? "Details" : row.confirmed ? "Open ↗" : "Book"}
+          {row.sub === "Transport"
+            ? "Details"
+            : row.confirmed
+              ? "Open ↗"
+              : isGoogleMapsUrl(row.href)
+                ? "View on Maps ↗"
+                : "Book"}
         </a>
       ) : null}
     </>
@@ -968,9 +995,27 @@ export function TripHostSetupDayPage({
 
 
 
+  const dayRole = useMemo<TripDayRole>(
+    () => resolveTripDayRole(dateIso, plan.hostSetup?.tripRange),
+    [dateIso, plan.hostSetup?.tripRange]
+  );
+  /** Saved (not booked) flight that replaces the generic AI flight for display on travel days. */
+  const flightSelection = plan.hostSetup?.flightSelections?.[0] ?? null;
+
   /** Items for Today's Itinerary — generatedItinerary base, confirmed vote options override/inject. */
   const scheduleItems = useMemo(() => {
     const rows: ScheduleRow[] = [];
+    // On the arrival day the outbound leg applies; on the departure day, the return leg.
+    const selectedSlice =
+      flightSelection && dayRole === "departure"
+        ? flightSelection.slices[flightSelection.slices.length - 1]
+        : flightSelection
+          ? flightSelection.slices[0]
+          : null;
+    const selectedFlightTime =
+      selectedSlice && dayRole === "departure"
+        ? selectedSlice.departingAt
+        : selectedSlice?.arrivingAt;
 
     // Base: generatedItinerary activities
     const genDay = plan.generatedItinerary?.days.find((d) => d.dateIso === dateIso);
@@ -988,13 +1033,17 @@ export function TripHostSetupDayPage({
         else if (isTransport) sub = "Transport";
         else if (act.category === "lodging") sub = "Lodging";
 
+        // A saved selection replaces the generic AI flight on the matching travel day.
+        const useSelection = isFlight && selectedSlice && (dayRole === "arrival" || dayRole === "departure");
         rows.push({
           key: `gen-${act.time}-${act.title}`,
-          label: act.title,
+          label: useSelection ? `Flight: ${selectedSlice!.origin} → ${selectedSlice!.destination}` : act.title,
           sub,
-          time: act.time || undefined,
+          time: useSelection && selectedFlightTime ? fmtClockFromIso(selectedFlightTime) : act.time || undefined,
           href: act.bookingUrl || (isFlight ? `https://www.google.com/travel/flights?hl=en&q=${encodeURIComponent(act.title.replace(/^Flight:\s*/i, ""))}` : undefined),
-          description: act.description || undefined,
+          description: useSelection
+            ? `Selected flight${selectedSlice!.airlineName ? ` · ${selectedSlice!.airlineName} ${selectedSlice!.flightNumber}` : ""} — not booked yet`
+            : act.description || undefined,
           dotClass: CATEGORY_DOT[act.category] ?? "bg-neutral-300",
         });
       }
@@ -1053,8 +1102,8 @@ export function TripHostSetupDayPage({
       }
     }
 
-    return sortScheduleRows(rows);
-  }, [plan.generatedItinerary, dateIso, meals, activities, dayVoting]);
+    return sortScheduleRows(rows, dayRole);
+  }, [plan.generatedItinerary, dateIso, meals, activities, dayVoting, dayRole, flightSelection]);
 
   // Derive map stops from the schedule — skip flights (airports, not local pins).
   const mapStops = useMemo<DayMapStop[]>(
@@ -1259,6 +1308,7 @@ export function TripHostSetupDayPage({
           tripEndIso={plan.hostSetup?.tripRange?.endIso ?? undefined}
           passengerCount={plan.people.count ?? 1}
           hotelBookingUrl={hotel?.bookingUrl ?? null}
+          dayRole={dayRole}
         />
 
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-white/[0.03]">

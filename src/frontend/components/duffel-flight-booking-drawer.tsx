@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DuffelOffer,
+  DuffelSlice,
   DuffelFlightPassenger,
   DuffelFlightBookingRecord,
+  DuffelSelectedFlightRecord,
+  DuffelFlightSelectApiResponse,
   DuffelFlightsBookApiResponse,
 } from "@/shared/duffel-flights";
 
@@ -119,7 +122,7 @@ const btnSecondary =
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = "results" | "passenger-details" | "confirm" | "done";
+type Step = "results" | "offer-detail" | "passenger-details" | "confirm" | "done";
 
 type PassengerForm = {
   given_name: string;
@@ -142,6 +145,8 @@ export type DuffelFlightDrawerProps = {
   passengerCount: number;
   flightLabel?: string; // e.g. "Flight: Miami → New York City"
   onBookingComplete?: (booking: DuffelFlightBookingRecord) => void;
+  /** Called after the host saves a flight without booking (explicit "Save" action). */
+  onFlightSelected?: (selection: DuffelSelectedFlightRecord) => void;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -243,6 +248,44 @@ function MockBadge() {
   );
 }
 
+/** One slice (outbound or return) rendered as a depart→arrive row with stops. */
+function SliceRow({ slice, kind }: { slice: DuffelSlice; kind?: "outbound" | "return" }) {
+  const first = slice.segments[0];
+  const last = slice.segments[slice.segments.length - 1];
+  if (!first || !last) return null;
+  const stops = slice.segments.length - 1;
+  return (
+    <div>
+      {kind && (
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+          {kind === "outbound" ? "Outbound" : "Return"} · {first.marketing_carrier.name} {first.marketing_carrier.iata_code}{first.marketing_carrier_flight_number}
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <div className="text-center">
+          <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(first.departing_at)}</p>
+          <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{first.origin.iata_code}</p>
+        </div>
+        <div className="flex flex-1 flex-col items-center gap-0.5">
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{parseDuration(slice.duration)}</p>
+          <div className="flex w-full items-center gap-1">
+            <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
+            <svg className="h-3 w-3 text-[color:var(--on-surface-muted)]" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M14.5 8.5a1 1 0 000-1H9.5l-2-4H6l1 4H3.5l-.75-1.5H1.5L2.5 8l-1 1.5h1.25L3.5 8h3l-1 4h1.5l2-4h5z"/></svg>
+            <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
+          </div>
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+            {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? "s" : ""}`}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(last.arriving_at)}</p>
+          <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{last.destination.iata_code}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OfferCard({
   offer,
   onSelect,
@@ -250,9 +293,10 @@ function OfferCard({
   offer: DuffelOffer;
   onSelect: () => void;
 }) {
-  const seg = offer.slices[0]?.segments[0];
-  if (!seg) return null;
-  const stops = (offer.slices[0]?.segments.length ?? 1) - 1;
+  const outbound = offer.slices[0];
+  if (!outbound?.segments[0]) return null;
+  const ret = offer.slices[1];
+  const isRoundTrip = offer.slices.length > 1;
 
   return (
     <button
@@ -260,42 +304,25 @@ function OfferCard({
       onClick={onSelect}
       className="w-full rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-4 text-left transition hover:border-[#2563EB] hover:shadow-sm dark:border-white/10 dark:bg-dm-page dark:hover:border-[#60A5FA]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-            {seg.marketing_carrier.name}
-            <span className="ml-1.5 text-xs font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-              {seg.marketing_carrier.iata_code}{seg.marketing_carrier_flight_number}
-            </span>
-          </p>
-          <div className="mt-2 flex items-center gap-3">
-            <div className="text-center">
-              <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(seg.departing_at)}</p>
-              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{seg.origin.iata_code}</p>
-            </div>
-            <div className="flex flex-1 flex-col items-center gap-0.5">
-              <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{parseDuration(seg.duration)}</p>
-              <div className="flex w-full items-center gap-1">
-                <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
-                <svg className="h-3 w-3 text-[color:var(--on-surface-muted)]" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M14.5 8.5a1 1 0 000-1H9.5l-2-4H6l1 4H3.5l-.75-1.5H1.5L2.5 8l-1 1.5h1.25L3.5 8h3l-1 4h1.5l2-4h5z"/></svg>
-                <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
-              </div>
-              <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? "s" : ""}`}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(seg.arriving_at)}</p>
-              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{seg.destination.iata_code}</p>
-            </div>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-lg font-bold text-[#2563EB] dark:text-[#60A5FA]">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="inline-flex items-center rounded-full bg-[color:var(--surface-container)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:bg-white/10">
+          {isRoundTrip ? "Round trip" : "One way"}
+        </span>
+        <div className="text-right">
+          <p className="text-lg font-bold leading-none text-[#2563EB] dark:text-[#60A5FA]">
             {fmtCurrency(offer.total_amount, offer.total_currency)}
           </p>
-          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">total</p>
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">total{isRoundTrip ? " · both legs" : ""}</p>
         </div>
+      </div>
+      <div className="space-y-2.5">
+        <SliceRow slice={outbound} kind={isRoundTrip ? "outbound" : undefined} />
+        {ret ? (
+          <>
+            <div className="h-px bg-[color:var(--hairline)] dark:bg-white/10" />
+            <SliceRow slice={ret} kind="return" />
+          </>
+        ) : null}
       </div>
     </button>
   );
@@ -314,11 +341,14 @@ export function DuffelFlightBookingDrawer({
   passengerCount,
   flightLabel,
   onBookingComplete,
+  onFlightSelected,
 }: DuffelFlightDrawerProps) {
   const [step, setStep] = useState<Step>("results");
   const [offers, setOffers] = useState<DuffelOffer[] | null>(null);
   const [isMock, setIsMock] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedSelection, setSavedSelection] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<DuffelOffer | null>(null);
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
@@ -372,6 +402,7 @@ export function DuffelFlightBookingDrawer({
     setSelectedOffer(null);
     setBooking(null);
     setPendingPriceChange(null);
+    setSavedSelection(false);
     setError(null);
     setPaxErrors([]);
     setSearchOrigin(origin);
@@ -383,14 +414,49 @@ export function DuffelFlightBookingDrawer({
     void runSearch({ origin, destination, date: departureDate, returnDate: returnDate ?? undefined, pax: passengerCount, cabin: "economy" });
   }, [runSearch, origin, destination, departureDate, returnDate, passengerCount]);
 
+  // Pick an offer to inspect (round-trip legs + Save vs Book) — not a commitment.
   const handleSelectOffer = useCallback((offer: DuffelOffer) => {
     setSelectedOffer(offer);
     setPendingPriceChange(null);
     setError(null);
-    setPassengers(Array.from({ length: offer.passengers.length }, blankPassenger));
-    setPaxErrors(Array.from({ length: offer.passengers.length }, () => ({})));
-    setStep("passenger-details");
+    setSavedSelection(false);
+    setStep("offer-detail");
   }, []);
+
+  // Proceed from inspect → passenger details (real booking flow).
+  const handleProceedToBook = useCallback(() => {
+    if (!selectedOffer) return;
+    setPassengers(Array.from({ length: selectedOffer.passengers.length }, blankPassenger));
+    setPaxErrors(Array.from({ length: selectedOffer.passengers.length }, () => ({})));
+    setError(null);
+    setStep("passenger-details");
+  }, [selectedOffer]);
+
+  // Explicitly save the inspected flight WITHOUT booking it.
+  const handleSaveSelection = useCallback(async () => {
+    if (!selectedOffer) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/select`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offer: selectedOffer, isMock, passengerCount: selectedOffer.passengers.length }),
+      });
+      const j = (await r.json()) as DuffelFlightSelectApiResponse;
+      if (!r.ok || !j.selection) {
+        setError(j.error ?? "Could not save this flight.");
+        return;
+      }
+      setSavedSelection(true);
+      onFlightSelected?.(j.selection);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedOffer, tripId, isMock, onFlightSelected]);
 
   const handleBook = useCallback(async (acceptPriceChange = false) => {
     if (!selectedOffer) return;
@@ -620,6 +686,67 @@ export function DuffelFlightBookingDrawer({
             </div>
           )}
 
+          {/* Offer detail — inspect round-trip legs, then Save (no booking) or Book now */}
+          {!loading && step === "offer-detail" && selectedOffer && (
+            <div className="space-y-5">
+              <div className="space-y-3 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 dark:border-white/10 dark:bg-dm-elevated">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center rounded-full bg-[color:var(--surface-container)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:bg-white/10">
+                    {selectedOffer.slices.length > 1 ? "Round trip" : "One way"}
+                  </span>
+                  <div className="text-right">
+                    <p className="text-xl font-bold leading-none text-[#2563EB] dark:text-[#60A5FA]">
+                      {fmtCurrency(selectedOffer.total_amount, selectedOffer.total_currency)}
+                    </p>
+                    <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      total · {passengerCount} passenger{passengerCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+                {selectedOffer.slices.map((slice, i) => (
+                  <div key={slice.id}>
+                    {i > 0 ? <div className="my-2 h-px bg-[color:var(--hairline)] dark:bg-white/10" /> : null}
+                    <SliceRow slice={slice} kind={selectedOffer.slices.length > 1 ? (i === 0 ? "outbound" : "return") : undefined} />
+                  </div>
+                ))}
+              </div>
+
+              {savedSelection ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flight saved to your trip</p>
+                  <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                    Saved as your selected flight — it replaces the suggested flight in your trip. It is not booked yet; you can book it anytime.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                  Save this flight to lock it into your trip without booking, or book it now. Flights are booked directly through Conci — there is no separate external link.
+                </p>
+              )}
+
+              {error && (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300">
+                  {error}
+                </p>
+              )}
+
+              {savedSelection ? (
+                <div className="flex gap-3">
+                  <button onClick={() => setStep("results")} className={btnSecondary}>Back to results</button>
+                  <button onClick={onClose} className={`flex-1 ${btnPrimary}`}>Done</button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => setStep("results")} className={btnSecondary}>Back</button>
+                  <button onClick={() => void handleSaveSelection()} disabled={saving} className={btnSecondary}>
+                    {saving ? "Saving…" : "Save flight"}
+                  </button>
+                  <button onClick={handleProceedToBook} className={`flex-1 ${btnPrimary}`}>Book now</button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Passenger details */}
           {!loading && step === "passenger-details" && selectedOffer && (
             <div className="space-y-6">
@@ -708,7 +835,7 @@ export function DuffelFlightBookingDrawer({
               })}
 
               <div className="flex gap-3 pt-1">
-                <button onClick={() => setStep("results")} className={btnSecondary}>Back</button>
+                <button onClick={() => setStep("offer-detail")} className={btnSecondary}>Back</button>
                 <button onClick={handleReviewBooking} className={`flex-1 ${btnPrimary}`}>
                   Review booking
                 </button>

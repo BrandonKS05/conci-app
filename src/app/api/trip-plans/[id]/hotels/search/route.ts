@@ -84,11 +84,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       envVarNamesContainingRapid: relatedEnv.length ? relatedEnv : "(none)",
       hint: "Set RAPIDAPI_KEY or RAPID_API_KEY in .env.local at project root (next to package.json), then restart npm run dev.",
     });
+    // Setup instructions stay in the server log above — never in user-facing copy.
     return NextResponse.json(
       {
-        error: "RapidAPI is not configured.",
-        detail:
-          "Add RAPIDAPI_KEY to .env.local in the project root (same folder as package.json), then restart the dev server (npm run dev). Subscribe to booking-com15 on RapidAPI (host booking-com15.p.rapidapi.com) and paste your app key.",
+        error: "Hotel search isn't available right now.",
+        detail: "You can still add hotel options manually or paste a booking link.",
       },
       { status: 503 }
     );

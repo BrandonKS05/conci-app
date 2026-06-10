@@ -1,5 +1,5 @@
 import type { PlaceSpotlight, SpotlightVenueKind } from "@/shared/place-preview";
-import type { DuffelFlightBookingRecord } from "@/shared/duffel-flights";
+import type { DuffelFlightBookingRecord, DuffelSelectedFlightRecord, SelectedFlightSlice } from "@/shared/duffel-flights";
 import type { DuffelBookingRecord } from "@/shared/duffel-stays";
 import type { LiteApiBookingRecord } from "@/shared/liteapi";
 import type { LodgingProviderName } from "@/shared/mock-hotel-search";
@@ -147,6 +147,8 @@ export type HostSetupState = {
   hotelStays?: HostHotelStay[];
   /** Confirmed Duffel flight bookings created through Conci. */
   flightBookings?: DuffelFlightBookingRecord[];
+  /** Flights the host saved from search but has NOT booked yet (one active selection). */
+  flightSelections?: DuffelSelectedFlightRecord[];
   /** Host-authored packing list notes (draft). */
   packingList?: string;
   /** Optional UX flag for completion meter only (does not gate publish). */
@@ -339,6 +341,49 @@ function parseDuffelFlightBookingRecord(raw: unknown): DuffelFlightBookingRecord
     : undefined;
 }
 
+function parseSelectedFlightSlice(raw: unknown): SelectedFlightSlice | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const origin = typeof o.origin === "string" ? o.origin.trim() : "";
+  const destination = typeof o.destination === "string" ? o.destination.trim() : "";
+  if (!origin || !destination) return undefined;
+  return {
+    origin,
+    destination,
+    departingAt: typeof o.departingAt === "string" ? o.departingAt : "",
+    arrivingAt: typeof o.arrivingAt === "string" ? o.arrivingAt : "",
+    airlineName: typeof o.airlineName === "string" ? o.airlineName : "",
+    flightNumber: typeof o.flightNumber === "string" ? o.flightNumber : "",
+    stops: typeof o.stops === "number" && Number.isFinite(o.stops) ? Math.max(0, Math.trunc(o.stops)) : 0,
+  };
+}
+
+function parseDuffelSelectedFlightRecord(raw: unknown): DuffelSelectedFlightRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  if (o.provider !== "duffel" || o.status !== "selected" || typeof o.offerId !== "string" || !o.offerId.trim()) {
+    return undefined;
+  }
+  const slices = Array.isArray(o.slices)
+    ? o.slices.map(parseSelectedFlightSlice).filter((s): s is SelectedFlightSlice => s !== undefined)
+    : [];
+  if (!slices.length) return undefined;
+  return {
+    provider: "duffel",
+    status: "selected",
+    offerId: o.offerId.trim(),
+    totalAmount: typeof o.totalAmount === "string" ? o.totalAmount : "",
+    currency: typeof o.currency === "string" ? o.currency : "USD",
+    slices,
+    passengerCount:
+      typeof o.passengerCount === "number" && Number.isFinite(o.passengerCount)
+        ? Math.max(1, Math.trunc(o.passengerCount))
+        : 1,
+    ...(o.isMock === true ? { isMock: true as const } : {}),
+    selectedAt: typeof o.selectedAt === "string" ? o.selectedAt : new Date().toISOString(),
+  };
+}
+
 export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const h = raw as Record<string, unknown>;
@@ -486,6 +531,15 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
     if (rows.length) flightBookings = rows;
   }
 
+  const flightSelectionsRaw = h.flightSelections;
+  let flightSelections: DuffelSelectedFlightRecord[] | undefined;
+  if (Array.isArray(flightSelectionsRaw) && flightSelectionsRaw.length) {
+    const rows = flightSelectionsRaw
+      .map(parseDuffelSelectedFlightRecord)
+      .filter((row): row is DuffelSelectedFlightRecord => row !== undefined);
+    if (rows.length) flightSelections = rows;
+  }
+
   const packingRaw = h.packingList;
   const packingList =
     typeof packingRaw === "string" ? packingRaw.slice(0, 20000) : undefined;
@@ -498,6 +552,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
     experiencesOutlined !== undefined ||
     hotelStays !== undefined ||
     flightBookings !== undefined ||
+    flightSelections !== undefined ||
     packingList !== undefined;
   if (!any) return undefined;
 
@@ -509,6 +564,7 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   if (experiencesOutlined !== undefined) out.experiencesOutlined = experiencesOutlined;
   if (hotelStays !== undefined) out.hotelStays = hotelStays;
   if (flightBookings !== undefined) out.flightBookings = flightBookings;
+  if (flightSelections !== undefined) out.flightSelections = flightSelections;
   if (packingList !== undefined) out.packingList = packingList;
 
   return out;
