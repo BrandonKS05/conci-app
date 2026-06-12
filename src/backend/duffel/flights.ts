@@ -108,7 +108,14 @@ export async function bookDuffelFlight(params: {
       totalAmount: params.offer.total_amount,
       totalCurrency: params.offer.total_currency,
     });
-    return { booking: { ...mock, slices: flightSlicesFromOffer(params.offer) }, isMock: true };
+    return {
+      booking: {
+        ...mock,
+        passengerCount: params.passengers.length,
+        slices: flightSlicesFromOffer(params.offer),
+      },
+      isMock: true,
+    };
   }
 
   const resp = await duffelPost<DuffelOrderResponse>("/air/orders", {
@@ -154,6 +161,7 @@ export async function bookDuffelFlight(params: {
     airlineName: seg?.marketing_carrier.name ?? "",
     flightNumber: `${seg?.marketing_carrier.iata_code ?? ""}${seg?.marketing_carrier_flight_number ?? ""}`,
     bookedAt: new Date().toISOString(),
+    passengerCount: params.passengers.length,
     slices: flightSlicesFromOffer(params.offer),
   };
 

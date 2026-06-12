@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { LiveFlightCard } from "@/shared/trip-live-recommendations";
 import { hasUserSelectedLodging } from "@/shared/trip-plan";
+import { resolveTripFlightCost } from "@/shared/trip-cost-estimate";
 
 type Deposit = {
   id: string;
@@ -103,18 +104,50 @@ export function TripCostRollup({
     firstUsdAmountFromText(plan.budget.perPerson) ??
     tierMidTripBudgetPerPersonUsd(plan.budget.tier);
 
-  const flightAmounts = flights
-    .map((f) => firstUsdAmountFromText(f.pricePerPerson))
-    .filter((n): n is number => n != null);
-  const lowFlightPp = flightAmounts.length ? Math.min(...flightAmounts) : null;
+  // Breakdown from itinerary for the expandable detail (also feeds the
+  // transport-estimate swap below when a real flight price exists).
+  const breakdown = useMemo(() => {
+    const days = plan.generatedItinerary?.days;
+    if (!days?.length) return null;
+    let lodgingPp = 0;
+    let transportPp = 0;
+    let foodPp = 0;
+    let activitiesPp = 0;
+    for (const day of days) {
+      for (const act of day.activities) {
+        const cost = act.estimatedCostPp ?? 0;
+        switch (act.category) {
+          case "lodging": lodgingPp += cost; break;
+          case "transport": transportPp += cost; break;
+          case "food": foodPp += cost; break;
+          default: activitiesPp += cost; break;
+        }
+      }
+    }
+    return { lodgingPp, transportPp, foodPp, activitiesPp };
+  }, [plan.generatedItinerary]);
 
-  // If AI estimate already includes transport, don't double-count flights
-  const flightAddon = aiEstimatePp != null ? 0 : (lowFlightPp ?? 0);
+  // Booked order total > saved selection price > lowest inspiration fare.
+  const flightCost = useMemo(
+    () => resolveTripFlightCost(plan, flights, headcount),
+    [plan, flights, headcount]
+  );
+  const flightPp = flightCost?.perPersonUsd ?? null;
+  const flightIsReal = flightCost != null && flightCost.source !== "estimate";
+
+  // If the AI estimate already includes transport, don't double-count flights —
+  // but a real provider price replaces the AI transport guess instead.
+  const flightAddon =
+    aiEstimatePp != null
+      ? flightIsReal
+        ? flightPp! - (breakdown?.transportPp ?? 0)
+        : 0
+      : flightPp ?? 0;
 
   const perPersonTotalUsd =
     perPersonFromBudget != null
-      ? perPersonFromBudget + flightAddon
-      : lowFlightPp;
+      ? Math.max(0, perPersonFromBudget + flightAddon)
+      : flightPp;
 
   const estimatedTotalUsd =
     perPersonTotalUsd != null ? Math.round(perPersonTotalUsd * headcount) : null;
@@ -136,28 +169,6 @@ export function TripCostRollup({
       .map(([name, amountUsd]) => ({ name, amountUsd }))
       .sort((a, b) => b.amountUsd - a.amountUsd);
   }, [deposits]);
-
-  // Breakdown from itinerary for the expandable detail
-  const breakdown = useMemo(() => {
-    const days = plan.generatedItinerary?.days;
-    if (!days?.length) return null;
-    let lodgingPp = 0;
-    let transportPp = 0;
-    let foodPp = 0;
-    let activitiesPp = 0;
-    for (const day of days) {
-      for (const act of day.activities) {
-        const cost = act.estimatedCostPp ?? 0;
-        switch (act.category) {
-          case "lodging": lodgingPp += cost; break;
-          case "transport": transportPp += cost; break;
-          case "food": foodPp += cost; break;
-          default: activitiesPp += cost; break;
-        }
-      }
-    }
-    return { lodgingPp, transportPp, foodPp, activitiesPp };
-  }, [plan.generatedItinerary]);
 
   const lodgingConfirmed = hasUserSelectedLodging(plan.hostSetup?.hotelStays);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -181,8 +192,12 @@ export function TripCostRollup({
             perPersonTotalUsd != null ? formatCurrencyUsd(perPersonTotalUsd) : "\u2014"
           }
           helper={
-            lowFlightPp != null
-              ? `incl. ~${formatCurrencyUsd(lowFlightPp)} flight`
+            flightPp != null
+              ? flightCost!.source === "booked"
+                ? `incl. ${formatCurrencyUsd(flightPp)} flights (booked${flightCost!.isMock ? " \u00b7 test" : ""})`
+                : flightCost!.source === "selected"
+                  ? `incl. ${formatCurrencyUsd(flightPp)} flight (selected, not booked)`
+                  : `incl. ~${formatCurrencyUsd(flightPp)} flight (estimate)`
               : perPersonFromBudget != null
                 ? "budget only \u2014 flights pending"
                 : "Set per-person budget"
@@ -243,12 +258,17 @@ export function TripCostRollup({
                 <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.lodgingPp)}</span>
               </li>
             ) : null}
-            {breakdown.transportPp > 0 ? (
+            {flightIsReal || breakdown.transportPp > 0 ? (
               <li className="flex justify-between">
                 <span className="text-blue-700 dark:text-blue-300">
-                  Flights & transport <span className="italic text-neutral-400">(estimated)</span>
+                  Flights & transport{" "}
+                  <span className="italic text-neutral-400">
+                    ({flightIsReal ? (flightCost!.source === "booked" ? "booked" : "selected, not booked") : "estimated"})
+                  </span>
                 </span>
-                <span className="tabular-nums font-semibold">{formatCurrencyUsd(breakdown.transportPp)}</span>
+                <span className="tabular-nums font-semibold">
+                  {formatCurrencyUsd(flightIsReal ? flightPp! : breakdown.transportPp)}
+                </span>
               </li>
             ) : null}
             <li className="flex justify-between border-t border-neutral-200 pt-1 dark:border-white/10">
@@ -257,7 +277,11 @@ export function TripCostRollup({
             </li>
           </ul>
           {!lodgingConfirmed && breakdown.lodgingPp > 0 ? (
-            <p className="mt-2 text-[10px] text-neutral-500">Lodging and flight estimates update once you confirm bookings.</p>
+            <p className="mt-2 text-[10px] text-neutral-500">
+              {flightIsReal
+                ? "Lodging estimates update once you confirm bookings."
+                : "Lodging and flight estimates update once you confirm bookings."}
+            </p>
           ) : null}
         </div>
       ) : null}

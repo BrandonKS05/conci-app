@@ -3,39 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import type { TripPlan } from "@/shared/trip-plan";
-import type { DuffelSelectedFlightRecord, SelectedFlightSlice } from "@/shared/duffel-flights";
+import type { DuffelSelectedFlightRecord } from "@/shared/duffel-flights";
 import { DuffelFlightBookingDrawer } from "@/frontend/components/duffel-flight-booking-drawer";
+import { FlightSliceLine, flightSliceKind } from "@/frontend/components/trip-flight-summary";
 
 /** Pull "JFK → CDG" style airport codes from the generated flight activity. */
 function extractIataPair(text: string): { origin: string; destination: string } | null {
   const m = text.match(/([A-Z]{3})\s*(?:→|->)\s*([A-Z]{3})/);
   return m ? { origin: m[1]!, destination: m[2]! } : null;
-}
-
-function fmtDateTime(iso: string): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function SelectedSliceLine({ slice, kind }: { slice: SelectedFlightSlice; kind: string }) {
-  return (
-    <div className="text-sm text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
-        {kind} · {slice.origin} → {slice.destination}
-        {slice.stops > 0 ? ` · ${slice.stops} stop${slice.stops > 1 ? "s" : ""}` : " · nonstop"}
-      </p>
-      <p className="text-xs text-[color:var(--on-surface-muted)]">
-        {slice.airlineName ? `${slice.airlineName} ${slice.flightNumber} · ` : ""}
-        {fmtDateTime(slice.departingAt)} → {fmtDateTime(slice.arrivingAt)}
-      </p>
-    </div>
-  );
 }
 
 /**
@@ -140,10 +115,10 @@ export function HostDuffelFlightPanel({ tripId, plan }: { tripId: string; plan: 
             ) : null}
           </div>
           {selection.slices.map((slice, i) => (
-            <SelectedSliceLine
+            <FlightSliceLine
               key={`${slice.origin}-${slice.destination}-${i}`}
               slice={slice}
-              kind={selection.slices.length > 1 ? (i === 0 ? "Outbound" : "Return") : "Flight"}
+              kind={flightSliceKind(selection.slices.length, i)}
             />
           ))}
           <p className="text-sm font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
@@ -201,10 +176,10 @@ export function HostDuffelFlightPanel({ tripId, plan }: { tripId: string; plan: 
               {booking.slices?.length ? (
                 // Full itinerary (outbound + return on round trips).
                 booking.slices.map((slice, i) => (
-                  <SelectedSliceLine
+                  <FlightSliceLine
                     key={`${booking.orderId}-${i}`}
                     slice={slice}
-                    kind={booking.slices!.length > 1 ? (i === 0 ? "Outbound" : "Return") : "Flight"}
+                    kind={flightSliceKind(booking.slices!.length, i)}
                   />
                 ))
               ) : (

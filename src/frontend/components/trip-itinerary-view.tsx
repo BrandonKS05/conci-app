@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import Link from "next/link";
 import type { TripPlan, ItineraryActivity } from "@/shared/trip-plan";
 import { isGoogleMapsUrl } from "@/shared/external-link";
+import { TripFlightSummary } from "@/frontend/components/trip-flight-summary";
 
 // ── Inline SVG icons (no external icon library needed) ─────────────────────────
 type IconProps = { className?: string };
@@ -294,6 +295,11 @@ export function TripItineraryView({ tripId, plan }: { tripId: string; plan: Trip
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Booked/saved flights — renders nothing on no-flight trips */}
+            <div className="relative mb-8">
+              <TripFlightSummary plan={plan} />
             </div>
 
             {/* Divider */}

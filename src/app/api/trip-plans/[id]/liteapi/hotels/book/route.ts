@@ -136,19 +136,39 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Booking failed — no confirmation received.", booking: null } satisfies LiteApiBookApiResponse, { status: 502 });
   }
 
-  // Persist booking into the trip plan
+  // Persist booking into the trip plan. The calendar row is sourced from the
+  // provider-confirmed booking record (bookLiteApiRate prefers fields echoed by
+  // LiteAPI and falls back to the posted values only when the response omits
+  // them) — never directly from the client payload.
   try {
+    if (
+      booking.hotelId !== hotelId ||
+      booking.hotelName !== hotelName ||
+      booking.checkInDate !== checkInDate ||
+      booking.checkOutDate !== checkOutDate
+    ) {
+      console.warn("[liteapi/hotels/book] provider-confirmed fields differ from client payload — persisting confirmed values", {
+        posted: { hotelId, hotelName, checkInDate, checkOutDate },
+        confirmed: {
+          hotelId: booking.hotelId,
+          hotelName: booking.hotelName,
+          checkInDate: booking.checkInDate,
+          checkOutDate: booking.checkOutDate,
+        },
+      });
+    }
+
     const planObj =
       typeof tripRow.plan === "object" && tripRow.plan !== null
         ? (tripRow.plan as Record<string, unknown>)
         : {};
 
     const place: PlaceSpotlight = {
-      name: hotelName,
-      address: destinationCity || hotelName,
+      name: booking.hotelName,
+      address: destinationCity || booking.hotelName,
       spotlightCategory: "hotel",
       mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        [hotelName, destinationCity].filter(Boolean).join(" ")
+        [booking.hotelName, destinationCity].filter(Boolean).join(" ")
       )}`,
     };
 
@@ -157,25 +177,26 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return hs?.tripRange ?? null;
     })();
 
-    const rangeStart = tripRange?.startIso ?? checkInDate;
-    const rangeEnd = tripRange?.endIso ?? checkOutDate;
+    const rangeStart = tripRange?.startIso ?? booking.checkInDate;
+    const rangeEnd = tripRange?.endIso ?? booking.checkOutDate;
 
     const { hotelStays, hotel: hotelPlace } = applyHostLodgingSegment(
       parseHostSetup(planObj.hostSetup)?.hotelStays,
       rangeStart,
       rangeEnd,
-      checkInDate,
-      checkOutDate,
+      booking.checkInDate,
+      booking.checkOutDate,
       place,
       {
         destinationCity: destinationCity || undefined,
         userSelected: true,
         lodgingType: "hotel",
         provider: "liteapi",
-        providerHotelId: hotelId,
-        providerRateId: rateId,
+        providerHotelId: booking.hotelId,
+        providerRateId: booking.rateId,
+        // offerId is the prebook token we sent — LiteAPI does not echo it back.
         ...(offerId ? { providerOfferId: offerId } : {}),
-        providerResultId: `liteapi:${hotelId}`,
+        providerResultId: `liteapi:${booking.hotelId}`,
         bookingType: "in_app",
         totalUsd: booking.totalAmount,
         priceCurrency: booking.currency,
@@ -192,10 +213,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (currentPlan.generatedItinerary) {
       const gi = upsertLodgingActivitiesInGeneratedItinerary(
         currentPlan.generatedItinerary,
-        checkInDate,
-        checkOutDate,
-        hotelName,
-        destinationCity || hotelName,
+        booking.checkInDate,
+        booking.checkOutDate,
+        booking.hotelName,
+        destinationCity || booking.hotelName,
         undefined
       );
       planMerged = { ...planMerged, generatedItinerary: gi };

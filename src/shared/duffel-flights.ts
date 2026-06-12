@@ -84,6 +84,11 @@ export type DuffelFlightBookingRecord = {
   /** True for local-mock bookings AND real Duffel test-mode orders (test token / live_mode=false). */
   isMock?: boolean;
   /**
+   * Travelers covered by this order's totalAmount. Absent on records persisted
+   * before this field existed — per-person math falls back to trip headcount.
+   */
+  passengerCount?: number;
+  /**
    * Every leg of the order (outbound first, return second on round trips).
    * Absent on records persisted before round-trip support — fall back to the
    * flat origin/destination fields above, which describe the first segment only.

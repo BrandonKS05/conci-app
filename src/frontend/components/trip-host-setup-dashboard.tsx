@@ -69,6 +69,7 @@ import {
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
 import { HostDuffelFlightPanel } from "@/frontend/components/host-duffel-flight-panel";
+import { TripFlightSummary } from "@/frontend/components/trip-flight-summary";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -2470,7 +2471,10 @@ export function TripHostSetupDashboard({
             ) : null}
             {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() && plan.departureCity?.trim() ? (
               <HostDuffelFlightPanel tripId={tripId} plan={plan} />
-          ) : null}
+          ) : (
+              // Guests and finalized trips: read-only booked/saved flights, no booking controls.
+              <TripFlightSummary plan={plan} />
+            )}
           {showFlightTransport ? (
               <div className="space-y-4 border-t border-[color:var(--hairline)] pt-6 dark:border-white/10">
                 <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">

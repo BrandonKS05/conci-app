@@ -532,6 +532,11 @@ export type LiteApiBookParams = {
   clientReference?: string;
 };
 
+/** "2026-07-10" from "2026-07-10" or "2026-07-10T14:00:00" — empty when not a calendar date. */
+function isoDayOrEmpty(raw: string): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : "";
+}
+
 export async function bookLiteApiRate(params: LiteApiBookParams): Promise<LiteApiBookingRecord> {
   if (!params.transactionId) {
     throw new Error("LiteAPI book requires a transactionId from the Payment SDK prebook step.");
@@ -564,19 +569,28 @@ export async function bookLiteApiRate(params: LiteApiBookParams): Promise<LiteAp
   const bookingId = str(data.bookingId || data.id);
   const status = (str(data.status || "CONFIRMED").toUpperCase() as LiteApiBookingRecord["status"]) || "CONFIRMED";
 
+  // Prefer the identity/dates LiteAPI confirmed in the book response over the
+  // client-posted params — the persisted calendar row must describe the actual
+  // booking. Params remain the fallback when the response omits a field.
+  const confirmedHotel = asRecord(data.hotel);
+  const confirmedHotelId = str(confirmedHotel.hotelId || confirmedHotel.id || data.hotelId);
+  const confirmedHotelName = str(confirmedHotel.name || data.hotelName);
+  const confirmedCheckIn = isoDayOrEmpty(str(data.checkin || data.checkIn || data.checkInDate));
+  const confirmedCheckOut = isoDayOrEmpty(str(data.checkout || data.checkOut || data.checkOutDate));
+
   return {
     provider: "liteapi",
     bookingId,
     clientReference: str(data.clientReference ?? params.clientReference ?? ""),
     status,
-    hotelId: params.hotelId,
-    hotelName: params.hotelName,
+    hotelId: confirmedHotelId || params.hotelId,
+    hotelName: confirmedHotelName || params.hotelName,
     rateId: params.rateId,
     prebookId: params.prebookId,
     totalAmount: num(data.totalAmount ?? data.price ?? 0),
     currency: str(data.currency ?? "USD"),
-    checkInDate: params.checkInDate,
-    checkOutDate: params.checkOutDate,
+    checkInDate: confirmedCheckIn || params.checkInDate,
+    checkOutDate: confirmedCheckOut || params.checkOutDate,
     bookedAt: new Date().toISOString(),
     cancellationPolicies: parseCancellationPolicies(data.cancellationPolicies),
     leadGuest: params.guest,
