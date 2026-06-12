@@ -7,6 +7,7 @@ dist
 .env
 .env.local
 coverage
+*.tsbuildinfo
 .claude/worktrees/
 .claude/settings.local.json
 CLAUDE.md
