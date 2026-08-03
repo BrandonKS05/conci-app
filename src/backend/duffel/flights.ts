@@ -1,5 +1,6 @@
-import { duffelPost, isDuffelConfigured } from "@/backend/duffel/client";
+import { duffelGet, duffelPost, isDuffelConfigured, isDuffelTestToken } from "@/backend/duffel/client";
 import { mockSearchFlights, mockBookFlight } from "@/backend/duffel/flights-mock";
+import { flightSlicesFromOffer } from "@/shared/duffel-flights";
 import type {
   DuffelOffer,
   DuffelFlightPassenger,
@@ -22,7 +23,13 @@ type DuffelOrderResponse = {
     payment_status: { awaiting_payment: boolean };
     slices: DuffelOffer["slices"];
     passengers: DuffelOffer["passengers"];
+    /** False on test-mode orders (test token); absent on older API shapes. */
+    live_mode?: boolean;
   };
+};
+
+type DuffelOfferGetResponse = {
+  data: DuffelOffer;
 };
 
 // ─── Service functions ─────────────────────────────────────────────────────
@@ -31,6 +38,8 @@ export type FlightSearchParams = {
   origin: string; // IATA code
   destination: string;
   departureDate: string; // YYYY-MM-DD
+  /** When set, searches a round trip (return leg destination→origin). */
+  returnDate?: string; // YYYY-MM-DD
   passengers: number;
   cabinClass?: "economy" | "premium_economy" | "business" | "first";
 };
@@ -43,16 +52,16 @@ export async function searchDuffelFlights(
   }
 
   const count = Math.max(1, Math.min(9, params.passengers));
+  const slices = [
+    { origin: params.origin, destination: params.destination, departure_date: params.departureDate },
+  ];
+  if (params.returnDate) {
+    slices.push({ origin: params.destination, destination: params.origin, departure_date: params.returnDate });
+  }
   const resp = await duffelPost<DuffelOfferRequestResponse>("/air/offer_requests", {
     data: {
       return_offers: true,
-      slices: [
-        {
-          origin: params.origin,
-          destination: params.destination,
-          departure_date: params.departureDate,
-        },
-      ],
+      slices,
       passengers: Array.from({ length: count }, () => ({ type: "adult" })),
       cabin_class: params.cabinClass ?? "economy",
     },
@@ -62,7 +71,22 @@ export async function searchDuffelFlights(
     (a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount)
   );
 
-  return { offers: offers.slice(0, 8), requestId: resp.data.id, isMock: false };
+  // A Duffel TEST token returns real API data that can never be ticketed —
+  // surface it as test mode so the UI badge is honest.
+  return { offers: offers.slice(0, 8), requestId: resp.data.id, isMock: isDuffelTestToken() };
+}
+
+export async function getDuffelFlightOffer(offerId: string): Promise<DuffelOffer | null> {
+  if (!isDuffelConfigured()) return null;
+  const resp = await duffelGet<DuffelOfferGetResponse>(`/air/offers/${encodeURIComponent(offerId)}`);
+  return resp.data;
+}
+
+export function duffelOfferPriceChanged(
+  previous: DuffelOffer,
+  confirmed: DuffelOffer
+): boolean {
+  return previous.total_amount !== confirmed.total_amount || previous.total_currency !== confirmed.total_currency;
 }
 
 export async function bookDuffelFlight(params: {
@@ -84,7 +108,14 @@ export async function bookDuffelFlight(params: {
       totalAmount: params.offer.total_amount,
       totalCurrency: params.offer.total_currency,
     });
-    return { booking: mock, isMock: true };
+    return {
+      booking: {
+        ...mock,
+        passengerCount: params.passengers.length,
+        slices: flightSlicesFromOffer(params.offer),
+      },
+      isMock: true,
+    };
   }
 
   const resp = await duffelPost<DuffelOrderResponse>("/air/orders", {
@@ -110,6 +141,11 @@ export async function bookDuffelFlight(params: {
     },
   });
 
+  // Test-mode honesty: trust the order's live_mode when present, else the token prefix.
+  const isTestOrder = resp.data.live_mode != null ? !resp.data.live_mode : isDuffelTestToken();
+
+  // Flat fields keep describing the first outbound segment (legacy shape);
+  // `slices` carries the complete itinerary including any return leg.
   const seg = params.offer.slices[0]?.segments[0];
   const booking: DuffelFlightBookingRecord = {
     provider: "duffel",
@@ -125,7 +161,9 @@ export async function bookDuffelFlight(params: {
     airlineName: seg?.marketing_carrier.name ?? "",
     flightNumber: `${seg?.marketing_carrier.iata_code ?? ""}${seg?.marketing_carrier_flight_number ?? ""}`,
     bookedAt: new Date().toISOString(),
+    passengerCount: params.passengers.length,
+    slices: flightSlicesFromOffer(params.offer),
   };
 
-  return { booking, isMock: false };
+  return { booking, isMock: isTestOrder };
 }

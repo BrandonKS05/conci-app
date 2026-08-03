@@ -2297,7 +2297,7 @@ function DecisionCard({
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                         <a
-                          href={r.openTableUrl}
+                          href={r.mapsUrl || r.openTableUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex justify-center rounded-lg border border-rose-200 bg-white px-3 py-2 text-center text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-elevated dark:text-rose-300 dark:hover:bg-dm-page"

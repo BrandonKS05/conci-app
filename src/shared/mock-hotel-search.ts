@@ -1,5 +1,5 @@
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import type { HostLodgingType } from "@/shared/trip-plan";
+import type { HostLodgingStayMeta, HostLodgingType } from "@/shared/trip-plan";
 
 export type MockHotelSearchInput = {
   destination: string;
@@ -25,6 +25,9 @@ export type MockHotelResult = {
 
 export type MockHotelAmenityIcon = "pool" | "hot_tub" | "wifi" | "gym" | "breakfast" | "shuttle";
 
+/** Which integration returned a lodging result. Used for routing, booking, and debug logging. */
+export type LodgingProviderName = "liteapi" | "duffel" | "rapidapi";
+
 export type MockHotelBrowseResult = MockHotelResult & {
   imageUrl: string | null;
   distanceLabel: string;
@@ -41,6 +44,21 @@ export type MockHotelBrowseResult = MockHotelResult & {
   urgencyText?: string;
   propertyKind: "hotel" | "home";
   bookingUrl?: string;
+  /** Provider that produced this result (omitted on legacy/mock rows). */
+  provider?: LodgingProviderName;
+  /** Provider-native hotel id — needed to fetch details or prebook. */
+  providerHotelId?: string;
+  /** Provider-native cheapest-rate id — display/source metadata only. */
+  providerRateId?: string;
+  /** roomType-level offer token — the value LiteAPI /rates/prebook expects (distinct from providerRateId). */
+  providerOfferId?: string;
+  /** Coordinates when the provider supplies them (used for centrality scoring). */
+  latitude?: number;
+  longitude?: number;
+  /** Vibe descriptors from LiteAPI aiSearch (tags like "central location", "boutique hotel"). */
+  vibeTags?: string[];
+  /** Joined persona/style/story text from aiSearch, for semantic intent matching. */
+  vibeText?: string;
 };
 
 const HOTEL_SKELETONS: Omit<MockHotelResult, "id" | "name" | "addressLine" | "lodgingType">[] = [
@@ -323,14 +341,47 @@ export function mockHotelResultToPlace(
   destinationCity: string
 ): PlaceSpotlight {
   const q = `${r.name} ${r.addressLine}`;
+  const photoUrl = (r as Partial<MockHotelBrowseResult>).imageUrl;
   return {
     name: r.name,
     mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
     rating: r.rating,
     address: r.addressLine,
     priceRange: r.priceEstimatePerNight,
-    photoUrl: null,
+    photoUrl: typeof photoUrl === "string" && photoUrl.startsWith("http") ? photoUrl : null,
     spotlightCategory: "hotel",
     sourceQuery: destinationCity.trim() || r.neighborhood,
+  };
+}
+
+export function hotelBrowseResultToLodgingMeta(
+  hotel: MockHotelBrowseResult,
+  opts?: { destinationCity?: string; guestCount?: number; roomCount?: number; searchSource?: string; userSelected?: boolean }
+): HostLodgingStayMeta {
+  const provider = hotel.provider;
+  const bookingType =
+    provider === "liteapi" && hotel.providerHotelId && hotel.providerRateId
+      ? "in_app"
+      : hotel.bookingUrl
+        ? "deep_link"
+        : undefined;
+
+  return {
+    ...(opts?.destinationCity?.trim() ? { destinationCity: opts.destinationCity.trim() } : {}),
+    lodgingType: hotel.lodgingType,
+    bookingUrl: hotel.bookingUrl ?? undefined,
+    ...(opts?.guestCount !== undefined ? { guestCount: opts.guestCount } : {}),
+    ...(opts?.roomCount !== undefined ? { roomCount: opts.roomCount } : {}),
+    ...(provider ? { provider } : {}),
+    ...(hotel.providerHotelId ? { providerHotelId: hotel.providerHotelId } : {}),
+    ...(hotel.providerRateId ? { providerRateId: hotel.providerRateId } : {}),
+    ...(hotel.providerOfferId ? { providerOfferId: hotel.providerOfferId } : {}),
+    providerResultId: hotel.id,
+    ...(opts?.searchSource ? { providerSearchSource: opts.searchSource } : {}),
+    nightlyUsd: hotel.nightlyUsd,
+    totalUsd: hotel.totalUsd,
+    priceCurrency: "USD",
+    ...(bookingType ? { bookingType } : {}),
+    ...(opts?.userSelected === true ? { userSelected: true } : {}),
   };
 }

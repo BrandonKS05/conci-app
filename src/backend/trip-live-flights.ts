@@ -91,7 +91,10 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
   const key = getSerpApiKey();
   const depCity = plan.departureCity?.trim();
   const dest = plan.location?.trim();
-  if (!key) return { flights: [], bookBaseUrl: null, error: "Add SERPAPI_KEY to search flights." };
+  if (!key) {
+    console.info("[trip-live-flights] SerpAPI key missing; flight inspiration skipped");
+    return { flights: [], bookBaseUrl: null, error: null };
+  }
   if (!depCity || !dest) {
     return { flights: [], bookBaseUrl: null, error: null };
   }
@@ -147,8 +150,8 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
       const num = Number.parseFloat(rawPrice.replace(/[^0-9.]/g, ""));
       const per =
         !Number.isNaN(num) && num > 0
-          ? `~$${Math.round(num / headcount)}/person (est. · party of ${headcount})`
-          : `${rawPrice} · total shown on Google Flights`;
+          ? `Inspiration estimate ~$${Math.round(num / headcount)}/person (party of ${headcount})`
+          : `${rawPrice} · shown on Google Flights`;
       const dur = formatDurationMinutes(
         typeof bf.duration === "number" ? bf.duration : Number.parseInt(String(bf.duration ?? ""), 10)
       );
@@ -164,6 +167,7 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
         departureTime: firstLegDeparture(bf as { flights?: { departure_airport?: { time?: string } }[] }),
         duration: dur,
         bookOnGoogleFlightsUrl: book,
+        bookingStatus: "inspiration",
       };
     });
 
@@ -173,10 +177,11 @@ export async function fetchSerpGoogleFlights(plan: TripPlan): Promise<{
       error: flights.length ? null : "No flight results returned for this search.",
     };
   } catch (e) {
+    console.error("[trip-live-flights] SerpAPI flight inspiration failed", e instanceof Error ? e.message : String(e));
     return {
       flights: [],
       bookBaseUrl: "https://www.google.com/travel/flights",
-      error: e instanceof Error ? e.message : "Flight search failed.",
+      error: null,
     };
   }
 }

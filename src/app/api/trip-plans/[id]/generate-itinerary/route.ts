@@ -25,7 +25,7 @@ import {
 } from "@/shared/trip-plan";
 import { isUuid } from "@/shared/is-uuid";
 import { enrichItineraryWithVenues } from "@/backend/itinerary-venue-enrichment";
-import type { PlacePreview } from "@/shared/place-preview";
+import { hotelBrowseResultToLodgingMeta, type MockHotelBrowseResult } from "@/shared/mock-hotel-search";
 
 /** Hard ceiling on each OpenAI call so a slow upstream can't hang the request. */
 const OPENAI_TIMEOUT_MS = 60_000;
@@ -237,17 +237,21 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
       });
     }
 
+    // Only offer a flight option when the itinerary actually has a real flight —
+    // never a generic "Origin → destination flight" placeholder.
     const flightsState: DayVoteCategoryState = {
-      options: [
-        {
-          id: dayVoteId("flt", `${dateIso}|${flightLabel}`),
-          label: flightLabel,
-          detail: "recommended by CONCI",
-          href: flightUrl,
-          votes: [],
-          suggestedBy: "conci:auto",
-        },
-      ],
+      options: flightActivity
+        ? [
+            {
+              id: dayVoteId("flt", `${dateIso}|${flightLabel}`),
+              label: flightLabel,
+              detail: "recommended by CONCI",
+              href: flightUrl,
+              votes: [],
+              suggestedBy: "conci:auto",
+            },
+          ]
+        : [],
     };
     dayVoting[dateIso] = {
       restaurants: {
@@ -326,42 +330,75 @@ function buildAutofillRecommendations(plan: TripPlan, itinerary: GeneratedItiner
   return { restaurantPins, activityPins, hotelStays, dayVoting };
 }
 
-/** SerpAPI hotel lookup — depends only on budget + location, so it can run in parallel
+type HotelCandidate = {
+  hotel: MockHotelBrowseResult;
+  reason: string;
+  source: "aiSearch" | "rates";
+};
+
+/** Provider lodging lookup — depends only on budget + location, so it can run in parallel
  * with itinerary generation. Date assignment happens later in {@link buildHotelStayFromCandidate}. */
 async function searchHotelCandidate(
   plan: TripPlan,
-  location: string
-): Promise<PlacePreview | null> {
-  const { searchPlacesGoogleMaps } = await import("@/backend/serpapi-places");
-  const budgetHint = plan.budget?.tier?.toLowerCase() || "";
-  let query = `hotel ${location}`;
-  if (budgetHint.includes("budget") || budgetHint.includes("cheap")) query = `budget hotel ${location}`;
-  else if (budgetHint.includes("splurge") || budgetHint.includes("luxury")) query = `luxury hotel ${location}`;
+  location: string,
+  seedText?: string | null
+): Promise<HotelCandidate | null> {
+  // Only auto-suggest when we know exact dates — the bookable rates search needs them.
+  const range = plan.hostSetup?.tripRange;
+  const checkIn = range?.startIso?.trim();
+  const checkOut = range?.endIso?.trim();
+  if (!checkIn || !checkOut) return null;
 
-  const results = await searchPlacesGoogleMaps(query, location, { limit: 3 });
-  return results[0] ?? null;
+  const guests = plan.people?.count ?? plan.people?.names?.length ?? 2;
+  const { suggestStayForTrip } = await import("@/backend/lodging/suggest-stay");
+  const pick = await suggestStayForTrip({
+    destination: location,
+    checkIn,
+    checkOut,
+    guests: Math.max(1, guests),
+    rooms: 1,
+    vibe: plan.vibe ?? [],
+    budgetTier: plan.budget?.tier ?? null,
+    budgetPerPerson: plan.budget?.perPerson ?? null,
+    seedText,
+  });
+  if (!pick) return null;
+
+  const h = pick.hotel;
+  console.log(`[generate-itinerary] Suggested stay: ${h.name} (${pick.source}) — ${pick.reason}`);
+  return pick;
 }
 
 function buildHotelStayFromCandidate(
   plan: TripPlan,
   itinerary: GeneratedItinerary,
-  top: PlacePreview
+  top: HotelCandidate
 ): HostHotelStay[] | null {
   const days = inferTripDays(plan, itinerary);
   if (!days.length) return null;
+  const h = top.hotel;
 
   return [{
     startIso: days[0]!,
     endIso: days[days.length - 1]!,
     place: {
-      name: top.name,
-      mapsUrl: top.mapsUrl,
+      name: h.name,
+      mapsUrl: mapsSearchUrl(`${h.name} ${plan.location?.trim() || h.addressLine}`),
       spotlightCategory: "hotel" as const,
-      rating: top.rating,
-      photoUrl: top.photoUrl,
-      address: top.address,
+      rating: h.rating > 0 ? h.rating : undefined,
+      reviewCount: h.reviewCount || undefined,
+      photoUrl: h.imageUrl,
+      address: h.addressLine || undefined,
+      priceRange: h.nightlyUsd > 0 ? `~$${h.nightlyUsd}/night` : undefined,
     },
     recommendedByConci: true,
+    ...hotelBrowseResultToLodgingMeta(h, {
+      destinationCity: plan.location?.trim() || undefined,
+      guestCount: Math.max(1, plan.people.count ?? plan.people.names.length ?? 2),
+      roomCount: 1,
+      searchSource: top.source,
+    }),
+    notes: `Conci suggested this stay: ${top.reason}`,
   }];
 }
 
@@ -539,6 +576,52 @@ function buildVibeConstraint(vibes: string[]): string {
   return lines.join("\n");
 }
 
+/**
+ * True only when the group is actually flying: a departure city is set AND the
+ * trip wasn't explicitly marked "no flight needed". Used to gate flight rows so
+ * we never invent a "Flight: Origin → …" placeholder for a non-flight trip.
+ */
+function tripWantsFlight(plan: TripPlan, seedText?: string | null): boolean {
+  if (!plan.departureCity?.trim()) return false;
+  return !(seedText ?? "").includes("no flight needed");
+}
+
+function isFlightActivity(a: ItineraryActivity): boolean {
+  return a.category === "transport" && /^\s*flight\s*:/i.test(a.title ?? "");
+}
+
+/**
+ * Defense against the model ignoring instructions: strip flight rows when the
+ * trip isn't flying, and when it is, force the outbound flight first on the
+ * arrival day and the return flight last on the departure day (arrival can't
+ * come after check-in/activities). Mutates and returns the itinerary.
+ */
+function normalizeFlightActivities(itinerary: GeneratedItinerary, wantsFlight: boolean): GeneratedItinerary {
+  const days = itinerary.days;
+  days.forEach((day, idx) => {
+    const acts = day.activities ?? [];
+    if (!wantsFlight) {
+      day.activities = acts.filter((a) => !isFlightActivity(a));
+      return;
+    }
+    if (idx === 0) {
+      const fi = acts.findIndex(isFlightActivity);
+      if (fi > 0) {
+        const [flight] = acts.splice(fi, 1);
+        acts.unshift(flight!);
+      }
+    }
+    if (idx === days.length - 1 && days.length > 1) {
+      const lastFlightIdx = acts.map(isFlightActivity).lastIndexOf(true);
+      if (lastFlightIdx >= 0 && lastFlightIdx < acts.length - 1) {
+        const [flight] = acts.splice(lastFlightIdx, 1);
+        acts.push(flight!);
+      }
+    }
+  });
+  return itinerary;
+}
+
 function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): string {
   const lines: string[] = [];
 
@@ -552,11 +635,12 @@ function buildItineraryUserPrompt(plan: TripPlan, seedText?: string | null): str
   }
 
   if (plan.departureCity) {
-    const needsFlight = seedText?.includes("(needs flight)") || !seedText?.includes("no flight needed");
     lines.push(`Departing from: ${plan.departureCity}`);
-    if (needsFlight) {
-      lines.push(`FLIGHT REQUIRED: Include outbound flight "${plan.departureCity} → ${plan.location || "destination"}" on Day 1 and return flight "${plan.location || "destination"} → ${plan.departureCity}" on last day. Use title format "Flight: CityA → CityB". In description include airport codes, ~duration, and fare estimate. Split round-trip cost evenly between the two flights.`);
-    }
+  }
+  if (tripWantsFlight(plan, seedText)) {
+    lines.push(`FLIGHT REQUIRED: Include outbound flight "${plan.departureCity} → ${plan.location || "destination"}" on Day 1 and return flight "${plan.location || "destination"} → ${plan.departureCity}" on last day. Use title format "Flight: CityA → CityB". In description include airport codes, ~duration, and fare estimate. Split round-trip cost evenly between the two flights. The outbound flight MUST be the FIRST activity on Day 1 (arrival happens before check-in and any activities).`);
+  } else {
+    lines.push(`NO FLIGHTS: The group is NOT flying. Do NOT include any flight activities or "Flight: ..." items anywhere in the itinerary. Only include ground/local transport if genuinely relevant (e.g. a notable train or ferry between cities).`);
   }
 
   if (plan.dates.options.length > 0) {
@@ -765,11 +849,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const location = plan.location.trim();
 
-  // Kick off the hotel SerpAPI lookup now so it overlaps with itinerary generation instead
+  // Kick off the provider lodging lookup now so it overlaps with itinerary generation instead
   // of adding a serial round-trip after it. Dates are assigned once the itinerary exists.
   const needHotelSearch = !hasUserSelectedLodging(plan.hostSetup?.hotelStays ?? []);
-  const hotelCandidatePromise: Promise<PlacePreview | null> = needHotelSearch
-    ? searchHotelCandidate(plan, location).catch(() => null)
+  const hotelCandidatePromise: Promise<HotelCandidate | null> = needHotelSearch
+    ? searchHotelCandidate(plan, location, seedText).catch(() => null)
     : Promise.resolve(null);
 
   const userPrompt = buildItineraryUserPrompt(plan, seedText);
@@ -882,6 +966,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const headcount = plan.people.count ?? (plan.people.names.length || 2);
   itinerary.totalEstimateGroup =
     itinerary.totalEstimatePp != null ? itinerary.totalEstimatePp * headcount : null;
+
+  // Strip invented flights for non-flight trips; force flight-first/last ordering otherwise.
+  normalizeFlightActivities(itinerary, tripWantsFlight(plan, seedText));
 
   const generated = buildAutofillRecommendations(plan, itinerary);
 

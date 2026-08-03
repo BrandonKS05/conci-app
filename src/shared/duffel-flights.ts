@@ -81,8 +81,94 @@ export type DuffelFlightBookingRecord = {
   airlineName: string;
   flightNumber: string;
   bookedAt: string;
+  /** True for local-mock bookings AND real Duffel test-mode orders (test token / live_mode=false). */
   isMock?: boolean;
+  /**
+   * Travelers covered by this order's totalAmount. Absent on records persisted
+   * before this field existed — per-person math falls back to trip headcount.
+   */
+  passengerCount?: number;
+  /**
+   * Every leg of the order (outbound first, return second on round trips).
+   * Absent on records persisted before round-trip support — fall back to the
+   * flat origin/destination fields above, which describe the first segment only.
+   */
+  slices?: SelectedFlightSlice[];
 };
+
+// ─── Selected (saved, not yet booked) flight ─────────────────────────────────
+
+/** One leg of a saved selection — outbound, plus a return leg for round trips. */
+export type SelectedFlightSlice = {
+  origin: string; // IATA
+  destination: string; // IATA
+  departingAt: string; // ISO datetime
+  arrivingAt: string; // ISO datetime
+  airlineName: string;
+  flightNumber: string;
+  /** Number of connection stops (segments - 1). */
+  stops: number;
+};
+
+/**
+ * A specific flight the host saved from search results WITHOUT booking it. It
+ * replaces the generic AI flight recommendation in trip views and supplies the
+ * arrival/departure times used for travel-day blocking. `status: "selected"`
+ * keeps it distinct from a confirmed {@link DuffelFlightBookingRecord}.
+ */
+export type DuffelSelectedFlightRecord = {
+  provider: "duffel";
+  status: "selected";
+  /** Duffel offer id — re-fetched/refreshed before any real order. May expire. */
+  offerId: string;
+  totalAmount: string;
+  currency: string;
+  /** [outbound] for one-way, [outbound, return] for round trips. */
+  slices: SelectedFlightSlice[];
+  passengerCount: number;
+  /** Saved from a test-mode / local-mock search (no live Duffel token). */
+  isMock?: boolean;
+  selectedAt: string;
+};
+
+function sliceFromDuffel(slice: DuffelSlice): SelectedFlightSlice {
+  const first = slice.segments[0];
+  const last = slice.segments[slice.segments.length - 1];
+  return {
+    origin: first?.origin.iata_code ?? slice.origin.iata_code,
+    destination: last?.destination.iata_code ?? slice.destination.iata_code,
+    departingAt: first?.departing_at ?? "",
+    arrivingAt: last?.arriving_at ?? "",
+    airlineName: first?.marketing_carrier.name ?? "",
+    flightNumber: first
+      ? `${first.marketing_carrier.iata_code}${first.marketing_carrier_flight_number}`
+      : "",
+    stops: Math.max(0, slice.segments.length - 1),
+  };
+}
+
+/** All legs of an offer as flat slices (outbound first; return second on round trips). */
+export function flightSlicesFromOffer(offer: DuffelOffer): SelectedFlightSlice[] {
+  return offer.slices.map(sliceFromDuffel);
+}
+
+/** Build a saveable selection from a Duffel offer (server-side, validated input). */
+export function selectedFlightFromOffer(
+  offer: DuffelOffer,
+  opts: { passengerCount: number; isMock?: boolean }
+): DuffelSelectedFlightRecord {
+  return {
+    provider: "duffel",
+    status: "selected",
+    offerId: offer.id,
+    totalAmount: offer.total_amount,
+    currency: offer.total_currency,
+    slices: offer.slices.map(sliceFromDuffel),
+    passengerCount: Math.max(1, opts.passengerCount),
+    ...(opts.isMock ? { isMock: true as const } : {}),
+    selectedAt: new Date().toISOString(),
+  };
+}
 
 // ─── API response shapes (Conci API) ─────────────────────────────────────────
 
@@ -93,7 +179,21 @@ export type DuffelFlightsSearchApiResponse = {
   error?: string;
 };
 
+export type DuffelFlightSelectApiResponse = {
+  selection: DuffelSelectedFlightRecord | null;
+  error?: string;
+};
+
 export type DuffelFlightsBookApiResponse = {
   booking: DuffelFlightBookingRecord | null;
+  isMock?: boolean;
+  requiresAcceptance?: boolean;
+  priceChange?: {
+    previousAmount: string;
+    previousCurrency: string;
+    confirmedAmount: string;
+    confirmedCurrency: string;
+    confirmedOffer: DuffelOffer;
+  };
   error?: string;
 };

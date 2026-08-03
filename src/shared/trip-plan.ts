@@ -1,4 +1,8 @@
 import type { PlaceSpotlight, SpotlightVenueKind } from "@/shared/place-preview";
+import type { DuffelFlightBookingRecord, DuffelSelectedFlightRecord, SelectedFlightSlice } from "@/shared/duffel-flights";
+import type { DuffelBookingRecord } from "@/shared/duffel-stays";
+import type { LiteApiBookingRecord } from "@/shared/liteapi";
+import type { LodgingProviderName } from "@/shared/mock-hotel-search";
 import {
   formatLocalIsoDate,
   inferDefaultYearFromDateOptions,
@@ -94,10 +98,32 @@ export type HostLodgingStayMeta = {
   notes?: string | null;
   guestCount?: number;
   roomCount?: number;
+  /** Search/booking provider that produced this stay. Manual rows use `manual`. */
+  provider?: LodgingProviderName | "manual";
+  /** Provider-native hotel/accommodation id. */
+  providerHotelId?: string;
+  /** Provider-native rate id — display/source metadata only. */
+  providerRateId?: string;
+  /** roomType-level offer token used for LiteAPI prebook (distinct from providerRateId). */
+  providerOfferId?: string;
+  /** Stable result id from the provider/search response. */
+  providerResultId?: string;
+  /** Search mode/provenance, e.g. LiteAPI aiSearch vs rates. */
+  providerSearchSource?: string;
+  /** Per-night amount from provider response, when available. */
+  nightlyUsd?: number;
+  /** Total stay amount from provider response, when available. */
+  totalUsd?: number;
+  /** Currency for provider price fields. */
+  priceCurrency?: string;
+  /** Whether this can be booked in-app, is an external link, or is manual. */
+  bookingType?: "in_app" | "deep_link" | "manual";
   /** Host picked this stay in the app (modal / calendar); refits must not replace it unless they ask AI to change lodging. */
   userSelected?: boolean;
+  /** Confirmed LiteAPI in-app booking record. */
+  liteApiBooking?: LiteApiBookingRecord;
   /** Confirmed Duffel in-app booking record — present when booked via Conci (not an external link). */
-  duffelBooking?: import("@/shared/duffel-stays").DuffelBookingRecord;
+  duffelBooking?: DuffelBookingRecord;
 };
 
 /** Inclusive lodging segment (host may split stays across the trip). */
@@ -119,6 +145,10 @@ export type HostSetupState = {
   hotel?: PlaceSpotlight | null;
   /** Segmented stays when the trip uses more than one property (calendar pick + scope). */
   hotelStays?: HostHotelStay[];
+  /** Confirmed Duffel flight bookings created through Conci. */
+  flightBookings?: DuffelFlightBookingRecord[];
+  /** Flights the host saved from search but has NOT booked yet (one active selection). */
+  flightSelections?: DuffelSelectedFlightRecord[];
   /** Host-authored packing list notes (draft). */
   packingList?: string;
   /** Optional UX flag for completion meter only (does not gate publish). */
@@ -263,6 +293,97 @@ export function spotlightFromUnknown(row: unknown): PlaceSpotlight | null {
   };
 }
 
+function trimStringField(raw: unknown): string | undefined {
+  return typeof raw === "string" ? raw.trim() || undefined : undefined;
+}
+
+function parseHttpUrlOrNull(raw: unknown): string | null | undefined {
+  if (typeof raw === "string") {
+    const v = raw.trim();
+    return v.startsWith("http") ? v : undefined;
+  }
+  return raw === null ? null : undefined;
+}
+
+function parseFiniteNumber(raw: unknown): number | undefined {
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : undefined;
+}
+
+function parseLodgingProvider(raw: unknown): HostLodgingStayMeta["provider"] {
+  return raw === "liteapi" || raw === "duffel" || raw === "rapidapi" || raw === "manual" ? raw : undefined;
+}
+
+function parseBookingType(raw: unknown): HostLodgingStayMeta["bookingType"] {
+  return raw === "in_app" || raw === "deep_link" || raw === "manual" ? raw : undefined;
+}
+
+function parseLiteApiBookingRecord(raw: unknown): LiteApiBookingRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return o.provider === "liteapi" && typeof o.bookingId === "string" && typeof o.rateId === "string"
+    ? (o as unknown as LiteApiBookingRecord)
+    : undefined;
+}
+
+function parseDuffelBookingRecord(raw: unknown): DuffelBookingRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return o.provider === "duffel" && typeof o.bookingReference === "string" && typeof o.rateId === "string"
+    ? (o as unknown as DuffelBookingRecord)
+    : undefined;
+}
+
+function parseDuffelFlightBookingRecord(raw: unknown): DuffelFlightBookingRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return o.provider === "duffel" && typeof o.bookingReference === "string" && typeof o.orderId === "string"
+    ? (o as unknown as DuffelFlightBookingRecord)
+    : undefined;
+}
+
+function parseSelectedFlightSlice(raw: unknown): SelectedFlightSlice | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const origin = typeof o.origin === "string" ? o.origin.trim() : "";
+  const destination = typeof o.destination === "string" ? o.destination.trim() : "";
+  if (!origin || !destination) return undefined;
+  return {
+    origin,
+    destination,
+    departingAt: typeof o.departingAt === "string" ? o.departingAt : "",
+    arrivingAt: typeof o.arrivingAt === "string" ? o.arrivingAt : "",
+    airlineName: typeof o.airlineName === "string" ? o.airlineName : "",
+    flightNumber: typeof o.flightNumber === "string" ? o.flightNumber : "",
+    stops: typeof o.stops === "number" && Number.isFinite(o.stops) ? Math.max(0, Math.trunc(o.stops)) : 0,
+  };
+}
+
+function parseDuffelSelectedFlightRecord(raw: unknown): DuffelSelectedFlightRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  if (o.provider !== "duffel" || o.status !== "selected" || typeof o.offerId !== "string" || !o.offerId.trim()) {
+    return undefined;
+  }
+  const slices = Array.isArray(o.slices)
+    ? o.slices.map(parseSelectedFlightSlice).filter((s): s is SelectedFlightSlice => s !== undefined)
+    : [];
+  if (!slices.length) return undefined;
+  return {
+    provider: "duffel",
+    status: "selected",
+    offerId: o.offerId.trim(),
+    totalAmount: typeof o.totalAmount === "string" ? o.totalAmount : "",
+    currency: typeof o.currency === "string" ? o.currency : "USD",
+    slices,
+    passengerCount:
+      typeof o.passengerCount === "number" && Number.isFinite(o.passengerCount)
+        ? Math.max(1, Math.trunc(o.passengerCount))
+        : 1,
+    ...(o.isMock === true ? { isMock: true as const } : {}),
+    selectedAt: typeof o.selectedAt === "string" ? o.selectedAt : new Date().toISOString(),
+  };
+}
+
 export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const h = raw as Record<string, unknown>;
@@ -352,17 +473,24 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
       if (!place) continue;
       const recommendedByConci = o.recommendedByConci === true;
       const destinationCity = typeof o.destinationCity === "string" ? o.destinationCity.trim() || undefined : undefined;
-      const bookingUrl =
-        typeof o.bookingUrl === "string" && o.bookingUrl.startsWith("http")
-          ? o.bookingUrl
-          : o.bookingUrl === null
-            ? null
-            : undefined;
+      const bookingUrl = parseHttpUrlOrNull(o.bookingUrl);
       const notes = typeof o.notes === "string" ? o.notes.trim() || undefined : undefined;
       const guestCount = typeof o.guestCount === "number" && Number.isFinite(o.guestCount) ? o.guestCount : undefined;
       const roomCount = typeof o.roomCount === "number" && Number.isFinite(o.roomCount) ? o.roomCount : undefined;
       const userSelected = o.userSelected === true;
       const lodgingType = parseHostLodgingType(o.lodgingType);
+      const provider = parseLodgingProvider(o.provider);
+      const providerHotelId = trimStringField(o.providerHotelId);
+      const providerRateId = trimStringField(o.providerRateId);
+      const providerOfferId = trimStringField(o.providerOfferId);
+      const providerResultId = trimStringField(o.providerResultId);
+      const providerSearchSource = trimStringField(o.providerSearchSource);
+      const nightlyUsd = parseFiniteNumber(o.nightlyUsd);
+      const totalUsd = parseFiniteNumber(o.totalUsd);
+      const priceCurrency = trimStringField(o.priceCurrency);
+      const bookingType = parseBookingType(o.bookingType);
+      const liteApiBooking = parseLiteApiBookingRecord(o.liteApiBooking);
+      const duffelBooking = parseDuffelBookingRecord(o.duffelBooking);
       if (startIso <= endIso) {
         list.push({
           startIso,
@@ -376,10 +504,40 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
           ...(notes ? { notes } : {}),
           ...(guestCount !== undefined ? { guestCount } : {}),
           ...(roomCount !== undefined ? { roomCount } : {}),
+          ...(provider ? { provider } : {}),
+          ...(providerHotelId ? { providerHotelId } : {}),
+          ...(providerRateId ? { providerRateId } : {}),
+          ...(providerOfferId ? { providerOfferId } : {}),
+          ...(providerResultId ? { providerResultId } : {}),
+          ...(providerSearchSource ? { providerSearchSource } : {}),
+          ...(nightlyUsd !== undefined ? { nightlyUsd } : {}),
+          ...(totalUsd !== undefined ? { totalUsd } : {}),
+          ...(priceCurrency ? { priceCurrency } : {}),
+          ...(bookingType ? { bookingType } : {}),
+          ...(liteApiBooking ? { liteApiBooking } : {}),
+          ...(duffelBooking ? { duffelBooking } : {}),
         });
       }
     }
     if (list.length) hotelStays = list;
+  }
+
+  const flightBookingsRaw = h.flightBookings;
+  let flightBookings: DuffelFlightBookingRecord[] | undefined;
+  if (Array.isArray(flightBookingsRaw) && flightBookingsRaw.length) {
+    const rows = flightBookingsRaw
+      .map(parseDuffelFlightBookingRecord)
+      .filter((row): row is DuffelFlightBookingRecord => row !== undefined);
+    if (rows.length) flightBookings = rows;
+  }
+
+  const flightSelectionsRaw = h.flightSelections;
+  let flightSelections: DuffelSelectedFlightRecord[] | undefined;
+  if (Array.isArray(flightSelectionsRaw) && flightSelectionsRaw.length) {
+    const rows = flightSelectionsRaw
+      .map(parseDuffelSelectedFlightRecord)
+      .filter((row): row is DuffelSelectedFlightRecord => row !== undefined);
+    if (rows.length) flightSelections = rows;
   }
 
   const packingRaw = h.packingList;
@@ -393,6 +551,8 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
     hotel !== undefined ||
     experiencesOutlined !== undefined ||
     hotelStays !== undefined ||
+    flightBookings !== undefined ||
+    flightSelections !== undefined ||
     packingList !== undefined;
   if (!any) return undefined;
 
@@ -403,6 +563,8 @@ export function parseHostSetup(raw: unknown): HostSetupState | undefined {
   if (hotel !== undefined) out.hotel = hotel ?? null;
   if (experiencesOutlined !== undefined) out.experiencesOutlined = experiencesOutlined;
   if (hotelStays !== undefined) out.hotelStays = hotelStays;
+  if (flightBookings !== undefined) out.flightBookings = flightBookings;
+  if (flightSelections !== undefined) out.flightSelections = flightSelections;
   if (packingList !== undefined) out.packingList = packingList;
 
   return out;
@@ -1098,56 +1260,6 @@ export function addLocalIsoDays(iso: string, deltaDays: number): string | null {
   return formatLocalIsoDate(startOfLocalDay(n));
 }
 
-/**
- * Merge a lodging pick from the calendar into `hotelStays` and set primary `hotel` for publish UIs.
- * - **full**: one segment for the entire trip range.
- * - **partial**: this stay runs from `fromDayIso` through `tripEndIso`; earlier days keep existing stays (trimmed).
- */
-export function applyHostHotelSelection(
-  existing: HostHotelStay[] | undefined,
-  tripStartIso: string,
-  tripEndIso: string,
-  fromDayIso: string,
-  place: PlaceSpotlight,
-  scope: "full" | "partial"
-): { hotelStays: HostHotelStay[]; hotel: PlaceSpotlight } {
-  if (scope === "full") {
-    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
-    return { hotelStays: [one], hotel: place };
-  }
-
-  if (!ISO_DAY.test(tripStartIso) || !ISO_DAY.test(tripEndIso) || !ISO_DAY.test(fromDayIso)) {
-    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
-    return { hotelStays: [one], hotel: place };
-  }
-
-  if (fromDayIso < tripStartIso || fromDayIso > tripEndIso) {
-    const one: HostHotelStay = { startIso: tripStartIso, endIso: tripEndIso, place };
-    return { hotelStays: [one], hotel: place };
-  }
-
-  const dayBefore = addLocalIsoDays(fromDayIso, -1);
-  const out: HostHotelStay[] = [];
-
-  for (const s of existing ?? []) {
-    if (!ISO_DAY.test(s.startIso) || !ISO_DAY.test(s.endIso)) continue;
-    if (s.endIso < fromDayIso) {
-      out.push(s);
-      continue;
-    }
-    if (s.startIso >= fromDayIso) {
-      continue;
-    }
-    if (s.startIso < fromDayIso && s.endIso >= fromDayIso && dayBefore && dayBefore >= s.startIso) {
-      out.push({ ...s, endIso: dayBefore });
-    }
-  }
-
-  out.push({ startIso: fromDayIso, endIso: tripEndIso, place });
-  out.sort((a, b) => a.startIso.localeCompare(b.startIso));
-  return { hotelStays: out, hotel: out[0]!.place };
-}
-
 function minIso(a: string, b: string): string {
   return a <= b ? a : b;
 }
@@ -1314,8 +1426,19 @@ export function applyHostLodgingSegment(
         ...(meta.notes?.trim() ? { notes: meta.notes.trim() } : {}),
         ...(meta.guestCount !== undefined ? { guestCount: meta.guestCount } : {}),
         ...(meta.roomCount !== undefined ? { roomCount: meta.roomCount } : {}),
+        ...(meta.provider ? { provider: meta.provider } : {}),
+        ...(meta.providerHotelId?.trim() ? { providerHotelId: meta.providerHotelId.trim() } : {}),
+        ...(meta.providerRateId?.trim() ? { providerRateId: meta.providerRateId.trim() } : {}),
+        ...(meta.providerOfferId?.trim() ? { providerOfferId: meta.providerOfferId.trim() } : {}),
+        ...(meta.providerResultId?.trim() ? { providerResultId: meta.providerResultId.trim() } : {}),
+        ...(meta.providerSearchSource?.trim() ? { providerSearchSource: meta.providerSearchSource.trim() } : {}),
+        ...(meta.nightlyUsd !== undefined ? { nightlyUsd: meta.nightlyUsd } : {}),
+        ...(meta.totalUsd !== undefined ? { totalUsd: meta.totalUsd } : {}),
+        ...(meta.priceCurrency?.trim() ? { priceCurrency: meta.priceCurrency.trim() } : {}),
+        ...(meta.bookingType ? { bookingType: meta.bookingType } : {}),
         ...(meta.userSelected === true ? { userSelected: true, recommendedByConci: false } : {}),
         ...(meta.lodgingType ? { lodgingType: meta.lodgingType } : {}),
+        ...(meta.liteApiBooking ? { liteApiBooking: meta.liteApiBooking } : {}),
         ...(meta.duffelBooking ? { duffelBooking: meta.duffelBooking } : {}),
       };
     }

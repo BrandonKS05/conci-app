@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 import {
+  hotelBrowseResultToLodgingMeta,
   mockHotelResultToPlace,
   type MockHotelAmenityIcon,
   type MockHotelBrowseResult,
@@ -18,7 +19,6 @@ import {
   type TripPlan,
 } from "@/shared/trip-plan";
 import type { PlaceSpotlight } from "@/shared/place-preview";
-import { DuffelLodgingBookingDrawer } from "@/frontend/components/duffel-lodging-booking-drawer";
 
 type StayTab = "all" | "hotels" | "homes";
 type SortKey = "recommended" | "price_low" | "price_high" | "rating";
@@ -132,10 +132,12 @@ function LodgingCardPhotoGradient({ hotel }: { hotel: MockHotelBrowseResult }) {
 function HotelCardDetails({
   hotel,
   onSelect,
+  onBook,
   selecting,
 }: {
   hotel: MockHotelBrowseResult;
   onSelect: () => void;
+  onBook?: () => void;
   selecting: boolean;
 }) {
   return (
@@ -158,14 +160,25 @@ function HotelCardDetails({
         ) : null}
         <p className="text-sm leading-relaxed text-neutral-500">{hotel.description}</p>
         {hotel.urgencyText ? <p className="text-sm font-medium text-rose-600">{hotel.urgencyText}</p> : null}
-        <button
-          type="button"
-          disabled={selecting}
-          onClick={onSelect}
-          className="mt-2 rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:opacity-50"
-        >
-          {selecting ? "Adding…" : "Add to trip"}
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={selecting}
+            onClick={onSelect}
+            className="rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:opacity-50"
+          >
+            {selecting ? "Adding…" : "Add to trip"}
+          </button>
+          {onBook ? (
+            <button
+              type="button"
+              onClick={onBook}
+              className="rounded-full bg-[#1c1c17] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
+            >
+              Book now
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex shrink-0 flex-col items-end justify-between gap-3 sm:min-w-[140px]">
@@ -190,16 +203,18 @@ function HotelCardDetails({
 function HotelResultCard({
   hotel,
   onSelect,
+  onBook,
   selecting,
 }: {
   hotel: MockHotelBrowseResult;
   onSelect: () => void;
+  onBook?: () => void;
   selecting: boolean;
 }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-white shadow-[var(--shadow-ambient-sm)] transition hover:border-[color:var(--hairline-strong)] hover:shadow-[var(--shadow-ambient)] dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/15 sm:flex-row">
       <HotelCardImage hotel={hotel} />
-      <HotelCardDetails hotel={hotel} onSelect={onSelect} selecting={selecting} />
+      <HotelCardDetails hotel={hotel} onSelect={onSelect} onBook={onBook} selecting={selecting} />
     </article>
   );
 }
@@ -228,6 +243,9 @@ export function TripHostLodgingPage(props: {
   const [stayTab, setStayTab] = useState<StayTab>("all");
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
   const [results, setResults] = useState<MockHotelBrowseResult[]>([]);
+  /** Show a useful, limited set by default; reveal the rest on demand. */
+  const DEFAULT_VISIBLE = 8;
+  const [visibleCount, setVisibleCount] = useState(DEFAULT_VISIBLE);
   const [loading, setLoading] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchDetail, setSearchDetail] = useState<string | null>(null);
@@ -245,7 +263,6 @@ export function TripHostLodgingPage(props: {
     notes: "",
   });
   const [manualError, setManualError] = useState<string | null>(null);
-  const [duffelDrawerOpen, setDuffelDrawerOpen] = useState(false);
 
   const runSearch = useCallback(async () => {
     const dest = destination.trim();
@@ -308,6 +325,7 @@ export function TripHostLodgingPage(props: {
 
       const hotels = raw.hotels ?? [];
       setResults(hotels);
+      setVisibleCount(DEFAULT_VISIBLE);
 
       if (hotels.length === 0) {
         setSearchError(raw.error || "No properties returned for this search.");
@@ -386,14 +404,12 @@ export function TripHostLodgingPage(props: {
         checkIn,
         checkOut,
         place,
-        {
+        hotelBrowseResultToLodgingMeta(hotel, {
           destinationCity: destination,
           guestCount: guests,
           roomCount: rooms,
           userSelected: true,
-          lodgingType: hotel.lodgingType,
-          bookingUrl: hotel.bookingUrl ?? undefined,
-        }
+        })
       );
       const gi = plan.generatedItinerary
         ? upsertLodgingActivitiesInGeneratedItinerary(
@@ -476,6 +492,8 @@ export function TripHostLodgingPage(props: {
         guestCount: guests,
         roomCount: rooms,
         userSelected: true,
+        provider: "manual",
+        bookingType: "manual",
         lodgingType: manualStay.lodgingType,
         bookingUrl: bookingUrl || undefined,
         notes: manualStay.notes,
@@ -556,19 +574,6 @@ export function TripHostLodgingPage(props: {
                 {destination.trim() || "Your trip"} · {dateLabel} · {travelersLabel}
               </p>
             </div>
-            {props.isHost && (
-              <button
-                type="button"
-                onClick={() => setDuffelDrawerOpen(true)}
-                className="flex items-center gap-2 rounded-xl bg-[#1c1c17] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#2a2a26] dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
-              >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <path d="M2 10h20" />
-                </svg>
-                Book with Conci
-              </button>
-            )}
           </div>
         </div>
 
@@ -622,15 +627,44 @@ export function TripHostLodgingPage(props: {
               <LodgingResultsSkeleton />
             ) : (
               <ul className="space-y-4">
-                {filteredResults.map((hotel) => (
+                {filteredResults.slice(0, visibleCount).map((hotel) => (
                   <li key={hotel.id}>
                     <HotelResultCard
                       hotel={hotel}
                       onSelect={() => void commitHotel(hotel)}
+                      onBook={
+                        hotel.provider === "liteapi" && hotel.providerHotelId && hotel.providerRateId
+                          ? () =>
+                              router.push(
+                                `/trip/${props.tripId}/lodging/checkout?` +
+                                  new URLSearchParams({
+                                    rateId: hotel.providerRateId ?? "",
+                                    offerId: hotel.providerOfferId ?? "",
+                                    hotelId: hotel.providerHotelId ?? "",
+                                    hotelName: hotel.name,
+                                    checkIn,
+                                    checkOut,
+                                    city: destination,
+                                    guests: String(guests),
+                                  }).toString()
+                              )
+                          : undefined
+                      }
                       selecting={selectingId === hotel.id}
                     />
                   </li>
                 ))}
+                {filteredResults.length > visibleCount ? (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((c) => c + DEFAULT_VISIBLE)}
+                      className="w-full rounded-xl border border-[color:var(--hairline-strong)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--on-surface)] transition hover:bg-[color:var(--surface-container-low)] dark:border-white/15 dark:bg-white/[0.03] dark:text-[#ebe9e4]"
+                    >
+                      Show more stays ({filteredResults.length - visibleCount} more)
+                    </button>
+                  </li>
+                ) : null}
                 {!filteredResults.length && results.length > 0 ? (
                   <li className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-950">
                     <p className="font-semibold">No properties match your filters</p>
@@ -645,23 +679,6 @@ export function TripHostLodgingPage(props: {
         </div>
       </div>
 
-      {props.isHost && (
-        <DuffelLodgingBookingDrawer
-          open={duffelDrawerOpen}
-          onClose={() => setDuffelDrawerOpen(false)}
-          tripId={props.tripId}
-          initialDestination={destination}
-          initialCheckIn={checkIn}
-          initialCheckOut={checkOut}
-          initialGuests={guests}
-          initialRooms={rooms}
-          onBookingComplete={() => {
-            setDuffelDrawerOpen(false);
-            setSaveMessage("Booking confirmed and saved to your trip.");
-            setTimeout(() => router.push(`/trip/${props.tripId}/setup#sec-lodging`), 2000);
-          }}
-        />
-      )}
     </div>
   );
 }

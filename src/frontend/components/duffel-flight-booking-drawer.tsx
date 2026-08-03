@@ -1,11 +1,113 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DuffelOffer,
+  DuffelSlice,
   DuffelFlightPassenger,
   DuffelFlightBookingRecord,
+  DuffelSelectedFlightRecord,
+  DuffelFlightSelectApiResponse,
+  DuffelFlightsBookApiResponse,
 } from "@/shared/duffel-flights";
+
+type AirportSuggestion = { iata: string; name: string; city: string; country: string };
+
+/** Type city/airport/code → pick an airport (resolves to IATA). Duffel-backed, no SerpAPI. */
+function AirportAutocomplete({
+  tripId,
+  label,
+  valueIata,
+  onChange,
+}: {
+  tripId: string;
+  label: string;
+  valueIata: string;
+  onChange: (iata: string) => void;
+}) {
+  const [query, setQuery] = useState(valueIata);
+  const [suggestions, setSuggestions] = useState<AirportSuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(valueIata);
+  }, [valueIata]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/airport-search?q=${encodeURIComponent(q)}`, {
+          credentials: "include",
+        });
+        const j = (await r.json()) as { airports?: AirportSuggestion[] };
+        if (!cancelled) setSuggestions(j.airports ?? []);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, tripId]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  return (
+    <div ref={boxRef} className="relative flex flex-col gap-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">{label}</span>
+      <input
+        value={query}
+        onChange={(e) => {
+          const v = e.target.value;
+          setQuery(v);
+          setOpen(true);
+          const code = v.trim().toUpperCase();
+          if (/^[A-Z]{3}$/.test(code)) onChange(code);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="City, airport, or code"
+        className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+      />
+      {open && suggestions.length > 0 ? (
+        <ul className="absolute top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-[color:var(--hairline-strong)] bg-white shadow-lg dark:border-white/15 dark:bg-dm-page">
+          {suggestions.map((s) => (
+            <li key={s.iata}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(s.iata);
+                  setQuery(s.iata);
+                  setOpen(false);
+                }}
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-[color:var(--surface-container-low)] dark:hover:bg-white/[0.06]"
+              >
+                <span className="font-semibold text-[color:var(--on-surface)] dark:text-white">{s.iata}</span>
+                <span className="truncate text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-400">
+                  {[s.city, s.name].filter(Boolean).join(" · ")}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 // ─── Style tokens (matches lodging drawer) ───────────────────────────────────
 
@@ -20,7 +122,7 @@ const btnSecondary =
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = "results" | "passenger-details" | "confirm" | "done";
+type Step = "results" | "offer-detail" | "passenger-details" | "confirm" | "done";
 
 type PassengerForm = {
   given_name: string;
@@ -39,9 +141,12 @@ export type DuffelFlightDrawerProps = {
   origin: string; // IATA e.g. "MIA"
   destination: string; // IATA e.g. "JFK"
   departureDate: string; // YYYY-MM-DD
+  returnDate?: string | null; // YYYY-MM-DD — enables round-trip when present
   passengerCount: number;
   flightLabel?: string; // e.g. "Flight: Miami → New York City"
   onBookingComplete?: (booking: DuffelFlightBookingRecord) => void;
+  /** Called after the host saves a flight without booking (explicit "Save" action). */
+  onFlightSelected?: (selection: DuffelSelectedFlightRecord) => void;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -143,6 +248,44 @@ function MockBadge() {
   );
 }
 
+/** One slice (outbound or return) rendered as a depart→arrive row with stops. */
+function SliceRow({ slice, kind }: { slice: DuffelSlice; kind?: "outbound" | "return" }) {
+  const first = slice.segments[0];
+  const last = slice.segments[slice.segments.length - 1];
+  if (!first || !last) return null;
+  const stops = slice.segments.length - 1;
+  return (
+    <div>
+      {kind && (
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+          {kind === "outbound" ? "Outbound" : "Return"} · {first.marketing_carrier.name} {first.marketing_carrier.iata_code}{first.marketing_carrier_flight_number}
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <div className="text-center">
+          <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(first.departing_at)}</p>
+          <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{first.origin.iata_code}</p>
+        </div>
+        <div className="flex flex-1 flex-col items-center gap-0.5">
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{parseDuration(slice.duration)}</p>
+          <div className="flex w-full items-center gap-1">
+            <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
+            <svg className="h-3 w-3 text-[color:var(--on-surface-muted)]" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M14.5 8.5a1 1 0 000-1H9.5l-2-4H6l1 4H3.5l-.75-1.5H1.5L2.5 8l-1 1.5h1.25L3.5 8h3l-1 4h1.5l2-4h5z"/></svg>
+            <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
+          </div>
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+            {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? "s" : ""}`}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(last.arriving_at)}</p>
+          <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{last.destination.iata_code}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OfferCard({
   offer,
   onSelect,
@@ -150,9 +293,10 @@ function OfferCard({
   offer: DuffelOffer;
   onSelect: () => void;
 }) {
-  const seg = offer.slices[0]?.segments[0];
-  if (!seg) return null;
-  const stops = (offer.slices[0]?.segments.length ?? 1) - 1;
+  const outbound = offer.slices[0];
+  if (!outbound?.segments[0]) return null;
+  const ret = offer.slices[1];
+  const isRoundTrip = offer.slices.length > 1;
 
   return (
     <button
@@ -160,42 +304,25 @@ function OfferCard({
       onClick={onSelect}
       className="w-full rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-4 text-left transition hover:border-[#2563EB] hover:shadow-sm dark:border-white/10 dark:bg-dm-page dark:hover:border-[#60A5FA]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-[color:var(--on-surface)] dark:text-[#ebe9e4]">
-            {seg.marketing_carrier.name}
-            <span className="ml-1.5 text-xs font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-              {seg.marketing_carrier.iata_code}{seg.marketing_carrier_flight_number}
-            </span>
-          </p>
-          <div className="mt-2 flex items-center gap-3">
-            <div className="text-center">
-              <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(seg.departing_at)}</p>
-              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{seg.origin.iata_code}</p>
-            </div>
-            <div className="flex flex-1 flex-col items-center gap-0.5">
-              <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">{parseDuration(seg.duration)}</p>
-              <div className="flex w-full items-center gap-1">
-                <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
-                <svg className="h-3 w-3 text-[color:var(--on-surface-muted)]" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M14.5 8.5a1 1 0 000-1H9.5l-2-4H6l1 4H3.5l-.75-1.5H1.5L2.5 8l-1 1.5h1.25L3.5 8h3l-1 4h1.5l2-4h5z"/></svg>
-                <div className="h-px flex-1 bg-[color:var(--hairline)] dark:bg-white/15" />
-              </div>
-              <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
-                {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? "s" : ""}`}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-base font-bold tabular-nums text-[color:var(--on-surface)] dark:text-[#ebe9e4]">{fmtTime(seg.arriving_at)}</p>
-              <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">{seg.destination.iata_code}</p>
-            </div>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-lg font-bold text-[#2563EB] dark:text-[#60A5FA]">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="inline-flex items-center rounded-full bg-[color:var(--surface-container)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:bg-white/10">
+          {isRoundTrip ? "Round trip" : "One way"}
+        </span>
+        <div className="text-right">
+          <p className="text-lg font-bold leading-none text-[#2563EB] dark:text-[#60A5FA]">
             {fmtCurrency(offer.total_amount, offer.total_currency)}
           </p>
-          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">total</p>
+          <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">total{isRoundTrip ? " · both legs" : ""}</p>
         </div>
+      </div>
+      <div className="space-y-2.5">
+        <SliceRow slice={outbound} kind={isRoundTrip ? "outbound" : undefined} />
+        {ret ? (
+          <>
+            <div className="h-px bg-[color:var(--hairline)] dark:bg-white/10" />
+            <SliceRow slice={ret} kind="return" />
+          </>
+        ) : null}
       </div>
     </button>
   );
@@ -210,66 +337,128 @@ export function DuffelFlightBookingDrawer({
   origin,
   destination,
   departureDate,
+  returnDate,
   passengerCount,
   flightLabel,
   onBookingComplete,
+  onFlightSelected,
 }: DuffelFlightDrawerProps) {
   const [step, setStep] = useState<Step>("results");
   const [offers, setOffers] = useState<DuffelOffer[] | null>(null);
   const [isMock, setIsMock] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedSelection, setSavedSelection] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<DuffelOffer | null>(null);
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [paxErrors, setPaxErrors] = useState<PassengerFieldErrors[]>([]);
   const [booking, setBooking] = useState<DuffelFlightBookingRecord | null>(null);
+  const [pendingPriceChange, setPendingPriceChange] = useState<DuffelFlightsBookApiResponse["priceChange"] | null>(null);
+  // Editable search fields (seeded from props; user can change and re-search).
+  const [searchOrigin, setSearchOrigin] = useState(origin);
+  const [searchDestination, setSearchDestination] = useState(destination);
+  const [searchDate, setSearchDate] = useState(departureDate);
+  const [searchReturnDate, setSearchReturnDate] = useState(returnDate ?? "");
+  const [searchPax, setSearchPax] = useState(Math.max(1, passengerCount));
+  const [searchCabin, setSearchCabin] = useState<"economy" | "premium_economy" | "business" | "first">("economy");
 
-  const fetchOffers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setOffers(null);
-    try {
-      const params = new URLSearchParams({
-        origin,
-        destination,
-        date: departureDate,
-        passengers: String(Math.max(1, passengerCount)),
-      });
-      const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/search?${params.toString()}`, {
-        credentials: "include",
-      });
-      const j = (await r.json()) as { offers?: DuffelOffer[]; isMock?: boolean; error?: string };
-      if (!r.ok || !j.offers) {
-        setError(j.error ?? "Failed to load flights.");
-        return;
+  const runSearch = useCallback(
+    async (p: { origin: string; destination: string; date: string; returnDate?: string; pax: number; cabin: string }) => {
+      setLoading(true);
+      setError(null);
+      setOffers(null);
+      try {
+        const params = new URLSearchParams({
+          origin: p.origin.trim().toUpperCase(),
+          destination: p.destination.trim().toUpperCase(),
+          date: p.date,
+          passengers: String(Math.max(1, p.pax)),
+          cabin: p.cabin,
+        });
+        if (p.returnDate && p.returnDate > p.date) params.set("returnDate", p.returnDate);
+        const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/search?${params.toString()}`, {
+          credentials: "include",
+        });
+        const j = (await r.json()) as { offers?: DuffelOffer[]; isMock?: boolean; error?: string };
+        if (!r.ok || !j.offers) {
+          setError(j.error ?? "Failed to load flights.");
+          return;
+        }
+        setOffers(j.offers);
+        setIsMock(j.isMock ?? false);
+      } catch {
+        setError("Network error. Please try again.");
+      } finally {
+        setLoading(false);
       }
-      setOffers(j.offers);
-      setIsMock(j.isMock ?? false);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [tripId, origin, destination, departureDate, passengerCount]);
+    },
+    [tripId]
+  );
 
-  // Fetch when drawer opens
+  // Fetch when drawer opens — reset editable fields to the incoming flight.
   const handleOpen = useCallback(() => {
     setStep("results");
     setSelectedOffer(null);
     setBooking(null);
+    setPendingPriceChange(null);
+    setSavedSelection(false);
     setError(null);
     setPaxErrors([]);
-    void fetchOffers();
-  }, [fetchOffers]);
+    setSearchOrigin(origin);
+    setSearchDestination(destination);
+    setSearchDate(departureDate);
+    setSearchReturnDate(returnDate ?? "");
+    setSearchPax(Math.max(1, passengerCount));
+    setSearchCabin("economy");
+    void runSearch({ origin, destination, date: departureDate, returnDate: returnDate ?? undefined, pax: passengerCount, cabin: "economy" });
+  }, [runSearch, origin, destination, departureDate, returnDate, passengerCount]);
 
+  // Pick an offer to inspect (round-trip legs + Save vs Book) — not a commitment.
   const handleSelectOffer = useCallback((offer: DuffelOffer) => {
     setSelectedOffer(offer);
-    setPassengers(Array.from({ length: offer.passengers.length }, blankPassenger));
-    setPaxErrors(Array.from({ length: offer.passengers.length }, () => ({})));
-    setStep("passenger-details");
+    setPendingPriceChange(null);
+    setError(null);
+    setSavedSelection(false);
+    setStep("offer-detail");
   }, []);
 
-  const handleBook = useCallback(async () => {
+  // Proceed from inspect → passenger details (real booking flow).
+  const handleProceedToBook = useCallback(() => {
+    if (!selectedOffer) return;
+    setPassengers(Array.from({ length: selectedOffer.passengers.length }, blankPassenger));
+    setPaxErrors(Array.from({ length: selectedOffer.passengers.length }, () => ({})));
+    setError(null);
+    setStep("passenger-details");
+  }, [selectedOffer]);
+
+  // Explicitly save the inspected flight WITHOUT booking it.
+  const handleSaveSelection = useCallback(async () => {
+    if (!selectedOffer) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/trip-plans/${tripId}/duffel/flights/select`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offer: selectedOffer, isMock, passengerCount: selectedOffer.passengers.length }),
+      });
+      const j = (await r.json()) as DuffelFlightSelectApiResponse;
+      if (!r.ok || !j.selection) {
+        setError(j.error ?? "Could not save this flight.");
+        return;
+      }
+      setSavedSelection(true);
+      onFlightSelected?.(j.selection);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedOffer, tripId, isMock, onFlightSelected]);
+
+  const handleBook = useCallback(async (acceptPriceChange = false) => {
     if (!selectedOffer) return;
     setLoading(true);
     setError(null);
@@ -289,14 +478,27 @@ export function DuffelFlightBookingDrawer({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offerId: selectedOffer.id, offer: selectedOffer, passengers: paxPayload }),
+        body: JSON.stringify({
+          offerId: selectedOffer.id,
+          offer: selectedOffer,
+          passengers: paxPayload,
+          acceptPriceChange,
+        }),
       });
-      const j = (await r.json()) as { booking?: DuffelFlightBookingRecord; error?: string };
+      const j = (await r.json()) as DuffelFlightsBookApiResponse;
+      if (j.requiresAcceptance && j.priceChange) {
+        setSelectedOffer(j.priceChange.confirmedOffer);
+        setPendingPriceChange(j.priceChange);
+        setError(j.error ?? "Review and accept the updated price before booking.");
+        setStep("confirm");
+        return;
+      }
       if (!r.ok || !j.booking) {
         setError(j.error ?? "Booking failed.");
         return;
       }
       setBooking(j.booking);
+      setPendingPriceChange(null);
       setStep("done");
       onBookingComplete?.(j.booking);
     } catch {
@@ -381,6 +583,65 @@ export function DuffelFlightBookingDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5">
 
+          {/* Editable search — origin/destination/date/travelers/cabin */}
+          {step === "results" && (
+            <div className="mb-4 grid grid-cols-2 gap-3 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-lowest)] p-4 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-3">
+              <AirportAutocomplete tripId={tripId} label="From" valueIata={searchOrigin} onChange={setSearchOrigin} />
+              <AirportAutocomplete tripId={tripId} label="To" valueIata={searchDestination} onChange={setSearchDestination} />
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Depart
+                <input
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Return <span className="normal-case text-[color:var(--on-surface-muted)]">(optional)</span>
+                <input
+                  type="date"
+                  value={searchReturnDate}
+                  min={searchDate || undefined}
+                  onChange={(e) => setSearchReturnDate(e.target.value)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Travelers
+                <input
+                  type="number"
+                  min={1}
+                  max={9}
+                  value={searchPax}
+                  onChange={(e) => setSearchPax(Math.max(1, Math.min(9, Number(e.target.value) || 1)))}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--on-surface-muted)]">
+                Cabin
+                <select
+                  value={searchCabin}
+                  onChange={(e) => setSearchCabin(e.target.value as typeof searchCabin)}
+                  className="rounded-lg border border-[color:var(--hairline-strong)] bg-white px-2 py-1.5 text-sm text-[color:var(--on-surface)] dark:border-white/15 dark:bg-dm-page dark:text-white"
+                >
+                  <option value="economy">Economy</option>
+                  <option value="premium_economy">Premium economy</option>
+                  <option value="business">Business</option>
+                  <option value="first">First</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void runSearch({ origin: searchOrigin, destination: searchDestination, date: searchDate, returnDate: searchReturnDate || undefined, pax: searchPax, cabin: searchCabin })}
+                className="self-end rounded-full bg-[#1c1c17] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2a2a26] disabled:opacity-50 dark:bg-neutral-200 dark:text-[#1a1a1a] dark:hover:bg-white"
+              >
+                Search
+              </button>
+            </div>
+          )}
+
           {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -398,7 +659,7 @@ export function DuffelFlightBookingDrawer({
             <div className="rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900/30 dark:bg-red-950/20">
               <p className="text-sm font-medium text-red-800 dark:text-red-300">{error}</p>
               {step === "results" && (
-                <button onClick={() => void fetchOffers()} className={`mt-3 ${btnSecondary}`}>
+                <button onClick={() => void runSearch({ origin: searchOrigin, destination: searchDestination, date: searchDate, returnDate: searchReturnDate || undefined, pax: searchPax, cabin: searchCabin })} className={`mt-3 ${btnSecondary}`}>
                   Try again
                 </button>
               )}
@@ -421,6 +682,67 @@ export function DuffelFlightBookingDrawer({
                     <OfferCard key={offer.id} offer={offer} onSelect={() => handleSelectOffer(offer)} />
                   ))}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* Offer detail — inspect round-trip legs, then Save (no booking) or Book now */}
+          {!loading && step === "offer-detail" && selectedOffer && (
+            <div className="space-y-5">
+              <div className="space-y-3 rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-container-low)] p-4 dark:border-white/10 dark:bg-dm-elevated">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center rounded-full bg-[color:var(--surface-container)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--on-surface-muted)] dark:bg-white/10">
+                    {selectedOffer.slices.length > 1 ? "Round trip" : "One way"}
+                  </span>
+                  <div className="text-right">
+                    <p className="text-xl font-bold leading-none text-[#2563EB] dark:text-[#60A5FA]">
+                      {fmtCurrency(selectedOffer.total_amount, selectedOffer.total_currency)}
+                    </p>
+                    <p className="text-[10px] text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                      total · {passengerCount} passenger{passengerCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+                {selectedOffer.slices.map((slice, i) => (
+                  <div key={slice.id}>
+                    {i > 0 ? <div className="my-2 h-px bg-[color:var(--hairline)] dark:bg-white/10" /> : null}
+                    <SliceRow slice={slice} kind={selectedOffer.slices.length > 1 ? (i === 0 ? "outbound" : "return") : undefined} />
+                  </div>
+                ))}
+              </div>
+
+              {savedSelection ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Flight saved to your trip</p>
+                  <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                    Saved as your selected flight — it replaces the suggested flight in your trip. It is not booked yet; you can book it anytime.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[color:var(--on-surface-muted)] dark:text-neutral-500">
+                  Save this flight to lock it into your trip without booking, or book it now. Flights are booked directly through Conci — there is no separate external link.
+                </p>
+              )}
+
+              {error && (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300">
+                  {error}
+                </p>
+              )}
+
+              {savedSelection ? (
+                <div className="flex gap-3">
+                  <button onClick={() => setStep("results")} className={btnSecondary}>Back to results</button>
+                  <button onClick={onClose} className={`flex-1 ${btnPrimary}`}>Done</button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => setStep("results")} className={btnSecondary}>Back</button>
+                  <button onClick={() => void handleSaveSelection()} disabled={saving} className={btnSecondary}>
+                    {saving ? "Saving…" : "Save flight"}
+                  </button>
+                  <button onClick={handleProceedToBook} className={`flex-1 ${btnPrimary}`}>Book now</button>
+                </div>
               )}
             </div>
           )}
@@ -513,7 +835,7 @@ export function DuffelFlightBookingDrawer({
               })}
 
               <div className="flex gap-3 pt-1">
-                <button onClick={() => setStep("results")} className={btnSecondary}>Back</button>
+                <button onClick={() => setStep("offer-detail")} className={btnSecondary}>Back</button>
                 <button onClick={handleReviewBooking} className={`flex-1 ${btnPrimary}`}>
                   Review booking
                 </button>
@@ -561,6 +883,23 @@ export function DuffelFlightBookingDrawer({
                 )}
               </div>
 
+              {pendingPriceChange ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Updated Duffel offer</p>
+                  <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                    Price changed from {fmtCurrency(pendingPriceChange.previousAmount, pendingPriceChange.previousCurrency)} to{" "}
+                    {fmtCurrency(pendingPriceChange.confirmedAmount, pendingPriceChange.confirmedCurrency)}. Accept the updated offer to book.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleBook(true)}
+                    className="mt-3 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-800 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200"
+                  >
+                    Accept updated price
+                  </button>
+                </div>
+              ) : null}
+
               {error && (
                 <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300">
                   {error}
@@ -569,7 +908,11 @@ export function DuffelFlightBookingDrawer({
 
               <div className="flex gap-3">
                 <button onClick={() => setStep("passenger-details")} className={btnSecondary}>Back</button>
-                <button onClick={() => void handleBook()} className={`flex-1 ${btnPrimary}`}>
+                <button
+                  onClick={() => void handleBook()}
+                  disabled={Boolean(pendingPriceChange)}
+                  className={`flex-1 ${btnPrimary}`}
+                >
                   Confirm &amp; book
                 </button>
               </div>

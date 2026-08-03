@@ -14,6 +14,11 @@
             "date": 1780192344399,
             "name": "/Users/brandonlee/conci-app/logs/mcp-puppeteer-2026-05-30.log",
             "hash": "b84239e05759c3e4eb6668c384cb7b0343d450be2b7e45525a453d10664fa91e"
+        },
+        {
+            "date": 1780300305439,
+            "name": "/Users/brandonlee/conci-app/logs/mcp-puppeteer-2026-06-01.log",
+            "hash": "1b1fb0c44566480f7b640392d7bbb2757ed4f6022686406e20e57525831fa182"
         }
     ],
     "hashType": "sha256"

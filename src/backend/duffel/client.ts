@@ -1,4 +1,5 @@
 import { getEnvTrimmed } from "@/backend/env-api-keys";
+import { fetchWithRetry } from "@/backend/http-retry";
 
 const DUFFEL_BASE = "https://api.duffel.com";
 const DUFFEL_VERSION = "v2";
@@ -10,6 +11,16 @@ export function getDuffelAccessToken(): string | undefined {
 
 export function isDuffelConfigured(): boolean {
   return !!getDuffelAccessToken();
+}
+
+/**
+ * True when the configured token is a Duffel TEST token (`duffel_test_…`).
+ * Test-mode searches/orders are real API calls but never charge money or issue
+ * tickets — they must render as "Test mode" alongside local-mock data.
+ */
+export function isDuffelTestToken(): boolean {
+  const t = getDuffelAccessToken();
+  return !!t && t.toLowerCase().startsWith("duffel_test");
 }
 
 function duffelHeaders(): Record<string, string> {
@@ -25,14 +36,18 @@ function duffelHeaders(): Record<string, string> {
 
 export async function duffelPost<T>(path: string, body: unknown): Promise<T> {
   const url = `${DUFFEL_BASE}${path}`;
+  const retryUnsafeMethods =
+    path === "/air/offer_requests" ||
+    path === "/stays/search" ||
+    path === "/stays/quotes";
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithRetry(url, {
       method: "POST",
       headers: duffelHeaders(),
       body: JSON.stringify(body),
       cache: "no-store",
-    });
+    }, { timeoutMs: 12_000, retryUnsafeMethods });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Duffel network error for POST ${path}: ${msg}`);
@@ -48,11 +63,11 @@ export async function duffelGet<T>(path: string): Promise<T> {
   const url = `${DUFFEL_BASE}${path}`;
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithRetry(url, {
       method: "GET",
       headers: duffelHeaders(),
       cache: "no-store",
-    });
+    }, { timeoutMs: 12_000 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Duffel network error for GET ${path}: ${msg}`);
@@ -68,11 +83,11 @@ export async function duffelDelete(path: string): Promise<void> {
   const url = `${DUFFEL_BASE}${path}`;
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithRetry(url, {
       method: "DELETE",
       headers: duffelHeaders(),
       cache: "no-store",
-    });
+    }, { timeoutMs: 12_000 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Duffel network error for DELETE ${path}: ${msg}`);

@@ -1,5 +1,6 @@
 import { getGooglePlacesApiKey } from "@/backend/env-api-keys";
 import { googlePlaceFirstPhotoProxyPath } from "@/backend/google-places-photo-media";
+import { fetchWithRetry } from "@/backend/http-retry";
 import type { TripPlan } from "@/shared/trip-plan";
 import type { RestaurantPick } from "@/shared/restaurants";
 
@@ -27,7 +28,7 @@ type PlaceJson = {
 };
 
 async function searchTextPlaces(apiKey: string, textQuery: string, pageSize: number): Promise<PlaceJson[]> {
-  const res = await fetch(SEARCH_TEXT_URL, {
+  const res = await fetchWithRetry(SEARCH_TEXT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -35,7 +36,7 @@ async function searchTextPlaces(apiKey: string, textQuery: string, pageSize: num
       "X-Goog-FieldMask": FIELD_MASK,
     },
     body: JSON.stringify({ textQuery, pageSize }),
-  });
+  }, { timeoutMs: 10_000, retryUnsafeMethods: true });
   const raw = (await res.json().catch(() => ({}))) as {
     places?: unknown;
     error?: { message?: string; status?: string };
@@ -95,6 +96,7 @@ function mapPlaceToPick(place: PlaceJson, id: string): RestaurantPick {
     neighborhood: (place.formattedAddress ?? "—").trim().slice(0, 160),
     ratingDisplay,
     priceRange: formatPriceLevel(place.priceLevel),
+    mapsUrl,
     openTableUrl: mapsUrl,
     cuisineType: summary ? summary.slice(0, 240) : undefined,
     reserveCtaLabel: "Open in Google Maps",

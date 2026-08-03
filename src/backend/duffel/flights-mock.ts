@@ -29,24 +29,28 @@ export function mockSearchFlights(params: {
   origin: string;
   destination: string;
   departureDate: string;
+  /** When set, each mock offer includes a return leg (round trip). */
+  returnDate?: string;
   passengers: number;
 }): { offers: DuffelOffer[]; requestId: string; isMock: boolean } {
   const originAirport = makeAirport(params.origin, params.origin);
   const destAirport = makeAirport(params.destination, params.destination);
   const base = new Date(`${params.departureDate}T06:00:00`);
-  const paxIds = Array.from({ length: Math.max(1, params.passengers) }, (_, i) => `pas_mock_${i + 1}`);
+  const returnBase = params.returnDate ? new Date(`${params.returnDate}T06:00:00`) : null;
+  const pax = Math.max(1, params.passengers);
+  const paxIds = Array.from({ length: pax }, (_, i) => `pas_mock_${i + 1}`);
 
   const offers: DuffelOffer[] = AIRLINES.slice(0, 4).map((airline, i) => {
     const depHour = 6 + i * 3;
     const durationMin = 120 + i * 30;
     const depDate = new Date(base.getTime() + depHour * 3600_000);
     const arrDate = new Date(depDate.getTime() + durationMin * 60_000);
-    const priceBase = 180 + i * 55 + Math.round(Math.random() * 40);
-    const total = (priceBase * Math.max(1, params.passengers)).toFixed(2);
+    // Round trips quote both legs, so the per-person fare is roughly doubled.
+    const priceBase = (180 + i * 55 + Math.round(Math.random() * 40)) * (returnBase ? 2 : 1);
+    const total = (priceBase * pax).toFixed(2);
 
-    const segId = `seg_mock_${i + 1}`;
-    const segment = {
-      id: segId,
+    const outboundSegment = {
+      id: `seg_mock_out_${i + 1}`,
       origin: originAirport,
       destination: destAirport,
       departing_at: depDate.toISOString(),
@@ -59,6 +63,42 @@ export function mockSearchFlights(params: {
       passengers: paxIds.map((id) => ({ passenger_id: id, cabin_class: "economy" })),
     };
 
+    const slices: DuffelOffer["slices"] = [
+      {
+        id: `slc_mock_out_${i + 1}`,
+        origin: originAirport,
+        destination: destAirport,
+        duration: isoDuration(durationMin),
+        segments: [outboundSegment],
+      },
+    ];
+
+    if (returnBase) {
+      const retDep = new Date(returnBase.getTime() + (12 + i) * 3600_000);
+      const retArr = new Date(retDep.getTime() + durationMin * 60_000);
+      slices.push({
+        id: `slc_mock_ret_${i + 1}`,
+        origin: destAirport,
+        destination: originAirport,
+        duration: isoDuration(durationMin),
+        segments: [
+          {
+            id: `seg_mock_ret_${i + 1}`,
+            origin: destAirport,
+            destination: originAirport,
+            departing_at: retDep.toISOString(),
+            arriving_at: retArr.toISOString(),
+            duration: isoDuration(durationMin),
+            marketing_carrier: airline,
+            marketing_carrier_flight_number: `${200 + i * 37}`,
+            operating_carrier: airline,
+            aircraft: null,
+            passengers: paxIds.map((id) => ({ passenger_id: id, cabin_class: "economy" })),
+          },
+        ],
+      });
+    }
+
     return {
       id: `off_mock_${i + 1}`,
       total_amount: total,
@@ -66,15 +106,7 @@ export function mockSearchFlights(params: {
       base_amount: (parseFloat(total) * 0.87).toFixed(2),
       tax_amount: (parseFloat(total) * 0.13).toFixed(2),
       expires_at: addHours(new Date(), 1),
-      slices: [
-        {
-          id: `slc_mock_${i + 1}`,
-          origin: originAirport,
-          destination: destAirport,
-          duration: isoDuration(durationMin),
-          segments: [segment],
-        },
-      ],
+      slices,
       passengers: paxIds.map((id, pi) => ({ id, type: "adult" as const, age: 30 + pi })),
     };
   });

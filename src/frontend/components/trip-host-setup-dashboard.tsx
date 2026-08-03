@@ -36,15 +36,28 @@ import {
 } from "@/shared/trip-plan";
 import type { TripLiveRecommendationsPayload } from "@/shared/trip-live-recommendations";
 import {
+  resolveTripDayRole,
+  looksLikeFlight,
+  travelDaySortKey,
+} from "@/shared/travel-day";
+import {
   CuratedFlightsRows,
   HostLiveScheduleByDay,
   LiveCurationErrorBanner,
   useLiveCurationMutation,
 } from "@/frontend/components/trip-plan-live-curate";
-import type { LodgingModalSeed } from "@/frontend/components/host-hotel-search-modal";
 import {
   HostSetupAddPlacesModal,
 } from "@/frontend/components/host-setup-add-places-modal";
+
+/** Seed values passed when opening the lodging setup flow (date range, destination, segment, type). */
+type LodgingModalSeed = {
+  segmentId?: string;
+  checkIn?: string;
+  checkOut?: string;
+  destination?: string;
+  lodgingType?: HostLodgingType;
+};
 import {
   HostSetupPinDetailModal,
   HostSetupRemovePinConfirm,
@@ -55,7 +68,8 @@ import {
   type HostCopilotUiHint,
 } from "@/frontend/components/host-setup-copilot";
 import { SiteShell } from "@/frontend/components/site-shell";
-import { HostFlightSearchPanel } from "@/frontend/components/host-flight-search-panel";
+import { HostDuffelFlightPanel } from "@/frontend/components/host-duffel-flight-panel";
+import { TripFlightSummary } from "@/frontend/components/trip-flight-summary";
 import { restaurantPickToSpotlight, type RestaurantPick } from "@/shared/restaurants";
 import type { LiveExperienceCard } from "@/shared/trip-live-recommendations";
 import type { PlaceSpotlight } from "@/shared/place-preview";
@@ -321,8 +335,16 @@ function TripLodgingPanel({
                         rel="noopener noreferrer"
                         className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
                       >
-                        Booking
+                        Book stay
                       </a>
+                    ) : canEditAsHost ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenLodgingModal()}
+                        className="text-xs font-semibold text-[color:var(--sage)] underline-offset-2 hover:underline dark:text-emerald-300"
+                      >
+                        Book stay
+                      </button>
                     ) : null}
                     {stay.place.mapsUrl?.startsWith("http") ? (
                       <a
@@ -404,19 +426,33 @@ function isoFromCell(viewYear: number, viewMonth: number, dom: number): string {
   return formatLocalIsoDate(new Date(viewYear, viewMonth, dom, 12, 0, 0, 0));
 }
 
-type TripCalendarDayRole = "arrival" | "departure" | "on-trip" | null;
+// Day role (arrival/departure/on-trip) comes from the shared travel-day module so
+// the calendar overview and the day view block travel days the same way.
+const tripCalendarDayRole = resolveTripDayRole;
 
-function tripCalendarDayRole(
-  cellIso: string,
-  range: { startIso: string; endIso: string } | null
-): TripCalendarDayRole {
-  if (!range?.startIso || !range?.endIso) return null;
-  const days = enumerateLocalIsoDays(range.startIso, range.endIso);
-  if (!days.includes(cellIso)) return null;
-  if (cellIso === range.startIso && cellIso === range.endIso) return "arrival";
-  if (cellIso === range.startIso) return "arrival";
-  if (cellIso === range.endIso) return "departure";
-  return "on-trip";
+/** "HH:MM" → minutes past midnight (null when unparseable). */
+function minutesFromHHMM(t: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return Number.isFinite(h) && Number.isFinite(min) ? h * 60 + min : null;
+}
+
+/** ISO datetime → "HH:MM" local (for sort base), or null. */
+function hhmmFromIso(iso: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** ISO datetime → "h:mm AM/PM" label, or null. */
+function clock12FromIso(iso: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 /** Human-readable range for the confirm dialog. */
@@ -1872,6 +1908,7 @@ export function TripHostSetupDashboard({
                     }
                     const cellIso = isoFromCell(calYear, calMonth, dom);
                     const tripDayRole = tripCalendarDayRole(cellIso, effectiveHighlightRange);
+                    const flightSelection = hostSetup.flightSelections?.[0] ?? null;
                     const dayLabel = formatPinDayLabel(cellIso);
                     const hotelCalendarRows = hotelStayRowsForCalendarDay(hostSetup.hotelStays, cellIso);
                     const mealPinsForCell = (hostSetup.restaurantPins ?? []).filter(
@@ -1988,10 +2025,24 @@ export function TripHostSetupDashboard({
                         time = "23:00";
                         label = "Night";
                         desc = "Turn in";
-                      } else if (expName.toLowerCase().includes("flight") || expName.toLowerCase().includes("lyft")) {
-                        time = expName.toLowerCase().includes("lyft") ? "14:30" : "16:50";
-                        label = expName.toLowerCase().includes("lyft") ? "2:30 PM" : "4:50 PM";
-                        desc = expName.toLowerCase().includes("lyft") ? "25 min" : "MIA → home";
+                      } else if (looksLikeFlight(expName)) {
+                        // Flight pin: anchor to the travel-day edge. Prefer the host's saved
+                        // flight time when present; otherwise show Arrival/Departure (no fake clock).
+                        const isReturn = tripDayRole === "departure";
+                        const selSlice = flightSelection
+                          ? isReturn
+                            ? flightSelection.slices[flightSelection.slices.length - 1]
+                            : flightSelection.slices[0]
+                          : null;
+                        const selIso = selSlice ? (isReturn ? selSlice.departingAt : selSlice.arrivingAt) : null;
+                        const clock = selIso ? clock12FromIso(selIso) : null;
+                        time = (selIso && hhmmFromIso(selIso)) || (isReturn ? "21:00" : "06:00");
+                        label = clock ?? (isReturn ? "Departure" : "Arrival");
+                        desc = isReturn ? "Departure flight" : "Arrival flight";
+                      } else if (expName.toLowerCase().includes("lyft")) {
+                        time = "14:30";
+                        label = "2:30 PM";
+                        desc = "25 min";
                       } else {
                         const times = ["11:00", "15:30", "17:00", "21:30"];
                         const labels = ["Morning", "Afternoon", "Evening", "Night"];
@@ -2010,8 +2061,15 @@ export function TripHostSetupDashboard({
                       });
                     });
 
-                    // Sort chronologically by assigned time!
-                    cellEntries.sort((a, b) => a.time.localeCompare(b.time));
+                    // Sort chronologically, but block travel days: the arrival flight is
+                    // pinned to the top of the day and the departure flight to the bottom —
+                    // the same rule the day view uses (shared travelDaySortKey).
+                    cellEntries.sort((a, b) => {
+                      const ka = travelDaySortKey(looksLikeFlight(a.title), tripDayRole, minutesFromHHMM(a.time));
+                      const kb = travelDaySortKey(looksLikeFlight(b.title), tripDayRole, minutesFromHHMM(b.time));
+                      if (ka !== kb) return ka - kb;
+                      return a.time.localeCompare(b.time);
+                    });
 
                     const borderClass = tripDayRole
                       ? "border border-[#e5e5e0] rounded-xl bg-white shadow-sm dark:border-white/10 dark:bg-dm-card"
@@ -2411,9 +2469,12 @@ export function TripHostSetupDashboard({
           {flightCurationErr ? (
               <LiveCurationErrorBanner message={flightCurationErr} onDismiss={() => setFlightCurationErr(null)} />
             ) : null}
-            {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() ? (
-              <HostFlightSearchPanel tripId={tripId} enabled />
-          ) : null}
+            {canEditAsHost && hostHasConcreteTripRange(plan) && plan.location?.trim() && plan.departureCity?.trim() ? (
+              <HostDuffelFlightPanel tripId={tripId} plan={plan} />
+          ) : (
+              // Guests and finalized trips: read-only booked/saved flights, no booking controls.
+              <TripFlightSummary plan={plan} />
+            )}
           {showFlightTransport ? (
               <div className="space-y-4 border-t border-[color:var(--hairline)] pt-6 dark:border-white/10">
                 <p className="text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-[color:var(--on-surface-muted)]">

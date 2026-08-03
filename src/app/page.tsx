@@ -14,21 +14,6 @@ export const metadata: Metadata = {
     "Describe the trip in one message. Conci's AI builds the full itinerary for your whole group. No spreadsheets, no twenty tabs.",
 };
 
-const steps = [
-  {
-    title: "Everyone has a voice",
-    body: "Invite the group and let Conci do the interrogating. Everyone drops in their dates, budgets, dietary restrictions, and hotel preferences.",
-  },
-  {
-    title: "AI builds the impossible",
-    body: "Conci synthesizes the group's conflicting constraints and builds a complete, bookable itinerary. Say 'find a cheaper flight' and watch the calendar update.",
-  },
-  {
-    title: "Seamless booking & money",
-    body: "No more manual Venmo tracking. Conci tracks exactly who owes what, and provides direct booking links for every flight, hotel, and dinner.",
-  },
-];
-
 const integrations = [
   "Google Flights",
   "Google Maps",
@@ -182,38 +167,6 @@ export default function HomePage() {
                   <div className="mt-6 flex items-center gap-2 text-sm font-medium text-white opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 translate-y-4">
                     Start planning <span aria-hidden="true">&rarr;</span>
                   </div>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works — vertical, all three fit in one viewport */}
-      <section className="relative overflow-hidden border-y border-[color:var(--hairline)] bg-[color:var(--surface)] py-16 shadow-sm dark:border-white/5 dark:bg-dm-card sm:py-20">
-        <div className="mx-auto max-w-3xl px-5 sm:px-6 lg:px-8">
-          <div className="divide-y divide-[color:var(--hairline)] dark:divide-white/5">
-            {steps.map((step, i) => (
-              <ScrollReveal key={step.title} delay={i * 0.08} direction="up"
-                className="flex items-center gap-8 py-8 sm:gap-12 sm:py-10">
-                {/* Number tile */}
-                <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[color:var(--hairline)] bg-gradient-to-tr from-[color:var(--surface-container)] to-[color:var(--surface-container-lowest)] shadow-sm dark:border-white/5 dark:from-[#151515] dark:to-[#1a1a1a]">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,var(--sage)_0%,transparent_55%)] opacity-10 blur-2xl dark:opacity-5" />
-                  <span className="font-display text-3xl font-semibold mix-blend-multiply dark:mix-blend-screen" style={{ color: "color-mix(in srgb, var(--sage) 30%, transparent)" }}>
-                    0{i + 1}
-                  </span>
-                </div>
-                {/* Text */}
-                <div className="flex-1">
-                  <span className="label-caps mb-1.5 block text-[11px] tracking-[0.2em] text-[color:var(--sage)] dark:text-[color:var(--sage-soft)]">
-                    Step 0{i + 1}
-                  </span>
-                  <h3 className="font-display text-xl font-medium tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-2xl">
-                    {step.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--on-surface-variant)] dark:text-neutral-400 sm:text-base">
-                    {step.body}
-                  </p>
                 </div>
               </ScrollReveal>
             ))}

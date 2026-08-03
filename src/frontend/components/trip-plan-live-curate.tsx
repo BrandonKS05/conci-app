@@ -423,7 +423,7 @@ export function CuratedFlightsRows({
     return <p className="text-sm text-amber-800 dark:text-amber-200/90">{flightsError}</p>;
   }
   if (!flights.length) {
-    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No flight rows yet (check SERPAPI_KEY).</p>;
+    return <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">No flight inspiration rows yet.</p>;
   }
 
   return (
@@ -436,7 +436,7 @@ export function CuratedFlightsRows({
             left or use <strong className="text-[color:var(--on-surface-variant)] dark:text-neutral-300">Not interested</strong> to clear the rest.
           </>
         ) : (
-          "Flight suggestions for your group (only the host can add them to the trip)."
+        "Flight inspiration for your group (only Duffel-backed search can book inside Conci)."
         )}
       </p>
       <KeptStrip title="On your trip" items={flightKeptMeta} busyKey={busyKey} onRemove={(k) => mutate("unkeep", k)} />
@@ -451,6 +451,11 @@ export function CuratedFlightsRows({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-100">{f.airline}</p>
+                {f.bookingStatus !== "bookable" ? (
+                  <span className="mt-1 flex w-fit rounded-full border border-[color:var(--hairline)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--on-surface-variant)] dark:border-white/10 dark:text-neutral-400">
+                    Inspiration only · not bookable in Conci
+                  </span>
+                ) : null}
                 <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Departs {f.departureTime}</p>
                 <p className="text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">Duration {f.duration}</p>
                 <p className="mt-1 text-base font-semibold text-[color:var(--on-surface)] dark:text-neutral-50">{f.pricePerPerson}</p>
@@ -470,7 +475,7 @@ export function CuratedFlightsRows({
               className="mt-3 inline-flex rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-50 dark:border-sky-500/30 dark:bg-dm-page dark:text-sky-200 dark:hover:bg-sky-950/40"
               onClick={(e) => e.stopPropagation()}
             >
-              Book on Google Flights
+              Explore on Google Flights
             </a>
           </div>
         </SwipeableLiveCard>
@@ -569,7 +574,7 @@ export function CuratedRestaurantsSection({
                     />
                   </div>
                   <a
-                    href={r.openTableUrl}
+                    href={r.mapsUrl || r.openTableUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-flex rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50 dark:border-white/10 dark:bg-dm-page dark:text-rose-300 dark:hover:bg-dm-elevated"

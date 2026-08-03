@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import type { TripPlan, ItineraryActivity } from "@/shared/trip-plan";
+import { isGoogleMapsUrl } from "@/shared/external-link";
+import { TripFlightSummary } from "@/frontend/components/trip-flight-summary";
 
 // ── Inline SVG icons (no external icon library needed) ─────────────────────────
 type IconProps = { className?: string };
@@ -295,6 +297,11 @@ export function TripItineraryView({ tripId, plan }: { tripId: string; plan: Trip
               </div>
             </div>
 
+            {/* Booked/saved flights — renders nothing on no-flight trips */}
+            <div className="relative mb-8">
+              <TripFlightSummary plan={plan} />
+            </div>
+
             {/* Divider */}
             <div className="flex items-center gap-4">
               <div className="h-px flex-1 bg-neutral-200 dark:bg-white/10" />
@@ -398,7 +405,7 @@ export function TripItineraryView({ tripId, plan }: { tripId: string; plan: Trip
                                   rel="noopener noreferrer"
                                   className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-[#2563EB] hover:underline dark:text-[#60A5FA]"
                                 >
-                                  Book now
+                                  {isGoogleMapsUrl(act.bookingUrl) ? "View on Maps" : "Book now"}
                                   <ExternalLink className="h-3 w-3" />
                                 </a>
                               )}
