@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Hard ceiling for the Supabase auth check. If the Auth server is slow, paused,
+// or unreachable, we must never let the middleware hang: a hung middleware makes
+// Vercel kill the request with 504 MIDDLEWARE_INVOCATION_TIMEOUT, which takes the
+// whole app down. On timeout we soft-fail to "no user" so pages keep serving.
+const AUTH_CHECK_TIMEOUT_MS = 3000;
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   // Supabase falls back to "Site URL" when redirect_to is not allowlisted — often the root with ?code=.
@@ -9,6 +15,26 @@ export async function middleware(request: NextRequest) {
     const dest = request.nextUrl.clone();
     dest.pathname = "/auth/callback";
     return NextResponse.redirect(dest);
+  }
+
+  const isProtected =
+    path === "/settings" ||
+    path.startsWith("/trip-parser") ||
+    path === "/saved" ||
+    path.startsWith("/saved/") ||
+    path === "/my-trips" ||
+    path === "/joined-trips" ||
+    path === "/booking" ||
+    path.startsWith("/booking/") ||
+    path.startsWith("/trip/") ||
+    path === "/join";
+
+  // Only auth-gated pages need the user. Everything else (landing, marketing,
+  // downloads, API routes that do their own auth) must not depend on Supabase
+  // being reachable — skipping the network round-trip keeps them up even when
+  // Auth is down, and avoids paying for a call whose result we never read.
+  if (!isProtected && path !== "/auth") {
+    return NextResponse.next({ request });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -39,21 +65,15 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const isProtected =
-    path === "/settings" ||
-    path.startsWith("/trip-parser") ||
-    path === "/saved" ||
-    path.startsWith("/saved/") ||
-    path === "/my-trips" ||
-    path === "/joined-trips" ||
-    path === "/booking" ||
-    path.startsWith("/booking/") ||
-    path.startsWith("/trip/") ||
-    path === "/join";
+  // Race the auth check against a timeout. A network error or a slow/unreachable
+  // Auth server resolves to `null` (treated as signed-out) instead of hanging.
+  const user = await Promise.race([
+    supabase.auth
+      .getUser()
+      .then((result) => result.data.user)
+      .catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), AUTH_CHECK_TIMEOUT_MS)),
+  ]);
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
@@ -92,6 +112,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pptx)$).*)",
   ],
 };
