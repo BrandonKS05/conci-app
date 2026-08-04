@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
 import { allocateUniqueInviteCode } from "@/backend/invite-code";
 import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { fetchSubscriptionTierForUser, userCanCreateTrips } from "@/backend/subscription-tier";
+import { requestHasAccessPass } from "@/backend/access-pass";
 import { ensureHostMembership } from "@/backend/trip-memberships";
 import {
   normalizePlan,
@@ -73,7 +75,22 @@ export async function POST(request: Request) {
     .eq("id", id)
     .maybeSingle();
 
-  /* Subscription gate temporarily disabled for testing — Stripe/checkout code unchanged. */
+  // Paywall: only subscribed hosts may create a new trip. Editing a trip you
+  // already own stays open; guest/join flows never reach this route.
+  if (!existing && !(await requestHasAccessPass())) {
+    const tier = await fetchSubscriptionTierForUser(svc, user.id);
+    if (!userCanCreateTrips(tier)) {
+      return NextResponse.json(
+        {
+          error: "Subscription required",
+          detail: "Subscribe to a Host plan to create trips.",
+          code: "subscription_required",
+          redirect: "/pricing",
+        },
+        { status: 402 }
+      );
+    }
+  }
 
   if (existing?.user_id && existing.user_id !== user.id) {
     return NextResponse.json({ error: "Forbidden", detail: "This trip belongs to another account." }, { status: 403 });

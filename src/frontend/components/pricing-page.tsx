@@ -105,17 +105,9 @@ function PricingContent() {
           <h1 className="font-display text-3xl font-semibold tracking-tight text-[color:var(--on-surface)] dark:text-white sm:text-4xl">
             Simple pricing
           </h1>
-          {process.env.NODE_ENV === "development" ? (
-            <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
-              Testing mode: every tier is <span className="font-semibold text-[color:var(--on-surface)] dark:text-neutral-200">$0/mo</span>{" "}
-              in the UI. Trip creation is open to all signed-in users — subscription billing is bypassed until we turn the
-              gate back on.
-            </p>
-          ) : (
-            <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
-              Choose the plan that fits your group. Start free, upgrade when you&apos;re ready.
-            </p>
-          )}
+          <p className="mx-auto mt-3 max-w-xl text-[color:var(--on-surface-variant)] dark:text-neutral-400">
+            Join any trip for free. Subscribe to a Host plan to create and run your own.
+          </p>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -141,10 +133,10 @@ function PricingContent() {
               ))}
             </ul>
             <Link
-              href="/trip-parser"
+              href="/join?from=create"
               className={`mt-8 block w-full text-center ${primaryFormButtonClass}`}
             >
-              Get started
+              Join a trip
             </Link>
           </article>
 
@@ -154,7 +146,7 @@ function PricingContent() {
             </span>
             <p className="text-sm font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">Host</p>
             <p className="mt-2 font-display text-4xl font-semibold text-[color:var(--on-surface)] dark:text-white">
-              $0
+              $20
               <span className="text-lg font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">/mo</span>
             </p>
             <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">
@@ -186,7 +178,7 @@ function PricingContent() {
           <article className="flex flex-col rounded-2xl border border-[color:var(--hairline-strong)] bg-[color:var(--surface-container-lowest)] p-8 shadow-[var(--shadow-ambient-sm)] dark:border-white/10 dark:bg-dm-card">
             <p className="text-sm font-semibold text-[color:var(--on-surface-muted)] dark:text-neutral-500">Host Pro</p>
             <p className="mt-2 font-display text-4xl font-semibold text-[color:var(--on-surface)] dark:text-white">
-              $0
+              $60
               <span className="text-lg font-normal text-[color:var(--on-surface-muted)] dark:text-neutral-500">/mo</span>
             </p>
             <p className="mt-4 text-sm text-[color:var(--on-surface-variant)] dark:text-neutral-400">

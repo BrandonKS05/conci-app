@@ -8,6 +8,10 @@ export const metadata: Metadata = {
 };
 import { AppTopNav } from "@/frontend/components/app-top-nav";
 import { createAuthServerClient } from "@/backend/supabase/auth-server";
+import { getSupabaseServiceRoleClient } from "@/backend/supabase/service-role";
+import { fetchSubscriptionTierForUser, userCanCreateTrips } from "@/backend/subscription-tier";
+import { requestHasAccessPass } from "@/backend/access-pass";
+import { redirect } from "next/navigation";
 import { guaranteedPlanTitle, normalizePlan, type TripPlan } from "@/shared/trip-plan";
 import {
   inferDefaultYearFromDateOptions,
@@ -123,6 +127,22 @@ export default async function TripParserPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   noStore();
+
+  // Paywall: only subscribed hosts can reach the trip creator. Free/guest
+  // accounts are sent to pricing. (Unauthenticated users are already handled
+  // by middleware, which redirects them to /auth.)
+  const authClient = await createAuthServerClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (user && !(await requestHasAccessPass())) {
+    const svc = getSupabaseServiceRoleClient();
+    if (svc) {
+      const tier = await fetchSubscriptionTierForUser(svc, user.id);
+      if (!userCanCreateTrips(tier)) redirect("/pricing?gate=create");
+    }
+  }
+
   const { q } = await searchParams;
   const initialPrompt = typeof q === "string" ? q : "";
   let activeTrip: ActiveTripCardData | null = null;

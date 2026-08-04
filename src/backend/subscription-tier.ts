@@ -1,7 +1,11 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseSubscriptionTier, type SubscriptionTier } from "@/shared/subscription";
+import {
+  parseSubscriptionTier,
+  subscriptionTierCanCreateTrips,
+  type SubscriptionTier,
+} from "@/shared/subscription";
 
 export async function fetchSubscriptionTierForUser(
   svc: SupabaseClient,
@@ -20,8 +24,7 @@ export async function fetchSubscriptionTierForUser(
   return parseSubscriptionTier(data?.subscription_tier as string | undefined);
 }
 
-/** Temporarily always true for testing — mirrors shared subscriptionTierCanCreateTrips bypass. */
+/** Delegates to the shared gate so entitlement logic lives in one place. */
 export function userCanCreateTrips(tier: SubscriptionTier): boolean {
-  void tier;
-  return true;
+  return subscriptionTierCanCreateTrips(tier);
 }
